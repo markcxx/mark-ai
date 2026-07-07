@@ -38,6 +38,15 @@
   color: #0369a1;
 }
 
+button:not(:disabled),
+[role="button"] {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
 .markdown-body p {
   @apply mb-4 leading-relaxed;
 }

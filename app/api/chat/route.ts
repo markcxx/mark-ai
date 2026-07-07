@@ -1,9 +1,19 @@
 import { GoogleGenAI } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
+import { findConfiguredModel } from '@/lib/models';
 
 export async function POST(req: NextRequest) {
   try {
     const { messages, model } = await req.json();
+    const selectedModel = findConfiguredModel(model);
+
+    if (!selectedModel) {
+      return NextResponse.json({ error: 'Model is not configured' }, { status: 400 });
+    }
+
+    if (selectedModel.provider !== 'gemini') {
+      return NextResponse.json({ error: 'This model provider is not available yet' }, { status: 501 });
+    }
     
     // Server-side initialization
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -15,7 +25,7 @@ export async function POST(req: NextRequest) {
     }));
 
     const responseStream = await ai.models.generateContentStream({
-      model: model || 'gemini-1.5-pro',
+      model: selectedModel.id,
       contents: [
         ...history,
         { role: 'user', parts: [{ text: prompt }] }
