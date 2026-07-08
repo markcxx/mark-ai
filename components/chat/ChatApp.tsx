@@ -17,6 +17,7 @@ import { WelcomePanel } from './WelcomePanel';
 
 const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 380;
+const BOTTOM_SCROLL_THRESHOLD = 48;
 
 const clampSidebarWidth = (width: number) =>
   Math.min(Math.max(width, SIDEBAR_MIN_WIDTH), SIDEBAR_MAX_WIDTH);
@@ -65,7 +66,7 @@ function MessageSkeletonList() {
   );
 }
 
-export default function ChatApp() {
+export default function ChatApp({ initialSessionId }: { initialSessionId?: string }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(260);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
@@ -89,10 +90,39 @@ export default function ChatApp() {
   const [multiSelectMode, setMultiSelectMode] = useState(false);
   const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([]);
   const [selectionAnchorId, setSelectionAnchorId] = useState<string | undefined>();
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const userHasScrolledAwayRef = useRef(false);
+  const isAutoScrollingRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const selectedModel = availableModels.find((model) => getModelKey(model) === selectedModelKey);
   const showWelcome = messages.length === 0 && !multiSelectMode;
+
+  const navigateToSession = useCallback(
+    (sessionId: string, history: 'push' | 'replace' = 'push') => {
+      const path = `/${encodeURIComponent(sessionId)}`;
+      if (history === 'replace') {
+        window.history.replaceState(null, '', path);
+        return;
+      }
+
+      window.history.pushState(null, '', path);
+    },
+    [],
+  );
+
+  const navigateToNewChat = useCallback(
+    (history: 'push' | 'replace' | 'none' = 'push') => {
+      if (history === 'none') return;
+      if (history === 'replace') {
+        window.history.replaceState(null, '', '/');
+        return;
+      }
+
+      window.history.pushState(null, '', '/');
+    },
+    [],
+  );
 
   const upsertSession = useCallback((session: ChatSession) => {
     setSessions((prev) =>
@@ -109,15 +139,28 @@ export default function ChatApp() {
     });
   };
 
-  const loadSession = useCallback(async (sessionId: string) => {
+  const exitMultiSelect = useCallback(() => {
+    setMultiSelectMode(false);
+    setSelectedMessageIds([]);
+    setSelectionAnchorId(undefined);
+  }, []);
+
+  const loadSession = useCallback(async (
+    sessionId: string,
+    options: { history?: 'push' | 'replace' | 'none' } = {},
+  ) => {
     try {
       setIsLoadingActiveSession(true);
       const response = await fetch(`/api/sessions/${sessionId}`, { cache: 'no-store' });
       if (!response.ok) throw new Error('Failed to load session');
 
       const data = await response.json();
+      userHasScrolledAwayRef.current = false;
       setMessages(Array.isArray(data.messages) ? data.messages : []);
       setActiveSessionId(data.session?.id || sessionId);
+      if (options.history !== 'none') {
+        navigateToSession(data.session?.id || sessionId, options.history || 'push');
+      }
       if (data.session) upsertSession(data.session);
       exitMultiSelect();
       setEditingMessageId(null);
@@ -129,7 +172,7 @@ export default function ChatApp() {
     } finally {
       setIsLoadingActiveSession(false);
     }
-  }, [upsertSession]);
+  }, [exitMultiSelect, navigateToSession, upsertSession]);
 
   const persistSessionMessages = async (sessionId: string, nextMessages: Message[]) => {
     try {
@@ -197,6 +240,7 @@ export default function ChatApp() {
     const session = data.session as ChatSession;
     upsertSession(session);
     setActiveSessionId(session.id);
+    navigateToSession(session.id);
     return session;
   };
 
@@ -210,12 +254,7 @@ export default function ChatApp() {
       setSessions(nextSessions);
 
       if (activeSessionId === sessionId) {
-        const nextSession = nextSessions[0];
-        if (nextSession) {
-          await loadSession(nextSession.id);
-        } else {
-          handleNewChat();
-        }
+        handleNewChat('replace');
       }
 
       toast.success('会话已删除');
@@ -279,13 +318,44 @@ export default function ChatApp() {
     }
   };
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const isNearScrollBottom = (container: HTMLDivElement) =>
+    container.scrollHeight - container.scrollTop - container.clientHeight < BOTTOM_SCROLL_THRESHOLD;
+
+  const scrollToBottom = useCallback((force = false) => {
+    const container = messagesScrollRef.current;
+    if (!container) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      return;
+    }
+
+    if (!force && userHasScrolledAwayRef.current) return;
+
+    isAutoScrollingRef.current = true;
+    requestAnimationFrame(() => {
+      container.scrollTop = container.scrollHeight;
+      requestAnimationFrame(() => {
+        isAutoScrollingRef.current = false;
+      });
+    });
+  }, []);
+
+  const handleMessagesScroll = useCallback(() => {
+    if (isAutoScrollingRef.current) return;
+
+    const container = messagesScrollRef.current;
+    if (!container) return;
+
+    userHasScrolledAwayRef.current = !isNearScrollBottom(container);
+  }, []);
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, scrollToBottom]);
+
+  useEffect(() => {
+    if (isLoadingActiveSession) return;
+    scrollToBottom();
+  }, [isLoadingActiveSession, scrollToBottom]);
 
   useEffect(() => {
     let isMounted = true;
@@ -332,8 +402,9 @@ export default function ChatApp() {
 
         if (!isMounted) return;
         setSessions(nextSessions);
-        if (nextSessions[0]) {
-          await loadSession(nextSessions[0].id);
+
+        if (initialSessionId) {
+          await loadSession(initialSessionId, { history: 'none' });
         }
       } catch (error) {
         console.error('Sessions list error:', error);
@@ -348,7 +419,7 @@ export default function ChatApp() {
     return () => {
       isMounted = false;
     };
-  }, [loadSession]);
+  }, [initialSessionId, loadSession]);
 
   useEffect(() => {
     if (!isLoading) return;
@@ -614,6 +685,7 @@ export default function ChatApp() {
     }
     if (!targetSessionId) return;
 
+    userHasScrolledAwayRef.current = false;
     const userMessage: Message = { content: prompt, id: createMessageId(), role: 'user' };
     const modelMessageId = createMessageId();
     const modelMessage: Message = {
@@ -773,12 +845,6 @@ export default function ChatApp() {
     setSelectionAnchorId(id);
   };
 
-  function exitMultiSelect() {
-    setMultiSelectMode(false);
-    setSelectedMessageIds([]);
-    setSelectionAnchorId(undefined);
-  }
-
   useEffect(() => {
     if (!multiSelectMode) return;
 
@@ -788,7 +854,7 @@ export default function ChatApp() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [multiSelectMode]);
+  }, [exitMultiSelect, multiSelectMode]);
 
   const copySelectedMessages = () => {
     const text = messages
@@ -891,7 +957,8 @@ export default function ChatApp() {
     toast(NOT_IMPLEMENTED_TOAST);
   };
 
-  const handleNewChat = () => {
+  const handleNewChat = useCallback((history: 'push' | 'replace' | 'none' = 'push') => {
+    userHasScrolledAwayRef.current = false;
     setMessages([]);
     setActiveSessionId(null);
     setIsLoadingActiveSession(false);
@@ -899,7 +966,25 @@ export default function ChatApp() {
     setEditingMessageId(null);
     setEditingContent('');
     setOpenMenuMessageId(null);
-  };
+    navigateToNewChat(history);
+  }, [exitMultiSelect, navigateToNewChat]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const nextSessionId = decodeURIComponent(
+        window.location.pathname.split('/').filter(Boolean)[0] || '',
+      );
+      if (nextSessionId) {
+        void loadSession(nextSessionId, { history: 'none' });
+        return;
+      }
+
+      handleNewChat('none');
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [handleNewChat, loadSession]);
 
   return (
     <div
@@ -963,10 +1048,12 @@ export default function ChatApp() {
         />
 
         <div
+          ref={messagesScrollRef}
           className={cn(
             'flex flex-1 flex-col items-center overflow-y-auto px-4 md:px-8',
             showWelcome ? 'justify-center pb-8 pt-0' : 'pb-40 pt-6',
           )}
+          onScroll={handleMessagesScroll}
         >
           {isLoadingActiveSession ? (
             <MessageSkeletonList />
