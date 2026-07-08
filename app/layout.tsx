@@ -6,8 +6,13 @@ const notoSansSC = Noto_Sans_SC({ subsets: ['latin'], variable: '--font-noto-san
 const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-plus-jakarta-sans' });
 
 export const metadata: Metadata = {
-  title: 'MarkAI - Intelligent Clarity',
-  description: 'AI Chat Assistant',
+  title: 'MarkAI - 个人AI效能工具，给自己一个更聪明的大脑',
+  description: '个人AI效能工具，给自己一个更聪明的大脑',
+  icons: {
+    icon: '/images/markai.svg',
+    shortcut: '/images/markai.svg',
+    apple: '/images/markai.svg',
+  },
 };
 
 export default function RootLayout({children}: {children: React.ReactNode}) {

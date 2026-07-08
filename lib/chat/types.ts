@@ -12,6 +12,16 @@ export type Message = {
   provider?: string;
 };
 
+export type ChatSession = {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  model?: string;
+  provider?: string;
+  messageCount: number;
+};
+
 export type ChatStreamEvent = {
   text?: string;
   type?: 'content' | 'reasoning';

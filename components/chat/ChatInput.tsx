@@ -200,7 +200,8 @@ export function ChatInput({
               </div>
               <ChatSendButton
                 className="!h-9 !w-9 !min-w-9 !rounded-full !p-0 shadow-sm transition-transform duration-150 ease-out hover:scale-105 active:scale-95 disabled:hover:scale-100"
-                disabled={!input.trim() || isLoading || !selectedModel}
+                disabled={(!input.trim() && !isLoading) || !selectedModel}
+                loading={isLoading}
                 onSend={onSend}
               />
             </div>

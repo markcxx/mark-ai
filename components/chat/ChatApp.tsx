@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 
 import { NOT_IMPLEMENTED_TOAST, THINKING_TEXTS } from '@/lib/chat/constants';
 import { createMessageId, extractThinkingFromText, getModelKey } from '@/lib/chat/helpers';
-import type { ChatStreamEvent, ConfiguredModel, Message } from '@/lib/chat/types';
+import type { ChatSession, ChatStreamEvent, ConfiguredModel, Message } from '@/lib/chat/types';
 import { cn } from '@/lib/utils';
 
 import { ChatInput } from './ChatInput';
@@ -21,6 +21,50 @@ const SIDEBAR_MAX_WIDTH = 380;
 const clampSidebarWidth = (width: number) =>
   Math.min(Math.max(width, SIDEBAR_MIN_WIDTH), SIDEBAR_MAX_WIDTH);
 
+type StreamedMessageResult = Pick<
+  Message,
+  'content' | 'isReasoning' | 'isStreaming' | 'reasoning' | 'reasoningDuration'
+>;
+
+function MessageSkeletonList() {
+  const lineWidths = ['100%', '88%', '64%'];
+
+  return (
+    <div className="mt-6 flex h-full w-full max-w-[840px] flex-col gap-9 px-3">
+      <div className="flex w-full flex-col items-end gap-2 pl-[25%]">
+        {lineWidths.map((width, index) => (
+          <div
+            className="h-4 animate-pulse rounded-md bg-gray-200/80"
+            key={width}
+            style={{ width: index === lineWidths.length - 1 ? '56%' : width }}
+          />
+        ))}
+      </div>
+
+      {Array.from({ length: 2 }).map((_, index) => (
+        <div className="flex w-full gap-3" key={index}>
+          <div className="h-7 w-7 shrink-0 animate-pulse rounded-md bg-gray-200/80" />
+          <div className="flex min-w-0 flex-1 flex-col gap-3">
+            <div className="flex flex-col gap-2">
+              {lineWidths.map((width) => (
+                <div
+                  className="h-4 animate-pulse rounded-md bg-gray-200/70"
+                  key={width}
+                  style={{ width }}
+                />
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <div className="h-5 w-16 animate-pulse rounded-md bg-gray-200/60" />
+              <div className="h-5 w-24 animate-pulse rounded-md bg-gray-200/60" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function ChatApp() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(260);
@@ -31,6 +75,11 @@ export default function ChatApp() {
   const [availableModels, setAvailableModels] = useState<ConfiguredModel[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(true);
   const [selectedModelKey, setSelectedModelKey] = useState('');
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(true);
+  const [isLoadingActiveSession, setIsLoadingActiveSession] = useState(false);
+  const [loadingSessionIds, setLoadingSessionIds] = useState<string[]>([]);
   const [modelSearchKeyword, setModelSearchKeyword] = useState('');
   const [loadingText, setLoadingText] = useState(THINKING_TEXTS[0]);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -44,6 +93,191 @@ export default function ChatApp() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const selectedModel = availableModels.find((model) => getModelKey(model) === selectedModelKey);
   const showWelcome = messages.length === 0 && !multiSelectMode;
+
+  const upsertSession = useCallback((session: ChatSession) => {
+    setSessions((prev) =>
+      [session, ...prev.filter((item) => item.id !== session.id)].sort(
+        (a, b) => b.updatedAt - a.updatedAt,
+      ),
+    );
+  }, []);
+
+  const setSessionLoading = (sessionId: string, loading: boolean) => {
+    setLoadingSessionIds((prev) => {
+      if (loading) return prev.includes(sessionId) ? prev : [...prev, sessionId];
+      return prev.filter((id) => id !== sessionId);
+    });
+  };
+
+  const loadSession = useCallback(async (sessionId: string) => {
+    try {
+      setIsLoadingActiveSession(true);
+      const response = await fetch(`/api/sessions/${sessionId}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error('Failed to load session');
+
+      const data = await response.json();
+      setMessages(Array.isArray(data.messages) ? data.messages : []);
+      setActiveSessionId(data.session?.id || sessionId);
+      if (data.session) upsertSession(data.session);
+      exitMultiSelect();
+      setEditingMessageId(null);
+      setEditingContent('');
+      setOpenMenuMessageId(null);
+    } catch (error) {
+      console.error('Session load error:', error);
+      toast.error('加载会话失败');
+    } finally {
+      setIsLoadingActiveSession(false);
+    }
+  }, [upsertSession]);
+
+  const persistSessionMessages = async (sessionId: string, nextMessages: Message[]) => {
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}/messages`, {
+        body: JSON.stringify({ messages: nextMessages }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'PUT',
+      });
+
+      if (!response.ok) {
+        const errorPayload = await response.text();
+        let message = errorPayload || 'Failed to save messages';
+        try {
+          const parsed = JSON.parse(errorPayload);
+          message = parsed.detail || parsed.error || message;
+        } catch {
+          // Keep the raw response text when the server did not return JSON.
+        }
+        throw new Error(message);
+      }
+
+      const data = await response.json();
+      if (data.session) upsertSession(data.session);
+      return data.session as ChatSession | undefined;
+    } catch (error) {
+      console.error('Session save error:', error);
+      toast.error(
+        error instanceof Error ? `保存会话失败：${error.message}` : '保存会话失败',
+      );
+      return undefined;
+    }
+  };
+
+  const generateSessionTitle = async (sessionId: string, nextMessages: Message[]) => {
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}/title`, {
+        body: JSON.stringify({ messages: nextMessages }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+      });
+
+      if (!response.ok) throw new Error('Failed to generate title');
+
+      const data = await response.json();
+      if (data.session) upsertSession(data.session);
+    } catch (error) {
+      console.error('Session title error:', error);
+    }
+  };
+
+  const createSession = async (initialMessage: string, model?: ConfiguredModel) => {
+    const response = await fetch('/api/sessions', {
+      body: JSON.stringify({
+        initialMessage,
+        model: model?.id,
+        provider: model?.provider,
+      }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    });
+
+    if (!response.ok) throw new Error('Failed to create session');
+
+    const data = await response.json();
+    const session = data.session as ChatSession;
+    upsertSession(session);
+    setActiveSessionId(session.id);
+    return session;
+  };
+
+  const deleteSession = async (sessionId: string) => {
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Failed to delete session');
+
+      setSessionLoading(sessionId, false);
+      const nextSessions = sessions.filter((session) => session.id !== sessionId);
+      setSessions(nextSessions);
+
+      if (activeSessionId === sessionId) {
+        const nextSession = nextSessions[0];
+        if (nextSession) {
+          await loadSession(nextSession.id);
+        } else {
+          handleNewChat();
+        }
+      }
+
+      toast.success('会话已删除');
+    } catch (error) {
+      console.error('Session delete error:', error);
+      toast.error('删除会话失败');
+    }
+  };
+
+  const renameSession = async (sessionId: string) => {
+    const session = sessions.find((item) => item.id === sessionId);
+    if (session) {
+      upsertSession({ ...session, title: '...' });
+    }
+    setSessionLoading(sessionId, true);
+
+    try {
+      let sourceMessages = activeSessionId === sessionId ? messages : undefined;
+
+      if (!sourceMessages) {
+        const response = await fetch(`/api/sessions/${sessionId}`, { cache: 'no-store' });
+        if (!response.ok) throw new Error('Failed to load session for title');
+        const data = await response.json();
+        sourceMessages = Array.isArray(data.messages) ? data.messages : [];
+      }
+
+      if (sourceMessages.length === 0) {
+        toast.error('没有可命名的消息');
+        if (session) upsertSession(session);
+        return;
+      }
+
+      await generateSessionTitle(sessionId, sourceMessages);
+    } catch (error) {
+      console.error('Session rename error:', error);
+      toast.error('自动命名失败');
+      if (session) upsertSession(session);
+    } finally {
+      setSessionLoading(sessionId, false);
+    }
+  };
+
+  const updateSessionTitle = async (sessionId: string, title: string) => {
+    setSessionLoading(sessionId, true);
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}`, {
+        body: JSON.stringify({ title }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'PATCH',
+      });
+      if (!response.ok) throw new Error('Failed to update session title');
+
+      const data = await response.json();
+      if (data.session) upsertSession(data.session);
+      toast.success('会话已重命名');
+    } catch (error) {
+      console.error('Session title update error:', error);
+      toast.error('重命名失败');
+    } finally {
+      setSessionLoading(sessionId, false);
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -83,7 +317,38 @@ export default function ChatApp() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [loadSession]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadSessions = async () => {
+      try {
+        const response = await fetch('/api/sessions', { cache: 'no-store' });
+        if (!response.ok) throw new Error('Failed to load sessions');
+
+        const data = await response.json();
+        const nextSessions = Array.isArray(data.sessions) ? data.sessions : [];
+
+        if (!isMounted) return;
+        setSessions(nextSessions);
+        if (nextSessions[0]) {
+          await loadSession(nextSessions[0].id);
+        }
+      } catch (error) {
+        console.error('Sessions list error:', error);
+        if (isMounted) toast.error('加载历史会话失败');
+      } finally {
+        if (isMounted) setIsLoadingSessions(false);
+      }
+    };
+
+    loadSessions();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [loadSession]);
 
   useEffect(() => {
     if (!isLoading) return;
@@ -151,7 +416,11 @@ export default function ChatApp() {
     historyMessages: Message[],
     modelMessageId: string,
     modelConfig: ConfiguredModel,
-  ) => {
+  ): Promise<StreamedMessageResult> => {
+    let plainContent = '';
+    let eventReasoning = '';
+    let reasoningDuration: number | undefined;
+
     try {
       setLoadingText((current) => {
         const index = THINKING_TEXTS.indexOf(current);
@@ -182,10 +451,7 @@ export default function ChatApp() {
         ?.includes('application/x-ndjson');
       let done = false;
       let buffer = '';
-      let plainContent = '';
-      let eventReasoning = '';
       let reasoningStartedAt: number | undefined;
-      let reasoningDuration: number | undefined;
 
       const beginReasoning = () => {
         reasoningStartedAt = reasoningStartedAt || Date.now();
@@ -284,6 +550,16 @@ export default function ChatApp() {
         endReasoning();
         updateStreamingMessage(false);
       }
+
+      const extracted = extractThinkingFromText(plainContent);
+
+      return {
+        content: extracted.content,
+        isReasoning: false,
+        isStreaming: false,
+        reasoning: `${eventReasoning}${extracted.reasoning}` || undefined,
+        reasoningDuration,
+      };
     } catch (error) {
       console.error('Chat error:', error);
       toast.error('生成失败，请稍后重试');
@@ -298,6 +574,13 @@ export default function ChatApp() {
             : message,
         ),
       );
+      return {
+        content: 'Sorry, I encountered an error. Please try again.',
+        isReasoning: false,
+        isStreaming: false,
+        reasoning: eventReasoning || undefined,
+        reasoningDuration,
+      };
     } finally {
       setIsLoading(false);
       setMessages((prev) =>
@@ -313,7 +596,25 @@ export default function ChatApp() {
   const sendMessage = async () => {
     if (!input.trim() || isLoading || !selectedModel) return;
 
-    const userMessage: Message = { content: input.trim(), id: createMessageId(), role: 'user' };
+    const prompt = input.trim();
+    let targetSessionId = activeSessionId;
+    let createdSession = false;
+
+    if (!targetSessionId) {
+      try {
+        const session = await createSession(prompt, selectedModel);
+        targetSessionId = session.id;
+        createdSession = true;
+        setSessionLoading(session.id, true);
+      } catch (error) {
+        console.error('Session create error:', error);
+        toast.error('创建会话失败');
+        return;
+      }
+    }
+    if (!targetSessionId) return;
+
+    const userMessage: Message = { content: prompt, id: createMessageId(), role: 'user' };
     const modelMessageId = createMessageId();
     const modelMessage: Message = {
       content: '',
@@ -329,7 +630,29 @@ export default function ChatApp() {
     setInput('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
 
-    await streamAssistantMessage([...messages, userMessage], modelMessageId, selectedModel);
+    const streamedMessage = await streamAssistantMessage(
+      [...messages, userMessage],
+      modelMessageId,
+      selectedModel,
+    );
+    const savedMessages = [
+      ...messages,
+      userMessage,
+      {
+        ...modelMessage,
+        ...streamedMessage,
+      },
+    ];
+
+    setMessages(savedMessages);
+    await persistSessionMessages(targetSessionId, savedMessages);
+    if (createdSession) {
+      try {
+        await generateSessionTitle(targetSessionId, savedMessages);
+      } finally {
+        setSessionLoading(targetSessionId, false);
+      }
+    }
   };
 
   const getMessageModel = (message: Message) => {
@@ -370,13 +693,15 @@ export default function ChatApp() {
   };
 
   const deleteMessage = (id: string) => {
-    setMessages((prev) => prev.filter((message) => message.id !== id));
+    const nextMessages = messages.filter((message) => message.id !== id);
+    setMessages(nextMessages);
     setSelectedMessageIds((prev) => prev.filter((messageId) => messageId !== id));
     setCollapsedMessageIds((prev) => prev.filter((messageId) => messageId !== id));
     if (editingMessageId === id) {
       setEditingMessageId(null);
       setEditingContent('');
     }
+    if (activeSessionId) void persistSessionMessages(activeSessionId, nextMessages);
     toast.success('消息已删除');
   };
 
@@ -398,13 +723,13 @@ export default function ChatApp() {
       return;
     }
 
-    setMessages((prev) =>
-      prev.map((message) =>
-        message.id === editingMessageId ? { ...message, content: editingContent.trim() } : message,
-      ),
+    const nextMessages = messages.map((message) =>
+      message.id === editingMessageId ? { ...message, content: editingContent.trim() } : message,
     );
+    setMessages(nextMessages);
     setEditingMessageId(null);
     setEditingContent('');
+    if (activeSessionId) void persistSessionMessages(activeSessionId, nextMessages);
     toast.success('消息已更新');
   };
 
@@ -480,9 +805,11 @@ export default function ChatApp() {
       return;
     }
 
-    setMessages((prev) => prev.filter((message) => !selectedMessageIds.includes(message.id)));
+    const nextMessages = messages.filter((message) => !selectedMessageIds.includes(message.id));
+    setMessages(nextMessages);
     setCollapsedMessageIds((prev) => prev.filter((id) => !selectedMessageIds.includes(id)));
     exitMultiSelect();
+    if (activeSessionId) void persistSessionMessages(activeSessionId, nextMessages);
     toast.success('已删除选中消息');
   };
 
@@ -513,10 +840,14 @@ export default function ChatApp() {
         provider: modelConfig.provider,
         role: 'model',
       };
+      const nextMessages = [...historyMessages, modelMessage];
 
-      setMessages([...historyMessages, modelMessage]);
+      setMessages(nextMessages);
       setOpenMenuMessageId(null);
-      await streamAssistantMessage(historyMessages, targetId, modelConfig);
+      const streamedMessage = await streamAssistantMessage(historyMessages, targetId, modelConfig);
+      const savedMessages = [...historyMessages, { ...modelMessage, ...streamedMessage }];
+      setMessages(savedMessages);
+      if (activeSessionId) await persistSessionMessages(activeSessionId, savedMessages);
       return;
     }
 
@@ -533,14 +864,26 @@ export default function ChatApp() {
       reasoningDuration: undefined,
     };
 
-    if (deleteCurrent) {
-      setMessages([...historyMessages, nextModelMessage]);
-    } else {
-      setMessages((prev) => [...prev.slice(0, index), nextModelMessage]);
-    }
+    const nextMessages = deleteCurrent
+      ? [...historyMessages, nextModelMessage]
+      : [...messages.slice(0, index), nextModelMessage];
 
+    setMessages(nextMessages);
     setOpenMenuMessageId(null);
-    await streamAssistantMessage(historyMessages, nextModelMessage.id, modelConfig);
+    const streamedMessage = await streamAssistantMessage(
+      historyMessages,
+      nextModelMessage.id,
+      modelConfig,
+    );
+    const savedMessages = [
+      ...nextMessages.slice(0, -1),
+      {
+        ...nextModelMessage,
+        ...streamedMessage,
+      },
+    ];
+    setMessages(savedMessages);
+    if (activeSessionId) await persistSessionMessages(activeSessionId, savedMessages);
   };
 
   const menuUnavailable = () => {
@@ -550,10 +893,12 @@ export default function ChatApp() {
 
   const handleNewChat = () => {
     setMessages([]);
+    setActiveSessionId(null);
+    setIsLoadingActiveSession(false);
     exitMultiSelect();
     setEditingMessageId(null);
     setEditingContent('');
-    toast.success('已新建会话');
+    setOpenMenuMessageId(null);
   };
 
   return (
@@ -577,11 +922,19 @@ export default function ChatApp() {
       />
 
       <Sidebar
+        activeSessionId={activeSessionId}
         isOpen={isSidebarOpen}
         isResizing={isResizingSidebar}
+        isLoadingSessions={isLoadingSessions}
+        loadingSessionIds={loadingSessionIds}
         onClose={() => setIsSidebarOpen(false)}
+        onDeleteSession={deleteSession}
         onNewChat={handleNewChat}
+        onRenameSession={renameSession}
+        onSelectSession={loadSession}
+        onUpdateSessionTitle={updateSessionTitle}
         onUnavailable={() => toast(NOT_IMPLEMENTED_TOAST)}
+        sessions={sessions}
         width={sidebarWidth}
       />
 
@@ -615,7 +968,9 @@ export default function ChatApp() {
             showWelcome ? 'justify-center pb-8 pt-0' : 'pb-40 pt-6',
           )}
         >
-          {showWelcome ? (
+          {isLoadingActiveSession ? (
+            <MessageSkeletonList />
+          ) : showWelcome ? (
             <WelcomePanel>
               <ChatInput
                 availableModels={availableModels}
@@ -670,7 +1025,7 @@ export default function ChatApp() {
           )}
         </div>
 
-        {showWelcome ? null : multiSelectMode ? (
+        {isLoadingActiveSession || showWelcome ? null : multiSelectMode ? (
           <SelectionFooterBar
             onCopy={copySelectedMessages}
             onDelete={deleteSelectedMessages}

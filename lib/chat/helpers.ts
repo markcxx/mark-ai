@@ -1,10 +1,11 @@
 import type { ConfiguredModel } from './types';
 
-let messageIdCounter = 0;
-
 export const createMessageId = () => {
-  messageIdCounter += 1;
-  return `message-${messageIdCounter}`;
+  if (globalThis.crypto?.randomUUID) {
+    return `message-${globalThis.crypto.randomUUID()}`;
+  }
+
+  return `message-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 };
 
 export const getModelKey = (model: ConfiguredModel) => `${model.provider}:${model.id}`;
@@ -51,4 +52,3 @@ export const extractThinkingFromText = (text: string) => {
     reasoning: reasoning.replace(/\n{3,}/g, '\n\n').trimStart(),
   };
 };
-
