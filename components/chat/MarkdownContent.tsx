@@ -40,7 +40,7 @@ const markdownComponents = {
   ),
   blockquote: (props: React.BlockquoteHTMLAttributes<HTMLQuoteElement>) => (
     <blockquote
-      className="my-4 rounded-lg border border-blue-100 border-l-4 border-l-primary/70 bg-blue-50/70 px-4 py-3 text-gray-700 shadow-sm"
+      className="my-4 border-0 border-l-4 border-solid border-l-gray-300 px-4 py-0 text-gray-500"
       {...props}
     />
   ),
@@ -92,4 +92,3 @@ export function MarkdownContent({ children }: { children: string }) {
     </ReactMarkdown>
   );
 }
-
