@@ -4,11 +4,14 @@ import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ModelIcon } from '@lobehub/icons';
+import toast, { Toaster } from 'react-hot-toast';
 import {
   Menu, Plus, Puzzle,
   Settings, HelpCircle, ChevronDown, Share2, MoreVertical,
-  Paperclip, Mic, ArrowUp, Copy, ThumbsUp, ThumbsDown, Pencil,
-  RotateCw, Trash2, MoreHorizontal, Search, Loader2, Atom
+  Paperclip, Mic, ArrowUp, Copy, Pencil,
+  RotateCw, Trash2, MoreHorizontal, Search, Loader2, Atom,
+  MessageSquarePlus, Minimize2, Volume2, Languages, CheckSquare,
+  X, Check
 } from 'lucide-react';
 import clsx from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -48,6 +51,15 @@ const THINKING_TEXTS = [
   '正在组织语言...',
   '正在生成回复...'
 ];
+
+const NOT_IMPLEMENTED_TOAST = '该功能暂未接入';
+
+let messageIdCounter = 0;
+
+const createMessageId = () => {
+  messageIdCounter += 1;
+  return `message-${messageIdCounter}`;
+};
 
 const getModelKey = (model: ConfiguredModel) => `${model.provider}:${model.id}`;
 
@@ -284,6 +296,12 @@ export default function ChatApp() {
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [modelSearchKeyword, setModelSearchKeyword] = useState('');
   const [loadingText, setLoadingText] = useState(THINKING_TEXTS[0]);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState('');
+  const [openMenuMessageId, setOpenMenuMessageId] = useState<string | null>(null);
+  const [collapsedMessageIds, setCollapsedMessageIds] = useState<string[]>([]);
+  const [multiSelectMode, setMultiSelectMode] = useState(false);
+  const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([]);
   const selectedModel = availableModels.find(model => getModelKey(model) === selectedModelKey);
   const filteredModels = availableModels.filter(model =>
     model.id.toLowerCase().includes(modelSearchKeyword.trim().toLowerCase())
@@ -331,7 +349,7 @@ export default function ChatApp() {
 
   useEffect(() => {
     if (isLoading) {
-      let i = Math.floor(Math.random() * THINKING_TEXTS.length);
+      let i = 0;
       const interval = setInterval(() => {
         i = (i + 1) % THINKING_TEXTS.length;
         setLoadingText(THINKING_TEXTS[i]);
@@ -355,34 +373,25 @@ export default function ChatApp() {
     }
   };
 
-  const sendMessage = async () => {
-    if (!input.trim() || isLoading || !selectedModel) return;
-
-    const userMessage: Message = { id: Date.now().toString(), role: 'user', content: input.trim() };
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    if (textareaRef.current) textareaRef.current.style.height = 'auto';
-    setLoadingText(THINKING_TEXTS[Math.floor(Math.random() * THINKING_TEXTS.length)]);
-    setIsLoading(true);
-
-    const modelMessageId = (Date.now() + 1).toString();
-    setMessages(prev => [...prev, {
-      id: modelMessageId,
-      role: 'model',
-      content: '',
-      isStreaming: true,
-      model: selectedModel.id,
-      provider: selectedModel.provider,
-    }]);
-
+  const streamAssistantMessage = async (
+    historyMessages: Message[],
+    modelMessageId: string,
+    modelConfig: ConfiguredModel,
+  ) => {
     try {
+      setLoadingText(current => {
+        const index = THINKING_TEXTS.indexOf(current);
+        return THINKING_TEXTS[(index + 1) % THINKING_TEXTS.length];
+      });
+      setIsLoading(true);
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [...messages, userMessage].map(m => ({ role: m.role, content: m.content })),
-          model: selectedModel.id,
-          provider: selectedModel.provider
+          messages: historyMessages.map(m => ({ role: m.role, content: m.content })),
+          model: modelConfig.id,
+          provider: modelConfig.provider
         })
       });
 
@@ -498,6 +507,7 @@ export default function ChatApp() {
       }
     } catch (error) {
       console.error('Chat error:', error);
+      toast.error('生成失败，请稍后重试');
       setMessages(prev => prev.map(m => 
         m.id === modelMessageId
           ? {
@@ -515,12 +525,275 @@ export default function ChatApp() {
     }
   };
 
+  const sendMessage = async () => {
+    if (!input.trim() || isLoading || !selectedModel) return;
+
+    const userMessage: Message = { id: createMessageId(), role: 'user', content: input.trim() };
+    const modelMessageId = createMessageId();
+    const modelMessage: Message = {
+      id: modelMessageId,
+      role: 'model',
+      content: '',
+      isStreaming: true,
+      model: selectedModel.id,
+      provider: selectedModel.provider,
+    };
+    const nextMessages = [...messages, userMessage, modelMessage];
+
+    setMessages(nextMessages);
+    setInput('');
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+
+    await streamAssistantMessage([...messages, userMessage], modelMessageId, selectedModel);
+  };
+
+  const getMessageModel = (message: Message) => {
+    if (message.role !== 'model') return selectedModel;
+
+    return (
+      availableModels.find(model => model.id === message.model && model.provider === message.provider) ||
+      selectedModel
+    );
+  };
+
+  const copyText = async (text: string, successMessage = '已复制') => {
+    if (!text.trim()) {
+      toast.error('没有可复制的内容');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(successMessage);
+    } catch {
+      toast.error('复制失败');
+    }
+  };
+
+  const copyMessage = (message: Message) => {
+    copyText(message.content, '消息已复制');
+  };
+
+  const copyConversation = () => {
+    const text = messages
+      .filter(message => message.content.trim())
+      .map(message => `${message.role === 'user' ? '用户' : message.model || 'AI'}：\n${message.content}`)
+      .join('\n\n');
+
+    copyText(text, '对话已复制');
+  };
+
   const deleteMessage = (id: string) => {
     setMessages(prev => prev.filter(message => message.id !== id));
+    setSelectedMessageIds(prev => prev.filter(messageId => messageId !== id));
+    setCollapsedMessageIds(prev => prev.filter(messageId => messageId !== id));
+    if (editingMessageId === id) {
+      setEditingMessageId(null);
+      setEditingContent('');
+    }
+    toast.success('消息已删除');
+  };
+
+  const startEditingMessage = (message: Message) => {
+    if (message.isStreaming) {
+      toast.error('生成中不能编辑');
+      return;
+    }
+
+    setEditingMessageId(message.id);
+    setEditingContent(message.content);
+    setOpenMenuMessageId(null);
+  };
+
+  const saveEditingMessage = () => {
+    if (!editingMessageId) return;
+    if (!editingContent.trim()) {
+      toast.error('消息内容不能为空');
+      return;
+    }
+
+    setMessages(prev => prev.map(message =>
+      message.id === editingMessageId ? { ...message, content: editingContent.trim() } : message
+    ));
+    setEditingMessageId(null);
+    setEditingContent('');
+    toast.success('消息已更新');
+  };
+
+  const cancelEditingMessage = () => {
+    setEditingMessageId(null);
+    setEditingContent('');
+  };
+
+  const toggleCollapseMessage = (id: string) => {
+    setCollapsedMessageIds(prev =>
+      prev.includes(id) ? prev.filter(messageId => messageId !== id) : [...prev, id]
+    );
+    setOpenMenuMessageId(null);
+  };
+
+  const enableMultiSelect = (id: string) => {
+    setMultiSelectMode(true);
+    setSelectedMessageIds(prev => prev.includes(id) ? prev : [...prev, id]);
+    setOpenMenuMessageId(null);
+    toast.success('已进入多选模式');
+  };
+
+  const toggleSelectedMessage = (id: string) => {
+    setSelectedMessageIds(prev =>
+      prev.includes(id) ? prev.filter(messageId => messageId !== id) : [...prev, id]
+    );
+  };
+
+  const exitMultiSelect = () => {
+    setMultiSelectMode(false);
+    setSelectedMessageIds([]);
+  };
+
+  const copySelectedMessages = () => {
+    const text = messages
+      .filter(message => selectedMessageIds.includes(message.id))
+      .map(message => `${message.role === 'user' ? '用户' : message.model || 'AI'}：\n${message.content}`)
+      .join('\n\n');
+
+    copyText(text, '已复制选中消息');
+  };
+
+  const deleteSelectedMessages = () => {
+    if (selectedMessageIds.length === 0) {
+      toast.error('请先选择消息');
+      return;
+    }
+
+    setMessages(prev => prev.filter(message => !selectedMessageIds.includes(message.id)));
+    setCollapsedMessageIds(prev => prev.filter(id => !selectedMessageIds.includes(id)));
+    exitMultiSelect();
+    toast.success('已删除选中消息');
+  };
+
+  const regenerateMessage = async (message: Message, deleteCurrent = false) => {
+    if (isLoading) {
+      toast.error('请等待当前回复完成');
+      return;
+    }
+
+    const index = messages.findIndex(item => item.id === message.id);
+    if (index < 0) return;
+
+    const modelConfig = getMessageModel(message);
+    if (!modelConfig) {
+      toast.error('请先配置可用模型');
+      return;
+    }
+
+    const targetId = createMessageId();
+
+    if (message.role === 'user') {
+      const historyMessages = messages.slice(0, index + 1);
+      const modelMessage: Message = {
+        id: targetId,
+        role: 'model',
+        content: '',
+        isStreaming: true,
+        model: modelConfig.id,
+        provider: modelConfig.provider,
+      };
+
+      setMessages([...historyMessages, modelMessage]);
+      setOpenMenuMessageId(null);
+      await streamAssistantMessage(historyMessages, targetId, modelConfig);
+      return;
+    }
+
+    const historyMessages = messages.slice(0, index);
+    const nextModelMessage: Message = {
+      ...message,
+      id: deleteCurrent ? targetId : message.id,
+      content: '',
+      reasoning: undefined,
+      reasoningDuration: undefined,
+      isReasoning: false,
+      isStreaming: true,
+      model: modelConfig.id,
+      provider: modelConfig.provider,
+    };
+
+    if (deleteCurrent) {
+      setMessages([...historyMessages, nextModelMessage]);
+    } else {
+      setMessages(prev => [
+        ...prev.slice(0, index),
+        nextModelMessage,
+      ]);
+    }
+
+    setOpenMenuMessageId(null);
+    await streamAssistantMessage(historyMessages, nextModelMessage.id, modelConfig);
+  };
+
+  const menuUnavailable = () => {
+    setOpenMenuMessageId(null);
+    toast(NOT_IMPLEMENTED_TOAST);
+  };
+
+  const renderMoreMenu = (message: Message, align: 'left' | 'right') => {
+    const isCollapsed = collapsedMessageIds.includes(message.id);
+    const menuItems = [
+      { icon: Pencil, label: '编辑', onClick: () => startEditingMessage(message) },
+      { icon: Copy, label: '复制', onClick: () => {
+        copyMessage(message);
+        setOpenMenuMessageId(null);
+      } },
+      { icon: MessageSquarePlus, label: '创建子话题', onClick: menuUnavailable },
+      { icon: Minimize2, label: isCollapsed ? '展开消息' : '收起消息', onClick: () => toggleCollapseMessage(message.id) },
+      { icon: Volume2, label: '语音朗读', onClick: menuUnavailable },
+      { icon: Languages, label: '翻译', onClick: menuUnavailable },
+      { icon: Share2, label: '分享', onClick: menuUnavailable },
+      { icon: CheckSquare, label: '多选', onClick: () => enableMultiSelect(message.id) },
+      { icon: RotateCw, label: '重新生成', onClick: () => regenerateMessage(message) },
+      { icon: RotateCw, label: '删除并重新生成', onClick: () => regenerateMessage(message, true), danger: true },
+      { icon: Trash2, label: '删除', onClick: () => deleteMessage(message.id), danger: true },
+    ];
+
+    return (
+      <div
+        className={cn(
+          "absolute top-full z-30 mt-1 w-48 overflow-hidden rounded-xl border border-gray-100 bg-white py-1 shadow-[0_12px_36px_rgba(0,0,0,0.14)]",
+          align === 'right' ? "right-0" : "left-0"
+        )}
+      >
+        {menuItems.map(({ icon: Icon, label, onClick, danger }) => (
+          <button
+            key={label}
+            className={cn(
+              "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100",
+              danger ? "text-red-600 hover:bg-red-50" : "text-gray-700"
+            )}
+            onClick={onClick}
+            type="button"
+          >
+            <Icon size={15} />
+            <span>{label}</span>
+          </button>
+        ))}
+      </div>
+    );
   };
 
   return (
     <div className="flex bg-[#f8f8f8] p-2 text-gray-900 antialiased h-screen w-screen overflow-hidden font-sans">
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          className: 'text-sm',
+          duration: 2200,
+          style: {
+            border: '1px solid #e5e7eb',
+            borderRadius: '12px',
+            boxShadow: '0 12px 36px rgba(0,0,0,0.12)',
+          },
+        }}
+      />
       
       {/* Sidebar */}
       <aside className={cn(
@@ -549,7 +822,17 @@ export default function ChatApp() {
 
           {/* New Chat Button */}
           <div className="px-4 mb-6 mt-2">
-            <button className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl border border-gray-200 hover:bg-white hover:shadow-sm transition-all text-gray-900 text-sm font-medium group bg-[#f3f4f5]">
+            <button
+              className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl border border-gray-200 hover:bg-white hover:shadow-sm transition-all text-gray-900 text-sm font-medium group bg-[#f3f4f5]"
+              onClick={() => {
+                setMessages([]);
+                exitMultiSelect();
+                setEditingMessageId(null);
+                setEditingContent('');
+                toast.success('已新建会话');
+              }}
+              type="button"
+            >
               <Plus size={20} />
               <span>新建会话</span>
               <span className="ml-auto text-xs text-gray-400 group-hover:text-gray-500 transition-colors">⌘K</span>
@@ -560,10 +843,14 @@ export default function ChatApp() {
           <div className="px-3 mb-4">
             <div className="text-xs text-gray-400 px-3 mb-2 uppercase tracking-wider font-jakarta font-semibold">视图</div>
             <nav className="flex flex-col gap-1">
-              <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-200 text-gray-900 font-medium transition-colors">
+              <button
+                className="flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-200 text-gray-900 font-medium transition-colors"
+                onClick={() => toast(NOT_IMPLEMENTED_TOAST)}
+                type="button"
+              >
                 <Puzzle size={20} />
                 <span className="text-sm">插件中心</span>
-              </a>
+              </button>
             </nav>
           </div>
 
@@ -571,39 +858,47 @@ export default function ChatApp() {
           <div className="flex-1 overflow-y-auto px-3 pb-4">
             <div className="text-xs text-gray-400 px-3 mb-2 uppercase tracking-wider font-jakarta font-semibold mt-4">今天</div>
             <div className="flex flex-col gap-1">
-              <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white shadow-sm border border-gray-100 text-gray-900 text-sm truncate transition-colors">
+              <button onClick={() => toast(NOT_IMPLEMENTED_TOAST)} type="button" className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white shadow-sm border border-gray-100 text-gray-900 text-sm truncate transition-colors">
                 <span className="truncate">Markdown 翻译工具</span>
-              </a>
-              <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-200 transition-colors text-sm truncate">
+              </button>
+              <button onClick={() => toast(NOT_IMPLEMENTED_TOAST)} type="button" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-200 transition-colors text-sm truncate">
                 <span className="truncate">PyQt5 按钮点击事件处理</span>
-              </a>
-              <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-200 transition-colors text-sm truncate">
+              </button>
+              <button onClick={() => toast(NOT_IMPLEMENTED_TOAST)} type="button" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-200 transition-colors text-sm truncate">
                 <span className="truncate">设计系统 Token 梳理</span>
-              </a>
+              </button>
             </div>
 
             <div className="text-xs text-gray-400 px-3 mb-2 uppercase tracking-wider font-jakarta font-semibold mt-6">昨天</div>
             <div className="flex flex-col gap-1">
-              <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-200 transition-colors text-sm truncate">
+              <button onClick={() => toast(NOT_IMPLEMENTED_TOAST)} type="button" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-200 transition-colors text-sm truncate">
                 <span className="truncate">TailwindCSS 网格布局求助</span>
-              </a>
-              <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-200 transition-colors text-sm truncate">
+              </button>
+              <button onClick={() => toast(NOT_IMPLEMENTED_TOAST)} type="button" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-200 transition-colors text-sm truncate">
                 <span className="truncate">分析 Q3 财报数据</span>
-              </a>
+              </button>
             </div>
           </div>
 
           {/* Sidebar Footer */}
           <div className="p-4 mt-auto border-t border-gray-200/50">
             <nav className="flex flex-col gap-1">
-              <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-200 transition-colors">
+              <button
+                className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-200 transition-colors"
+                onClick={() => toast(NOT_IMPLEMENTED_TOAST)}
+                type="button"
+              >
                 <Settings size={20} />
                 <span className="text-sm">设置</span>
-              </a>
-              <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-200 transition-colors">
+              </button>
+              <button
+                className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-200 transition-colors"
+                onClick={() => toast(NOT_IMPLEMENTED_TOAST)}
+                type="button"
+              >
                 <HelpCircle size={20} />
                 <span className="text-sm">帮助</span>
-              </a>
+              </button>
             </nav>
           </div>
         </div>
@@ -627,10 +922,20 @@ export default function ChatApp() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 transition-colors">
+            <button
+              className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 transition-colors"
+              onClick={copyConversation}
+              title="复制对话"
+              type="button"
+            >
               <Share2 size={20} />
             </button>
-            <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 transition-colors">
+            <button
+              className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 transition-colors"
+              onClick={() => toast(NOT_IMPLEMENTED_TOAST)}
+              title="更多"
+              type="button"
+            >
               <MoreVertical size={20} />
             </button>
           </div>
@@ -639,36 +944,120 @@ export default function ChatApp() {
         {/* Chat Area */}
         <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-40 pt-6 flex flex-col items-center">
           <div className="w-full max-w-[840px] flex flex-col gap-8">
+            {multiSelectMode && (
+              <div className="sticky top-0 z-10 flex items-center justify-between rounded-xl border border-gray-200 bg-white/95 px-3 py-2 text-sm shadow-sm backdrop-blur">
+                <span className="text-gray-500">已选择 {selectedMessageIds.length} 条消息</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-gray-600 transition-colors hover:bg-gray-100"
+                    onClick={copySelectedMessages}
+                    type="button"
+                  >
+                    <Copy size={15} />
+                    复制
+                  </button>
+                  <button
+                    className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-red-600 transition-colors hover:bg-red-50"
+                    onClick={deleteSelectedMessages}
+                    type="button"
+                  >
+                    <Trash2 size={15} />
+                    删除
+                  </button>
+                  <button
+                    className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-gray-600 transition-colors hover:bg-gray-100"
+                    onClick={exitMultiSelect}
+                    type="button"
+                  >
+                    <X size={15} />
+                    退出
+                  </button>
+                </div>
+              </div>
+            )}
             {messages.map((message) => (
-              <div key={message.id} className={cn("w-full", message.role === 'user' ? "flex justify-end" : "")}>
+              <div key={message.id} className={cn("relative w-full", message.role === 'user' ? "flex justify-end" : "")}>
+                {multiSelectMode && (
+                  <button
+                    className={cn(
+                      "absolute left-[-34px] top-2 flex h-6 w-6 items-center justify-center rounded-full border transition-colors",
+                      selectedMessageIds.includes(message.id)
+                        ? "border-gray-900 bg-gray-900 text-white"
+                        : "border-gray-300 bg-white text-transparent hover:border-gray-500"
+                    )}
+                    onClick={() => toggleSelectedMessage(message.id)}
+                    type="button"
+                  >
+                    <Check size={14} />
+                  </button>
+                )}
                 {message.role === 'user' ? (
                   <div className="group relative flex w-full flex-col items-end">
-                    <div className="bg-[#f3f4f5] text-gray-900 px-5 py-3 rounded-2xl rounded-tr-sm text-[15px] break-words text-left shadow-sm whitespace-pre-wrap" style={{ maxWidth: '85%', width: 'fit-content' }}>
-                      {message.content}
-                    </div>
+                    {editingMessageId === message.id ? (
+                      <div className="w-full max-w-[85%] rounded-2xl rounded-tr-sm bg-[#f3f4f5] p-3 shadow-sm">
+                        <textarea
+                          value={editingContent}
+                          onChange={(event) => setEditingContent(event.target.value)}
+                          className="min-h-[96px] w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2 text-[15px] text-gray-900 outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
+                          autoFocus
+                        />
+                        <div className="mt-2 flex justify-end gap-2">
+                          <button
+                            className="rounded-lg px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-200"
+                            onClick={cancelEditingMessage}
+                            type="button"
+                          >
+                            取消
+                          </button>
+                          <button
+                            className="rounded-lg bg-gray-900 px-3 py-1.5 text-sm text-white transition-opacity hover:opacity-85"
+                            onClick={saveEditingMessage}
+                            type="button"
+                          >
+                            保存
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-[#f3f4f5] text-gray-900 px-5 py-3 rounded-2xl rounded-tr-sm text-[15px] break-words text-left shadow-sm whitespace-pre-wrap" style={{ maxWidth: '85%', width: 'fit-content' }}>
+                        {collapsedMessageIds.includes(message.id) ? '消息已收起' : message.content}
+                      </div>
+                    )}
                     <div className="flex items-center gap-1 mt-2 mr-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button className="p-1.5 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-800 hover:bg-gray-100 transition-colors" title="编辑">
+                      <button
+                        className="p-1.5 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-800 hover:bg-gray-100 transition-colors"
+                        title="编辑"
+                        onClick={() => startEditingMessage(message)}
+                        type="button"
+                      >
                         <Pencil size={15} />
                       </button>
-                      <button className="p-1.5 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-800 hover:bg-gray-100 transition-colors" title="复制">
+                      <button
+                        className="p-1.5 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-800 hover:bg-gray-100 transition-colors"
+                        title="复制"
+                        onClick={() => copyMessage(message)}
+                        type="button"
+                      >
                         <Copy size={15} />
                       </button>
                       <button
                         className="p-1.5 flex items-center justify-center rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                         title="删除"
                         onClick={() => deleteMessage(message.id)}
+                        type="button"
                       >
                         <Trash2 size={15} />
                       </button>
-                      <div className="relative group/menu">
-                        <button className="p-1.5 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-800 hover:bg-gray-100 transition-colors" title="更多">
+                      <div className="relative">
+                        <button
+                          className="p-1.5 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-800 hover:bg-gray-100 transition-colors"
+                          title="更多"
+                          onClick={() => setOpenMenuMessageId(openMenuMessageId === message.id ? null : message.id)}
+                          type="button"
+                        >
                           <MoreHorizontal size={15} />
                         </button>
-                        <div className="absolute top-full right-0 mt-1 w-32 bg-white rounded-lg shadow-lg border border-gray-100 py-1 hidden group-hover/menu:block z-10">
-                          <button className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
-                            <Share2 size={14} /> 分享
-                          </button>
-                        </div>
+                        {openMenuMessageId === message.id && renderMoreMenu(message, 'right')}
                       </div>
                     </div>
                   </div>
@@ -689,49 +1078,96 @@ export default function ChatApp() {
                     </div>
 
                     <div className="ml-10 text-[15px] text-gray-900 leading-relaxed markdown-body">
-                      <ThinkingPanel
-                        content={message.reasoning}
-                        duration={message.reasoningDuration}
-                        thinking={message.isReasoning}
-                      />
-                      {message.content ? (
-                        <MarkdownContent>{message.content}</MarkdownContent>
-                      ) : null}
-                      {message.isStreaming && message.content && (
-                        <span className="inline-block w-2 h-4 bg-primary align-middle ml-1 animate-pulse rounded-full" />
+                      {editingMessageId === message.id ? (
+                        <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                          <textarea
+                            value={editingContent}
+                            onChange={(event) => setEditingContent(event.target.value)}
+                            className="min-h-[180px] w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2 text-[15px] text-gray-900 outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
+                            autoFocus
+                          />
+                          <div className="mt-2 flex justify-end gap-2">
+                            <button
+                              className="rounded-lg px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-200"
+                              onClick={cancelEditingMessage}
+                              type="button"
+                            >
+                              取消
+                            </button>
+                            <button
+                              className="rounded-lg bg-gray-900 px-3 py-1.5 text-sm text-white transition-opacity hover:opacity-85"
+                              onClick={saveEditingMessage}
+                              type="button"
+                            >
+                              保存
+                            </button>
+                          </div>
+                        </div>
+                      ) : collapsedMessageIds.includes(message.id) ? (
+                        <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-500">
+                          消息已收起
+                        </div>
+                      ) : (
+                        <>
+                          <ThinkingPanel
+                            content={message.reasoning}
+                            duration={message.reasoningDuration}
+                            thinking={message.isReasoning}
+                          />
+                          {message.content ? (
+                            <MarkdownContent>{message.content}</MarkdownContent>
+                          ) : null}
+                          {message.isStreaming && message.content && (
+                            <span className="inline-block w-2 h-4 bg-primary align-middle ml-1 animate-pulse rounded-full" />
+                          )}
+                        </>
                       )}
                     </div>
 
                     {!message.isStreaming && (
                       <div className="ml-10 flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button className="p-1.5 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-800 hover:bg-gray-100 transition-colors" title="复制">
+                        <button
+                          className="p-1.5 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-800 hover:bg-gray-100 transition-colors"
+                          title="复制"
+                          onClick={() => copyMessage(message)}
+                          type="button"
+                        >
                           <Copy size={15} />
                         </button>
-                        <button className="p-1.5 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-800 hover:bg-gray-100 transition-colors" title="重新生成">
+                        <button
+                          className="p-1.5 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-800 hover:bg-gray-100 transition-colors"
+                          title="重新生成"
+                          onClick={() => regenerateMessage(message)}
+                          type="button"
+                        >
                           <RotateCw size={15} />
                         </button>
-                        <button className="p-1.5 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-800 hover:bg-gray-100 transition-colors" title="赞">
-                          <ThumbsUp size={15} />
-                        </button>
-                        <button className="p-1.5 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-800 hover:bg-gray-100 transition-colors" title="踩">
-                          <ThumbsDown size={15} />
+                        <button
+                          className="p-1.5 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-800 hover:bg-gray-100 transition-colors"
+                          title="编辑"
+                          onClick={() => startEditingMessage(message)}
+                          type="button"
+                        >
+                          <Pencil size={15} />
                         </button>
                         <button
                           className="p-1.5 flex items-center justify-center rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                           title="删除"
                           onClick={() => deleteMessage(message.id)}
+                          type="button"
                         >
                           <Trash2 size={15} />
                         </button>
-                        <div className="relative group/menu">
-                          <button className="p-1.5 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-800 hover:bg-gray-100 transition-colors" title="更多">
+                        <div className="relative">
+                          <button
+                            className="p-1.5 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-800 hover:bg-gray-100 transition-colors"
+                            title="更多"
+                            onClick={() => setOpenMenuMessageId(openMenuMessageId === message.id ? null : message.id)}
+                            type="button"
+                          >
                             <MoreHorizontal size={15} />
                           </button>
-                          <div className="absolute top-full left-0 mt-1 w-32 bg-white rounded-lg shadow-lg border border-gray-100 py-1 hidden group-hover/menu:block z-10">
-                            <button className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
-                              <Share2 size={14} /> 分享
-                            </button>
-                          </div>
+                          {openMenuMessageId === message.id && renderMoreMenu(message, 'left')}
                         </div>
                       </div>
                     )}
@@ -761,10 +1197,20 @@ export default function ChatApp() {
               {/* Input Toolbar */}
               <div className="flex items-center justify-between px-3 pb-3 pt-1">
                 <div className="flex items-center gap-1">
-                  <button className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors" title="添加附件">
+                  <button
+                    className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                    title="添加附件"
+                    onClick={() => toast(NOT_IMPLEMENTED_TOAST)}
+                    type="button"
+                  >
                     <Paperclip size={20} />
                   </button>
-                  <button className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors" title="语音输入">
+                  <button
+                    className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                    title="语音输入"
+                    onClick={() => toast(NOT_IMPLEMENTED_TOAST)}
+                    type="button"
+                  >
                     <Mic size={20} />
                   </button>
                 </div>
