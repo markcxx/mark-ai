@@ -75,7 +75,7 @@ export function ChatInput({
     <div
       className={cn(
         placement === 'bottom'
-          ? 'pointer-events-none absolute bottom-0 left-0 right-0 z-20 flex justify-center bg-gradient-to-t from-[#f8f9fa] via-[#f8f9fa] to-transparent p-4 pb-6 pt-10 md:px-8 md:pb-8'
+          ? 'pointer-events-none absolute bottom-0 left-0 right-0 z-20 flex justify-center bg-gradient-to-t from-white dark:from-gray-900 via-white/80 dark:via-gray-900/80 to-transparent p-4 pb-6 pt-10 md:px-8 md:pb-8'
           : 'w-full',
       )}
     >
@@ -85,9 +85,9 @@ export function ChatInput({
           placement === 'bottom' ? 'pointer-events-auto max-w-[840px]' : 'max-w-[760px]',
         )}
       >
-        <div className="relative flex flex-col rounded-xl border border-gray-200 bg-white shadow-[0_12px_32px_rgba(0,0,0,0.06)] transition-all duration-300 focus-within:border-primary/30 focus-within:ring-2 focus-within:ring-primary/20">
+        <div className="relative flex flex-col rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-[0_12px_32px_rgba(0,0,0,0.06)] dark:shadow-[0_12px_32px_rgba(0,0,0,0.3)] transition-all duration-300 focus-within:border-primary/30 focus-within:ring-2 focus-within:ring-primary/20">
           <textarea
-            className="max-h-[200px] min-h-[64px] w-full resize-none border-none bg-transparent px-4 py-4 text-[15px] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-0"
+            className="max-h-[200px] min-h-[64px] w-full resize-none border-none bg-transparent px-4 py-4 text-[15px] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-0"
             disabled={isLoading || !selectedModel}
             onChange={onInput}
             onKeyDown={onKeyDown}
@@ -100,7 +100,7 @@ export function ChatInput({
           <div className="flex items-center justify-between px-3 pb-3 pt-1">
             <div className="flex items-center gap-1">
               <button
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-200"
                 onClick={onAttachment}
                 title="添加附件"
                 type="button"
@@ -108,7 +108,7 @@ export function ChatInput({
                 <Paperclip size={20} />
               </button>
               <button
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-200"
                 onClick={onMic}
                 title="语音输入"
                 type="button"
@@ -119,7 +119,7 @@ export function ChatInput({
             <div className="flex items-center gap-2">
               <div className="relative" ref={modelMenuRef}>
                 <button
-                  className="flex h-9 max-w-[220px] items-center gap-2 rounded-lg px-2.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex h-9 max-w-[220px] items-center gap-2 rounded-lg px-2.5 text-sm text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-60"
                   disabled={isLoadingModels || availableModels.length === 0}
                   onClick={() => {
                     if (availableModels.length > 0) setIsModelDropdownOpen((value) => !value);
@@ -149,13 +149,13 @@ export function ChatInput({
                 </button>
 
                 {isModelDropdownOpen && availableModels.length > 0 && (
-                  <div className="absolute bottom-full right-0 z-50 mb-2 flex max-h-[460px] w-[min(320px,calc(100vw-32px))] select-none flex-col overflow-hidden rounded-xl border border-gray-200 bg-white p-0 shadow-[0_12px_40px_rgba(0,0,0,0.14)]">
-                    <div className="flex h-10 items-center border-b border-gray-100 px-2">
-                      <div className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-gray-400 focus-within:bg-gray-50">
+                  <div className="absolute bottom-full right-0 z-50 mb-2 flex max-h-[460px] w-[min(320px,calc(100vw-32px))] select-none flex-col overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-0 shadow-[0_12px_40px_rgba(0,0,0,0.14)]">
+                    <div className="flex h-10 items-center border-b border-gray-100 dark:border-gray-700 px-2">
+                      <div className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-gray-400 focus-within:bg-gray-50 dark:focus-within:bg-gray-700">
                         <Search size={16} />
                         <input
                           autoFocus
-                          className="h-full min-w-0 flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
+                          className="h-full min-w-0 flex-1 bg-transparent text-sm text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500"
                           onChange={(event) => setModelSearchKeyword(event.target.value)}
                           onKeyDown={(event) => event.stopPropagation()}
                           placeholder="搜索模型"
@@ -175,8 +175,8 @@ export function ChatInput({
                               className={cn(
                                 'mx-1 my-px flex w-[calc(100%-8px)] items-center gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors',
                                 isSelected
-                                  ? 'bg-gray-100 text-gray-950'
-                                  : 'text-gray-700 hover:bg-gray-100',
+                                  ? 'bg-gray-100 dark:bg-gray-700 text-gray-950 dark:text-gray-50'
+                                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700',
                               )}
                               key={key}
                               onClick={() => {
@@ -199,9 +199,10 @@ export function ChatInput({
                 )}
               </div>
               <ChatSendButton
-                className="!h-9 !w-9 !min-w-9 !rounded-full !p-0 shadow-sm transition-transform duration-150 ease-out hover:scale-105 active:scale-95 disabled:hover:scale-100"
+                className="!h-9 !w-9 !min-w-9 !rounded-full !p-0 shadow-sm transition-transform duration-150 ease-out hover:scale-105 active:scale-95 disabled:hover:scale-100 dark:[&_svg]:!text-white dark:[&_svg]:!stroke-white"
                 disabled={(!input.trim() && !isLoading) || !selectedModel}
                 loading={isLoading}
+                onStop={onSend}
                 onSend={onSend}
               />
             </div>

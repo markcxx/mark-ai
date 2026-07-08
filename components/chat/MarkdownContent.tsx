@@ -36,11 +36,11 @@ const renderAdmonitionParagraph = (children: React.ReactNode) => {
 
 const markdownComponents = {
   a: (props: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
-    <a className="text-primary transition-colors hover:text-blue-700 hover:underline" {...props} />
+    <a className="text-primary transition-colors hover:text-blue-700 hover:underline dark:hover:text-blue-300" {...props} />
   ),
   blockquote: (props: React.BlockquoteHTMLAttributes<HTMLQuoteElement>) => (
     <blockquote
-      className="my-4 border-0 border-l-4 border-solid border-l-gray-300 px-4 py-0 text-gray-500"
+      className="my-4 border-0 border-l-4 border-solid border-l-gray-300 px-4 py-0 text-gray-500 dark:border-l-gray-600 dark:text-gray-400"
       {...props}
     />
   ),
@@ -53,35 +53,35 @@ const markdownComponents = {
     return <Pre language={match?.[1] || 'text'}>{String(children)}</Pre>;
   },
   h1: (props: React.HTMLAttributes<HTMLHeadingElement>) => (
-    <h1 className="mb-4 mt-6 text-2xl font-semibold text-gray-900" {...props} />
+    <h1 className="mb-4 mt-6 text-2xl font-semibold text-gray-900 dark:text-gray-100" {...props} />
   ),
   h2: (props: React.HTMLAttributes<HTMLHeadingElement>) => (
-    <h2 className="mb-4 mt-6 text-xl font-semibold text-gray-900" {...props} />
+    <h2 className="mb-4 mt-6 text-xl font-semibold text-gray-900 dark:text-gray-100" {...props} />
   ),
   h3: (props: React.HTMLAttributes<HTMLHeadingElement>) => (
-    <h3 className="mb-4 mt-6 text-lg font-semibold text-gray-900" {...props} />
+    <h3 className="mb-4 mt-6 text-lg font-semibold text-gray-900 dark:text-gray-100" {...props} />
   ),
   ol: (props: React.OlHTMLAttributes<HTMLOListElement>) => (
-    <ol className="mb-4 ml-2 list-inside list-decimal space-y-1 text-gray-700" {...props} />
+    <ol className="mb-4 ml-2 list-inside list-decimal space-y-1 text-gray-700 dark:text-gray-300" {...props} />
   ),
   p: ({ children }: { children?: React.ReactNode }) => renderAdmonitionParagraph(children),
   pre: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
   table: (props: React.TableHTMLAttributes<HTMLTableElement>) => (
-    <div className="my-4 overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
+    <div className="my-4 overflow-x-auto rounded-lg border border-gray-200 shadow-sm dark:border-gray-700">
       <table className="w-full border-collapse" {...props} />
     </div>
   ),
   td: (props: React.TdHTMLAttributes<HTMLTableCellElement>) => (
-    <td className="border-b border-gray-200 px-4 py-3 text-sm text-gray-600" {...props} />
+    <td className="border-b border-gray-200 px-4 py-3 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-300" {...props} />
   ),
   th: (props: React.ThHTMLAttributes<HTMLTableCellElement>) => (
     <th
-      className="border-b border-gray-200 bg-gray-50 px-4 py-3 text-left text-sm font-medium text-gray-700"
+      className="border-b border-gray-200 bg-gray-50 px-4 py-3 text-left text-sm font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
       {...props}
     />
   ),
   ul: (props: React.HTMLAttributes<HTMLUListElement>) => (
-    <ul className="mb-4 ml-2 list-inside list-disc space-y-1 text-gray-700" {...props} />
+    <ul className="mb-4 ml-2 list-inside list-disc space-y-1 text-gray-700 dark:text-gray-300" {...props} />
   ),
 };
 

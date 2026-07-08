@@ -117,7 +117,7 @@ ${transcript}
   try {
     if (selectedModel.runtime === 'openai-compatible') {
       const endpoint = toOpenAIChatEndpoint(selectedModel.baseUrl);
-      if (!endpoint) return fallback;
+      if (!endpoint) return { title: fallback, titleModel: { ...titleModel, reason: 'No endpoint configured' } };
 
       const response = await fetch(endpoint, {
         body: JSON.stringify({

@@ -17,7 +17,7 @@ export function ModelAvatar({
   return (
     <div
       className={cn(
-        'shrink-0 overflow-hidden rounded-full bg-white shadow-sm ring-1 ring-gray-200',
+        'shrink-0 overflow-hidden rounded-full bg-white shadow-sm ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700',
         className,
       )}
       style={{ height: size, width: size }}

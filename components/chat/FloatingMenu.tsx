@@ -93,7 +93,7 @@ export function FloatingMenu({
 
   return createPortal(
     <div
-      className="fixed z-50 w-52 overflow-y-auto rounded-xl border border-gray-200 bg-white py-1 shadow-[0_12px_36px_rgba(0,0,0,0.16)]"
+      className="fixed z-50 w-52 overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-1 shadow-[0_12px_36px_rgba(0,0,0,0.16)]"
       ref={menuRef}
       style={{
         left: position?.left ?? -9999,
@@ -104,8 +104,8 @@ export function FloatingMenu({
       {items.map(({ danger, icon: Icon, label, onClick }) => (
         <button
           className={cn(
-            'flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100',
-            danger ? 'text-red-600 hover:bg-red-50' : 'text-gray-700',
+            'flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-700',
+            danger ? 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20' : 'text-gray-700 dark:text-gray-300',
           )}
           key={label}
           onClick={() => {

@@ -28,8 +28,8 @@ export function WelcomePanel({ children }: { children: ReactNode }) {
       <div className="mb-8 flex items-center gap-4">
         <AnimatedEmojiLogo />
         <div className="min-w-0">
-          <h1 className="font-jakarta text-3xl font-semibold text-gray-950">MARKAI</h1>
-          <p className="mt-2 text-[15px] text-gray-500">你好，我是 MarkAI。今天想聊点什么？</p>
+          <h1 className="font-jakarta text-3xl font-semibold text-gray-950 dark:text-gray-50">MARKAI</h1>
+          <p className="mt-2 text-[15px] text-gray-500 dark:text-gray-400">你好，我是 MarkAI。今天想聊点什么？</p>
         </div>
       </div>
       {children}

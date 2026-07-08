@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-primary: #0056c3;
   --color-primary-container: #2a70e4;
@@ -13,9 +15,25 @@
   --color-on-secondary-container: #5e6368;
   --color-outline: #727785;
   --color-outline-variant: #c2c6d6;
-  
+
   --font-sans: var(--font-noto-sans-sc), "Noto Sans SC", sans-serif;
   --font-jakarta: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", sans-serif;
+}
+
+/* Dark mode overrides */
+.dark {
+  --color-primary: #5b9aff;
+  --color-primary-container: #3a7cdb;
+  --color-on-primary-container: #e8f1ff;
+  --color-surface-container-low: #1a1b1e;
+  --color-surface-container-high: #2a2b2e;
+  --color-surface-container-lowest: #111214;
+  --color-surface-variant: #2e3038;
+  --color-on-surface-variant: #c4c8d4;
+  --color-secondary-container: #2e3238;
+  --color-on-secondary-container: #c0c4ca;
+  --color-outline: #8a8f9d;
+  --color-outline-variant: #404452;
 }
 
 /* Custom scrollbar */
@@ -36,6 +54,11 @@
 ::selection {
   background-color: #bae6fd;
   color: #0369a1;
+}
+
+.dark ::selection {
+  background-color: #1e3a5f;
+  color: #93c5fd;
 }
 
 button:not(:disabled),
@@ -63,7 +86,7 @@ button:disabled {
   @apply list-decimal list-inside mb-4;
 }
 .markdown-body blockquote {
-  @apply border-l-4 border-gray-300 pl-4 italic mb-4 text-gray-600;
+  @apply border-l-4 border-gray-300 dark:border-gray-600 pl-4 italic mb-4 text-gray-600 dark:text-gray-400;
 }
 .markdown-body a {
   @apply text-primary hover:underline;
@@ -72,5 +95,5 @@ button:disabled {
   @apply w-full mb-4 border-collapse;
 }
 .markdown-body th, .markdown-body td {
-  @apply border border-gray-200 px-4 py-2;
+  @apply border border-gray-200 dark:border-gray-700 px-4 py-2;
 }

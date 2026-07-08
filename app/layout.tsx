@@ -1,5 +1,6 @@
 import type {Metadata} from 'next';
 import { Noto_Sans_SC, Plus_Jakarta_Sans } from 'next/font/google';
+import { ThemeProvider } from '@/components/ThemeProvider';
 import './globals.css';
 
 const notoSansSC = Noto_Sans_SC({ subsets: ['latin'], variable: '--font-noto-sans-sc' });
@@ -18,8 +19,10 @@ export const metadata: Metadata = {
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
-      <body suppressHydrationWarning className={`${notoSansSC.variable} ${plusJakartaSans.variable} font-sans antialiased text-gray-900 bg-gray-50 h-screen w-screen overflow-hidden`}>
-        {children}
+      <body suppressHydrationWarning className={`${notoSansSC.variable} ${plusJakartaSans.variable} font-sans antialiased text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-950 h-screen w-screen overflow-hidden`}>
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

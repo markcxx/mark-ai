@@ -14,12 +14,12 @@ export function SelectionFooterBar({
   selectedCount: number;
 }) {
   return (
-    <div className="absolute bottom-0 left-0 right-0 z-20 flex justify-center border-t border-gray-200 bg-white px-4 py-3 md:px-8">
+    <div className="absolute bottom-0 left-0 right-0 z-20 flex justify-center border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 md:px-8">
       <div className="relative flex w-full max-w-[840px] items-center justify-center">
-        <span className="absolute left-0 text-sm text-gray-500">已选择 {selectedCount} 条消息</span>
+        <span className="absolute left-0 text-sm text-gray-500 dark:text-gray-400">已选择 {selectedCount} 条消息</span>
         <div className="flex items-center gap-1">
           <button
-            className="flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm text-gray-600 transition-colors hover:bg-gray-100"
+            className="flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm text-gray-600 dark:text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
             onClick={onExit}
             type="button"
           >
@@ -27,7 +27,7 @@ export function SelectionFooterBar({
             取消
           </button>
           <button
-            className="flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-50"
+            className="flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm text-gray-600 dark:text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
             disabled={selectedCount === 0}
             onClick={onCopy}
             type="button"
@@ -36,7 +36,7 @@ export function SelectionFooterBar({
             复制
           </button>
           <button
-            className="flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+            className="flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm text-red-600 dark:text-red-400 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
             disabled={selectedCount === 0}
             onClick={onDelete}
             type="button"

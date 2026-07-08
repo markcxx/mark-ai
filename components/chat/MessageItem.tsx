@@ -44,7 +44,7 @@ function MoreMenuButton({
   return (
     <>
       <button
-        className="flex items-center justify-center rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-800"
+        className="flex items-center justify-center rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-800 dark:hover:text-gray-200"
         onClick={() => setOpenMenuId(open ? null : menuId)}
         ref={buttonRef}
         title="更多"
@@ -150,23 +150,23 @@ export function MessageItem({
   const body = message.role === 'user' ? (
     <div className="group relative flex w-full flex-col items-end">
       {editing ? (
-        <div className="w-full max-w-[85%] rounded-2xl rounded-tr-sm bg-[#f3f4f5] p-3 shadow-sm">
+        <div className="w-full max-w-[85%] rounded-2xl rounded-tr-sm bg-[#f3f4f5] dark:bg-gray-800 p-3 shadow-sm">
           <textarea
             autoFocus
-            className="min-h-[96px] w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2 text-[15px] text-gray-900 outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
+            className="min-h-[96px] w-full resize-y rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-[15px] text-gray-900 dark:text-gray-100 outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
             onChange={(event) => setEditingContent(event.target.value)}
             value={editingContent}
           />
           <div className="mt-2 flex justify-end gap-2">
             <button
-              className="rounded-lg px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-200"
+              className="rounded-lg px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700"
               onClick={cancelEditingMessage}
               type="button"
             >
               取消
             </button>
             <button
-              className="rounded-lg bg-gray-900 px-3 py-1.5 text-sm text-white transition-opacity hover:opacity-85"
+              className="rounded-lg bg-gray-900 dark:bg-gray-100 px-3 py-1.5 text-sm text-white dark:text-gray-900 transition-opacity hover:opacity-85"
               onClick={saveEditingMessage}
               type="button"
             >
@@ -176,7 +176,7 @@ export function MessageItem({
         </div>
       ) : (
         <div
-          className="w-fit max-w-[85%] break-words rounded-2xl rounded-tr-sm bg-[#f3f4f5] px-5 py-3 text-left text-[15px] text-gray-900 shadow-sm whitespace-pre-wrap"
+          className="w-fit max-w-[85%] break-words rounded-2xl rounded-tr-sm bg-[#f3f4f5] dark:bg-gray-800 px-5 py-3 text-left text-[15px] text-gray-900 dark:text-gray-100 shadow-sm whitespace-pre-wrap"
         >
           <CollapsibleContent>{collapsed ? '消息已收起' : message.content}</CollapsibleContent>
         </div>
@@ -184,7 +184,7 @@ export function MessageItem({
       {!multiSelectMode && (
         <div className="mr-1 mt-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
           <button
-            className="flex items-center justify-center rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-800"
+            className="flex items-center justify-center rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-800 dark:hover:text-gray-200"
             onClick={() => startEditingMessage(message)}
             title="编辑"
             type="button"
@@ -192,7 +192,7 @@ export function MessageItem({
             <Pencil size={15} />
           </button>
           <button
-            className="flex items-center justify-center rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-800"
+            className="flex items-center justify-center rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-800 dark:hover:text-gray-200"
             onClick={() => copyMessage(message)}
             title="复制"
             type="button"
@@ -200,7 +200,7 @@ export function MessageItem({
             <Copy size={15} />
           </button>
           <button
-            className="flex items-center justify-center rounded-md p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
+            className="flex items-center justify-center rounded-md p-1.5 text-gray-400 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400"
             onClick={() => deleteMessage(message.id)}
             title="删除"
             type="button"
@@ -222,7 +222,7 @@ export function MessageItem({
       <div className="message-header mb-3 flex items-center gap-2.5">
         <ModelAvatar model={message.model} provider={message.provider} />
         <div className="flex min-w-0 flex-col">
-          <span className="truncate font-jakarta text-[15px] font-bold text-gray-900">
+          <span className="truncate font-jakarta text-[15px] font-bold text-gray-900 dark:text-gray-100">
             {message.model || selectedModel?.id}
           </span>
           {message.isStreaming && (
@@ -233,25 +233,25 @@ export function MessageItem({
         </div>
       </div>
 
-      <div className="markdown-body ml-10 text-[15px] leading-relaxed text-gray-900">
+      <div className="markdown-body ml-10 text-[15px] leading-relaxed text-gray-900 dark:text-gray-100">
         {editing ? (
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-3">
             <textarea
               autoFocus
-              className="min-h-[180px] w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2 text-[15px] text-gray-900 outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
+              className="min-h-[180px] w-full resize-y rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-[15px] text-gray-900 dark:text-gray-100 outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
               onChange={(event) => setEditingContent(event.target.value)}
               value={editingContent}
             />
             <div className="mt-2 flex justify-end gap-2">
               <button
-                className="rounded-lg px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-200"
+                className="rounded-lg px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700"
                 onClick={cancelEditingMessage}
                 type="button"
               >
                 取消
               </button>
               <button
-                className="rounded-lg bg-gray-900 px-3 py-1.5 text-sm text-white transition-opacity hover:opacity-85"
+                className="rounded-lg bg-gray-900 dark:bg-gray-100 px-3 py-1.5 text-sm text-white dark:text-gray-900 transition-opacity hover:opacity-85"
                 onClick={saveEditingMessage}
                 type="button"
               >
@@ -260,7 +260,7 @@ export function MessageItem({
             </div>
           </div>
         ) : collapsed ? (
-          <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-500">
+          <div className="rounded-xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
             消息已收起
           </div>
         ) : (
@@ -281,7 +281,7 @@ export function MessageItem({
       {!message.isStreaming && !multiSelectMode && (
         <div className="ml-10 mt-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
           <button
-            className="flex items-center justify-center rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-800"
+            className="flex items-center justify-center rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-800 dark:hover:text-gray-200"
             onClick={() => copyMessage(message)}
             title="复制"
             type="button"
@@ -289,7 +289,7 @@ export function MessageItem({
             <Copy size={15} />
           </button>
           <button
-            className="flex items-center justify-center rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-800"
+            className="flex items-center justify-center rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-800 dark:hover:text-gray-200"
             onClick={() => regenerateMessage(message)}
             title="重新生成"
             type="button"
@@ -297,7 +297,7 @@ export function MessageItem({
             <RotateCw size={15} />
           </button>
           <button
-            className="flex items-center justify-center rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-800"
+            className="flex items-center justify-center rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-800 dark:hover:text-gray-200"
             onClick={() => startEditingMessage(message)}
             title="编辑"
             type="button"
@@ -305,7 +305,7 @@ export function MessageItem({
             <Pencil size={15} />
           </button>
           <button
-            className="flex items-center justify-center rounded-md p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
+            className="flex items-center justify-center rounded-md p-1.5 text-gray-400 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400"
             onClick={() => deleteMessage(message.id)}
             title="删除"
             type="button"

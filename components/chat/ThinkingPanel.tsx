@@ -38,14 +38,14 @@ export function ThinkingPanel({
   return (
     <div className="mb-4 text-sm">
       <button
-        className="flex items-center gap-1.5 rounded-lg px-1 py-1 text-left text-gray-500 transition-colors hover:bg-gray-100"
+        className="flex items-center gap-1.5 rounded-lg px-1 py-1 text-left text-gray-500 dark:text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
         onClick={() => setShowDetail((value) => !value)}
         type="button"
       >
         <span
           className={cn(
-            'flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-400',
-            expanded && !thinking && 'border-purple-200 bg-purple-50 text-purple-500',
+            'flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-400',
+            expanded && !thinking && 'border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/30 text-purple-500 dark:text-purple-400',
           )}
         >
           {thinking ? <Loader2 className="animate-spin" size={14} /> : <Atom size={14} />}
@@ -54,8 +54,8 @@ export function ThinkingPanel({
           className={cn(
             'text-sm',
             thinking
-              ? 'animate-pulse bg-gradient-to-r from-gray-400 via-gray-600 to-gray-400 bg-[length:200%_100%] bg-clip-text text-transparent'
-              : 'text-gray-500',
+              ? 'animate-pulse bg-gradient-to-r from-gray-400 via-gray-600 to-gray-400 bg-[length:200%_100%] bg-clip-text text-transparent dark:via-gray-200'
+              : 'text-gray-500 dark:text-gray-400',
           )}
         >
           {title}
@@ -74,7 +74,7 @@ export function ThinkingPanel({
       >
         <div className="min-h-0 overflow-hidden">
           <div
-            className="mt-1 max-h-[min(40vh,320px)] overflow-y-auto px-2 pb-2 text-[13px] leading-relaxed text-gray-500"
+            className="mt-1 max-h-[min(40vh,320px)] overflow-y-auto px-2 pb-2 text-[13px] leading-relaxed text-gray-500 dark:text-gray-400"
             ref={scrollRef}
             style={{
               WebkitMaskImage:
@@ -83,7 +83,7 @@ export function ThinkingPanel({
                 'linear-gradient(to bottom, transparent, black 12px, black calc(100% - 18px), transparent)',
             }}
           >
-            <div className="markdown-body [&_*]:!text-gray-500">
+            <div className="markdown-body [&_*]:!text-gray-500 dark:[&_*]:!text-gray-400">
               {hasContent ? <MarkdownContent>{content || ''}</MarkdownContent> : null}
             </div>
           </div>

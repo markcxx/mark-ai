@@ -62,7 +62,7 @@ export function CollapsibleContent({ children }: { children: ReactNode }) {
       {shouldCollapse && (
         <div className="mt-1.5 flex justify-center">
           <button
-            className="inline-flex h-6 items-center gap-1 rounded-full bg-gray-200/70 px-2.5 text-xs text-gray-500 transition-colors hover:bg-gray-300/70 hover:text-gray-900"
+            className="inline-flex h-6 items-center gap-1 rounded-full bg-gray-200/70 px-2.5 text-xs text-gray-500 transition-colors hover:bg-gray-300/70 hover:text-gray-900 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-100"
             onClick={() => setCollapsed((value) => !value)}
             type="button"
           >
