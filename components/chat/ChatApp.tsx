@@ -294,7 +294,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
         width={sidebarWidth}
       />
 
-      <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#e5e5e5] dark:border-gray-700 bg-white dark:bg-gray-900 shadow-none">
+      <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#e5e5e5] dark:border-gray-700 bg-white dark:bg-[#0d0d0d] shadow-none">
         {isSidebarOpen && (
           <div
             aria-label="调整侧栏宽度"

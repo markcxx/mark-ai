@@ -82,7 +82,7 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        'z-30 flex h-full shrink-0 flex-col bg-[#f8f8f8] dark:bg-[#0e0f11]',
+        'z-30 flex h-full shrink-0 flex-col bg-[#f8f8f8] dark:bg-[#000000]',
         !isResizing && 'transition-[width,margin] duration-200 ease-out',
         isOpen ? 'mr-2' : 'mr-0 w-0 overflow-hidden',
       )}
