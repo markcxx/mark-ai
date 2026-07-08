@@ -3,12 +3,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { OpenAI, Gemini, DeepSeek } from '@lobehub/icons';
+import { ModelIcon } from '@lobehub/icons';
 import {
   Menu, Plus, Puzzle,
   Settings, HelpCircle, ChevronDown, Share2, MoreVertical,
   Paperclip, Mic, ArrowUp, Copy, ThumbsUp, ThumbsDown, Pencil,
-  RotateCw, Trash2, MoreHorizontal
+  RotateCw, Trash2, MoreHorizontal, Search, Loader2, Atom
 } from 'lucide-react';
 import clsx from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -22,13 +22,22 @@ type Message = {
   id: string;
   role: 'user' | 'model';
   content: string;
+  reasoning?: string;
+  reasoningDuration?: number;
+  isReasoning?: boolean;
   isStreaming?: boolean;
   model?: string;
+  provider?: string;
+};
+
+type ChatStreamEvent = {
+  text?: string;
+  type?: 'content' | 'reasoning';
 };
 
 type ConfiguredModel = {
   id: string;
-  provider: 'openai' | 'gemini' | 'deepseek';
+  provider: string;
 };
 
 const THINKING_TEXTS = [
@@ -40,11 +49,49 @@ const THINKING_TEXTS = [
   '正在生成回复...'
 ];
 
-const getModelFamily = (model?: string) => {
-  const normalized = (model || '').toLowerCase();
-  if (normalized.includes('gpt') || normalized.includes('openai')) return 'openai';
-  if (normalized.includes('deepseek')) return 'deepseek';
-  return 'gemini';
+const getModelKey = (model: ConfiguredModel) => `${model.provider}:${model.id}`;
+
+const THINKING_TAGS = [
+  { close: '</think>', open: '<think>' },
+  { close: '</lobeThinking>', open: '<lobeThinking>' },
+];
+
+const extractThinkingFromText = (text: string) => {
+  let content = '';
+  let reasoning = '';
+  let cursor = 0;
+  let hasOpenThinking = false;
+
+  while (cursor < text.length) {
+    const nextTag = THINKING_TAGS
+      .map(tag => ({ ...tag, index: text.indexOf(tag.open, cursor) }))
+      .filter(tag => tag.index >= 0)
+      .sort((a, b) => a.index - b.index)[0];
+
+    if (!nextTag) {
+      content += text.slice(cursor);
+      break;
+    }
+
+    content += text.slice(cursor, nextTag.index);
+    const reasoningStart = nextTag.index + nextTag.open.length;
+    const reasoningEnd = text.indexOf(nextTag.close, reasoningStart);
+
+    if (reasoningEnd < 0) {
+      reasoning += text.slice(reasoningStart);
+      hasOpenThinking = true;
+      break;
+    }
+
+    reasoning += text.slice(reasoningStart, reasoningEnd);
+    cursor = reasoningEnd + nextTag.close.length;
+  }
+
+  return {
+    content: content.replace(/\n{3,}/g, '\n\n').trimStart(),
+    hasOpenThinking,
+    reasoning: reasoning.replace(/\n{3,}/g, '\n\n').trimStart(),
+  };
 };
 
 const getTextFromNode = (node: React.ReactNode): string => {
@@ -56,7 +103,7 @@ const getTextFromNode = (node: React.ReactNode): string => {
 
 const renderAdmonitionParagraph = (children: React.ReactNode) => {
   const text = getTextFromNode(children);
-  const match = text.match(/^\[!(TIP|NOTE|WARNING|IMPORTANT|CAUTION)\]\s*(.*)/s);
+  const match = text.match(/^\[!(TIP|NOTE|WARNING|IMPORTANT|CAUTION)\]\s*([\s\S]*)/);
 
   if (!match) {
     return <p className="mb-4 leading-relaxed last:mb-0">{children}</p>;
@@ -73,16 +120,130 @@ const renderAdmonitionParagraph = (children: React.ReactNode) => {
   );
 };
 
-const ModelAvatar = ({ model, className, size = 32 }: { model?: string; className?: string; size?: number }) => {
-  const family = getModelFamily(model);
+const ModelAvatar = ({ model, className, size = 32 }: { model?: string; provider?: string; className?: string; size?: number }) => {
   return (
     <div
       className={cn("shrink-0 overflow-hidden rounded-full shadow-sm ring-1 ring-gray-200 bg-white", className)}
       style={{ width: size, height: size }}
     >
-      {family === 'openai' && <OpenAI.Avatar size={size} />}
-      {family === 'deepseek' && <DeepSeek.Avatar size={size} />}
-      {family === 'gemini' && <Gemini.Avatar size={size} />}
+      <ModelIcon model={model} size={size} type="avatar" />
+    </div>
+  );
+};
+
+const markdownComponents = {
+  pre: ({children}: any) => <>{children}</>,
+  code({className, children}: any) {
+    const match = /language-(\w+)/.exec(className || '');
+    const isInline = !match && !String(children).includes('\n');
+    if (isInline) {
+      return <PreSingleLine>{children}</PreSingleLine>;
+    }
+    return (
+      <Pre language={match?.[1] || 'text'}>
+        {String(children)}
+      </Pre>
+    );
+  },
+  h1: (props: any) => <h1 className="text-2xl font-semibold mt-6 mb-4 text-gray-900" {...props} />,
+  h2: (props: any) => <h2 className="text-xl font-semibold mt-6 mb-4 text-gray-900" {...props} />,
+  h3: (props: any) => <h3 className="text-lg font-semibold mt-6 mb-4 text-gray-900" {...props} />,
+  a: (props: any) => <a className="text-primary hover:underline hover:text-blue-700 transition-colors" {...props} />,
+  table: (props: any) => <div className="overflow-x-auto my-4 rounded-lg border border-gray-200 shadow-sm"><table className="w-full border-collapse" {...props} /></div>,
+  th: (props: any) => <th className="border-b border-gray-200 bg-gray-50 px-4 py-3 font-medium text-left text-sm text-gray-700" {...props} />,
+  td: (props: any) => <td className="border-b border-gray-200 px-4 py-3 text-sm text-gray-600" {...props} />,
+  p: ({children}: any) => renderAdmonitionParagraph(children),
+  ul: (props: any) => <ul className="list-disc list-inside mb-4 space-y-1 text-gray-700 ml-2" {...props} />,
+  ol: (props: any) => <ol className="list-decimal list-inside mb-4 space-y-1 text-gray-700 ml-2" {...props} />,
+  blockquote: (props: any) => <blockquote className="rounded-lg border border-blue-100 border-l-4 border-l-primary/70 bg-blue-50/70 px-4 py-3 text-gray-700 my-4 shadow-sm" {...props} />,
+};
+
+const MarkdownContent = ({ children }: { children: string }) => (
+  <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+    {children}
+  </ReactMarkdown>
+);
+
+const ThinkingPanel = ({
+  content,
+  duration,
+  thinking,
+}: {
+  content?: string;
+  duration?: number;
+  thinking?: boolean;
+}) => {
+  const [showDetail, setShowDetail] = useState(() => Boolean(thinking));
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const hasContent = Boolean(content?.trim());
+  const expanded = Boolean(thinking || showDetail);
+
+  useEffect(() => {
+    if (thinking && expanded && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [content, expanded, thinking]);
+
+  if (!thinking && !hasContent) return null;
+
+  const title = thinking
+    ? '正在深度思考...'
+    : duration
+      ? `已深度思考 (${(duration / 1000).toFixed(1)} 秒)`
+      : '已深度思考';
+
+  return (
+    <div className="mb-4 text-sm">
+      <button
+        className="flex items-center gap-1.5 rounded-lg px-1 py-1 text-left text-gray-500 transition-colors hover:bg-gray-100"
+        onClick={() => setShowDetail(value => !value)}
+        type="button"
+      >
+        <span
+          className={cn(
+            "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-400",
+            expanded && !thinking && "border-purple-200 bg-purple-50 text-purple-500"
+          )}
+        >
+          {thinking ? <Loader2 size={14} className="animate-spin" /> : <Atom size={14} />}
+        </span>
+        <span
+          className={cn(
+            "text-sm",
+            thinking
+              ? "animate-pulse bg-gradient-to-r from-gray-400 via-gray-600 to-gray-400 bg-[length:200%_100%] bg-clip-text text-transparent"
+              : "text-gray-500"
+          )}
+        >
+          {title}
+        </span>
+        <ChevronDown
+          size={14}
+          className={cn("text-gray-400 transition-transform", expanded && "rotate-180")}
+        />
+      </button>
+
+      <div
+        className={cn(
+          "grid transition-[grid-template-rows] duration-200 ease-out",
+          expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        )}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div
+            ref={scrollRef}
+            className="mt-1 max-h-[min(40vh,320px)] overflow-y-auto px-2 pb-2 text-[13px] leading-relaxed text-gray-500"
+            style={{
+              maskImage: 'linear-gradient(to bottom, transparent, black 12px, black calc(100% - 18px), transparent)',
+              WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 12px, black calc(100% - 18px), transparent)',
+            }}
+          >
+            <div className="markdown-body [&_*]:!text-gray-500">
+              {hasContent ? <MarkdownContent>{content || ''}</MarkdownContent> : null}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
@@ -91,8 +252,9 @@ const INITIAL_MESSAGES: Message[] = [
   {
     id: '1',
     role: 'model',
-    content: '下面是 MarkAI 对话里 Markdown 提示框组件的默认渲染效果：\n\n> [!TIP]\n> 顶部模型列表会从环境变量读取，例如 `GEMINI_MODELS=gemini-2.5-flash,gemini-2.5-pro`。\n\n> [!NOTE]\n> AI 回复会保留标题、列表、表格、代码块和链接等 Markdown 结构。\n\n> [!WARNING]\n> 没有配置到环境变量里的模型不会出现在顶部模型选择器中。\n\n```ts\nconst model = "gemini-2.5-flash";\nconsole.log(`Using ${model}`);\n```\n\n| 能力 | 状态 |\n| --- | --- |\n| GFM 表格 | 已支持 |\n| 代码高亮 | 已支持 |\n| 提示框样式 | 已优化 |',
-    model: 'gemini-3.5-flash'
+    content: '下面是 MarkAI 对话里 Markdown 提示框组件的默认渲染效果：\n\n> [!TIP]\n> 模型列表会从环境变量读取，例如 `GEMINI_MODELS=gemini-2.5-flash,gemini-2.5-pro`。\n\n> [!NOTE]\n> AI 回复会保留标题、列表、表格、代码块和链接等 Markdown 结构。\n\n> [!WARNING]\n> 没有配置到环境变量里的模型不会出现在输入框右侧的模型选择器中。\n\n```ts\nconst model = "gemini-2.5-flash";\nconsole.log(`Using ${model}`);\n```\n\n| 能力 | 状态 |\n| --- | --- |\n| GFM 表格 | 已支持 |\n| 代码高亮 | 已支持 |\n| 提示框样式 | 已优化 |',
+    model: 'gemini-3.5-flash',
+    provider: 'gemini'
   },
   {
     id: '2',
@@ -103,7 +265,8 @@ const INITIAL_MESSAGES: Message[] = [
     id: '3',
     role: 'model',
     content: '没问题，以下是翻译后的结果：\n\n## Example Features\n\n- **Code Highlighting**: Supports multiple languages\n- ~~Incorrect content~~ should be deleted\n- This is inline code: `console.log("hello")`\n\n```python\ndef hello_world():\n    print("Hello, world!")\n```\n\n| Feature | Supported | Notes |\n| --- | --- | --- |\n| Tables | ✅ | GFM Feature |\n| Task Lists | ❌ | Not yet supported |\n\n[Learn more](https://example.com)',
-    model: 'deepseek-v4-pro'
+    model: 'deepseek-v4-pro',
+    provider: 'deepseek'
   }
 ];
 
@@ -117,9 +280,14 @@ export default function ChatApp() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const [selectedModel, setSelectedModel] = useState('');
+  const [selectedModelKey, setSelectedModelKey] = useState('');
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const [modelSearchKeyword, setModelSearchKeyword] = useState('');
   const [loadingText, setLoadingText] = useState(THINKING_TEXTS[0]);
+  const selectedModel = availableModels.find(model => getModelKey(model) === selectedModelKey);
+  const filteredModels = availableModels.filter(model =>
+    model.id.toLowerCase().includes(modelSearchKeyword.trim().toLowerCase())
+  );
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -134,20 +302,20 @@ export default function ChatApp() {
 
     const loadModels = async () => {
       try {
-        const response = await fetch('/api/models');
+        const response = await fetch('/api/models', { cache: 'no-store' });
         if (!response.ok) throw new Error('Failed to load models');
         const data = await response.json();
         const models = Array.isArray(data.models) ? data.models : [];
 
         if (isMounted) {
           setAvailableModels(models);
-          setSelectedModel(models[0]?.id || '');
+          setSelectedModelKey(models[0] ? getModelKey(models[0]) : '');
         }
       } catch (error) {
         console.error('Model config error:', error);
         if (isMounted) {
           setAvailableModels([]);
-          setSelectedModel('');
+          setSelectedModelKey('');
         }
       } finally {
         if (isMounted) setIsLoadingModels(false);
@@ -167,7 +335,7 @@ export default function ChatApp() {
       const interval = setInterval(() => {
         i = (i + 1) % THINKING_TEXTS.length;
         setLoadingText(THINKING_TEXTS[i]);
-      }, 1200);
+      }, 4200);
       return () => clearInterval(interval);
     }
   }, [isLoading]);
@@ -198,7 +366,14 @@ export default function ChatApp() {
     setIsLoading(true);
 
     const modelMessageId = (Date.now() + 1).toString();
-    setMessages(prev => [...prev, { id: modelMessageId, role: 'model', content: '', isStreaming: true, model: selectedModel }]);
+    setMessages(prev => [...prev, {
+      id: modelMessageId,
+      role: 'model',
+      content: '',
+      isStreaming: true,
+      model: selectedModel.id,
+      provider: selectedModel.provider,
+    }]);
 
     try {
       const response = await fetch('/api/chat', {
@@ -206,7 +381,8 @@ export default function ChatApp() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: [...messages, userMessage].map(m => ({ role: m.role, content: m.content })),
-          model: selectedModel
+          model: selectedModel.id,
+          provider: selectedModel.provider
         })
       });
 
@@ -215,28 +391,126 @@ export default function ChatApp() {
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
+      const isStructuredStream = response.headers
+        .get('content-type')
+        ?.includes('application/x-ndjson');
       let done = false;
-      let text = '';
+      let buffer = '';
+      let plainContent = '';
+      let eventReasoning = '';
+      let reasoningStartedAt: number | undefined;
+      let reasoningDuration: number | undefined;
+
+      const beginReasoning = () => {
+        reasoningStartedAt = reasoningStartedAt || Date.now();
+      };
+
+      const endReasoning = () => {
+        if (reasoningStartedAt && !reasoningDuration) {
+          reasoningDuration = Date.now() - reasoningStartedAt;
+        }
+      };
+
+      const updateStreamingMessage = (isReasoning?: boolean) => {
+        const extracted = extractThinkingFromText(plainContent);
+        const reasoning = `${eventReasoning}${extracted.reasoning}`;
+
+        setMessages(prev => prev.map(m =>
+          m.id === modelMessageId
+            ? {
+                ...m,
+                content: extracted.content,
+                isReasoning: Boolean(isReasoning || extracted.hasOpenThinking),
+                reasoning,
+                reasoningDuration,
+              }
+            : m
+        ));
+      };
+
+      const appendContent = (chunk: string) => {
+        plainContent += chunk;
+        const extracted = extractThinkingFromText(plainContent);
+
+        if (extracted.reasoning) beginReasoning();
+        if (eventReasoning && reasoningStartedAt && !reasoningDuration) endReasoning();
+        if (extracted.reasoning && !extracted.hasOpenThinking) endReasoning();
+
+        updateStreamingMessage(extracted.hasOpenThinking);
+      };
+
+      const appendReasoning = (chunk: string) => {
+        beginReasoning();
+        eventReasoning += chunk;
+        updateStreamingMessage(true);
+      };
+
+      const handleStreamLine = (line: string) => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+
+        try {
+          const event = JSON.parse(trimmed) as ChatStreamEvent;
+          if (event.type === 'reasoning' && event.text) {
+            appendReasoning(event.text);
+            return;
+          }
+
+          if (event.type === 'content' && event.text) {
+            appendContent(event.text);
+            return;
+          }
+        } catch {
+          // Fall back to rendering non-JSON chunks as normal content.
+        }
+
+        appendContent(line);
+      };
 
       while (!done) {
         const { value, done: doneReading } = await reader.read();
         done = doneReading;
         if (value) {
-          text += decoder.decode(value, { stream: !done });
-          setMessages(prev => prev.map(m => 
-            m.id === modelMessageId ? { ...m, content: text } : m
-          ));
+          const chunk = decoder.decode(value, { stream: !done });
+
+          if (!isStructuredStream) {
+            appendContent(chunk);
+            continue;
+          }
+
+          buffer += chunk;
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            handleStreamLine(line);
+          }
         }
+      }
+
+      if (isStructuredStream && buffer) {
+        handleStreamLine(buffer);
+      }
+
+      if (reasoningStartedAt && !reasoningDuration) {
+        endReasoning();
+        updateStreamingMessage(false);
       }
     } catch (error) {
       console.error('Chat error:', error);
       setMessages(prev => prev.map(m => 
-        m.id === modelMessageId ? { ...m, content: 'Sorry, I encountered an error. Please try again.' } : m
+        m.id === modelMessageId
+          ? {
+              ...m,
+              content: 'Sorry, I encountered an error. Please try again.',
+              isReasoning: false,
+            }
+          : m
       ));
     } finally {
       setIsLoading(false);
       setMessages(prev => prev.map(m => 
-        m.id === modelMessageId ? { ...m, isStreaming: false } : m
+        m.id === modelMessageId ? { ...m, isReasoning: false, isStreaming: false } : m
       ));
     }
   };
@@ -349,40 +623,7 @@ export default function ChatApp() {
                 <Menu size={20} />
               </button>
             )}
-            <div className="relative">
-              <div 
-                className="flex items-center gap-2 cursor-pointer group px-3 py-1.5 rounded-lg hover:bg-gray-200 transition-colors"
-                onClick={() => {
-                  if (availableModels.length > 0) setIsModelDropdownOpen(!isModelDropdownOpen);
-                }}
-              >
-                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                  {selectedModel && <ModelAvatar model={selectedModel} size={26} className="shadow-none" />}
-                  {isLoadingModels ? '加载模型中...' : selectedModel || '未配置模型'}
-                  {availableModels.length > 0 && (
-                    <ChevronDown size={20} className="text-gray-400 group-hover:text-gray-900 transition-colors" />
-                  )}
-                </h2>
-              </div>
-              
-              {isModelDropdownOpen && availableModels.length > 0 && (
-                <div className="absolute top-full left-0 mt-1 w-60 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50">
-                  {availableModels.map(model => (
-                    <button
-                      key={model.id}
-                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-2.5"
-                      onClick={() => {
-                        setSelectedModel(model.id);
-                        setIsModelDropdownOpen(false);
-                      }}
-                    >
-                      <ModelAvatar model={model.id} size={24} className="shadow-none" />
-                      <span className="truncate">{model.id}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <h2 className="px-3 text-base font-semibold text-gray-900">对话</h2>
           </div>
 
           <div className="flex items-center gap-2">
@@ -434,13 +675,13 @@ export default function ChatApp() {
                 ) : (
                   <div className="group relative w-full">
                     <div className="mb-3 flex items-center gap-2.5">
-                      <ModelAvatar model={message.model} />
-                      <div className="flex min-w-0 items-center gap-2">
+                      <ModelAvatar model={message.model} provider={message.provider} />
+                      <div className="flex min-w-0 flex-col">
                         <span className="truncate font-jakarta text-[15px] font-bold text-gray-900">
-                          {message.model || selectedModel}
+                          {message.model || selectedModel?.id}
                         </span>
                         {message.isStreaming && (
-                          <span className="shrink-0 text-xs font-medium text-gray-400 animate-pulse">
+                          <span className="mt-0.5 text-xs font-medium text-gray-400 animate-pulse">
                             {loadingText}
                           </span>
                         )}
@@ -448,43 +689,14 @@ export default function ChatApp() {
                     </div>
 
                     <div className="ml-10 text-[15px] text-gray-900 leading-relaxed markdown-body">
+                      <ThinkingPanel
+                        content={message.reasoning}
+                        duration={message.reasoningDuration}
+                        thinking={message.isReasoning}
+                      />
                       {message.content ? (
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          components={{
-                            pre: ({children}) => <>{children}</>,
-                            code({className, children}: any) {
-                              const match = /language-(\w+)/.exec(className || '');
-                              const isInline = !match && !String(children).includes('\n');
-                              if (isInline) {
-                                return <PreSingleLine>{children}</PreSingleLine>;
-                              }
-                              return (
-                                <Pre language={match?.[1] || 'text'}>
-                                  {String(children)}
-                                </Pre>
-                              );
-                            },
-                            h1: (props) => <h1 className="text-2xl font-semibold mt-6 mb-4 text-gray-900" {...props} />,
-                            h2: (props) => <h2 className="text-xl font-semibold mt-6 mb-4 text-gray-900" {...props} />,
-                            h3: (props) => <h3 className="text-lg font-semibold mt-6 mb-4 text-gray-900" {...props} />,
-                            a: (props) => <a className="text-primary hover:underline hover:text-blue-700 transition-colors" {...props} />,
-                            table: (props) => <div className="overflow-x-auto my-4 rounded-lg border border-gray-200 shadow-sm"><table className="w-full border-collapse" {...props} /></div>,
-                            th: (props) => <th className="border-b border-gray-200 bg-gray-50 px-4 py-3 font-medium text-left text-sm text-gray-700" {...props} />,
-                            td: (props) => <td className="border-b border-gray-200 px-4 py-3 text-sm text-gray-600" {...props} />,
-                            p: ({children}) => renderAdmonitionParagraph(children),
-                            ul: (props) => <ul className="list-disc list-inside mb-4 space-y-1 text-gray-700 ml-2" {...props} />,
-                            ol: (props) => <ol className="list-decimal list-inside mb-4 space-y-1 text-gray-700 ml-2" {...props} />,
-                            blockquote: (props) => <blockquote className="rounded-lg border border-blue-100 border-l-4 border-l-primary/70 bg-blue-50/70 px-4 py-3 text-gray-700 my-4 shadow-sm" {...props} />,
-                          }}
-                        >
-                          {message.content}
-                        </ReactMarkdown>
-                      ) : (
-                        <div className="h-7 flex items-center text-sm font-medium text-gray-400 animate-pulse">
-                          {loadingText}
-                        </div>
-                      )}
+                        <MarkdownContent>{message.content}</MarkdownContent>
+                      ) : null}
                       {message.isStreaming && message.content && (
                         <span className="inline-block w-2 h-4 bg-primary align-middle ml-1 animate-pulse rounded-full" />
                       )}
@@ -557,6 +769,83 @@ export default function ChatApp() {
                   </button>
                 </div>
                 <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (availableModels.length > 0) setIsModelDropdownOpen(!isModelDropdownOpen);
+                      }}
+                      disabled={isLoadingModels || availableModels.length === 0}
+                      className="flex h-9 max-w-[220px] items-center gap-2 rounded-lg px-2.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                      title="选择模型"
+                    >
+                      {selectedModel ? (
+                        <>
+                          <ModelIcon model={selectedModel.id} size={20} type="avatar" />
+                          <span className="hidden max-w-[138px] truncate sm:inline">{selectedModel.id}</span>
+                        </>
+                      ) : (
+                        <span className="max-w-[120px] truncate">
+                          {isLoadingModels ? '加载中' : '未配置模型'}
+                        </span>
+                      )}
+                      <ChevronDown
+                        size={16}
+                        className={cn(
+                          "shrink-0 text-gray-400 transition-transform",
+                          isModelDropdownOpen && "rotate-180"
+                        )}
+                      />
+                    </button>
+
+                    {isModelDropdownOpen && availableModels.length > 0 && (
+                      <div className="absolute bottom-full right-0 z-50 mb-2 flex max-h-[460px] w-[min(320px,calc(100vw-32px))] select-none flex-col overflow-hidden rounded-xl border border-gray-200 bg-white p-0 shadow-[0_12px_40px_rgba(0,0,0,0.14)]">
+                        <div className="flex h-10 items-center border-b border-gray-100 px-2">
+                          <div className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-gray-400 focus-within:bg-gray-50">
+                            <Search size={16} />
+                            <input
+                              value={modelSearchKeyword}
+                              onChange={(event) => setModelSearchKeyword(event.target.value)}
+                              onKeyDown={(event) => event.stopPropagation()}
+                              className="h-full min-w-0 flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
+                              placeholder="搜索模型"
+                              autoFocus
+                            />
+                          </div>
+                        </div>
+
+                        <div className="min-h-0 flex-1 overflow-y-auto py-1">
+                          {filteredModels.length > 0 ? (
+                            filteredModels.map(model => {
+                              const key = getModelKey(model);
+                              const isSelected = key === selectedModelKey;
+
+                              return (
+                                <button
+                                  key={key}
+                                  className={cn(
+                                    "mx-1 my-px flex w-[calc(100%-8px)] items-center gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors",
+                                    isSelected ? "bg-gray-100 text-gray-950" : "text-gray-700 hover:bg-gray-100"
+                                  )}
+                                  onClick={() => {
+                                    setSelectedModelKey(key);
+                                    setIsModelDropdownOpen(false);
+                                    setModelSearchKeyword('');
+                                  }}
+                                  type="button"
+                                >
+                                  <ModelIcon model={model.id} size={20} type="avatar" />
+                                  <span className="min-w-0 flex-1 truncate">{model.id}</span>
+                                </button>
+                              );
+                            })
+                          ) : (
+                            <div className="px-3 py-2 text-sm text-gray-400">没有匹配的模型</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   <button 
                     onClick={sendMessage}
                     disabled={!input.trim() || isLoading || !selectedModel}
