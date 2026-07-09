@@ -153,6 +153,14 @@ export const useSessionStore = create<SessionStore>()(
         }));
 
         if (get().activeSessionId === sessionId) {
+          const [{ useChatStore }, { useUIStore }] = await Promise.all([
+            import('./useChatStore'),
+            import('./useUIStore'),
+          ]);
+
+          useChatStore.getState().reset();
+          useUIStore.getState().exitMultiSelect();
+          useUIStore.getState().setOpenMenuMessageId(null);
           set({ activeSessionId: null, isLoadingActiveSession: false });
           navigateToNewChat('replace');
         }

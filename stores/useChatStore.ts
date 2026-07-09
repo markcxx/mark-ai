@@ -21,6 +21,12 @@ type StreamOptions = {
   initialContent?: string;
 };
 
+const getTotalTokens = (inputTokens: number, outputTokens: number, totalTokens?: number) => {
+  const estimatedTotal = inputTokens + outputTokens;
+  if (!totalTokens) return estimatedTotal;
+  return Math.max(totalTokens, estimatedTotal);
+};
+
 interface ChatState {
   messages: Message[];
   input: string;
@@ -158,6 +164,8 @@ export const useChatStore = create<ChatStore>()(
             content: extracted.content,
             reasoning,
           });
+          const nextOutputTokens = outputTokens || estimatedOutputTokens;
+          const nextTotalTokens = getTotalTokens(inputTokens, nextOutputTokens, totalTokens);
           set((s) => ({
             messages: s.messages.map((m) =>
               m.id === modelMessageId
@@ -166,10 +174,10 @@ export const useChatStore = create<ChatStore>()(
                     content: extracted.content,
                     inputTokens,
                     isReasoning: Boolean(isReasoning || extracted.hasOpenThinking),
-                    outputTokens: outputTokens || estimatedOutputTokens,
+                    outputTokens: nextOutputTokens,
                     reasoning,
                     reasoningDuration,
-                    totalTokens: totalTokens || inputTokens + estimatedOutputTokens,
+                    totalTokens: nextTotalTokens,
                   }
                 : m,
             ),
@@ -199,7 +207,7 @@ export const useChatStore = create<ChatStore>()(
             if (event.type === 'usage') {
               inputTokens = event.inputTokens || inputTokens;
               outputTokens = event.outputTokens || outputTokens;
-              totalTokens = event.totalTokens || inputTokens + outputTokens;
+              totalTokens = getTotalTokens(inputTokens, outputTokens, event.totalTokens);
               updateStreamingMessage(false);
               return;
             }
@@ -232,7 +240,7 @@ export const useChatStore = create<ChatStore>()(
           reasoning,
         });
         const finalOutputTokens = outputTokens || estimatedOutputTokens;
-        const finalTotalTokens = totalTokens || inputTokens + finalOutputTokens;
+        const finalTotalTokens = getTotalTokens(inputTokens, finalOutputTokens, totalTokens);
         return {
           content: extracted.content,
           generationDuration: Date.now() - startedAt,
@@ -253,6 +261,7 @@ export const useChatStore = create<ChatStore>()(
             reasoning,
           });
           const finalOutputTokens = outputTokens || estimatedOutputTokens;
+          const finalTotalTokens = getTotalTokens(inputTokens, finalOutputTokens, totalTokens);
           return {
             content: extracted.content || plainContent,
             generationDuration: Date.now() - startedAt,
@@ -263,7 +272,7 @@ export const useChatStore = create<ChatStore>()(
             outputTokens: finalOutputTokens,
             reasoning,
             reasoningDuration,
-            totalTokens: totalTokens || inputTokens + finalOutputTokens,
+            totalTokens: finalTotalTokens,
           };
         }
         console.error('Chat error:', error);
@@ -481,6 +490,19 @@ export const useChatStore = create<ChatStore>()(
       }
 
       const historyMessages = messages.slice(0, index);
+      const promptIndex = (() => {
+        for (let i = index - 1; i >= 0; i -= 1) {
+          if (messages[i].role === 'user') return i;
+        }
+        return -1;
+      })();
+
+      if (promptIndex < 0) {
+        toast.error('找不到可用于重新生成的用户消息');
+        return;
+      }
+
+      const regenerateHistoryMessages = messages.slice(0, promptIndex + 1);
       const nextModelMessage: Message = {
         ...message, content: '', createdAt: Date.now(), id: deleteCurrent ? targetId : message.id,
         generationDuration: undefined, inputTokens: undefined, interrupted: false,
@@ -495,7 +517,7 @@ export const useChatStore = create<ChatStore>()(
       set({ messages: nextMessages });
       setOpenMenuMessageId(null);
 
-      const streamedMessage = await streamAssistantMessage(historyMessages, nextModelMessage.id, modelConfig);
+      const streamedMessage = await streamAssistantMessage(regenerateHistoryMessages, nextModelMessage.id, modelConfig);
       const savedMessages = [...nextMessages.slice(0, -1), { ...nextModelMessage, ...streamedMessage }];
       set({ messages: savedMessages });
       if (sessionStore.activeSessionId) await sessionStore.persistSessionMessages(sessionStore.activeSessionId, savedMessages);
