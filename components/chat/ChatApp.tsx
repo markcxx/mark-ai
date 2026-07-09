@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 
 import { NOT_IMPLEMENTED_TOAST, THINKING_TEXTS } from '@/lib/chat/constants';
@@ -11,6 +11,7 @@ import { useSessionStore, navigateToNewChat } from '@/stores/useSessionStore';
 import { useUIStore } from '@/stores/useUIStore';
 
 import { ChatInput } from './ChatInput';
+import { ChatMiniMap } from './ChatMiniMap';
 import { MessageItem } from './MessageItem';
 import { SelectToHereButton } from './SelectToHereButton';
 import { SelectionFooterBar } from './SelectionFooterBar';
@@ -72,6 +73,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   const isLoadingModels = useUIStore((s) => s.isLoadingModels);
   const selectedModelKey = useUIStore((s) => s.selectedModelKey);
   const modelSearchKeyword = useUIStore((s) => s.modelSearchKeyword);
+  const wideChatMode = useUIStore((s) => s.wideChatMode);
 
   // Session Store
   const sessions = useSessionStore((s) => s.sessions);
@@ -94,9 +96,12 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   const userHasScrolledAwayRef = useRef(false);
   const isAutoScrollingRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [selectionLayoutMode, setSelectionLayoutMode] = useState(false);
+  const [activeMiniMapMessageId, setActiveMiniMapMessageId] = useState<string | null>(null);
 
   // Derived
   const selectedModel = availableModels.find((m) => getModelKey(m) === selectedModelKey);
+  const activeSession = sessions.find((session) => session.id === activeSessionId);
   const showWelcome = messages.length === 0 && !multiSelectMode;
 
   // Scroll helpers
@@ -120,6 +125,21 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
     if (!container) return;
     userHasScrolledAwayRef.current =
       container.scrollHeight - container.scrollTop - container.clientHeight > BOTTOM_SCROLL_THRESHOLD;
+
+    const containerTop = container.getBoundingClientRect().top;
+    const nodes = Array.from(container.querySelectorAll<HTMLElement>('[data-message-id]'));
+    let activeId: string | null = null;
+
+    for (const node of nodes) {
+      if (node.getBoundingClientRect().top - containerTop <= 96) {
+        activeId = node.dataset.messageId || activeId;
+      } else {
+        break;
+      }
+    }
+
+    if (!activeId && nodes[0]) activeId = nodes[0].dataset.messageId || null;
+    setActiveMiniMapMessageId((current) => (current === activeId ? current : activeId));
   }, []);
 
   const handleLoadSession = useCallback(async (
@@ -187,6 +207,14 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
     const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') useUIStore.getState().exitMultiSelect(); };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [multiSelectMode]);
+
+  // Keep the full-width selection layout briefly after exit so the row can animate closed.
+  useEffect(() => {
+    if (multiSelectMode) return;
+
+    const timeout = window.setTimeout(() => setSelectionLayoutMode(false), 180);
+    return () => window.clearTimeout(timeout);
   }, [multiSelectMode]);
 
   // Browser history popstate
@@ -289,6 +317,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
         onNewChat={handleNewChat}
         onRenameSession={(id) => useSessionStore.getState().renameSession(id)}
         onSelectSession={handleLoadSession}
+        onToggleFavorite={(id, favorite) => useSessionStore.getState().updateSessionFavorite(id, favorite)}
         onUpdateSessionTitle={(id, title) => useSessionStore.getState().updateSessionTitle(id, title)}
         onUnavailable={() => toast(NOT_IMPLEMENTED_TOAST)}
         sessions={sessions}
@@ -313,10 +342,37 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
         )}
 
         <TopHeader
+          activeSession={activeSession}
           copyConversation={() => useChatStore.getState().copyConversation()}
+          copySessionId={() => {
+            if (!activeSessionId) { toast.error('当前没有会话 ID'); return; }
+            void navigator.clipboard.writeText(activeSessionId);
+            toast.success('会话 ID 已复制');
+          }}
+          deleteSession={() => {
+            if (!activeSessionId) { toast.error('当前没有可删除的会话'); return; }
+            void useSessionStore.getState().deleteSession(activeSessionId);
+          }}
+          isFavorite={Boolean(activeSession?.favorite)}
           isSidebarOpen={isSidebarOpen}
-          onMore={() => toast(NOT_IMPLEMENTED_TOAST)}
+          isWideChatMode={wideChatMode}
           onOpenSidebar={() => useUIStore.getState().setSidebarOpen(true)}
+          smartRenameSession={() => {
+            if (!activeSessionId) { toast.error('当前没有可重命名的会话'); return; }
+            void useSessionStore.getState().renameSession(activeSessionId);
+          }}
+          toggleFavorite={() => {
+            if (!activeSessionId) { toast.error('当前没有可收藏的会话'); return; }
+            void useSessionStore.getState().updateSessionFavorite(
+              activeSessionId,
+              !activeSession?.favorite,
+            );
+          }}
+          toggleWideChatMode={() => useUIStore.getState().setWideChatMode(!wideChatMode)}
+          updateSessionTitle={(title) => {
+            if (!activeSessionId) { toast.error('当前没有可重命名的会话'); return; }
+            void useSessionStore.getState().updateSessionTitle(activeSessionId, title);
+          }}
         />
 
         <div
@@ -351,7 +407,16 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
               />
             </WelcomePanel>
           ) : (
-            <div className="flex w-full max-w-[840px] flex-col gap-8">
+            <div
+              className={cn(
+                'flex w-full flex-col transition-[max-width,gap] duration-200 ease-out',
+                selectionLayoutMode
+                  ? 'max-w-none gap-0'
+                  : wideChatMode
+                    ? 'max-w-[1120px] gap-8'
+                    : 'max-w-[840px] gap-8',
+              )}
+            >
               {messages.map((message) => (
                 <MessageItem
                   cancelEditingMessage={() => useChatStore.getState().cancelEditing()}
@@ -361,7 +426,12 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                   deleteMessage={(id) => useChatStore.getState().deleteMessage(id)}
                   editingContent={editingContent}
                   editingMessageId={editingMessageId}
-                  enableMultiSelect={(id) => useUIStore.getState().enableMultiSelect(id)}
+                  enableMultiSelect={(id) => {
+                    setSelectionLayoutMode(true);
+                    window.requestAnimationFrame(() => {
+                      useUIStore.getState().enableMultiSelect(id);
+                    });
+                  }}
                   getMessageModel={getMessageModel}
                   isSelected={selectedMessageIds.includes(message.id)}
                   key={message.id}
@@ -373,6 +443,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                   regenerateMessage={(m, del) => useChatStore.getState().regenerateMessage(m, del)}
                   saveEditingMessage={() => useChatStore.getState().saveEditing()}
                   selectedModel={selectedModel}
+                  selectionLayoutMode={selectionLayoutMode}
                   setEditingContent={(c) => useChatStore.setState({ editingContent: c })}
                   setOpenMenuMessageId={(id) => useUIStore.getState().setOpenMenuMessageId(id)}
                   startEditingMessage={(m) => useChatStore.getState().startEditing(m)}
@@ -384,6 +455,13 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
             </div>
           )}
         </div>
+
+        {!isLoadingActiveSession && !showWelcome && !multiSelectMode && (
+          <ChatMiniMap
+            activeMessageId={activeMiniMapMessageId || messages[0]?.id || null}
+            messages={messages}
+          />
+        )}
 
         {multiSelectMode && !isLoadingActiveSession && !showWelcome && (
           <SelectToHereButton

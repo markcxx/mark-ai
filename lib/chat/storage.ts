@@ -46,6 +46,7 @@ const ensureDatabase = () => {
     CREATE TABLE IF NOT EXISTS chat_sessions (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
+      favorite INTEGER,
       model TEXT,
       provider TEXT,
       created_at INTEGER NOT NULL,
@@ -77,6 +78,16 @@ const ensureDatabase = () => {
       ON chat_sessions(updated_at DESC);
   `);
 
+  const sessionColumns = new Set(
+    db.prepare('PRAGMA table_info(chat_sessions)').all().map((row: any) => String(row.name)),
+  );
+  const ensureSessionColumn = (name: string, definition: string) => {
+    if (sessionColumns.has(name)) return;
+    db!.exec(`ALTER TABLE chat_sessions ADD COLUMN ${definition}`);
+  };
+
+  ensureSessionColumn('favorite', 'favorite INTEGER');
+
   const columns = new Set(
     db.prepare('PRAGMA table_info(chat_messages)').all().map((row: any) => String(row.name)),
   );
@@ -96,6 +107,7 @@ const ensureDatabase = () => {
 
 const toSession = (row: any): ChatSession => ({
   createdAt: Number(row.created_at),
+  favorite: Boolean(row.favorite),
   id: String(row.id),
   messageCount: Number(row.message_count || 0),
   model: row.model || undefined,
@@ -128,6 +140,7 @@ export const listChatSessions = () => {
       SELECT
         s.id,
         s.title,
+        s.favorite,
         s.model,
         s.provider,
         s.created_at,
@@ -136,7 +149,7 @@ export const listChatSessions = () => {
       FROM chat_sessions s
       LEFT JOIN chat_messages m ON m.session_id = s.id
       GROUP BY s.id
-      ORDER BY s.updated_at DESC
+      ORDER BY s.favorite DESC, s.updated_at DESC
     `)
     .all();
 
@@ -159,12 +172,13 @@ export const createChatSession = ({
 
   ensureDatabase()
     .prepare(
-      `INSERT INTO chat_sessions (id, title, model, provider, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO chat_sessions (id, title, favorite, model, provider, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       id,
       title?.trim() || getTemporarySessionTitle(initialMessage),
+      0,
       model || null,
       provider || null,
       now,
@@ -180,6 +194,7 @@ export const getChatSession = (sessionId: string) => {
       SELECT
         s.id,
         s.title,
+        s.favorite,
         s.model,
         s.provider,
         s.created_at,
@@ -228,6 +243,14 @@ export const updateChatSessionTitle = (sessionId: string, title: string) => {
   ensureDatabase()
     .prepare('UPDATE chat_sessions SET title = ?, updated_at = ? WHERE id = ?')
     .run(nextTitle, Date.now(), sessionId);
+
+  return getChatSession(sessionId);
+};
+
+export const updateChatSessionFavorite = (sessionId: string, favorite: boolean) => {
+  ensureDatabase()
+    .prepare('UPDATE chat_sessions SET favorite = ?, updated_at = ? WHERE id = ?')
+    .run(favorite ? 1 : 0, Date.now(), sessionId);
 
   return getChatSession(sessionId);
 };

@@ -23,6 +23,7 @@ export type ChatSession = {
   title: string;
   createdAt: number;
   updatedAt: number;
+  favorite?: boolean;
   model?: string;
   provider?: string;
   messageCount: number;

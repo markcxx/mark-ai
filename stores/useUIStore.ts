@@ -13,6 +13,7 @@ interface UIState {
   multiSelectMode: boolean;
   selectedMessageIds: string[];
   selectionAnchorId: string | undefined;
+  wideChatMode: boolean;
   modelSearchKeyword: string;
   availableModels: ConfiguredModel[];
   isLoadingModels: boolean;
@@ -29,6 +30,7 @@ interface UIActions {
   enableMultiSelect: (id: string) => void;
   toggleSelectedMessage: (id: string, shiftKey: boolean, messages: Message[]) => void;
   selectToHere: (targetId: string | undefined, messages: Message[]) => void;
+  setWideChatMode: (wide: boolean) => void;
   exitMultiSelect: () => void;
   removeFromSelection: (ids: string[]) => void;
   removeFromCollapsed: (ids: string[]) => void;
@@ -55,6 +57,7 @@ export const useUIStore = create<UIStore>()(
     multiSelectMode: false,
     selectedMessageIds: [],
     selectionAnchorId: undefined,
+    wideChatMode: false,
     modelSearchKeyword: '',
     availableModels: [],
     isLoadingModels: true,
@@ -156,6 +159,7 @@ export const useUIStore = create<UIStore>()(
     },
 
     setSelectedModelKey: (key) => set({ selectedModelKey: key }),
+    setWideChatMode: (wide) => set({ wideChatMode: wide }),
     setModelSearchKeyword: (keyword) => set({ modelSearchKeyword: keyword }),
   })),
 );

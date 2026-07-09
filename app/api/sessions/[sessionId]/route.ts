@@ -4,6 +4,7 @@ import {
   deleteChatSession,
   getChatMessages,
   getChatSession,
+  updateChatSessionFavorite,
   updateChatSessionTitle,
 } from '@/lib/chat/storage';
 
@@ -53,6 +54,11 @@ export async function PATCH(
   }
 
   const body = await req.json().catch(() => ({}));
+  if (typeof body.favorite === 'boolean') {
+    const session = updateChatSessionFavorite(sessionId, body.favorite);
+    return NextResponse.json({ session });
+  }
+
   const title = typeof body.title === 'string' ? body.title : '';
   const session = updateChatSessionTitle(sessionId, title);
 

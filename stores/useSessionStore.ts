@@ -19,6 +19,7 @@ interface SessionActions {
   deleteSession: (sessionId: string) => Promise<void>;
   renameSession: (sessionId: string) => Promise<void>;
   updateSessionTitle: (sessionId: string, title: string) => Promise<void>;
+  updateSessionFavorite: (sessionId: string, favorite: boolean) => Promise<void>;
   persistSessionMessages: (sessionId: string, messages: Message[]) => Promise<ChatSession | undefined>;
   generateSessionTitle: (sessionId: string, messages: Message[]) => Promise<void>;
   upsertSession: (session: ChatSession) => void;
@@ -217,6 +218,27 @@ export const useSessionStore = create<SessionStore>()(
       } catch (error) {
         console.error('Session title update error:', error);
         toast.error('重命名失败');
+      } finally {
+        get().setSessionLoading(sessionId, false);
+      }
+    },
+
+    updateSessionFavorite: async (sessionId, favorite) => {
+      get().setSessionLoading(sessionId, true);
+      try {
+        const response = await fetch(`/api/sessions/${sessionId}`, {
+          body: JSON.stringify({ favorite }),
+          headers: { 'Content-Type': 'application/json' },
+          method: 'PATCH',
+        });
+        if (!response.ok) throw new Error('Failed to update session favorite');
+
+        const data = await response.json();
+        if (data.session) get().upsertSession(data.session);
+        toast.success(favorite ? '已收藏会话' : '已取消收藏');
+      } catch (error) {
+        console.error('Session favorite update error:', error);
+        toast.error('收藏状态更新失败');
       } finally {
         get().setSessionLoading(sessionId, false);
       }

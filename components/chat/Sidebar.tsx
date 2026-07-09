@@ -1,6 +1,8 @@
 'use client';
 
 import {
+  ChevronDown,
+  ChevronRight,
   Copy,
   Hash,
   HelpCircle,
@@ -10,6 +12,7 @@ import {
   Plus,
   Puzzle,
   Settings,
+  Star,
   Trash2,
   Wand2,
 } from 'lucide-react';
@@ -17,8 +20,30 @@ import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 
 import { NOT_IMPLEMENTED_TOAST } from '@/lib/chat/constants';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { InlineTextEdit } from '@/components/ui/InlineTextEdit';
 import type { ChatSession } from '@/lib/chat/types';
 import { cn } from '@/lib/utils';
+
+const getSessionTimeGroup = (updatedAt: number) => {
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const day = 24 * 60 * 60 * 1000;
+
+  if (updatedAt >= todayStart) return 'today';
+  if (updatedAt >= todayStart - day) return 'yesterday';
+  if (updatedAt >= todayStart - 7 * day) return 'week';
+  if (updatedAt >= todayStart - 30 * day) return 'month';
+  return 'earlier';
+};
+
+const SESSION_GROUPS = [
+  { key: 'today', label: '今天' },
+  { key: 'yesterday', label: '昨天' },
+  { key: 'week', label: '近 7 天' },
+  { key: 'month', label: '近 30 天' },
+  { key: 'earlier', label: '更早' },
+];
 
 function SessionSkeletonList() {
   return (
@@ -44,6 +69,7 @@ export function Sidebar({
   onNewChat,
   onRenameSession,
   onSelectSession,
+  onToggleFavorite,
   onUpdateSessionTitle,
   onUnavailable,
   sessions,
@@ -59,13 +85,22 @@ export function Sidebar({
   onNewChat: () => void;
   onRenameSession: (sessionId: string) => void;
   onSelectSession: (sessionId: string) => void;
+  onToggleFavorite: (sessionId: string, favorite: boolean) => void;
   onUpdateSessionTitle: (sessionId: string, title: string) => void;
   onUnavailable: (message?: string) => void;
   sessions: ChatSession[];
   width: number;
 }) {
   const [openSessionMenuId, setOpenSessionMenuId] = useState<string | null>(null);
+  const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [deletingSession, setDeletingSession] = useState<ChatSession | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const groupedSessions = SESSION_GROUPS.map((group) => ({
+    ...group,
+    sessions: sessions.filter((session) => getSessionTimeGroup(session.updatedAt) === group.key),
+  })).filter((group) => group.sessions.length > 0);
 
   useEffect(() => {
     if (!openSessionMenuId) return;
@@ -152,62 +187,112 @@ export function Sidebar({
             {!isLoadingSessions && sessions.length === 0 && (
               <div className="px-3 py-2 text-sm text-gray-400">暂无历史对话</div>
             )}
-            {sessions.map((session) => {
-              const active = activeSessionId === session.id;
-              const loading = loadingSessionIds.includes(session.id);
-              const menuOpen = openSessionMenuId === session.id;
-
+            {groupedSessions.map((group) => {
+              const collapsed = collapsedGroups.includes(group.key);
               return (
-                <div
-                  className="relative"
-                  key={session.id}
-                  ref={menuOpen ? menuRef : undefined}
-                >
-                  <div
-                    className={cn(
-                      'group flex h-9 min-w-0 items-center gap-2 overflow-hidden rounded-lg px-1 text-sm transition-colors',
-                      active ? 'bg-[#eceef0] dark:bg-gray-800 text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-300 hover:bg-[#f0f1f2] dark:hover:bg-gray-800/60',
-                    )}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        onSelectSession(session.id);
-                      }
-                    }}
-                    onClick={() => onSelectSession(session.id)}
-                    role="button"
-                    tabIndex={0}
+                <div className="flex flex-col gap-1" key={group.key}>
+                  <button
+                    className="mt-1 flex h-7 items-center gap-1 rounded-md px-2 text-left text-xs font-medium text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                    onClick={() =>
+                      setCollapsedGroups((current) =>
+                        current.includes(group.key)
+                          ? current.filter((key) => key !== group.key)
+                          : [...current, group.key],
+                      )
+                    }
+                    type="button"
                   >
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center text-gray-400">
-                      <Hash size={15} />
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-left">
-                      {session.title || '新对话'}
-                    </span>
-                    {loading ? (
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center">
-                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
-                      </span>
-                    ) : (
-                      <button
-                        className={cn(
-                          'flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-400 opacity-0 transition-opacity hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-800 dark:hover:text-gray-200 group-hover:opacity-100',
-                          menuOpen && 'opacity-100',
-                        )}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          setOpenSessionMenuId(menuOpen ? null : session.id);
-                        }}
-                        title="更多"
-                        type="button"
-                      >
-                        <MoreHorizontal size={15} />
-                      </button>
-                    )}
-                  </div>
+                    {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+                    <span>{group.label}</span>
+                    <span className="ml-auto tabular-nums">{group.sessions.length}</span>
+                  </button>
 
-                  {menuOpen && (
+                  {!collapsed && group.sessions.map((session) => {
+                    const active = activeSessionId === session.id;
+                    const loading = loadingSessionIds.includes(session.id);
+                    const menuOpen = openSessionMenuId === session.id;
+
+                    return (
+                      <div
+                        className="relative"
+                        key={session.id}
+                        ref={menuOpen ? menuRef : undefined}
+                      >
+                        <div
+                          className={cn(
+                            'group flex h-9 min-w-0 items-center gap-2 overflow-hidden rounded-lg px-1 text-sm transition-colors',
+                            active ? 'bg-[#eceef0] dark:bg-gray-800 text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-300 hover:bg-[#f0f1f2] dark:hover:bg-gray-800/60',
+                          )}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              onSelectSession(session.id);
+                            }
+                          }}
+                          onClick={() => onSelectSession(session.id)}
+                          role="button"
+                          tabIndex={0}
+                        >
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center text-gray-400">
+                            <Hash size={15} />
+                          </span>
+                          {editingSessionId === session.id ? (
+                            <InlineTextEdit
+                              className="h-7 min-w-0 flex-1 px-2 text-sm"
+                              onCancel={() => setEditingSessionId(null)}
+                              onChange={setEditingTitle}
+                              onSave={() => {
+                                const nextTitle = editingTitle.trim();
+                                setEditingSessionId(null);
+                                if (nextTitle && nextTitle !== session.title) {
+                                  onUpdateSessionTitle(session.id, nextTitle);
+                                }
+                              }}
+                              value={editingTitle}
+                            />
+                          ) : (
+                            <span className="min-w-0 flex-1 truncate text-left">
+                              {session.title || '新对话'}
+                            </span>
+                          )}
+                          {session.favorite && (
+                            <button
+                              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-amber-400 transition-colors hover:bg-amber-100/70 hover:text-amber-500 dark:hover:bg-amber-400/10"
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                onToggleFavorite(session.id, false);
+                              }}
+                              title="取消收藏"
+                              type="button"
+                            >
+                              <Star fill="currentColor" size={14} />
+                            </button>
+                          )}
+                          {loading ? (
+                            <span className="flex h-7 w-7 shrink-0 items-center justify-center">
+                              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
+                            </span>
+                          ) : (
+                            <button
+                              className={cn(
+                                'flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-400 opacity-0 transition-opacity hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-800 dark:hover:text-gray-200 group-hover:opacity-100',
+                                menuOpen && 'opacity-100',
+                              )}
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                setOpenSessionMenuId(menuOpen ? null : session.id);
+                              }}
+                              title="更多"
+                              type="button"
+                            >
+                              <MoreHorizontal size={15} />
+                            </button>
+                          )}
+                        </div>
+
+                        {menuOpen && (
                     <div className="absolute right-1 top-8 z-50 min-w-36 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-1 text-sm shadow-[0_12px_32px_rgba(0,0,0,0.12)]">
                       <button
                         className="flex h-8 w-full items-center gap-2 px-2.5 text-left text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -224,10 +309,8 @@ export function Sidebar({
                         className="flex h-8 w-full items-center gap-2 px-2.5 text-left text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
                         onClick={() => {
                           setOpenSessionMenuId(null);
-                          const nextTitle = window.prompt('重命名会话', session.title);
-                          if (nextTitle?.trim()) {
-                            onUpdateSessionTitle(session.id, nextTitle.trim());
-                          }
+                          setEditingSessionId(session.id);
+                          setEditingTitle(session.title || '新对话');
                         }}
                         type="button"
                       >
@@ -250,9 +333,7 @@ export function Sidebar({
                         className="flex h-8 w-full items-center gap-2 px-2.5 text-left text-red-600 dark:text-red-400 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20"
                         onClick={() => {
                           setOpenSessionMenuId(null);
-                          if (window.confirm('确定删除这个会话吗？')) {
-                            onDeleteSession(session.id);
-                          }
+                          setDeletingSession(session);
                         }}
                         type="button"
                       >
@@ -260,7 +341,10 @@ export function Sidebar({
                         <span>删除</span>
                       </button>
                     </div>
-                  )}
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}
@@ -288,6 +372,17 @@ export function Sidebar({
           </nav>
         </div>
       </div>
+      <ConfirmDialog
+        confirmText="删除"
+        description={`“${deletingSession?.title || '新对话'}” 会被永久删除，此操作无法撤销。`}
+        onCancel={() => setDeletingSession(null)}
+        onConfirm={() => {
+          if (deletingSession) onDeleteSession(deletingSession.id);
+          setDeletingSession(null);
+        }}
+        open={Boolean(deletingSession)}
+        title="删除这个会话？"
+      />
     </aside>
   );
 }

@@ -139,6 +139,7 @@ export function MessageItem({
   regenerateMessage,
   saveEditingMessage,
   selectedModel,
+  selectionLayoutMode,
   setEditingContent,
   setOpenMenuMessageId,
   startEditingMessage,
@@ -163,6 +164,7 @@ export function MessageItem({
   regenerateMessage: (message: Message, deleteCurrent?: boolean) => Promise<void>;
   saveEditingMessage: () => void;
   selectedModel?: ConfiguredModel;
+  selectionLayoutMode: boolean;
   setEditingContent: (content: string) => void;
   setOpenMenuMessageId: (id: string | null) => void;
   startEditingMessage: (message: Message) => void;
@@ -218,6 +220,15 @@ export function MessageItem({
     : undefined;
   const body = message.role === 'user' ? (
     <div className="group group/message relative flex w-full flex-col items-end">
+      {relativeTime && (
+        <time
+          className="mb-2 mr-1 text-xs text-gray-400 opacity-0 transition-opacity duration-200 group-hover/message:opacity-100 dark:text-gray-500"
+          dateTime={message.createdAt ? new Date(message.createdAt).toISOString() : undefined}
+          title={absoluteTime}
+        >
+          {relativeTime}
+        </time>
+      )}
       {editing ? (
         <div className="w-full max-w-[85%] rounded-2xl rounded-tr-sm bg-[var(--chat-user-bubble-bg)] p-3 shadow-sm">
           <textarea
@@ -420,7 +431,8 @@ export function MessageItem({
         isSelected={isSelected}
         message={message}
         onToggle={toggleSelectedMessage}
-        selectionMode={multiSelectMode}
+        selectionInteractive={multiSelectMode}
+        selectionMode={selectionLayoutMode}
       >
         {body}
       </MessageSelectionWrapper>
