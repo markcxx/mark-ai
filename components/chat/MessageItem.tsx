@@ -9,6 +9,7 @@ import {
   Minimize2,
   MoreHorizontal,
   Pencil,
+  Play,
   RotateCw,
   Share2,
   Trash2,
@@ -16,6 +17,7 @@ import {
 } from 'lucide-react';
 
 import type { ConfiguredModel, MenuItem, Message } from '@/lib/chat/types';
+import { formatDuration, formatRelativeTime } from '@/lib/chat/metrics';
 import { cn } from '@/lib/utils';
 
 import { CollapsibleContent } from './CollapsibleContent';
@@ -63,9 +65,65 @@ function MoreMenuButton({
   );
 }
 
+function MessageStats({ message }: { message: Message }) {
+  if (message.role !== 'model' || message.isStreaming) return null;
+
+  const duration = formatDuration(message.generationDuration);
+  const items = [
+    message.inputTokens ? `输入约 ${message.inputTokens}` : undefined,
+    message.outputTokens ? `输出约 ${message.outputTokens}` : undefined,
+    message.totalTokens ? `共约 ${message.totalTokens} tokens` : undefined,
+    duration ? `耗时 ${duration}` : undefined,
+  ].filter(Boolean);
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-400 opacity-0 transition-opacity duration-200 group-hover/message:opacity-100 dark:text-gray-500">
+      {items.map((item, index) => (
+        <span className="inline-flex items-center gap-2" key={item}>
+          {index > 0 && <span className="h-1 w-1 rounded-full bg-gray-300 dark:bg-gray-600" />}
+          {item}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function InterruptedHint({
+  onContinue,
+  onRegenerate,
+}: {
+  onContinue: () => void;
+  onRegenerate: () => void;
+}) {
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+      <span>已中断 · 接下来需要做什么？</span>
+      <button
+        className="inline-flex h-6 items-center gap-1 rounded-md px-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-gray-100"
+        onClick={onContinue}
+        type="button"
+      >
+        <Play size={12} />
+        继续生成
+      </button>
+      <button
+        className="inline-flex h-6 items-center gap-1 rounded-md px-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-gray-100"
+        onClick={onRegenerate}
+        type="button"
+      >
+        <RotateCw size={12} />
+        重新生成
+      </button>
+    </div>
+  );
+}
+
 export function MessageItem({
   cancelEditingMessage,
   collapsed,
+  continueMessage,
   copyMessage,
   deleteMessage,
   editingContent,
@@ -89,6 +147,7 @@ export function MessageItem({
 }: {
   cancelEditingMessage: () => void;
   collapsed: boolean;
+  continueMessage: (message: Message) => Promise<void>;
   copyMessage: (message: Message) => void;
   deleteMessage: (id: string) => void;
   editingContent: string;
@@ -147,10 +206,20 @@ export function MessageItem({
   );
 
   const editing = editingMessageId === message.id;
+  const relativeTime = formatRelativeTime(message.createdAt);
+  const absoluteTime = message.createdAt
+    ? new Intl.DateTimeFormat('zh-CN', {
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      }).format(message.createdAt)
+    : undefined;
   const body = message.role === 'user' ? (
-    <div className="group relative flex w-full flex-col items-end">
+    <div className="group group/message relative flex w-full flex-col items-end">
       {editing ? (
-        <div className="w-full max-w-[85%] rounded-2xl rounded-tr-sm bg-[#f3f4f5] dark:bg-gray-800 p-3 shadow-sm">
+        <div className="w-full max-w-[85%] rounded-2xl rounded-tr-sm bg-[var(--chat-user-bubble-bg)] p-3 shadow-sm">
           <textarea
             autoFocus
             className="min-h-[96px] w-full resize-y rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-[15px] text-gray-900 dark:text-gray-100 outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
@@ -176,7 +245,7 @@ export function MessageItem({
         </div>
       ) : (
         <div
-          className="w-fit max-w-[85%] break-words rounded-2xl rounded-tr-sm bg-[#f3f4f5] dark:bg-gray-800 px-5 py-3 text-left text-[15px] text-gray-900 dark:text-gray-100 shadow-sm whitespace-pre-wrap"
+          className="w-fit max-w-[85%] break-words rounded-2xl rounded-tr-sm bg-[var(--chat-user-bubble-bg)] px-5 py-3 text-left text-[15px] text-gray-900 dark:text-gray-100 shadow-sm whitespace-pre-wrap"
         >
           <CollapsibleContent>{collapsed ? '消息已收起' : message.content}</CollapsibleContent>
         </div>
@@ -218,13 +287,24 @@ export function MessageItem({
       )}
     </div>
   ) : (
-    <div className="group relative w-full">
+    <div className="group group/message relative w-full">
       <div className="message-header mb-3 flex items-center gap-2.5">
         <ModelAvatar model={message.model} provider={message.provider} />
         <div className="flex min-w-0 flex-col">
-          <span className="truncate font-jakarta text-[15px] font-bold text-gray-900 dark:text-gray-100">
-            {message.model || selectedModel?.id}
-          </span>
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="truncate font-jakarta text-[15px] font-bold text-gray-900 dark:text-gray-100">
+              {message.model || selectedModel?.id}
+            </span>
+            {relativeTime && (
+              <time
+                className="shrink-0 text-xs text-gray-400 opacity-0 transition-opacity duration-200 group-hover/message:opacity-100 dark:text-gray-500"
+                dateTime={message.createdAt ? new Date(message.createdAt).toISOString() : undefined}
+                title={absoluteTime}
+              >
+                {relativeTime}
+              </time>
+            )}
+          </div>
           {message.isStreaming && (
             <span className="mt-0.5 animate-pulse text-xs font-medium text-gray-400">
               {loadingText}
@@ -274,6 +354,13 @@ export function MessageItem({
             {message.isStreaming && message.content && (
               <span className="ml-1 inline-block h-4 w-2 animate-pulse rounded-full bg-primary align-middle" />
             )}
+            {message.interrupted && (
+              <InterruptedHint
+                onContinue={() => continueMessage(message)}
+                onRegenerate={() => regenerateMessage(message)}
+              />
+            )}
+            <MessageStats message={message} />
           </>
         )}
       </div>
@@ -340,4 +427,3 @@ export function MessageItem({
     </div>
   );
 }
-

@@ -15,7 +15,7 @@ export function TopHeader({
   onOpenSidebar: () => void;
 }) {
   return (
-    <header className="sticky top-0 z-20 flex h-16 w-full items-center justify-between bg-white/80 dark:bg-gray-900/80 px-6 backdrop-blur-md">
+    <header className="sticky top-0 z-20 flex h-16 w-full items-center justify-between bg-[var(--chat-header-bg)] px-6 backdrop-blur-md">
       <div className="flex items-center">
         {!isSidebarOpen && (
           <button

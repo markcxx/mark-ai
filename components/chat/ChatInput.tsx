@@ -3,8 +3,7 @@
 import type { RefObject } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { ModelIcon } from '@lobehub/icons';
-import { ChatSendButton } from '@lobehub/ui/mobile';
-import { ChevronDown, Mic, Paperclip, Search } from 'lucide-react';
+import { ChevronDown, Mic, Paperclip, Search, SendHorizontal, Square } from 'lucide-react';
 
 import type { ConfiguredModel } from '@/lib/chat/types';
 import { getModelKey } from '@/lib/chat/helpers';
@@ -75,7 +74,7 @@ export function ChatInput({
     <div
       className={cn(
         placement === 'bottom'
-          ? 'pointer-events-none absolute bottom-0 left-0 right-0 z-20 flex justify-center bg-gradient-to-t from-white dark:from-gray-900 via-white/80 dark:via-gray-900/80 to-transparent p-4 pb-6 pt-10 md:px-8 md:pb-8'
+          ? 'pointer-events-none absolute bottom-0 left-0 right-0 z-20 flex justify-center bg-gradient-to-t from-[var(--chat-input-overlay-from)] via-[var(--chat-input-overlay-via)] to-transparent p-4 pb-6 pt-10 md:px-8 md:pb-8'
           : 'w-full',
       )}
     >
@@ -85,7 +84,7 @@ export function ChatInput({
           placement === 'bottom' ? 'pointer-events-auto max-w-[840px]' : 'max-w-[760px]',
         )}
       >
-        <div className="relative flex flex-col rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-[0_12px_32px_rgba(0,0,0,0.06)] dark:shadow-[0_12px_32px_rgba(0,0,0,0.3)] transition-all duration-300 focus-within:border-primary/30 focus-within:ring-2 focus-within:ring-primary/20">
+        <div className="relative flex flex-col rounded-xl border border-gray-200 bg-[var(--chat-input-bg)] shadow-[0_12px_32px_rgba(0,0,0,0.06)] transition-all duration-300 focus-within:border-primary/30 focus-within:ring-2 focus-within:ring-primary/20 dark:border-white/10 dark:shadow-[0_14px_40px_rgba(0,0,0,0.35)] dark:focus-within:border-white/20 dark:focus-within:ring-white/[0.06]">
           <textarea
             className="max-h-[200px] min-h-[64px] w-full resize-none border-none bg-transparent px-4 py-4 text-[15px] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-0"
             disabled={isLoading || !selectedModel}
@@ -149,7 +148,7 @@ export function ChatInput({
                 </button>
 
                 {isModelDropdownOpen && availableModels.length > 0 && (
-                  <div className="absolute bottom-full right-0 z-50 mb-2 flex max-h-[460px] w-[min(320px,calc(100vw-32px))] select-none flex-col overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-0 shadow-[0_12px_40px_rgba(0,0,0,0.14)]">
+                  <div className="absolute bottom-full right-0 z-50 mb-2 flex max-h-[460px] w-[min(320px,calc(100vw-32px))] select-none flex-col overflow-hidden rounded-xl border border-gray-200 bg-[var(--chat-popover-bg)] p-0 shadow-[0_12px_40px_rgba(0,0,0,0.14)] dark:border-white/10">
                     <div className="flex h-10 items-center border-b border-gray-100 dark:border-gray-700 px-2">
                       <div className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-gray-400 focus-within:bg-gray-50 dark:focus-within:bg-gray-700">
                         <Search size={16} />
@@ -198,13 +197,26 @@ export function ChatInput({
                   </div>
                 )}
               </div>
-              <ChatSendButton
-                className="!h-9 !w-9 !min-w-9 !rounded-full !p-0 shadow-sm transition-transform duration-150 ease-out hover:scale-105 active:scale-95 disabled:hover:scale-100 dark:[&_svg]:!text-white dark:[&_svg]:!stroke-white"
+              <button
+                aria-label={isLoading ? '停止生成' : '发送消息'}
+                className={cn(
+                  'relative flex h-9 w-9 min-w-9 items-center justify-center overflow-hidden rounded-full bg-gray-950 text-white shadow-sm transition-transform duration-150 ease-out hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 disabled:hover:scale-100 dark:bg-white dark:text-gray-950 dark:disabled:bg-gray-700 dark:disabled:text-gray-400',
+                  isLoading && 'bg-red-500 text-white hover:bg-red-600 dark:bg-red-500 dark:text-white dark:hover:bg-red-600',
+                )}
                 disabled={(!input.trim() && !isLoading) || !selectedModel}
-                loading={isLoading}
-                onStop={onSend}
-                onSend={onSend}
-              />
+                onClick={onSend}
+                title={isLoading ? '停止生成' : '发送'}
+                type="button"
+              >
+                {isLoading ? (
+                  <>
+                    <span className="absolute inset-1 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                    <Square className="relative z-10" fill="currentColor" size={11} />
+                  </>
+                ) : (
+                  <SendHorizontal size={17} />
+                )}
+              </button>
             </div>
           </div>
         </div>

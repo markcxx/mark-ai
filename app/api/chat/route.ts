@@ -9,6 +9,12 @@ type ChatMessage = {
 
 type StreamEventType = 'content' | 'reasoning';
 
+type UsagePayload = {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+};
+
 const toOpenAIChatEndpoint = (baseUrl?: string) => {
   if (!baseUrl) return undefined;
 
@@ -47,6 +53,9 @@ const getChoiceText = (choice: any, fields: string[]) => {
 
 const encodeStreamEvent = (encoder: TextEncoder, type: StreamEventType, text: string) =>
   encoder.encode(`${JSON.stringify({ type, text })}\n`);
+
+const encodeUsageEvent = (encoder: TextEncoder, usage: UsagePayload) =>
+  encoder.encode(`${JSON.stringify({ type: 'usage', ...usage })}\n`);
 
 const createOpenAICompatibleStream = async (
   messages: ChatMessage[],
@@ -105,6 +114,17 @@ const createOpenAICompatibleStream = async (
         try {
           const parsed = JSON.parse(data);
           const choices = Array.isArray(parsed.choices) ? parsed.choices : [];
+          const usage = parsed.usage;
+
+          if (usage && typeof usage === 'object') {
+            controller.enqueue(encodeUsageEvent(encoder, {
+              inputTokens: Number.isFinite(usage.prompt_tokens) ? usage.prompt_tokens : undefined,
+              outputTokens: Number.isFinite(usage.completion_tokens)
+                ? usage.completion_tokens
+                : undefined,
+              totalTokens: Number.isFinite(usage.total_tokens) ? usage.total_tokens : undefined,
+            }));
+          }
 
           for (const choice of choices) {
             const reasoning = getChoiceText(choice, [
@@ -208,6 +228,20 @@ export async function POST(req: NextRequest) {
         for await (const chunk of responseStream) {
           if (chunk.text) {
             controller.enqueue(encodeStreamEvent(encoder, 'content', chunk.text));
+          }
+          const usageMetadata = (chunk as any).usageMetadata;
+          if (usageMetadata) {
+            controller.enqueue(encodeUsageEvent(encoder, {
+              inputTokens: Number.isFinite(usageMetadata.promptTokenCount)
+                ? usageMetadata.promptTokenCount
+                : undefined,
+              outputTokens: Number.isFinite(usageMetadata.candidatesTokenCount)
+                ? usageMetadata.candidatesTokenCount
+                : undefined,
+              totalTokens: Number.isFinite(usageMetadata.totalTokenCount)
+                ? usageMetadata.totalTokenCount
+                : undefined,
+            }));
           }
         }
         controller.close();

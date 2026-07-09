@@ -4,8 +4,14 @@ export type Message = {
   id: string;
   role: 'user' | 'model';
   content: string;
+  createdAt?: number;
   reasoning?: string;
   reasoningDuration?: number;
+  generationDuration?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  interrupted?: boolean;
   isReasoning?: boolean;
   isStreaming?: boolean;
   model?: string;
@@ -23,8 +29,11 @@ export type ChatSession = {
 };
 
 export type ChatStreamEvent = {
+  inputTokens?: number;
+  outputTokens?: number;
   text?: string;
-  type?: 'content' | 'reasoning';
+  totalTokens?: number;
+  type?: 'content' | 'reasoning' | 'usage';
 };
 
 export type ConfiguredModel = {

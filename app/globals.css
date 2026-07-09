@@ -20,6 +20,17 @@
   --font-jakarta: var(--font-plus-jakarta-sans), "Plus Jakarta Sans", sans-serif;
 }
 
+:root {
+  --chat-app-bg: #f8f8f8;
+  --chat-panel-bg: #ffffff;
+  --chat-header-bg: rgba(255, 255, 255, 0.8);
+  --chat-input-bg: #ffffff;
+  --chat-input-overlay-from: #ffffff;
+  --chat-input-overlay-via: rgba(255, 255, 255, 0.8);
+  --chat-popover-bg: #ffffff;
+  --chat-user-bubble-bg: #f3f4f5;
+}
+
 /* Dark mode overrides */
 .dark {
   --color-primary: #5b9aff;
@@ -34,6 +45,14 @@
   --color-on-secondary-container: #c0c4ca;
   --color-outline: #8a8f9d;
   --color-outline-variant: #404452;
+  --chat-app-bg: #0e0f11;
+  --chat-panel-bg: #111214;
+  --chat-header-bg: rgba(17, 18, 20, 0.9);
+  --chat-input-bg: #191919;
+  --chat-input-overlay-from: #111214;
+  --chat-input-overlay-via: rgba(17, 18, 20, 0.9);
+  --chat-popover-bg: #191919;
+  --chat-user-bubble-bg: #1f2023;
 }
 
 /* Custom scrollbar */

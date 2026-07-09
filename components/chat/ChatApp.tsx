@@ -12,6 +12,7 @@ import { useUIStore } from '@/stores/useUIStore';
 
 import { ChatInput } from './ChatInput';
 import { MessageItem } from './MessageItem';
+import { SelectToHereButton } from './SelectToHereButton';
 import { SelectionFooterBar } from './SelectionFooterBar';
 import { Sidebar } from './Sidebar';
 import { TopHeader } from './TopHeader';
@@ -260,7 +261,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   return (
     <div
       className={cn(
-        'flex h-screen w-screen overflow-hidden bg-[#f8f8f8] dark:bg-[#0e0f11] p-2 font-sans text-gray-900 dark:text-gray-100 antialiased',
+        'flex h-screen w-screen overflow-hidden bg-[var(--chat-app-bg)] p-2 font-sans text-gray-900 dark:text-gray-100 antialiased',
         isResizingSidebar && 'cursor-col-resize select-none',
       )}
     >
@@ -294,7 +295,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
         width={sidebarWidth}
       />
 
-      <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#e5e5e5] dark:border-gray-700 bg-white dark:bg-[#0d0d0d] shadow-none">
+      <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#e5e5e5] bg-[var(--chat-panel-bg)] shadow-none dark:border-gray-700">
         {isSidebarOpen && (
           <div
             aria-label="调整侧栏宽度"
@@ -355,6 +356,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                 <MessageItem
                   cancelEditingMessage={() => useChatStore.getState().cancelEditing()}
                   collapsed={collapsedMessageIds.includes(message.id)}
+                  continueMessage={(m) => useChatStore.getState().continueMessage(m)}
                   copyMessage={(m) => useChatStore.getState().copyMessage(m)}
                   deleteMessage={(id) => useChatStore.getState().deleteMessage(id)}
                   editingContent={editingContent}
@@ -382,6 +384,12 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
             </div>
           )}
         </div>
+
+        {multiSelectMode && !isLoadingActiveSession && !showWelcome && (
+          <SelectToHereButton
+            onSelectToHere={(id) => useUIStore.getState().selectToHere(id, messages)}
+          />
+        )}
 
         {isLoadingActiveSession || showWelcome ? null : multiSelectMode ? (
           <SelectionFooterBar

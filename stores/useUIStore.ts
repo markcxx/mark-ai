@@ -28,6 +28,7 @@ interface UIActions {
   toggleCollapseMessage: (id: string) => void;
   enableMultiSelect: (id: string) => void;
   toggleSelectedMessage: (id: string, shiftKey: boolean, messages: Message[]) => void;
+  selectToHere: (targetId: string | undefined, messages: Message[]) => void;
   exitMultiSelect: () => void;
   removeFromSelection: (ids: string[]) => void;
   removeFromCollapsed: (ids: string[]) => void;
@@ -108,6 +109,20 @@ export const useUIStore = create<UIStore>()(
           : [...s.selectedMessageIds, id],
         selectionAnchorId: id,
       }));
+    },
+
+    selectToHere: (targetId, messages) => {
+      const { selectionAnchorId } = get();
+      const anchorId = targetId || selectionAnchorId || messages.at(-1)?.id;
+      if (!anchorId) return;
+
+      const anchorIndex = messages.findIndex((m) => m.id === anchorId);
+      if (anchorIndex < 0) return;
+
+      set({
+        selectedMessageIds: messages.slice(0, anchorIndex + 1).map((m) => m.id),
+        selectionAnchorId: anchorId,
+      });
     },
 
     exitMultiSelect: () =>

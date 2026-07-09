@@ -4,6 +4,7 @@ import { subscribeWithSelector } from 'zustand/middleware';
 
 import { THINKING_TEXTS } from '@/lib/chat/constants';
 import { createMessageId, extractThinkingFromText } from '@/lib/chat/helpers';
+import { estimateMessageTokens, estimateMessagesTokens, estimateTextTokens } from '@/lib/chat/metrics';
 import type { ChatStreamEvent, ConfiguredModel, Message } from '@/lib/chat/types';
 import { useSessionStore } from './useSessionStore';
 import { useUIStore } from './useUIStore';
@@ -11,7 +12,14 @@ import { useUIStore } from './useUIStore';
 type StreamedMessageResult = Pick<
   Message,
   'content' | 'isReasoning' | 'isStreaming' | 'reasoning' | 'reasoningDuration'
+> & Pick<
+  Message,
+  'generationDuration' | 'inputTokens' | 'interrupted' | 'outputTokens' | 'totalTokens'
 >;
+
+type StreamOptions = {
+  initialContent?: string;
+};
 
 interface ChatState {
   messages: Message[];
@@ -32,7 +40,9 @@ interface ChatActions {
     historyMessages: Message[],
     modelMessageId: string,
     modelConfig: ConfiguredModel,
+    options?: StreamOptions,
   ) => Promise<StreamedMessageResult>;
+  continueMessage: (message: Message) => Promise<void>;
   regenerateMessage: (message: Message, deleteCurrent?: boolean) => Promise<void>;
   startEditing: (message: Message) => void;
   saveEditing: () => void;
@@ -93,9 +103,13 @@ export const useChatStore = create<ChatStore>()(
         abortController: null,
       }),
 
-    streamAssistantMessage: async (historyMessages, modelMessageId, modelConfig) => {
-      let plainContent = '';
+    streamAssistantMessage: async (historyMessages, modelMessageId, modelConfig, options = {}) => {
+      const startedAt = Date.now();
+      let plainContent = options.initialContent || '';
       let eventReasoning = '';
+      let inputTokens = estimateMessagesTokens(historyMessages);
+      let outputTokens = 0;
+      let totalTokens = inputTokens;
       let reasoningDuration: number | undefined;
 
       const controller = new AbortController();
@@ -140,10 +154,23 @@ export const useChatStore = create<ChatStore>()(
         const updateStreamingMessage = (isReasoning?: boolean) => {
           const extracted = extractThinkingFromText(plainContent);
           const reasoning = `${eventReasoning}${extracted.reasoning}`;
+          const estimatedOutputTokens = estimateMessageTokens({
+            content: extracted.content,
+            reasoning,
+          });
           set((s) => ({
             messages: s.messages.map((m) =>
               m.id === modelMessageId
-                ? { ...m, content: extracted.content, isReasoning: Boolean(isReasoning || extracted.hasOpenThinking), reasoning, reasoningDuration }
+                ? {
+                    ...m,
+                    content: extracted.content,
+                    inputTokens,
+                    isReasoning: Boolean(isReasoning || extracted.hasOpenThinking),
+                    outputTokens: outputTokens || estimatedOutputTokens,
+                    reasoning,
+                    reasoningDuration,
+                    totalTokens: totalTokens || inputTokens + estimatedOutputTokens,
+                  }
                 : m,
             ),
           }));
@@ -169,6 +196,13 @@ export const useChatStore = create<ChatStore>()(
           if (!trimmed) return;
           try {
             const event = JSON.parse(trimmed) as ChatStreamEvent;
+            if (event.type === 'usage') {
+              inputTokens = event.inputTokens || inputTokens;
+              outputTokens = event.outputTokens || outputTokens;
+              totalTokens = event.totalTokens || inputTokens + outputTokens;
+              updateStreamingMessage(false);
+              return;
+            }
             if (event.type === 'reasoning' && event.text) { appendReasoning(event.text); return; }
             if (event.type === 'content' && event.text) { appendContent(event.text); return; }
           } catch { /* non-JSON line */ }
@@ -192,22 +226,44 @@ export const useChatStore = create<ChatStore>()(
         if (reasoningStartedAt && !reasoningDuration) { endReasoning(); updateStreamingMessage(false); }
 
         const extracted = extractThinkingFromText(plainContent);
+        const reasoning = `${eventReasoning}${extracted.reasoning}` || undefined;
+        const estimatedOutputTokens = estimateMessageTokens({
+          content: extracted.content,
+          reasoning,
+        });
+        const finalOutputTokens = outputTokens || estimatedOutputTokens;
+        const finalTotalTokens = totalTokens || inputTokens + finalOutputTokens;
         return {
           content: extracted.content,
+          generationDuration: Date.now() - startedAt,
+          inputTokens,
           isReasoning: false,
           isStreaming: false,
-          reasoning: `${eventReasoning}${extracted.reasoning}` || undefined,
+          outputTokens: finalOutputTokens,
+          reasoning,
           reasoningDuration,
+          totalTokens: finalTotalTokens,
         };
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') {
           const extracted = extractThinkingFromText(plainContent);
+          const reasoning = `${eventReasoning}${extracted.reasoning}` || undefined;
+          const estimatedOutputTokens = estimateMessageTokens({
+            content: extracted.content || plainContent,
+            reasoning,
+          });
+          const finalOutputTokens = outputTokens || estimatedOutputTokens;
           return {
             content: extracted.content || plainContent,
+            generationDuration: Date.now() - startedAt,
+            inputTokens,
+            interrupted: true,
             isReasoning: false,
             isStreaming: false,
-            reasoning: `${eventReasoning}${extracted.reasoning}` || undefined,
+            outputTokens: finalOutputTokens,
+            reasoning,
             reasoningDuration,
+            totalTokens: totalTokens || inputTokens + finalOutputTokens,
           };
         }
         console.error('Chat error:', error);
@@ -221,10 +277,14 @@ export const useChatStore = create<ChatStore>()(
         }));
         return {
           content: 'Sorry, I encountered an error. Please try again.',
+          generationDuration: Date.now() - startedAt,
+          inputTokens,
           isReasoning: false,
           isStreaming: false,
+          outputTokens: estimateTextTokens('Sorry, I encountered an error. Please try again.'),
           reasoning: eventReasoning || undefined,
           reasoningDuration,
+          totalTokens: inputTokens + estimateTextTokens('Sorry, I encountered an error. Please try again.'),
         };
       } finally {
         set((s) => ({
@@ -268,10 +328,18 @@ export const useChatStore = create<ChatStore>()(
         }
         if (!targetSessionId) return;
 
-        const userMessage: Message = { content: prompt, id: createMessageId(), role: 'user' };
+        const now = Date.now();
+        const userMessage: Message = {
+          content: prompt,
+          createdAt: now,
+          id: createMessageId(),
+          role: 'user',
+          totalTokens: estimateMessageTokens({ content: prompt }),
+        };
         const modelMessageId = createMessageId();
         const modelMessage: Message = {
           content: '',
+          createdAt: now,
           id: modelMessageId,
           isStreaming: true,
           model: selectedModel.id,
@@ -308,6 +376,69 @@ export const useChatStore = create<ChatStore>()(
       }
     },
 
+    continueMessage: async (message) => {
+      const { isLoading, messages, streamAssistantMessage } = get();
+      if (isLoading) { toast.error('请等待当前回复完成'); return; }
+      if (message.role !== 'model') return;
+
+      const index = messages.findIndex((item) => item.id === message.id);
+      if (index < 0) return;
+
+      const { availableModels, selectedModelKey, setOpenMenuMessageId } = useUIStore.getState();
+      const { getModelKey } = await import('@/lib/chat/helpers');
+      const selectedModel = availableModels.find((m) => getModelKey(m) === selectedModelKey);
+      const modelConfig = availableModels.find(
+        (m) => m.id === message.model && m.provider === message.provider,
+      ) || selectedModel;
+
+      if (!modelConfig) { toast.error('请先配置可用模型'); return; }
+
+      const baseContent = message.content.trimEnd();
+      const initialContent = baseContent ? `${baseContent}\n\n` : '';
+      const continuePrompt: Message = {
+        content: '请从上次中断的位置继续，不要重复已经输出过的内容。',
+        createdAt: Date.now(),
+        id: createMessageId(),
+        role: 'user',
+      };
+      const historyMessages = [...messages.slice(0, index + 1), continuePrompt];
+      const nextMessages = messages.map((item) =>
+        item.id === message.id
+          ? {
+              ...item,
+              content: initialContent,
+              generationDuration: undefined,
+              inputTokens: undefined,
+              interrupted: false,
+              isReasoning: false,
+              isStreaming: true,
+              outputTokens: undefined,
+              reasoningDuration: undefined,
+              totalTokens: undefined,
+            }
+          : item,
+      );
+
+      set({ messages: nextMessages });
+      setOpenMenuMessageId(null);
+
+      const streamedMessage = await streamAssistantMessage(
+        historyMessages,
+        message.id,
+        modelConfig,
+        { initialContent },
+      );
+      const savedMessages = nextMessages.map((item) =>
+        item.id === message.id ? { ...item, ...streamedMessage } : item,
+      );
+      set({ messages: savedMessages });
+
+      const sessionStore = useSessionStore.getState();
+      if (sessionStore.activeSessionId) {
+        await sessionStore.persistSessionMessages(sessionStore.activeSessionId, savedMessages);
+      }
+    },
+
     regenerateMessage: async (message, deleteCurrent = false) => {
       const { isLoading, messages, streamAssistantMessage } = get();
       if (isLoading) { toast.error('请等待当前回复完成'); return; }
@@ -336,7 +467,7 @@ export const useChatStore = create<ChatStore>()(
       if (message.role === 'user') {
         const historyMessages = messages.slice(0, index + 1);
         const modelMessage: Message = {
-          content: '', id: targetId, isStreaming: true,
+          content: '', createdAt: Date.now(), id: targetId, isStreaming: true,
           model: modelConfig.id, provider: modelConfig.provider, role: 'model',
         };
         set({ messages: [...historyMessages, modelMessage] });
@@ -351,9 +482,11 @@ export const useChatStore = create<ChatStore>()(
 
       const historyMessages = messages.slice(0, index);
       const nextModelMessage: Message = {
-        ...message, content: '', id: deleteCurrent ? targetId : message.id,
+        ...message, content: '', createdAt: Date.now(), id: deleteCurrent ? targetId : message.id,
+        generationDuration: undefined, inputTokens: undefined, interrupted: false,
         isReasoning: false, isStreaming: true, model: modelConfig.id,
-        provider: modelConfig.provider, reasoning: undefined, reasoningDuration: undefined,
+        outputTokens: undefined, provider: modelConfig.provider, reasoning: undefined,
+        reasoningDuration: undefined, totalTokens: undefined,
       };
       const nextMessages = deleteCurrent
         ? [...historyMessages, nextModelMessage]

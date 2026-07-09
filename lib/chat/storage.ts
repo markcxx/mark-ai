@@ -57,8 +57,13 @@ const ensureDatabase = () => {
       session_id TEXT NOT NULL,
       role TEXT NOT NULL,
       content TEXT NOT NULL,
+      interrupted INTEGER,
       reasoning TEXT,
       reasoning_duration INTEGER,
+      generation_duration INTEGER,
+      input_tokens INTEGER,
+      output_tokens INTEGER,
+      total_tokens INTEGER,
       model TEXT,
       provider TEXT,
       position INTEGER NOT NULL,
@@ -71,6 +76,20 @@ const ensureDatabase = () => {
     CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated_at
       ON chat_sessions(updated_at DESC);
   `);
+
+  const columns = new Set(
+    db.prepare('PRAGMA table_info(chat_messages)').all().map((row: any) => String(row.name)),
+  );
+  const ensureColumn = (name: string, definition: string) => {
+    if (columns.has(name)) return;
+    db!.exec(`ALTER TABLE chat_messages ADD COLUMN ${definition}`);
+  };
+
+  ensureColumn('interrupted', 'interrupted INTEGER');
+  ensureColumn('generation_duration', 'generation_duration INTEGER');
+  ensureColumn('input_tokens', 'input_tokens INTEGER');
+  ensureColumn('output_tokens', 'output_tokens INTEGER');
+  ensureColumn('total_tokens', 'total_tokens INTEGER');
 
   return db;
 };
@@ -87,13 +106,20 @@ const toSession = (row: any): ChatSession => ({
 
 const toMessage = (row: any): Message => ({
   content: String(row.content || ''),
+  createdAt: typeof row.created_at === 'number' ? row.created_at : undefined,
+  generationDuration:
+    typeof row.generation_duration === 'number' ? row.generation_duration : undefined,
   id: String(row.id),
+  inputTokens: typeof row.input_tokens === 'number' ? row.input_tokens : undefined,
+  interrupted: Boolean(row.interrupted),
   model: row.model || undefined,
+  outputTokens: typeof row.output_tokens === 'number' ? row.output_tokens : undefined,
   provider: row.provider || undefined,
   reasoning: row.reasoning || undefined,
   reasoningDuration:
     typeof row.reasoning_duration === 'number' ? row.reasoning_duration : undefined,
   role: row.role === 'user' ? 'user' : 'model',
+  totalTokens: typeof row.total_tokens === 'number' ? row.total_tokens : undefined,
 });
 
 export const listChatSessions = () => {
@@ -172,7 +198,20 @@ export const getChatSession = (sessionId: string) => {
 export const getChatMessages = (sessionId: string) => {
   const rows = ensureDatabase()
     .prepare(
-      `SELECT id, role, content, reasoning, reasoning_duration, model, provider
+      `SELECT
+        id,
+        role,
+        content,
+        interrupted,
+        reasoning,
+        reasoning_duration,
+        generation_duration,
+        input_tokens,
+        output_tokens,
+        total_tokens,
+        model,
+        provider,
+        created_at
        FROM chat_messages
        WHERE session_id = ?
        ORDER BY position ASC, created_at ASC`,
@@ -207,8 +246,24 @@ export const replaceChatMessages = (sessionId: string, messages: Message[]) => {
 
     const insert = database.prepare(
       `INSERT INTO chat_messages
-        (id, session_id, role, content, reasoning, reasoning_duration, model, provider, position, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (
+          id,
+          session_id,
+          role,
+          content,
+          interrupted,
+          reasoning,
+          reasoning_duration,
+          generation_duration,
+          input_tokens,
+          output_tokens,
+          total_tokens,
+          model,
+          provider,
+          position,
+          created_at
+        )
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
 
     messages.forEach((message, index) => {
@@ -221,12 +276,17 @@ export const replaceChatMessages = (sessionId: string, messages: Message[]) => {
         sessionId,
         message.role,
         message.content,
+        message.interrupted ? 1 : 0,
         message.reasoning || null,
         message.reasoningDuration || null,
+        message.generationDuration || null,
+        message.inputTokens || null,
+        message.outputTokens || null,
+        message.totalTokens || null,
         message.model || null,
         message.provider || null,
         index,
-        now + index,
+        message.createdAt || now + index,
       );
     });
 
