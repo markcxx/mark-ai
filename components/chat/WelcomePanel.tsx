@@ -4,6 +4,7 @@ import { FluentEmoji } from '@lobehub/fluent-emoji';
 import { useEffect, useState, type ReactNode } from 'react';
 
 const WELCOME_EMOJIS = ['🙂', '😊', '😄', '😁', '🤗', '🤩', '😎', '🫡', '😉'];
+const WELCOME_TEXT = '你好，我是 MarkAI。今天想聊点什么？';
 
 const pickWelcomeEmoji = () => WELCOME_EMOJIS[Math.floor(Math.random() * WELCOME_EMOJIS.length)];
 
@@ -33,6 +34,38 @@ function AnimatedEmojiLogo() {
   );
 }
 
+function TypewriterText({ text }: { text: string }) {
+  const [visibleLength, setVisibleLength] = useState(0);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setVisibleLength((length) => {
+        if (length >= text.length) {
+          window.clearInterval(interval);
+          return length;
+        }
+
+        return length + 1;
+      });
+    }, 58);
+
+    return () => window.clearInterval(interval);
+  }, [text]);
+
+  return (
+    <p
+      aria-label={text}
+      className="mt-2 min-h-6 text-[15px] text-gray-500 dark:text-gray-400"
+    >
+      <span aria-hidden="true">{text.slice(0, visibleLength)}</span>
+      <span
+        aria-hidden="true"
+        className="ml-0.5 inline-block h-4 w-px translate-y-0.5 animate-pulse bg-gray-400 dark:bg-gray-500"
+      />
+    </p>
+  );
+}
+
 export function WelcomePanel({ children }: { children: ReactNode }) {
   return (
     <div className="flex w-full max-w-[840px] flex-col items-center px-4">
@@ -40,7 +73,7 @@ export function WelcomePanel({ children }: { children: ReactNode }) {
         <AnimatedEmojiLogo />
         <div className="min-w-0">
           <h1 className="font-jakarta text-3xl font-semibold text-gray-950 dark:text-gray-50">MARKAI</h1>
-          <p className="mt-2 text-[15px] text-gray-500 dark:text-gray-400">你好，我是 MarkAI。今天想聊点什么？</p>
+          <TypewriterText text={WELCOME_TEXT} />
         </div>
       </div>
       {children}
