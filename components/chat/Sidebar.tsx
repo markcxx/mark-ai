@@ -1,29 +1,18 @@
 'use client';
 
-import {
-  ChevronDown,
-  ChevronRight,
-  Copy,
-  Hash,
-  HelpCircle,
-  MoreHorizontal,
-  PanelLeftClose,
-  PencilLine,
-  Plus,
-  Puzzle,
-  Settings,
-  Star,
-  Trash2,
-  Wand2,
-} from 'lucide-react';
+import { HelpCircle, PanelLeftClose, Plus, Puzzle, Settings } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 
 import { NOT_IMPLEMENTED_TOAST } from '@/lib/chat/constants';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { InlineTextEdit } from '@/components/ui/InlineTextEdit';
+import { IconButton } from '@/components/ui/IconButton';
 import type { ChatSession } from '@/lib/chat/types';
 import { cn } from '@/lib/utils';
+
+import { SessionGroupHeader } from './SessionGroupHeader';
+import { SidebarNavItem } from './SidebarNavItem';
+import { SessionRow } from './SessionRow';
 
 const getSessionTimeGroup = (updatedAt: number) => {
   const now = new Date();
@@ -138,14 +127,9 @@ export function Sidebar({
               <h1 className="text-lg font-bold leading-tight text-gray-900 dark:text-gray-100">MarkAI</h1>
             </div>
           </div>
-          <button
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700"
-            onClick={onClose}
-            title="收起侧栏"
-            type="button"
-          >
+          <IconButton onClick={onClose} shape="rounded" size="sm" title="收起侧栏">
             <PanelLeftClose size={18} />
-          </button>
+          </IconButton>
         </div>
 
         <div className="mb-6 mt-2 px-4">
@@ -155,7 +139,7 @@ export function Sidebar({
             type="button"
           >
             <Plus size={20} />
-            <span>新建会话</span>
+            <span>开启新话题</span>
             <span className="ml-auto text-xs text-gray-400 transition-colors group-hover:text-gray-500">
               ⌘K
             </span>
@@ -167,14 +151,12 @@ export function Sidebar({
             视图
           </div>
           <nav className="flex flex-col gap-1">
-            <button
-              className="flex items-center gap-3 rounded-lg bg-gray-200 dark:bg-gray-800 px-3 py-2 font-medium text-gray-900 dark:text-gray-100 transition-colors"
+            <SidebarNavItem
+              active
+              icon={Puzzle}
+              label="插件中心"
               onClick={() => onUnavailable(NOT_IMPLEMENTED_TOAST)}
-              type="button"
-            >
-              <Puzzle size={20} />
-              <span className="text-sm">插件中心</span>
-            </button>
+            />
           </nav>
         </div>
 
@@ -191,158 +173,65 @@ export function Sidebar({
               const collapsed = collapsedGroups.includes(group.key);
               return (
                 <div className="flex flex-col gap-1" key={group.key}>
-                  <button
-                    className="mt-1 flex h-7 items-center gap-1 rounded-md px-2 text-left text-xs font-medium text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-                    onClick={() =>
+                  <SessionGroupHeader
+                    collapsed={collapsed}
+                    count={group.sessions.length}
+                    label={group.label}
+                    onToggle={() =>
                       setCollapsedGroups((current) =>
                         current.includes(group.key)
                           ? current.filter((key) => key !== group.key)
                           : [...current, group.key],
                       )
                     }
-                    type="button"
-                  >
-                    {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-                    <span>{group.label}</span>
-                    <span className="ml-auto tabular-nums">{group.sessions.length}</span>
-                  </button>
+                  />
 
                   {!collapsed && group.sessions.map((session) => {
                     const active = activeSessionId === session.id;
                     const loading = loadingSessionIds.includes(session.id);
                     const menuOpen = openSessionMenuId === session.id;
+                    const editing = editingSessionId === session.id;
 
                     return (
-                      <div
-                        className="relative"
+                      <SessionRow
+                        active={active}
+                        editing={editing}
+                        editingTitle={editingTitle}
                         key={session.id}
-                        ref={menuOpen ? menuRef : undefined}
-                      >
-                        <div
-                          className={cn(
-                            'group flex h-9 min-w-0 items-center gap-2 overflow-hidden rounded-lg px-1 text-sm transition-colors',
-                            active ? 'bg-[#eceef0] dark:bg-gray-800 text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-300 hover:bg-[#f0f1f2] dark:hover:bg-gray-800/60',
-                          )}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter' || event.key === ' ') {
-                              event.preventDefault();
-                              onSelectSession(session.id);
-                            }
-                          }}
-                          onClick={() => onSelectSession(session.id)}
-                          role="button"
-                          tabIndex={0}
-                        >
-                          <span className="flex h-7 w-7 shrink-0 items-center justify-center text-gray-400">
-                            <Hash size={15} />
-                          </span>
-                          {editingSessionId === session.id ? (
-                            <InlineTextEdit
-                              className="h-7 min-w-0 flex-1 px-2 text-sm"
-                              onCancel={() => setEditingSessionId(null)}
-                              onChange={setEditingTitle}
-                              onSave={() => {
-                                const nextTitle = editingTitle.trim();
-                                setEditingSessionId(null);
-                                if (nextTitle && nextTitle !== session.title) {
-                                  onUpdateSessionTitle(session.id, nextTitle);
-                                }
-                              }}
-                              value={editingTitle}
-                            />
-                          ) : (
-                            <span className="min-w-0 flex-1 truncate text-left">
-                              {session.title || '新对话'}
-                            </span>
-                          )}
-                          {session.favorite && (
-                            <button
-                              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-amber-400 transition-colors hover:bg-amber-100/70 hover:text-amber-500 dark:hover:bg-amber-400/10"
-                              onClick={(event) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                onToggleFavorite(session.id, false);
-                              }}
-                              title="取消收藏"
-                              type="button"
-                            >
-                              <Star fill="currentColor" size={14} />
-                            </button>
-                          )}
-                          {loading ? (
-                            <span className="flex h-7 w-7 shrink-0 items-center justify-center">
-                              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
-                            </span>
-                          ) : (
-                            <button
-                              className={cn(
-                                'flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-400 opacity-0 transition-opacity hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-800 dark:hover:text-gray-200 group-hover:opacity-100',
-                                menuOpen && 'opacity-100',
-                              )}
-                              onClick={(event) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                setOpenSessionMenuId(menuOpen ? null : session.id);
-                              }}
-                              title="更多"
-                              type="button"
-                            >
-                              <MoreHorizontal size={15} />
-                            </button>
-                          )}
-                        </div>
-
-                        {menuOpen && (
-                    <div className="absolute right-1 top-8 z-50 min-w-36 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-1 text-sm shadow-[0_12px_32px_rgba(0,0,0,0.12)]">
-                      <button
-                        className="flex h-8 w-full items-center gap-2 px-2.5 text-left text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
-                        onClick={() => {
+                        loading={loading}
+                        menuOpen={menuOpen}
+                        menuRef={menuRef}
+                        onAutoRename={() => {
                           setOpenSessionMenuId(null);
                           onRenameSession(session.id);
                         }}
-                        type="button"
-                      >
-                        <Wand2 size={14} />
-                        <span>自动命名</span>
-                      </button>
-                      <button
-                        className="flex h-8 w-full items-center gap-2 px-2.5 text-left text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
-                        onClick={() => {
+                        onCancelEditing={() => setEditingSessionId(null)}
+                        onCopyId={() => {
+                          setOpenSessionMenuId(null);
+                          navigator.clipboard.writeText(session.id);
+                        }}
+                        onDelete={() => {
+                          setOpenSessionMenuId(null);
+                          setDeletingSession(session);
+                        }}
+                        onEditingTitleChange={setEditingTitle}
+                        onSaveEditing={() => {
+                          const nextTitle = editingTitle.trim();
+                          setEditingSessionId(null);
+                          if (nextTitle && nextTitle !== session.title) {
+                            onUpdateSessionTitle(session.id, nextTitle);
+                          }
+                        }}
+                        onSelect={() => onSelectSession(session.id)}
+                        onStartRename={() => {
                           setOpenSessionMenuId(null);
                           setEditingSessionId(session.id);
                           setEditingTitle(session.title || '新对话');
                         }}
-                        type="button"
-                      >
-                        <PencilLine size={14} />
-                        <span>重命名</span>
-                      </button>
-                      <button
-                        className="flex h-8 w-full items-center gap-2 px-2.5 text-left text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
-                        onClick={() => {
-                          setOpenSessionMenuId(null);
-                          navigator.clipboard.writeText(session.id);
-                        }}
-                        type="button"
-                      >
-                        <Copy size={14} />
-                        <span>复制 ID</span>
-                      </button>
-                      <div className="my-1 h-px bg-gray-100 dark:bg-gray-700" />
-                      <button
-                        className="flex h-8 w-full items-center gap-2 px-2.5 text-left text-red-600 dark:text-red-400 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20"
-                        onClick={() => {
-                          setOpenSessionMenuId(null);
-                          setDeletingSession(session);
-                        }}
-                        type="button"
-                      >
-                        <Trash2 size={14} />
-                        <span>删除</span>
-                      </button>
-                    </div>
-                        )}
-                      </div>
+                        onToggleFavorite={() => onToggleFavorite(session.id, false)}
+                        onToggleMenu={() => setOpenSessionMenuId(menuOpen ? null : session.id)}
+                        session={session}
+                      />
                     );
                   })}
                 </div>
@@ -353,22 +242,16 @@ export function Sidebar({
 
         <div className="mt-auto border-t border-gray-200/50 dark:border-gray-700/50 p-4">
           <nav className="flex flex-col gap-1">
-            <button
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-600 dark:text-gray-400 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700"
+            <SidebarNavItem
+              icon={Settings}
+              label="设置"
               onClick={() => onUnavailable(NOT_IMPLEMENTED_TOAST)}
-              type="button"
-            >
-              <Settings size={20} />
-              <span className="text-sm">设置</span>
-            </button>
-            <button
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-600 dark:text-gray-400 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700"
+            />
+            <SidebarNavItem
+              icon={HelpCircle}
+              label="帮助"
               onClick={() => onUnavailable(NOT_IMPLEMENTED_TOAST)}
-              type="button"
-            >
-              <HelpCircle size={20} />
-              <span className="text-sm">帮助</span>
-            </button>
+            />
           </nav>
         </div>
       </div>

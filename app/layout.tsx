@@ -1,5 +1,6 @@
 import type {Metadata} from 'next';
 import { Noto_Sans_SC, Plus_Jakarta_Sans } from 'next/font/google';
+import { AppBootSplash } from '@/components/AppBootSplash';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import './globals.css';
 
@@ -21,6 +22,7 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
     <html lang="zh-CN" suppressHydrationWarning>
       <body suppressHydrationWarning className={`${notoSansSC.variable} ${plusJakartaSans.variable} font-sans antialiased text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-950 h-screen w-screen overflow-hidden`}>
         <ThemeProvider>
+          <AppBootSplash />
           {children}
         </ThemeProvider>
       </body>

@@ -6,6 +6,8 @@ import remarkGfm from 'remark-gfm';
 
 import { Pre, PreSingleLine } from '@/components/CodeBlock';
 
+import { HtmlPreviewBlock } from './HtmlPreviewBlock';
+
 const getTextFromNode = (node: React.ReactNode): string => {
   if (typeof node === 'string' || typeof node === 'number') return String(node);
   if (Array.isArray(node)) return node.map(getTextFromNode).join('');
@@ -46,11 +48,15 @@ const markdownComponents = {
   ),
   code({ children, className }: { children?: React.ReactNode; className?: string }) {
     const match = /language-(\w+)/.exec(className || '');
+    const language = match?.[1]?.toLowerCase() || 'text';
     const isInline = !match && !String(children).includes('\n');
     if (isInline) {
       return <PreSingleLine>{children}</PreSingleLine>;
     }
-    return <Pre language={match?.[1] || 'text'}>{String(children)}</Pre>;
+    if (language === 'html' || language === 'htm') {
+      return <HtmlPreviewBlock>{String(children)}</HtmlPreviewBlock>;
+    }
+    return <Pre language={language}>{String(children)}</Pre>;
   },
   h1: (props: React.HTMLAttributes<HTMLHeadingElement>) => (
     <h1 className="mb-4 mt-6 text-2xl font-semibold text-gray-900 dark:text-gray-100" {...props} />

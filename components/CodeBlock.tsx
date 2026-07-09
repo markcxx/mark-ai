@@ -18,7 +18,7 @@ export const Pre = ({ children, language }: { children: string, language: string
   const normalizedLanguage = normalizeLanguage(language);
   const lineCount = countLines(children.replace(/\n$/, ''));
   const collapsible = lineCount > 8;
-  const [collapsed, setCollapsed] = useState(collapsible);
+  const [collapsed, setCollapsed] = useState(false);
   const syntaxTheme = resolvedTheme === 'dark' ? oneDark : oneLight;
 
   const handleCopy = () => {

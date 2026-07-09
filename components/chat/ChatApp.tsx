@@ -12,6 +12,9 @@ import { useUIStore } from '@/stores/useUIStore';
 
 import { ChatInput } from './ChatInput';
 import { ChatMiniMap } from './ChatMiniMap';
+import { HtmlPreviewContext } from './HtmlPreviewContext';
+import { HtmlPreviewPanel } from './HtmlPreviewPanel';
+import type { HtmlPreviewPayload } from './htmlPreviewUtils';
 import { MessageItem } from './MessageItem';
 import { SelectToHereButton } from './SelectToHereButton';
 import { SelectionFooterBar } from './SelectionFooterBar';
@@ -98,6 +101,8 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [selectionLayoutMode, setSelectionLayoutMode] = useState(false);
   const [activeMiniMapMessageId, setActiveMiniMapMessageId] = useState<string | null>(null);
+  const [activeHtmlPreview, setActiveHtmlPreview] = useState<HtmlPreviewPayload | null>(null);
+  const [htmlPreviewFullscreen, setHtmlPreviewFullscreen] = useState(false);
 
   // Derived
   const selectedModel = availableModels.find((m) => getModelKey(m) === selectedModelKey);
@@ -147,6 +152,8 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
     options: { history?: 'push' | 'replace' | 'none' } = {},
   ) => {
     useChatStore.getState().abortStreaming();
+    setActiveHtmlPreview(null);
+    setHtmlPreviewFullscreen(false);
     userHasScrolledAwayRef.current = false;
     const loadedMessages = await useSessionStore.getState().loadSession(sessionId, options);
     if (loadedMessages) {
@@ -158,6 +165,8 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   }, []);
 
   const handleNewChat = useCallback((history: 'push' | 'replace' | 'none' = 'push') => {
+    setActiveHtmlPreview(null);
+    setHtmlPreviewFullscreen(false);
     userHasScrolledAwayRef.current = false;
     useChatStore.getState().reset();
     useSessionStore.getState().resetActiveSession();
@@ -284,6 +293,18 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
     ) || selectedModel;
   };
 
+  const openHtmlPreview = useCallback((preview: HtmlPreviewPayload) => {
+    setActiveHtmlPreview(preview);
+    setHtmlPreviewFullscreen(false);
+    useUIStore.getState().setSidebarOpen(false);
+  }, []);
+
+  const closeHtmlPreview = useCallback(() => {
+    setActiveHtmlPreview(null);
+    setHtmlPreviewFullscreen(false);
+    useUIStore.getState().setSidebarOpen(true);
+  }, []);
+
   // PLACEHOLDER_RENDER
 
   return (
@@ -324,7 +345,34 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
         width={sidebarWidth}
       />
 
-      <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#e5e5e5] bg-[var(--chat-panel-bg)] shadow-none dark:border-gray-700">
+      <HtmlPreviewContext.Provider
+        value={{
+          activePreview: activeHtmlPreview,
+          closePreview: closeHtmlPreview,
+          openPreview: openHtmlPreview,
+        }}
+      >
+        <div
+          className={cn(
+            'grid min-w-0 flex-1 transition-[grid-template-columns,gap] duration-300 ease-out',
+            activeHtmlPreview && htmlPreviewFullscreen ? 'gap-0' : 'gap-2',
+          )}
+          style={{
+            gridTemplateColumns: activeHtmlPreview
+              ? htmlPreviewFullscreen
+                ? 'minmax(0, 0fr) minmax(0, 1fr)'
+                : 'minmax(0, 1fr) minmax(360px, 48%)'
+              : 'minmax(0, 1fr)',
+          }}
+        >
+          <main
+            className={cn(
+              'relative flex min-w-0 flex-col overflow-hidden rounded-xl border border-[#e5e5e5] bg-[var(--chat-panel-bg)] shadow-none transition-[opacity,border-color] duration-300 ease-out dark:border-gray-700',
+              activeHtmlPreview && htmlPreviewFullscreen
+                ? 'pointer-events-none border-transparent opacity-0'
+                : 'opacity-100',
+            )}
+          >
         {isSidebarOpen && (
           <div
             aria-label="调整侧栏宽度"
@@ -496,6 +544,17 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
           />
         )}
       </main>
+
+      {activeHtmlPreview && (
+        <HtmlPreviewPanel
+          fullscreen={htmlPreviewFullscreen}
+          onClose={closeHtmlPreview}
+          onFullscreenChange={setHtmlPreviewFullscreen}
+          preview={activeHtmlPreview}
+        />
+      )}
+        </div>
+      </HtmlPreviewContext.Provider>
     </div>
   );
 }

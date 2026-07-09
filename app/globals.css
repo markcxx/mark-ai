@@ -89,6 +89,46 @@ button:disabled {
   cursor: not-allowed;
 }
 
+@keyframes markai-brand-draw {
+  0% {
+    stroke-dashoffset: 1000;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes markai-brand-fill {
+  30% {
+    fill-opacity: 0.05;
+  }
+  100% {
+    fill-opacity: 1;
+  }
+}
+
+.markai-brand-loading text,
+.markai-brand-loading path {
+  fill: currentColor;
+  fill-opacity: 0;
+  stroke: currentColor;
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  stroke-width: 4px;
+  animation:
+    markai-brand-draw 2s cubic-bezier(0.4, 0, 0.2, 1) infinite,
+    markai-brand-fill 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .markai-brand-loading text,
+  .markai-brand-loading path {
+    animation: none;
+    fill-opacity: 1;
+    stroke-dashoffset: 0;
+  }
+}
+
 .markdown-body p {
   @apply mb-4 leading-relaxed;
 }

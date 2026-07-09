@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils';
 import { CollapsibleContent } from './CollapsibleContent';
 import { FloatingMenu } from './FloatingMenu';
 import { MarkdownContent } from './MarkdownContent';
+import { MessageActionButton } from './MessageActionButton';
 import { MessageSelectionWrapper } from './MessageSelectionWrapper';
 import { ModelAvatar } from './ModelAvatar';
 import { ThinkingPanel } from './ThinkingPanel';
@@ -45,15 +46,12 @@ function MoreMenuButton({
 
   return (
     <>
-      <button
-        className="flex items-center justify-center rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-800 dark:hover:text-gray-200"
+      <MessageActionButton
+        icon={MoreHorizontal}
         onClick={() => setOpenMenuId(open ? null : menuId)}
         ref={buttonRef}
         title="更多"
-        type="button"
-      >
-        <MoreHorizontal size={15} />
-      </button>
+      />
       <FloatingMenu
         align={align}
         anchorRef={buttonRef as RefObject<HTMLElement | null>}
@@ -263,30 +261,22 @@ export function MessageItem({
       )}
       {!multiSelectMode && (
         <div className="mr-1 mt-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-          <button
-            className="flex items-center justify-center rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-800 dark:hover:text-gray-200"
+          <MessageActionButton
+            icon={Pencil}
             onClick={() => startEditingMessage(message)}
             title="编辑"
-            type="button"
-          >
-            <Pencil size={15} />
-          </button>
-          <button
-            className="flex items-center justify-center rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-800 dark:hover:text-gray-200"
+          />
+          <MessageActionButton
+            icon={Copy}
             onClick={() => copyMessage(message)}
             title="复制"
-            type="button"
-          >
-            <Copy size={15} />
-          </button>
-          <button
-            className="flex items-center justify-center rounded-md p-1.5 text-gray-400 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400"
+          />
+          <MessageActionButton
+            danger
+            icon={Trash2}
             onClick={() => deleteMessage(message.id)}
             title="删除"
-            type="button"
-          >
-            <Trash2 size={15} />
-          </button>
+          />
           <MoreMenuButton
             align="right"
             items={moreItems}
@@ -378,38 +368,27 @@ export function MessageItem({
 
       {!message.isStreaming && !multiSelectMode && (
         <div className="ml-10 mt-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-          <button
-            className="flex items-center justify-center rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-800 dark:hover:text-gray-200"
+          <MessageActionButton
+            icon={Copy}
             onClick={() => copyMessage(message)}
             title="复制"
-            type="button"
-          >
-            <Copy size={15} />
-          </button>
-          <button
-            className="flex items-center justify-center rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-800 dark:hover:text-gray-200"
+          />
+          <MessageActionButton
+            icon={RotateCw}
             onClick={() => regenerateMessage(message)}
             title="重新生成"
-            type="button"
-          >
-            <RotateCw size={15} />
-          </button>
-          <button
-            className="flex items-center justify-center rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-800 dark:hover:text-gray-200"
+          />
+          <MessageActionButton
+            icon={Pencil}
             onClick={() => startEditingMessage(message)}
             title="编辑"
-            type="button"
-          >
-            <Pencil size={15} />
-          </button>
-          <button
-            className="flex items-center justify-center rounded-md p-1.5 text-gray-400 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400"
+          />
+          <MessageActionButton
+            danger
+            icon={Trash2}
             onClick={() => deleteMessage(message.id)}
             title="删除"
-            type="button"
-          >
-            <Trash2 size={15} />
-          </button>
+          />
           <MoreMenuButton
             align="left"
             items={moreItems}

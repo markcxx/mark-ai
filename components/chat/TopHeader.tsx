@@ -16,6 +16,8 @@ import {
 
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { DropdownSurface } from '@/components/ui/DropdownSurface';
+import { IconButton } from '@/components/ui/IconButton';
 import { InlineTextEdit } from '@/components/ui/InlineTextEdit';
 import { MenuAction, MenuSwitchAction } from '@/components/ui/MenuAction';
 import type { ChatSession } from '@/lib/chat/types';
@@ -90,14 +92,13 @@ export function TopHeader({
       <header className="sticky top-0 z-20 flex h-16 w-full items-center justify-between bg-[var(--chat-header-bg)] px-6 backdrop-blur-md">
         <div className="flex min-w-0 items-center">
           {!isSidebarOpen && (
-            <button
-              className="mr-2 flex h-10 w-10 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700"
+            <IconButton
+              className="mr-2"
               onClick={onOpenSidebar}
               title="展开侧栏"
-              type="button"
             >
               <PanelLeftOpen size={18} />
-            </button>
+            </IconButton>
           )}
 
           <div className="relative flex min-w-0 items-center gap-1" ref={menuRef}>
@@ -115,17 +116,16 @@ export function TopHeader({
               </h2>
             )}
 
-            <button
-              className="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700"
+            <IconButton
               onClick={() => setMenuOpen((open) => !open)}
+              size="sm"
               title="会话操作"
-              type="button"
             >
               <MoreVertical size={17} />
-            </button>
+            </IconButton>
 
             {menuOpen && (
-              <div className="absolute left-0 top-11 z-50 w-56 rounded-xl border border-gray-200 bg-white p-1 shadow-[0_12px_36px_rgba(0,0,0,0.16)] dark:border-white/10 dark:bg-[#191919]">
+              <DropdownSurface className="absolute left-0 top-11 w-56">
                 <MenuAction
                   icon={Sparkles}
                   label="智能重命名"
@@ -169,21 +169,16 @@ export function TopHeader({
                     setDeleteOpen(true);
                   }}
                 />
-              </div>
+              </DropdownSurface>
             )}
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <button
-            className="flex h-10 w-10 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700"
-            onClick={copyConversation}
-            title="复制对话"
-            type="button"
-          >
+          <IconButton onClick={copyConversation} title="复制对话">
             <Share2 size={20} />
-          </button>
+          </IconButton>
         </div>
       </header>
 
