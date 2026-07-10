@@ -17,8 +17,8 @@ function AnimatedEmojiLogo() {
   }, []);
 
   return (
-    <div className="markai-logo-face flex h-20 w-20 shrink-0 items-center justify-center">
-      <FluentEmoji cdn="aliyun" emoji={emoji} size={76} type="3d" unoptimized />
+    <div className="markai-logo-face flex h-16 w-16 shrink-0 items-center justify-center md:h-20 md:w-20">
+      <FluentEmoji cdn="aliyun" emoji={emoji} size={64} type="3d" unoptimized />
       <style>{`
         @keyframes markai-logo-float {
           0%, 100% { transform: translateY(0) rotate(-2deg); }
@@ -68,11 +68,11 @@ function TypewriterText({ text }: { text: string }) {
 
 export function WelcomePanel({ children }: { children: ReactNode }) {
   return (
-    <div className="flex w-full max-w-[840px] flex-col items-center px-4">
-      <div className="mb-8 flex items-center gap-4">
+    <div className="flex w-full max-w-[840px] flex-col items-center px-0 md:px-4">
+      <div className="mb-6 flex items-center gap-3 md:mb-8 md:gap-4">
         <AnimatedEmojiLogo />
         <div className="min-w-0">
-          <h1 className="font-jakarta text-3xl font-semibold text-gray-950 dark:text-gray-50">MARKAI</h1>
+          <h1 className="font-jakarta text-2xl font-semibold text-gray-950 dark:text-gray-50 md:text-3xl">MARKAI</h1>
           <TypewriterText text={WELCOME_TEXT} />
         </div>
       </div>

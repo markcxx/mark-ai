@@ -228,7 +228,7 @@ export function MessageItem({
         </time>
       )}
       {editing ? (
-        <div className="w-full max-w-[85%] rounded-2xl rounded-tr-sm bg-[var(--chat-user-bubble-bg)] p-3 shadow-sm">
+        <div className="w-full max-w-[92%] rounded-2xl rounded-tr-sm bg-[var(--chat-user-bubble-bg)] p-3 shadow-sm md:max-w-[85%]">
           <textarea
             autoFocus
             className="min-h-[96px] w-full resize-y rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-[15px] text-gray-900 dark:text-gray-100 outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
@@ -254,13 +254,13 @@ export function MessageItem({
         </div>
       ) : (
         <div
-          className="w-fit max-w-[85%] break-words rounded-2xl rounded-tr-sm bg-[var(--chat-user-bubble-bg)] px-5 py-3 text-left text-[15px] text-gray-900 dark:text-gray-100 shadow-sm whitespace-pre-wrap"
+          className="w-fit max-w-[92%] break-words rounded-2xl rounded-tr-sm bg-[var(--chat-user-bubble-bg)] px-4 py-3 text-left text-[15px] text-gray-900 shadow-sm whitespace-pre-wrap dark:text-gray-100 md:max-w-[85%] md:px-5"
         >
           <CollapsibleContent>{collapsed ? '消息已收起' : message.content}</CollapsibleContent>
         </div>
       )}
       {!multiSelectMode && (
-        <div className="mr-1 mt-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="mr-1 mt-2 flex items-center gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
           <MessageActionButton
             icon={Pencil}
             onClick={() => startEditingMessage(message)}
@@ -367,7 +367,7 @@ export function MessageItem({
       </div>
 
       {!message.isStreaming && !multiSelectMode && (
-        <div className="ml-10 mt-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="ml-10 mt-2 flex items-center gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
           <MessageActionButton
             icon={Copy}
             onClick={() => copyMessage(message)}

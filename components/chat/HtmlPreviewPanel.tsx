@@ -80,7 +80,7 @@ export function HtmlPreviewPanel({
   const previewDocument = useMemo(() => getHtmlPreviewDocument(preview.content), [preview.content]);
 
   return (
-    <aside className="relative flex min-w-0 flex-col overflow-hidden rounded-xl border border-[#e5e5e5] bg-[var(--chat-panel-bg)] opacity-100 shadow-none transition-opacity duration-300 ease-out dark:border-gray-700">
+    <aside className="relative flex min-w-0 flex-col overflow-hidden border-0 bg-[var(--chat-panel-bg)] opacity-100 shadow-none transition-opacity duration-300 ease-out dark:border-gray-700 md:rounded-xl md:border md:border-[#e5e5e5]">
       <div className="flex min-h-12 items-center justify-between gap-3 border-b border-gray-200 bg-[var(--chat-header-bg)] px-3 backdrop-blur-md dark:border-white/10">
         <div className="flex min-w-0 items-center gap-2">
           <PreviewTabs mode={mode} onModeChange={setMode} />
@@ -99,7 +99,7 @@ export function HtmlPreviewPanel({
             <Download size={15} />
           </button>
           <button
-            className="flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-gray-100"
+            className="hidden h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-gray-100 md:flex"
             onClick={() => onFullscreenChange(!fullscreen)}
             title={fullscreen ? '恢复分栏' : '全屏预览'}
             type="button"

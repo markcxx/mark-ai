@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Copy,
   Expand,
+  FileJson,
+  ImageDown,
   MoreVertical,
   PanelLeftOpen,
   PencilLine,
@@ -27,6 +29,8 @@ export function TopHeader({
   copyConversation,
   copySessionId,
   deleteSession,
+  exportSessionImage,
+  exportSessionJson,
   isFavorite,
   isSidebarOpen,
   isWideChatMode,
@@ -40,6 +44,8 @@ export function TopHeader({
   copyConversation: () => void;
   copySessionId: () => void;
   deleteSession: () => void;
+  exportSessionImage: () => void;
+  exportSessionJson: () => void;
   isFavorite: boolean;
   isSidebarOpen: boolean;
   isWideChatMode: boolean;
@@ -89,7 +95,7 @@ export function TopHeader({
 
   return (
     <>
-      <header className="sticky top-0 z-20 flex h-16 w-full items-center justify-between bg-[var(--chat-header-bg)] px-6 backdrop-blur-md">
+      <header className="sticky top-0 z-20 flex h-14 w-full items-center justify-between bg-[var(--chat-header-bg)] px-2 backdrop-blur-md md:h-16 md:px-6">
         <div className="flex min-w-0 items-center">
           {!isSidebarOpen && (
             <IconButton
@@ -104,14 +110,14 @@ export function TopHeader({
           <div className="relative flex min-w-0 items-center gap-1" ref={menuRef}>
             {editingTitle ? (
               <InlineTextEdit
-                className="h-9 max-w-[52vw] text-base font-semibold"
+                className="h-9 max-w-[42vw] text-base font-semibold md:max-w-[52vw]"
                 onCancel={() => setEditingTitle(false)}
                 onChange={setDraftTitle}
                 onSave={saveTitle}
                 value={draftTitle}
               />
             ) : (
-              <h2 className="max-w-[52vw] truncate px-3 text-base font-semibold text-gray-900 dark:text-gray-100">
+              <h2 className="max-w-[42vw] truncate px-2 text-base font-semibold text-gray-900 dark:text-gray-100 md:max-w-[52vw] md:px-3">
                 {title}
               </h2>
             )}
@@ -151,6 +157,22 @@ export function TopHeader({
                     copySessionId();
                   }}
                 />
+                <MenuAction
+                  icon={FileJson}
+                  label="导出 JSON"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    exportSessionJson();
+                  }}
+                />
+                <MenuAction
+                  icon={ImageDown}
+                  label="导出图片"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    exportSessionImage();
+                  }}
+                />
 
                 <MenuSwitchAction
                   checked={isWideChatMode}
@@ -174,7 +196,7 @@ export function TopHeader({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 md:gap-2">
           <ThemeToggle />
           <IconButton onClick={copyConversation} title="复制对话">
             <Share2 size={20} />

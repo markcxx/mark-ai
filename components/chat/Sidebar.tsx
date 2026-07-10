@@ -104,15 +104,18 @@ export function Sidebar({
   }, [openSessionMenuId]);
 
   return (
-    <aside
-      className={cn(
-        'z-30 flex h-full shrink-0 flex-col bg-[#f8f8f8] dark:bg-[#000000]',
-        !isResizing && 'transition-[width,margin] duration-200 ease-out',
-        isOpen ? 'mr-2' : 'mr-0 w-0 overflow-hidden',
-      )}
-      style={isOpen ? { width } : undefined}
-    >
-      <div className="flex h-full flex-col" style={{ width }}>
+    <>
+      <aside
+        className={cn(
+          'fixed inset-y-0 left-0 z-40 flex h-dvh max-w-[86vw] shrink-0 flex-col bg-[#f8f8f8] shadow-[16px_0_40px_rgba(15,23,42,0.16)] will-change-transform dark:bg-[#000000] md:static md:z-30 md:h-full md:max-w-none md:shadow-none md:will-change-auto',
+          !isResizing && 'transition-[width,margin,transform,opacity,box-shadow] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] md:duration-200',
+          isOpen
+            ? 'translate-x-0 opacity-100 md:mr-2'
+            : '-translate-x-[calc(100%+24px)] opacity-0 md:mr-0 md:w-0 md:translate-x-0 md:overflow-hidden md:opacity-100',
+        )}
+        style={isOpen ? { width } : undefined}
+      >
+      <div className="flex h-full w-full flex-col">
         <div className="mb-2 flex items-center justify-between p-3">
           <div className="ml-2 mt-1 flex items-center gap-3">
             <Image
@@ -266,6 +269,7 @@ export function Sidebar({
         open={Boolean(deletingSession)}
         title="删除这个会话？"
       />
-    </aside>
+      </aside>
+    </>
   );
 }

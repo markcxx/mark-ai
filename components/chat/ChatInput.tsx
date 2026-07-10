@@ -74,7 +74,7 @@ export function ChatInput({
     <div
       className={cn(
         placement === 'bottom'
-          ? 'pointer-events-none absolute bottom-0 left-0 right-0 z-20 flex justify-center bg-gradient-to-t from-[var(--chat-input-overlay-from)] via-[var(--chat-input-overlay-via)] to-transparent p-4 pb-6 pt-10 md:px-8 md:pb-8'
+          ? 'pointer-events-none absolute bottom-0 left-0 right-0 z-20 flex justify-center bg-gradient-to-t from-[var(--chat-input-overlay-from)] via-[var(--chat-input-overlay-via)] to-transparent px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-8 md:p-4 md:px-8 md:pb-8 md:pt-10'
           : 'w-full',
       )}
     >
@@ -86,7 +86,7 @@ export function ChatInput({
       >
         <div className="relative flex flex-col rounded-xl border border-gray-200 bg-[var(--chat-input-bg)] shadow-[0_12px_32px_rgba(0,0,0,0.06)] transition-all duration-300 focus-within:border-primary/30 focus-within:ring-2 focus-within:ring-primary/20 dark:border-white/10 dark:shadow-[0_14px_40px_rgba(0,0,0,0.35)] dark:focus-within:border-white/20 dark:focus-within:ring-white/[0.06]">
           <textarea
-            className="max-h-[200px] min-h-[64px] w-full resize-none border-none bg-transparent px-4 py-4 text-[15px] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-0"
+            className="max-h-[36dvh] min-h-[56px] w-full resize-none border-none bg-transparent px-3 py-3 text-[16px] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-0 dark:text-gray-100 dark:placeholder:text-gray-500 md:max-h-[200px] md:min-h-[64px] md:px-4 md:py-4 md:text-[15px]"
             disabled={isLoading || !selectedModel}
             onChange={onInput}
             onKeyDown={onKeyDown}
@@ -96,7 +96,7 @@ export function ChatInput({
             value={input}
           />
 
-          <div className="flex items-center justify-between px-3 pb-3 pt-1">
+          <div className="flex items-center justify-between px-2.5 pb-2.5 pt-1 md:px-3 md:pb-3">
             <div className="flex items-center gap-1">
               <button
                 className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-200"
@@ -148,7 +148,7 @@ export function ChatInput({
                 </button>
 
                 {isModelDropdownOpen && availableModels.length > 0 && (
-                  <div className="absolute bottom-full right-0 z-50 mb-2 flex max-h-[460px] w-[min(320px,calc(100vw-32px))] select-none flex-col overflow-hidden rounded-xl border border-gray-200 bg-[var(--chat-popover-bg)] p-0 shadow-[0_12px_40px_rgba(0,0,0,0.14)] dark:border-white/10">
+                  <div className="absolute bottom-full right-0 z-50 mb-2 flex max-h-[min(60dvh,460px)] w-[min(320px,calc(100vw-24px))] select-none flex-col overflow-hidden rounded-xl border border-gray-200 bg-[var(--chat-popover-bg)] p-0 shadow-[0_12px_40px_rgba(0,0,0,0.14)] dark:border-white/10 md:w-[min(320px,calc(100vw-32px))]">
                     <div className="flex h-10 items-center border-b border-gray-100 dark:border-gray-700 px-2">
                       <div className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-gray-400 focus-within:bg-gray-50 dark:focus-within:bg-gray-700">
                         <Search size={16} />
@@ -221,7 +221,7 @@ export function ChatInput({
           </div>
         </div>
 
-        <p className="mt-3 text-center font-jakarta text-xs text-gray-400">
+        <p className="mt-3 hidden text-center font-jakarta text-xs text-gray-400 sm:block">
           内容由 AI 生成，请注意甄别。
         </p>
       </div>

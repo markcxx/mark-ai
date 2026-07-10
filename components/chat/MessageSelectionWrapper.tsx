@@ -31,7 +31,7 @@ export function MessageSelectionWrapper({
   return (
     <div
       className={cn(
-        'group/selection -mx-4 flex w-[calc(100%+32px)] items-center text-left transition-colors duration-150 ease-out dark:active:bg-white/[0.055] md:-mx-8 md:w-[calc(100%+64px)]',
+        'group/selection -mx-3 flex w-[calc(100%+24px)] items-center text-left transition-colors duration-150 ease-out dark:active:bg-white/[0.055] md:-mx-8 md:w-[calc(100%+64px)]',
         selectionInteractive && 'hover:bg-gray-100/55 active:bg-gray-100/75 dark:hover:bg-white/[0.035]',
         isSelected && selectionInteractive && 'bg-gray-100/70 hover:bg-gray-100/70 dark:bg-white/[0.045] dark:hover:bg-white/[0.045]',
       )}

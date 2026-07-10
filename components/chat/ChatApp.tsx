@@ -12,6 +12,7 @@ import { useUIStore } from '@/stores/useUIStore';
 
 import { ChatInput } from './ChatInput';
 import { ChatMiniMap } from './ChatMiniMap';
+import { ExportDialog, type ExportMode } from './ExportDialog';
 import { HtmlPreviewContext } from './HtmlPreviewContext';
 import { HtmlPreviewPanel } from './HtmlPreviewPanel';
 import type { HtmlPreviewPayload } from './htmlPreviewUtils';
@@ -103,11 +104,15 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   const [activeMiniMapMessageId, setActiveMiniMapMessageId] = useState<string | null>(null);
   const [activeHtmlPreview, setActiveHtmlPreview] = useState<HtmlPreviewPayload | null>(null);
   const [htmlPreviewFullscreen, setHtmlPreviewFullscreen] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportDialogMode, setExportDialogMode] = useState<ExportMode>('image');
 
   // Derived
   const selectedModel = availableModels.find((m) => getModelKey(m) === selectedModelKey);
   const activeSession = sessions.find((session) => session.id === activeSessionId);
   const showWelcome = messages.length === 0 && !multiSelectMode;
+  const mobileSidebarOffset = `min(${sidebarWidth}px, 86vw)`;
 
   // Scroll helpers
   const scrollToBottom = useCallback((force = false) => {
@@ -188,6 +193,30 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   useEffect(() => {
     useSessionStore.getState().loadSessions(initialSessionId);
   }, [initialSessionId]);
+
+  // Mobile uses the sidebar as a temporary drawer instead of a persistent column.
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 767px)');
+    const syncMobileViewport = () => {
+      const mobile = query.matches;
+      setIsMobileViewport(mobile);
+      if (mobile) useUIStore.getState().setSidebarOpen(false);
+    };
+
+    syncMobileViewport();
+    query.addEventListener('change', syncMobileViewport);
+    return () => query.removeEventListener('change', syncMobileViewport);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobileViewport || !isSidebarOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isMobileViewport, isSidebarOpen]);
 
   // Loading text rotation
   useEffect(() => {
@@ -286,6 +315,15 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
   };
 
+  const openExportDialog = (mode: ExportMode) => {
+    if (messages.length === 0) {
+      toast.error('没有可导出的消息');
+      return;
+    }
+    setExportDialogMode(mode);
+    setExportDialogOpen(true);
+  };
+
   const getMessageModel = (message: { role: string; model?: string; provider?: string }) => {
     if (message.role !== 'model') return selectedModel;
     return availableModels.find(
@@ -302,15 +340,15 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   const closeHtmlPreview = useCallback(() => {
     setActiveHtmlPreview(null);
     setHtmlPreviewFullscreen(false);
-    useUIStore.getState().setSidebarOpen(true);
-  }, []);
+    if (!isMobileViewport) useUIStore.getState().setSidebarOpen(true);
+  }, [isMobileViewport]);
 
   // PLACEHOLDER_RENDER
 
   return (
     <div
       className={cn(
-        'flex h-screen w-screen overflow-hidden bg-[var(--chat-app-bg)] p-2 font-sans text-gray-900 dark:text-gray-100 antialiased',
+        'flex h-dvh w-screen overflow-hidden bg-[var(--chat-app-bg)] p-0 font-sans text-gray-900 antialiased dark:text-gray-100 md:p-2',
         isResizingSidebar && 'cursor-col-resize select-none',
       )}
     >
@@ -335,15 +373,31 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
         loadingSessionIds={loadingSessionIds}
         onClose={() => useUIStore.getState().setSidebarOpen(false)}
         onDeleteSession={(id) => useSessionStore.getState().deleteSession(id)}
-        onNewChat={handleNewChat}
+        onNewChat={() => {
+          handleNewChat();
+          if (isMobileViewport) useUIStore.getState().setSidebarOpen(false);
+        }}
         onRenameSession={(id) => useSessionStore.getState().renameSession(id)}
-        onSelectSession={handleLoadSession}
+        onSelectSession={(id) => {
+          void handleLoadSession(id);
+          if (isMobileViewport) useUIStore.getState().setSidebarOpen(false);
+        }}
         onToggleFavorite={(id, favorite) => useSessionStore.getState().updateSessionFavorite(id, favorite)}
         onUpdateSessionTitle={(id, title) => useSessionStore.getState().updateSessionTitle(id, title)}
         onUnavailable={() => toast(NOT_IMPLEMENTED_TOAST)}
         sessions={sessions}
         width={sidebarWidth}
       />
+
+      {isMobileViewport && isSidebarOpen && (
+        <button
+          aria-label="收起历史会话"
+          className="fixed inset-y-0 right-0 z-30 bg-transparent"
+          onClick={() => useUIStore.getState().setSidebarOpen(false)}
+          style={{ left: mobileSidebarOffset }}
+          type="button"
+        />
+      )}
 
       <HtmlPreviewContext.Provider
         value={{
@@ -354,21 +408,25 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
       >
         <div
           className={cn(
-            'grid min-w-0 flex-1 transition-[grid-template-columns,gap] duration-300 ease-out',
-            activeHtmlPreview && htmlPreviewFullscreen ? 'gap-0' : 'gap-2',
+            'grid min-w-0 flex-1 transition-[grid-template-columns,gap,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] md:duration-300 md:ease-out',
+            activeHtmlPreview && (htmlPreviewFullscreen || isMobileViewport) ? 'gap-0' : 'gap-2',
           )}
           style={{
             gridTemplateColumns: activeHtmlPreview
-              ? htmlPreviewFullscreen
+              ? htmlPreviewFullscreen || isMobileViewport
                 ? 'minmax(0, 0fr) minmax(0, 1fr)'
                 : 'minmax(0, 1fr) minmax(360px, 48%)'
               : 'minmax(0, 1fr)',
+            transform:
+              isMobileViewport && isSidebarOpen
+                ? `translateX(${mobileSidebarOffset})`
+                : undefined,
           }}
         >
           <main
             className={cn(
-              'relative flex min-w-0 flex-col overflow-hidden rounded-xl border border-[#e5e5e5] bg-[var(--chat-panel-bg)] shadow-none transition-[opacity,border-color] duration-300 ease-out dark:border-gray-700',
-              activeHtmlPreview && htmlPreviewFullscreen
+              'relative flex min-w-0 flex-col overflow-hidden border-0 bg-[var(--chat-panel-bg)] shadow-none transition-[opacity,border-color] duration-300 ease-out dark:border-gray-700 md:rounded-xl md:border md:border-[#e5e5e5]',
+              activeHtmlPreview && (htmlPreviewFullscreen || isMobileViewport)
                 ? 'pointer-events-none border-transparent opacity-0'
                 : 'opacity-100',
             )}
@@ -376,7 +434,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
         {isSidebarOpen && (
           <div
             aria-label="调整侧栏宽度"
-            className="group absolute inset-y-0 left-0 z-30 w-3 -translate-x-1/2 touch-none cursor-col-resize"
+            className="group absolute inset-y-0 left-0 z-30 hidden w-3 -translate-x-1/2 touch-none cursor-col-resize md:block"
             onPointerDown={handleSidebarResizePointerDown}
             role="separator"
           >
@@ -401,6 +459,8 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
             if (!activeSessionId) { toast.error('当前没有可删除的会话'); return; }
             void useSessionStore.getState().deleteSession(activeSessionId);
           }}
+          exportSessionImage={() => openExportDialog('image')}
+          exportSessionJson={() => openExportDialog('json')}
           isFavorite={Boolean(activeSession?.favorite)}
           isSidebarOpen={isSidebarOpen}
           isWideChatMode={wideChatMode}
@@ -426,8 +486,10 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
         <div
           ref={messagesScrollRef}
           className={cn(
-            'flex flex-1 flex-col items-center overflow-y-auto px-4 md:px-8',
-            showWelcome ? 'justify-center pb-8 pt-0' : 'pb-40 pt-6',
+            'flex flex-1 flex-col items-center overflow-y-auto px-3 md:px-8',
+            showWelcome
+              ? 'justify-center pb-6 pt-0 md:pb-8'
+              : 'pb-[calc(11rem+env(safe-area-inset-bottom))] pt-4 md:pb-40 md:pt-6',
           )}
           onScroll={handleMessagesScroll}
         >
@@ -555,6 +617,16 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
       )}
         </div>
       </HtmlPreviewContext.Provider>
+
+      {exportDialogOpen && (
+        <ExportDialog
+          initialMode={exportDialogMode}
+          messages={messages}
+          onClose={() => setExportDialogOpen(false)}
+          open
+          session={activeSession}
+        />
+      )}
     </div>
   );
 }
