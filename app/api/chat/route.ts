@@ -1,10 +1,29 @@
 import { GoogleGenAI } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
 import { findConfiguredModel } from '@/lib/models';
+import { searchTavily } from '@/lib/search/tavily';
+import { readWebpage } from '@/lib/search/webpage';
+import type { WebSearchState } from '@/lib/chat/types';
 
 type ChatMessage = {
   content: string;
-  role: 'user' | 'model' | 'assistant';
+  role: 'user' | 'model' | 'assistant' | 'system';
+};
+
+type OpenAIChatMessage = {
+  content: string | null;
+  role: 'system' | 'user' | 'assistant' | 'tool';
+  tool_call_id?: string;
+  tool_calls?: OpenAIToolCall[];
+};
+
+type OpenAIToolCall = {
+  function: {
+    arguments: string;
+    name: string;
+  };
+  id: string;
+  type: 'function';
 };
 
 type StreamEventType = 'content' | 'reasoning';
@@ -14,6 +33,90 @@ type UsagePayload = {
   outputTokens?: number;
   totalTokens?: number;
 };
+
+const WEB_SEARCH_TOOL = {
+  function: {
+    description:
+      'Search the public web for fresh, current, or externally verifiable information. Use this only when the answer needs information beyond the conversation or your internal knowledge.',
+    name: 'web_search',
+    parameters: {
+      additionalProperties: false,
+      properties: {
+        query: {
+          description: 'A concise search query in the same language as the user question when possible.',
+          type: 'string',
+        },
+      },
+      required: ['query'],
+      type: 'object',
+    },
+  },
+  type: 'function',
+} as const;
+
+const READ_WEBPAGE_TOOL = {
+  function: {
+    description:
+      'Read and extract visible text content from a specific public webpage URL. Use this when the user gives a URL or when search results need deeper inspection.',
+    name: 'read_webpage',
+    parameters: {
+      additionalProperties: false,
+      properties: {
+        url: {
+          description: 'The public http/https URL to read.',
+          type: 'string',
+        },
+      },
+      required: ['url'],
+      type: 'object',
+    },
+  },
+  type: 'function',
+} as const;
+
+const WEB_SEARCH_SYSTEM_PROMPT =
+  '联网工具可用：web_search 用于搜索公开网页，read_webpage 用于读取具体公开网页 URL。只有当用户问题需要实时信息、外部事实核验、最新资料、明确要求联网，或用户提供 URL 需要阅读时才调用；普通推理、写作、翻译、代码解释不要调用。回答中应引用使用过的来源 URL。';
+
+const getSafeTimeZone = (timezone?: unknown) => {
+  const candidate = typeof timezone === 'string' && timezone.trim() ? timezone.trim() : 'Asia/Shanghai';
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: candidate }).format(new Date());
+    return candidate;
+  } catch {
+    return 'UTC';
+  }
+};
+
+const getDatePart = (date: Date, timezone: string, part: Intl.DateTimeFormatPartTypes) =>
+  new Intl.DateTimeFormat('en-US', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: timezone,
+    year: 'numeric',
+  })
+    .formatToParts(date)
+    .find(item => item.type === part)?.value || '';
+
+const getCurrentDatePrompt = (timezone?: unknown) => {
+  const tz = getSafeTimeZone(timezone);
+  const now = new Date();
+  const year = getDatePart(now, tz, 'year');
+  const month = getDatePart(now, tz, 'month');
+  const day = getDatePart(now, tz, 'day');
+  return `Current date: ${year}-${month}-${day} (${tz})`;
+};
+
+const getRuntimeSystemPrompt = ({
+  timezone,
+  webSearchEnabled,
+}: {
+  timezone?: unknown;
+  webSearchEnabled: boolean;
+}) =>
+  [
+    getCurrentDatePrompt(timezone),
+    webSearchEnabled ? WEB_SEARCH_SYSTEM_PROMPT : '',
+  ].filter(Boolean).join('\n\n');
 
 const toOpenAIChatEndpoint = (baseUrl?: string) => {
   if (!baseUrl) return undefined;
@@ -57,62 +160,165 @@ const encodeStreamEvent = (encoder: TextEncoder, type: StreamEventType, text: st
 const encodeUsageEvent = (encoder: TextEncoder, usage: UsagePayload) =>
   encoder.encode(`${JSON.stringify({ type: 'usage', ...usage })}\n`);
 
+const encodeToolEvent = (encoder: TextEncoder, webSearch: WebSearchState) =>
+  encoder.encode(`${JSON.stringify({ type: 'tool', webSearch })}\n`);
+
+const toOpenAIMessages = ({
+  messages,
+  timezone,
+  webSearchEnabled,
+}: {
+  messages: ChatMessage[];
+  timezone?: unknown;
+  webSearchEnabled: boolean;
+}): OpenAIChatMessage[] => {
+  const openAIMessages = messages.map(message => ({
+    content: message.content,
+    role: message.role === 'model' ? 'assistant' : message.role,
+  })) as OpenAIChatMessage[];
+
+  return [
+    {
+      content: getRuntimeSystemPrompt({ timezone, webSearchEnabled }),
+      role: 'system',
+    },
+    ...openAIMessages,
+  ];
+};
+
+const tryParseToolArgs = (value: string) => {
+  try {
+    const parsed = JSON.parse(value || '{}');
+    return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : {};
+  } catch {
+    return {};
+  }
+};
+
+const getToolSearchQuery = (toolCall: OpenAIToolCall) => {
+  const args = tryParseToolArgs(toolCall.function.arguments);
+  const query = typeof args.query === 'string' ? args.query.trim() : '';
+  return query || toolCall.function.arguments.trim();
+};
+
+const getToolWebpageUrl = (toolCall: OpenAIToolCall) => {
+  const args = tryParseToolArgs(toolCall.function.arguments);
+  const url = typeof args.url === 'string' ? args.url.trim() : '';
+  return url || toolCall.function.arguments.trim();
+};
+
+const formatToolResultForModel = (webSearch: WebSearchState) =>
+  JSON.stringify({
+    answer: webSearch.answer,
+    content: webSearch.content,
+    description: webSearch.description,
+    error: webSearch.error,
+    query: webSearch.query,
+    results: webSearch.results.slice(0, 8).map((item, index) => ({
+      content: item.content,
+      index: index + 1,
+      title: item.title,
+      url: item.url,
+    })),
+    siteName: webSearch.siteName,
+    status: webSearch.status,
+    title: webSearch.title,
+    tool: webSearch.tool,
+    url: webSearch.url,
+  });
+
+const normalizeToolCalls = (toolCalls: OpenAIToolCall[]) =>
+  toolCalls
+    .filter(toolCall => toolCall.id && toolCall.function.name)
+    .map(toolCall => ({
+      function: {
+        arguments: toolCall.function.arguments || '{}',
+        name: toolCall.function.name,
+      },
+      id: toolCall.id,
+      type: 'function' as const,
+    }));
+
 const createOpenAICompatibleStream = async (
   messages: ChatMessage[],
   model: string,
   apiKey: string,
   baseUrl?: string,
+  webSearchEnabled = false,
+  timezone?: unknown,
 ) => {
   const endpoint = toOpenAIChatEndpoint(baseUrl);
   if (!endpoint) {
     return NextResponse.json({ error: 'Model base URL is not configured' }, { status: 400 });
   }
 
-  const upstream = await fetch(endpoint, {
-    body: JSON.stringify({
-      messages: messages.map(message => ({
-        content: message.content,
-        role: message.role === 'model' ? 'assistant' : message.role,
-      })),
-      model,
-      stream: true,
-    }),
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    method: 'POST',
-  });
-
-  if (!upstream.ok) {
-    const detail = await upstream.text();
-    return NextResponse.json(
-      { error: 'Upstream model request failed', detail },
-      { status: upstream.status },
-    );
-  }
-
-  if (!upstream.body) {
-    return NextResponse.json({ error: 'No upstream response body' }, { status: 502 });
-  }
-
-  const reader = upstream.body.getReader();
-  const decoder = new TextDecoder();
   const encoder = new TextEncoder();
+  const openAIMessages = toOpenAIMessages({ messages, timezone, webSearchEnabled });
 
   const stream = new ReadableStream({
     async start(controller) {
-      let buffer = '';
+      const requestUpstream = async (requestMessages: OpenAIChatMessage[], allowTools: boolean) => {
+        const upstream = await fetch(endpoint, {
+          body: JSON.stringify({
+            messages: requestMessages,
+            model,
+            stream: true,
+            ...(allowTools
+              ? {
+                  tool_choice: 'auto',
+                  tools: [WEB_SEARCH_TOOL, READ_WEBPAGE_TOOL],
+                }
+              : {}),
+          }),
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          method: 'POST',
+        });
 
-      const enqueueDataLine = (line: string) => {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith('data:')) return false;
+        if (!upstream.ok) {
+          const detail = await upstream.text();
+          throw new Error(detail || 'Upstream model request failed');
+        }
 
-        const data = trimmed.slice(5).trim();
-        if (!data || data === '[DONE]') return data === '[DONE]';
+        if (!upstream.body) {
+          throw new Error('No upstream response body');
+        }
 
-        try {
-          const parsed = JSON.parse(data);
+        return upstream.body.getReader();
+      };
+
+      const streamModelResponse = async (requestMessages: OpenAIChatMessage[], allowTools: boolean) => {
+        const reader = await requestUpstream(requestMessages, allowTools);
+        const decoder = new TextDecoder();
+        const toolCallsByIndex = new Map<number, OpenAIToolCall>();
+        let assistantContent = '';
+        let buffer = '';
+
+        const appendToolCall = (toolCall: any, fallbackIndex: number) => {
+          const index = Number.isFinite(toolCall?.index) ? Number(toolCall.index) : fallbackIndex;
+          const current = toolCallsByIndex.get(index) || {
+            function: { arguments: '', name: '' },
+            id: '',
+            type: 'function' as const,
+          };
+
+          if (typeof toolCall?.id === 'string') current.id = toolCall.id;
+          if (toolCall?.function) {
+            if (typeof toolCall.function.name === 'string') {
+              current.function.name += toolCall.function.name;
+            }
+            if (typeof toolCall.function.arguments === 'string') {
+              current.function.arguments += toolCall.function.arguments;
+            }
+          }
+          if (toolCall?.type === 'function') current.type = 'function';
+
+          toolCallsByIndex.set(index, current);
+        };
+
+        const handleParsedEvent = (parsed: any) => {
           const choices = Array.isArray(parsed.choices) ? parsed.choices : [];
           const usage = parsed.usage;
 
@@ -136,38 +342,188 @@ const createOpenAICompatibleStream = async (
               'thinking',
             ]);
             const content = getChoiceText(choice, ['content', 'text']);
+            const deltaToolCalls = choice?.delta?.tool_calls || choice?.message?.tool_calls;
 
             if (reasoning) controller.enqueue(encodeStreamEvent(encoder, 'reasoning', reasoning));
-            if (content) controller.enqueue(encodeStreamEvent(encoder, 'content', content));
-          }
-        } catch {
-          // Some compatible providers send comments or metadata lines in the SSE stream.
-        }
-
-        return false;
-      };
-
-      while (true) {
-        const { value, done } = await reader.read();
-
-        if (value) {
-          buffer += decoder.decode(value, { stream: !done });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-
-          for (const line of lines) {
-            if (enqueueDataLine(line)) {
-              controller.close();
-              return;
+            if (content) {
+              assistantContent += content;
+              controller.enqueue(encodeStreamEvent(encoder, 'content', content));
+            }
+            if (Array.isArray(deltaToolCalls)) {
+              deltaToolCalls.forEach(appendToolCall);
             }
           }
+        };
+
+        const enqueueDataLine = (line: string) => {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data:')) return false;
+
+          const data = trimmed.slice(5).trim();
+          if (!data || data === '[DONE]') return data === '[DONE]';
+
+          try {
+            handleParsedEvent(JSON.parse(data));
+          } catch {
+            // Some compatible providers send comments or metadata lines in the SSE stream.
+          }
+
+          return false;
+        };
+
+        while (true) {
+          const { value, done } = await reader.read();
+
+          if (value) {
+            buffer += decoder.decode(value, { stream: !done });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              if (enqueueDataLine(line)) {
+                return {
+                  assistantContent,
+                  toolCalls: normalizeToolCalls([...toolCallsByIndex.values()]),
+                };
+              }
+            }
+          }
+
+          if (done) break;
         }
 
-        if (done) break;
-      }
+        if (buffer) enqueueDataLine(buffer);
 
-      if (buffer) enqueueDataLine(buffer);
-      controller.close();
+        return {
+          assistantContent,
+          toolCalls: normalizeToolCalls([...toolCallsByIndex.values()]),
+        };
+      };
+
+      try {
+        const firstPass = await streamModelResponse(openAIMessages, webSearchEnabled);
+        const executableToolCalls = firstPass.toolCalls.filter(
+          toolCall => ['web_search', 'read_webpage'].includes(toolCall.function.name),
+        );
+
+        if (executableToolCalls.length === 0) {
+          controller.close();
+          return;
+        }
+
+        const assistantToolMessage: OpenAIChatMessage = {
+          content: firstPass.assistantContent || null,
+          role: 'assistant',
+          tool_calls: executableToolCalls,
+        };
+        const toolResultMessages: OpenAIChatMessage[] = [];
+
+        for (const toolCall of executableToolCalls) {
+          if (toolCall.function.name === 'read_webpage') {
+            const url = getToolWebpageUrl(toolCall);
+            const readingState: WebSearchState = {
+              query: url,
+              results: [],
+              status: 'searching',
+              tool: 'read_webpage',
+              url,
+            };
+            controller.enqueue(encodeToolEvent(encoder, readingState));
+
+            try {
+              const result = await readWebpage({ url });
+              const doneState: WebSearchState = {
+                completedAt: Date.now(),
+                content: result.content,
+                costTime: result.costTime,
+                description: result.description,
+                query: result.url,
+                results: [],
+                siteName: result.siteName,
+                status: 'done',
+                title: result.title,
+                tool: 'read_webpage',
+                url: result.url,
+              };
+              controller.enqueue(encodeToolEvent(encoder, doneState));
+              toolResultMessages.push({
+                content: formatToolResultForModel(doneState),
+                role: 'tool',
+                tool_call_id: toolCall.id,
+              });
+            } catch (error) {
+              const errorState: WebSearchState = {
+                completedAt: Date.now(),
+                error: error instanceof Error ? error.message : '网页读取失败',
+                query: url,
+                results: [],
+                status: 'error',
+                tool: 'read_webpage',
+                url,
+              };
+              controller.enqueue(encodeToolEvent(encoder, errorState));
+              toolResultMessages.push({
+                content: formatToolResultForModel(errorState),
+                role: 'tool',
+                tool_call_id: toolCall.id,
+              });
+            }
+            continue;
+          }
+
+          const query = getToolSearchQuery(toolCall);
+          const searchingState: WebSearchState = {
+            query,
+            results: [],
+            status: 'searching',
+            tool: 'web_search',
+          };
+          controller.enqueue(encodeToolEvent(encoder, searchingState));
+
+          try {
+            const result = await searchTavily({ query });
+            const doneState: WebSearchState = {
+              answer: result.answer,
+              completedAt: Date.now(),
+              costTime: result.costTime,
+              query: result.query,
+              results: result.results,
+              status: 'done',
+              tool: 'web_search',
+            };
+            controller.enqueue(encodeToolEvent(encoder, doneState));
+            toolResultMessages.push({
+              content: formatToolResultForModel(doneState),
+              role: 'tool',
+              tool_call_id: toolCall.id,
+            });
+          } catch (error) {
+            const errorState: WebSearchState = {
+              completedAt: Date.now(),
+              error: error instanceof Error ? error.message : '联网搜索失败',
+              query,
+              results: [],
+              status: 'error',
+              tool: 'web_search',
+            };
+            controller.enqueue(encodeToolEvent(encoder, errorState));
+            toolResultMessages.push({
+              content: formatToolResultForModel(errorState),
+              role: 'tool',
+              tool_call_id: toolCall.id,
+            });
+          }
+        }
+
+        await streamModelResponse(
+          [...openAIMessages, assistantToolMessage, ...toolResultMessages],
+          false,
+        );
+        controller.close();
+      } catch (error) {
+        console.error('OpenAI compatible chat error:', error);
+        controller.error(error);
+      }
     },
   });
 
@@ -182,7 +538,7 @@ const createOpenAICompatibleStream = async (
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, model, provider } = await req.json();
+    const { messages, model, provider, timezone, webSearchEnabled } = await req.json();
     const selectedModel = findConfiguredModel(model, provider);
 
     if (!selectedModel) {
@@ -199,6 +555,8 @@ export async function POST(req: NextRequest) {
         selectedModel.id,
         selectedModel.apiKey,
         selectedModel.baseUrl,
+        Boolean(webSearchEnabled),
+        timezone,
       );
     }
 
@@ -208,6 +566,10 @@ export async function POST(req: NextRequest) {
     });
 
     const prompt = messages[messages.length - 1].content;
+    const runtimeSystemPrompt = getRuntimeSystemPrompt({
+      timezone,
+      webSearchEnabled: false,
+    });
     const history = messages.slice(0, -1).map((message: ChatMessage) => ({
       parts: [{ text: message.content }],
       role: message.role === 'model' ? 'model' : 'user',
@@ -215,6 +577,8 @@ export async function POST(req: NextRequest) {
 
     const responseStream = await ai.models.generateContentStream({
       contents: [
+        { role: 'user', parts: [{ text: runtimeSystemPrompt }] },
+        { role: 'model', parts: [{ text: '了解。' }] },
         ...history,
         { role: 'user', parts: [{ text: prompt }] },
       ],

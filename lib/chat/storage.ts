@@ -101,8 +101,19 @@ const ensureDatabase = () => {
   ensureColumn('input_tokens', 'input_tokens INTEGER');
   ensureColumn('output_tokens', 'output_tokens INTEGER');
   ensureColumn('total_tokens', 'total_tokens INTEGER');
+  ensureColumn('web_search', 'web_search TEXT');
 
   return db;
+};
+
+const parseJsonValue = <T>(value: unknown): T | undefined => {
+  if (typeof value !== 'string' || !value.trim()) return undefined;
+
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return undefined;
+  }
 };
 
 const toSession = (row: any): ChatSession => ({
@@ -132,6 +143,7 @@ const toMessage = (row: any): Message => ({
     typeof row.reasoning_duration === 'number' ? row.reasoning_duration : undefined,
   role: row.role === 'user' ? 'user' : 'model',
   totalTokens: typeof row.total_tokens === 'number' ? row.total_tokens : undefined,
+  webSearch: parseJsonValue(row.web_search),
 });
 
 export const listChatSessions = () => {
@@ -224,6 +236,7 @@ export const getChatMessages = (sessionId: string) => {
         input_tokens,
         output_tokens,
         total_tokens,
+        web_search,
         model,
         provider,
         created_at
@@ -281,12 +294,13 @@ export const replaceChatMessages = (sessionId: string, messages: Message[]) => {
           input_tokens,
           output_tokens,
           total_tokens,
+          web_search,
           model,
           provider,
           position,
           created_at
         )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
 
     messages.forEach((message, index) => {
@@ -306,6 +320,7 @@ export const replaceChatMessages = (sessionId: string, messages: Message[]) => {
         message.inputTokens || null,
         message.outputTokens || null,
         message.totalTokens || null,
+        message.webSearch ? JSON.stringify(message.webSearch) : null,
         message.model || null,
         message.provider || null,
         index,

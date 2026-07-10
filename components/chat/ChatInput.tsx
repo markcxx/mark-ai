@@ -3,7 +3,8 @@
 import type { RefObject } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { ModelIcon } from '@lobehub/icons';
-import { ChevronDown, Mic, Paperclip, Search, SendHorizontal, Square } from 'lucide-react';
+import Switch from '@lobehub/ui/es/base-ui/Switch/Switch';
+import { ChevronDown, Globe2, Mic, Paperclip, Search, SendHorizontal, Square } from 'lucide-react';
 
 import type { ConfiguredModel } from '@/lib/chat/types';
 import { getModelKey } from '@/lib/chat/helpers';
@@ -26,6 +27,8 @@ export function ChatInput({
   setModelSearchKeyword,
   setSelectedModelKey,
   textareaRef,
+  webSearchEnabled,
+  onToggleWebSearch,
 }: {
   availableModels: ConfiguredModel[];
   input: string;
@@ -43,6 +46,8 @@ export function ChatInput({
   setModelSearchKeyword: (keyword: string) => void;
   setSelectedModelKey: (key: string) => void;
   textareaRef: RefObject<HTMLTextAreaElement | null>;
+  webSearchEnabled: boolean;
+  onToggleWebSearch: () => void;
 }) {
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const modelMenuRef = useRef<HTMLDivElement | null>(null);
@@ -114,6 +119,39 @@ export function ChatInput({
               >
                 <Mic size={20} />
               </button>
+              <div
+                className={cn(
+                  'flex h-9 items-center gap-2 rounded-lg px-2 text-sm transition-colors',
+                  webSearchEnabled
+                    ? 'text-sky-700 hover:bg-sky-50 dark:text-sky-200 dark:hover:bg-sky-500/10'
+                    : 'text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-200',
+                  isLoading && 'cursor-not-allowed opacity-60',
+                )}
+                title={webSearchEnabled ? '关闭联网搜索' : '开启联网搜索'}
+              >
+                <Globe2 size={18} />
+                <span className="hidden text-sm sm:inline">联网搜索</span>
+                <Switch
+                  checked={webSearchEnabled}
+                  disabled={isLoading}
+                  onChange={(checked) => {
+                    if (checked !== webSearchEnabled) onToggleWebSearch();
+                  }}
+                  size="small"
+                  styles={{
+                    root: {
+                      background: webSearchEnabled ? '#0ea5e9' : 'rgba(148, 163, 184, 0.38)',
+                      boxShadow: webSearchEnabled
+                        ? 'inset 0 1.5px 3px rgba(2, 132, 199, 0.34)'
+                        : 'inset 0 1.5px 2px rgba(15, 23, 42, 0.12)',
+                    },
+                    thumb: {
+                      background: '#fff',
+                    },
+                  }}
+                  title={webSearchEnabled ? '关闭联网搜索' : '开启联网搜索'}
+                />
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <div className="relative" ref={modelMenuRef}>

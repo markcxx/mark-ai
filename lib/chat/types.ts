@@ -16,6 +16,32 @@ export type Message = {
   isStreaming?: boolean;
   model?: string;
   provider?: string;
+  webSearch?: WebSearchState;
+};
+
+export type WebSearchResult = {
+  content?: string;
+  favicon?: string;
+  publishedDate?: string;
+  score?: number;
+  title: string;
+  url: string;
+};
+
+export type WebSearchState = {
+  answer?: string;
+  completedAt?: number;
+  content?: string;
+  costTime?: number;
+  description?: string;
+  error?: string;
+  query: string;
+  siteName?: string;
+  results: WebSearchResult[];
+  title?: string;
+  tool?: 'web_search' | 'read_webpage';
+  status: 'searching' | 'done' | 'error';
+  url?: string;
 };
 
 export type ChatSession = {
@@ -34,7 +60,8 @@ export type ChatStreamEvent = {
   outputTokens?: number;
   text?: string;
   totalTokens?: number;
-  type?: 'content' | 'reasoning' | 'usage';
+  type?: 'content' | 'reasoning' | 'tool' | 'usage';
+  webSearch?: WebSearchState;
 };
 
 export type ConfiguredModel = {

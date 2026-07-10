@@ -18,6 +18,7 @@ interface UIState {
   availableModels: ConfiguredModel[];
   isLoadingModels: boolean;
   selectedModelKey: string;
+  webSearchEnabled: boolean;
 }
 
 interface UIActions {
@@ -37,6 +38,8 @@ interface UIActions {
   loadModels: () => Promise<void>;
   setSelectedModelKey: (key: string) => void;
   setModelSearchKeyword: (keyword: string) => void;
+  setWebSearchEnabled: (enabled: boolean) => void;
+  toggleWebSearch: () => void;
 }
 
 export type UIStore = UIState & UIActions;
@@ -62,6 +65,7 @@ export const useUIStore = create<UIStore>()(
     availableModels: [],
     isLoadingModels: true,
     selectedModelKey: '',
+    webSearchEnabled: false,
 
     toggleSidebar: () => set((s) => ({ isSidebarOpen: !s.isSidebarOpen })),
     setSidebarOpen: (open) => set({ isSidebarOpen: open }),
@@ -161,5 +165,7 @@ export const useUIStore = create<UIStore>()(
     setSelectedModelKey: (key) => set({ selectedModelKey: key }),
     setWideChatMode: (wide) => set({ wideChatMode: wide }),
     setModelSearchKeyword: (keyword) => set({ modelSearchKeyword: keyword }),
+    setWebSearchEnabled: (enabled) => set({ webSearchEnabled: enabled }),
+    toggleWebSearch: () => set((s) => ({ webSearchEnabled: !s.webSearchEnabled })),
   })),
 );

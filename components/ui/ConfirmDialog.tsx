@@ -1,5 +1,7 @@
 'use client';
 
+import { createPortal } from 'react-dom';
+
 export function ConfirmDialog({
   cancelText = '取消',
   confirmText = '确认',
@@ -17,9 +19,9 @@ export function ConfirmDialog({
   open: boolean;
   title: string;
 }) {
-  if (!open) return null;
+  if (!open || typeof document === 'undefined') return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 backdrop-blur-sm">
       <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-4 shadow-[0_18px_60px_rgba(0,0,0,0.2)] dark:border-white/10 dark:bg-[#191919]">
         <h3 className="text-base font-semibold text-gray-950 dark:text-gray-50">{title}</h3>
@@ -41,6 +43,7 @@ export function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

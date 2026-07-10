@@ -78,6 +78,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   const selectedModelKey = useUIStore((s) => s.selectedModelKey);
   const modelSearchKeyword = useUIStore((s) => s.modelSearchKeyword);
   const wideChatMode = useUIStore((s) => s.wideChatMode);
+  const webSearchEnabled = useUIStore((s) => s.webSearchEnabled);
 
   // Session Store
   const sessions = useSessionStore((s) => s.sessions);
@@ -508,12 +509,14 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                 onKeyDown={handleKeyDown}
                 onMic={() => toast(NOT_IMPLEMENTED_TOAST)}
                 onSend={handleSend}
+                onToggleWebSearch={() => useUIStore.getState().toggleWebSearch()}
                 placement="center"
                 selectedModel={selectedModel}
                 selectedModelKey={selectedModelKey}
                 setModelSearchKeyword={(kw) => useUIStore.getState().setModelSearchKeyword(kw)}
                 setSelectedModelKey={(key) => useUIStore.getState().setSelectedModelKey(key)}
                 textareaRef={textareaRef}
+                webSearchEnabled={webSearchEnabled}
               />
             </WelcomePanel>
           ) : (
@@ -598,11 +601,13 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
             onKeyDown={handleKeyDown}
             onMic={() => toast(NOT_IMPLEMENTED_TOAST)}
             onSend={handleSend}
+            onToggleWebSearch={() => useUIStore.getState().toggleWebSearch()}
             selectedModel={selectedModel}
             selectedModelKey={selectedModelKey}
             setModelSearchKeyword={(kw) => useUIStore.getState().setModelSearchKeyword(kw)}
             setSelectedModelKey={(key) => useUIStore.getState().setSelectedModelKey(key)}
             textareaRef={textareaRef}
+            webSearchEnabled={webSearchEnabled}
           />
         )}
       </main>

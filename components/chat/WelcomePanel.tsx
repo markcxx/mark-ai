@@ -18,7 +18,7 @@ function AnimatedEmojiLogo() {
 
   return (
     <div className="markai-logo-face flex h-16 w-16 shrink-0 items-center justify-center md:h-20 md:w-20">
-      <FluentEmoji cdn="aliyun" emoji={emoji} size={64} type="3d" unoptimized />
+      <FluentEmoji cdn="aliyun" emoji={emoji} size={64} type="3d" />
       <style>{`
         @keyframes markai-logo-float {
           0%, 100% { transform: translateY(0) rotate(-2deg); }

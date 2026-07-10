@@ -14,11 +14,12 @@ type StreamedMessageResult = Pick<
   'content' | 'isReasoning' | 'isStreaming' | 'reasoning' | 'reasoningDuration'
 > & Pick<
   Message,
-  'generationDuration' | 'inputTokens' | 'interrupted' | 'outputTokens' | 'totalTokens'
+  'generationDuration' | 'inputTokens' | 'interrupted' | 'outputTokens' | 'totalTokens' | 'webSearch'
 >;
 
 type StreamOptions = {
   initialContent?: string;
+  webSearchEnabled?: boolean;
 };
 
 const getTotalTokens = (inputTokens: number, outputTokens: number, totalTokens?: number) => {
@@ -26,6 +27,15 @@ const getTotalTokens = (inputTokens: number, outputTokens: number, totalTokens?:
   if (!totalTokens) return estimatedTotal;
   return Math.max(totalTokens, estimatedTotal);
 };
+
+const getClientTimezone = () => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return undefined;
+  }
+};
+
 
 interface ChatState {
   messages: Message[];
@@ -117,6 +127,7 @@ export const useChatStore = create<ChatStore>()(
       let outputTokens = 0;
       let totalTokens = inputTokens;
       let reasoningDuration: number | undefined;
+      let finalWebSearch: Message['webSearch'];
 
       const controller = new AbortController();
       set({ abortController: controller });
@@ -132,13 +143,25 @@ export const useChatStore = create<ChatStore>()(
             messages: historyMessages.map((m) => ({ content: m.content, role: m.role })),
             model: modelConfig.id,
             provider: modelConfig.provider,
+            timezone: getClientTimezone(),
+            webSearchEnabled: Boolean(options.webSearchEnabled),
           }),
           headers: { 'Content-Type': 'application/json' },
           method: 'POST',
           signal: controller.signal,
         });
 
-        if (!response.ok) throw new Error('Network response was not ok');
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => '');
+          let detail = errorText;
+          try {
+            const parsed = JSON.parse(errorText);
+            detail = parsed?.detail || parsed?.error?.message || parsed?.error || errorText;
+          } catch {
+            // Use raw text fallback.
+          }
+          throw new Error(typeof detail === 'string' && detail.trim() ? detail : '模型请求失败');
+        }
         if (!response.body) throw new Error('No response body');
 
         const reader = response.body.getReader();
@@ -211,6 +234,15 @@ export const useChatStore = create<ChatStore>()(
               updateStreamingMessage(false);
               return;
             }
+            if (event.type === 'tool' && event.webSearch) {
+              finalWebSearch = event.webSearch;
+              set((s) => ({
+                messages: s.messages.map((m) =>
+                  m.id === modelMessageId ? { ...m, webSearch: event.webSearch } : m,
+                ),
+              }));
+              return;
+            }
             if (event.type === 'reasoning' && event.text) { appendReasoning(event.text); return; }
             if (event.type === 'content' && event.text) { appendContent(event.text); return; }
           } catch { /* non-JSON line */ }
@@ -251,6 +283,7 @@ export const useChatStore = create<ChatStore>()(
           reasoning,
           reasoningDuration,
           totalTokens: finalTotalTokens,
+          webSearch: finalWebSearch,
         };
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') {
@@ -273,6 +306,7 @@ export const useChatStore = create<ChatStore>()(
             reasoning,
             reasoningDuration,
             totalTokens: finalTotalTokens,
+            webSearch: finalWebSearch,
           };
         }
         console.error('Chat error:', error);
@@ -294,6 +328,7 @@ export const useChatStore = create<ChatStore>()(
           reasoning: eventReasoning || undefined,
           reasoningDuration,
           totalTokens: inputTokens + estimateTextTokens('Sorry, I encountered an error. Please try again.'),
+          webSearch: finalWebSearch,
         };
       } finally {
         set((s) => ({
@@ -308,7 +343,7 @@ export const useChatStore = create<ChatStore>()(
 
     sendMessage: async () => {
       const { input, isLoading, messages, streamAssistantMessage } = get();
-      const { availableModels, selectedModelKey } = useUIStore.getState();
+      const { availableModels, selectedModelKey, webSearchEnabled } = useUIStore.getState();
       const { getModelKey } = await import('@/lib/chat/helpers');
       const selectedModel = availableModels.find((m) => getModelKey(m) === selectedModelKey);
 
@@ -363,8 +398,14 @@ export const useChatStore = create<ChatStore>()(
           [...messages, userMessage],
           modelMessageId,
           selectedModel,
+          { webSearchEnabled },
         );
-        const savedMessages = [...messages, userMessage, { ...modelMessage, ...streamedMessage }];
+        const latestModelMessage = get().messages.find((m) => m.id === modelMessageId);
+        const savedMessages = [
+          ...messages,
+          userMessage,
+          { ...modelMessage, ...(latestModelMessage || {}), ...streamedMessage },
+        ];
         set({ messages: savedMessages });
 
         await sessionStore.persistSessionMessages(targetSessionId, savedMessages);
@@ -455,7 +496,7 @@ export const useChatStore = create<ChatStore>()(
       const index = messages.findIndex((item) => item.id === message.id);
       if (index < 0) return;
 
-      const { availableModels, selectedModelKey, setOpenMenuMessageId } = useUIStore.getState();
+      const { availableModels, selectedModelKey, setOpenMenuMessageId, webSearchEnabled } = useUIStore.getState();
       const { getModelKey } = await import('@/lib/chat/helpers');
       const selectedModel = availableModels.find((m) => getModelKey(m) === selectedModelKey);
 
@@ -483,8 +524,17 @@ export const useChatStore = create<ChatStore>()(
         set({ messages: [...historyMessages, modelMessage] });
         setOpenMenuMessageId(null);
 
-        const streamedMessage = await streamAssistantMessage(historyMessages, targetId, modelConfig);
-        const savedMessages = [...historyMessages, { ...modelMessage, ...streamedMessage }];
+        const streamedMessage = await streamAssistantMessage(
+          historyMessages,
+          targetId,
+          modelConfig,
+          { webSearchEnabled },
+        );
+        const latestUserRetryMessage = get().messages.find((item) => item.id === targetId);
+        const savedMessages = [
+          ...historyMessages,
+          { ...modelMessage, ...(latestUserRetryMessage || {}), ...streamedMessage },
+        ];
         set({ messages: savedMessages });
         if (sessionStore.activeSessionId) await sessionStore.persistSessionMessages(sessionStore.activeSessionId, savedMessages);
         return;
@@ -510,6 +560,7 @@ export const useChatStore = create<ChatStore>()(
         isReasoning: false, isStreaming: true, model: modelConfig.id,
         outputTokens: undefined, provider: modelConfig.provider, reasoning: undefined,
         reasoningDuration: undefined, totalTokens: undefined,
+        webSearch: undefined,
       };
       const nextMessages = deleteCurrent
         ? [...historyMessages, nextModelMessage]
@@ -518,8 +569,17 @@ export const useChatStore = create<ChatStore>()(
       set({ messages: nextMessages });
       setOpenMenuMessageId(null);
 
-      const streamedMessage = await streamAssistantMessage(regenerateHistoryMessages, nextModelMessage.id, modelConfig);
-      const savedMessages = [...nextMessages.slice(0, -1), { ...nextModelMessage, ...streamedMessage }];
+      const streamedMessage = await streamAssistantMessage(
+        regenerateHistoryMessages,
+        nextModelMessage.id,
+        modelConfig,
+        { webSearchEnabled },
+      );
+      const latestRetryMessage = get().messages.find((item) => item.id === nextModelMessage.id);
+      const savedMessages = [
+        ...nextMessages.slice(0, -1),
+        { ...nextModelMessage, ...(latestRetryMessage || {}), ...streamedMessage },
+      ];
       set({ messages: savedMessages });
       if (sessionStore.activeSessionId) await sessionStore.persistSessionMessages(sessionStore.activeSessionId, savedMessages);
     },
