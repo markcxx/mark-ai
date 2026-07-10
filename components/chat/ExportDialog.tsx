@@ -28,7 +28,7 @@ function ExportPreviewMessage({ message }: { message: Message }) {
   if (isUser) {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[82%] rounded-2xl rounded-tr-sm bg-[var(--chat-user-bubble-bg)] px-5 py-3 text-[15px] leading-relaxed text-gray-900 shadow-sm whitespace-pre-wrap">
+        <div className="max-w-[82%] rounded-2xl rounded-tr-sm bg-[var(--chat-user-bubble-bg)] px-5 py-3 text-[15px] leading-relaxed text-gray-900 shadow-sm whitespace-pre-wrap dark:text-gray-100 dark:shadow-none">
           {message.content}
         </div>
       </div>
@@ -40,7 +40,7 @@ function ExportPreviewMessage({ message }: { message: Message }) {
       <ModelAvatar model={message.model} size={32} />
       <div className="min-w-0 flex-1">
         <div className="mb-2 flex items-center gap-2">
-          <span className="truncate font-jakarta text-[15px] font-bold text-gray-900">
+          <span className="truncate font-jakarta text-[15px] font-bold text-gray-900 dark:text-gray-100">
             {message.model || 'MARKAI'}
           </span>
           {message.createdAt && (
@@ -50,11 +50,11 @@ function ExportPreviewMessage({ message }: { message: Message }) {
           )}
         </div>
         {message.reasoning && (
-          <div className="mb-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-500">
+          <div className="mb-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-400">
             {message.reasoning}
           </div>
         )}
-        <div className="markdown-body text-[15px] leading-relaxed text-gray-900">
+        <div className="markdown-body text-[15px] leading-relaxed text-gray-900 dark:text-gray-100">
           <MarkdownContent>{message.content}</MarkdownContent>
         </div>
       </div>
@@ -76,25 +76,25 @@ function ExportImagePreview({
     : 'MARKAI conversation';
 
   return (
-    <div className="mx-auto w-[780px] max-w-full bg-[#f1f5f9] p-6">
+    <div className="mx-auto w-[780px] max-w-full bg-[#f1f5f9] p-6 dark:bg-[#0e0f11]">
       <div
-        className="overflow-hidden rounded-xl border border-gray-200 bg-white text-gray-900 shadow-sm"
+        className="overflow-hidden rounded-xl border border-gray-200 bg-white text-gray-900 shadow-sm dark:border-white/10 dark:bg-[#111214] dark:text-gray-100 dark:shadow-none"
         id={PREVIEW_ID}
       >
-        <div className="border-b border-gray-200 bg-white px-6 py-5">
+        <div className="border-b border-gray-200 bg-white px-6 py-5 dark:border-white/10 dark:bg-[#111214]">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-50">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-50 dark:bg-white/[0.06]">
               <Image alt="MARKAI" height={28} src="/images/markai.svg" width={28} />
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="truncate text-lg font-semibold text-gray-950">{title}</h3>
-              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
+              <h3 className="truncate text-lg font-semibold text-gray-950 dark:text-gray-50">{title}</h3>
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
                 <span>{visibleMessages.length} 条消息</span>
-                <span className="h-1 w-1 rounded-full bg-gray-300" />
+                <span className="h-1 w-1 rounded-full bg-gray-300 dark:bg-gray-600" />
                 <span>{modelLabel}</span>
                 {session?.updatedAt && (
                   <>
-                    <span className="h-1 w-1 rounded-full bg-gray-300" />
+                    <span className="h-1 w-1 rounded-full bg-gray-300 dark:bg-gray-600" />
                     <span>更新于 {formatExportDateTime(session.updatedAt)}</span>
                   </>
                 )}
@@ -103,22 +103,22 @@ function ExportImagePreview({
           </div>
         </div>
 
-        <div className="flex flex-col gap-8 bg-white px-6 py-7">
+        <div className="flex flex-col gap-8 bg-white px-6 py-7 dark:bg-[#111214]">
           {visibleMessages.length > 0 ? (
             visibleMessages.map((message) => (
               <ExportPreviewMessage key={message.id} message={message} />
             ))
           ) : (
-            <div className="py-8 text-center text-sm text-gray-400">暂无可导出的消息</div>
+            <div className="py-8 text-center text-sm text-gray-400 dark:text-gray-500">暂无可导出的消息</div>
           )}
         </div>
 
-        <div className="flex flex-col items-center justify-center gap-2 border-t border-gray-200 bg-white px-6 py-5 text-center">
+        <div className="flex flex-col items-center justify-center gap-2 border-t border-gray-200 bg-white px-6 py-5 text-center dark:border-white/10 dark:bg-[#111214]">
           <div className="flex items-center justify-center gap-2">
             <Image alt="MARKAI" height={24} src="/images/markai.svg" width={24} />
-            <span className="font-jakarta text-sm font-bold tracking-wide text-gray-950">MARKAI</span>
+            <span className="font-jakarta text-sm font-bold tracking-wide text-gray-950 dark:text-gray-50">MARKAI</span>
           </div>
-          <div className="text-xs text-gray-400">Generated by MARKAI</div>
+          <div className="text-xs text-gray-400 dark:text-gray-500">Generated by MARKAI</div>
         </div>
       </div>
     </div>

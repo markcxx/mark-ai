@@ -19,7 +19,8 @@ export const Pre = ({ children, language }: { children: string, language: string
   const lineCount = countLines(children.replace(/\n$/, ''));
   const collapsible = lineCount > 8;
   const [collapsed, setCollapsed] = useState(false);
-  const syntaxTheme = resolvedTheme === 'dark' ? oneDark : oneLight;
+  const isDark = resolvedTheme === 'dark';
+  const syntaxTheme = isDark ? oneDark : oneLight;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(children);
@@ -28,12 +29,12 @@ export const Pre = ({ children, language }: { children: string, language: string
   };
 
   return (
-    <div className="group relative my-5 overflow-hidden rounded-xl border border-gray-200 bg-[#f8f9fa] dark:border-gray-700 dark:bg-gray-950">
+    <div className="group relative my-5 overflow-hidden rounded-xl border border-gray-200 bg-[#f8f9fa] shadow-sm dark:border-white/10 dark:bg-[#0d1117] dark:shadow-none">
       <div
         className={cn(
-          'flex h-10 w-full items-center justify-between bg-white/80 px-3 text-left transition-colors dark:bg-gray-900/80',
-          !collapsed && 'border-b border-gray-200/80 dark:border-gray-700',
-          collapsible && 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800',
+          'flex h-10 w-full items-center justify-between bg-white/80 px-3 text-left transition-colors dark:bg-[#161b22]',
+          !collapsed && 'border-b border-gray-200/80 dark:border-white/10',
+          collapsible && 'cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.06]',
         )}
         onClick={() => {
           if (collapsible) setCollapsed((value) => !value);
@@ -48,20 +49,20 @@ export const Pre = ({ children, language }: { children: string, language: string
         role={collapsible ? 'button' : undefined}
         tabIndex={collapsible ? 0 : undefined}
       >
-        <span className="rounded-md bg-gray-100 px-2 py-1 font-jakarta text-xs font-medium uppercase text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+        <span className="rounded-md bg-gray-100 px-2 py-1 font-jakarta text-xs font-medium uppercase text-gray-500 dark:bg-white/[0.06] dark:text-gray-300">
           {normalizedLanguage}
         </span>
         <div className="flex items-center gap-1">
           {collapsible && (
             <span
-              className="flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.08] dark:hover:text-gray-100"
               title={collapsed ? '展开代码' : '折叠代码'}
             >
               {collapsed ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
             </span>
           )}
           <button
-            className="flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.08] dark:hover:text-gray-100"
             onClick={(event) => {
               event.stopPropagation();
               handleCopy();
@@ -83,8 +84,17 @@ export const Pre = ({ children, language }: { children: string, language: string
           language={normalizedLanguage}
           style={syntaxTheme as any}
           showLineNumbers={true}
-          customStyle={{ margin: 0, padding: 0, background: 'transparent' }}
-          lineNumberStyle={{ minWidth: '2.5em', paddingRight: '1em', color: '#cbd5e1', textAlign: 'right', userSelect: 'none' }}
+          customStyle={{ background: 'transparent', margin: 0, padding: 0 }}
+          codeTagProps={{ style: { background: 'transparent' } }}
+          lineNumberStyle={{
+            color: isDark ? '#6e7681' : '#94a3b8',
+            minWidth: '2.5em',
+            paddingRight: '1em',
+            textAlign: 'right',
+            userSelect: 'none',
+          }}
+          lineProps={{ style: { background: 'transparent' } }}
+          PreTag="div"
         >
           {children.replace(/\n$/, '')}
         </SyntaxHighlighter>

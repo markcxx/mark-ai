@@ -461,9 +461,10 @@ export const useChatStore = create<ChatStore>()(
 
       let modelConfig: ConfiguredModel | undefined;
       if (message.role === 'model') {
-        modelConfig = availableModels.find(
+        const originalModel = availableModels.find(
           (m) => m.id === message.model && m.provider === message.provider,
-        ) || selectedModel;
+        );
+        modelConfig = selectedModel || originalModel;
       } else {
         modelConfig = selectedModel;
       }

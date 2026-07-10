@@ -56,21 +56,28 @@ export function TopHeader({
   updateSessionTitle: (title: string) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [shareMenuOpen, setShareMenuOpen] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
   const [deleteOpen, setDeleteOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const shareMenuRef = useRef<HTMLDivElement | null>(null);
   const title = activeSession?.title || '新对话';
 
   useEffect(() => {
-    if (!menuOpen) return;
+    if (!menuOpen && !shareMenuOpen) return;
 
     const handlePointerDown = (event: PointerEvent) => {
       if (menuRef.current?.contains(event.target as Node)) return;
+      if (shareMenuRef.current?.contains(event.target as Node)) return;
       setMenuOpen(false);
+      setShareMenuOpen(false);
     };
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setMenuOpen(false);
+      if (event.key === 'Escape') {
+        setMenuOpen(false);
+        setShareMenuOpen(false);
+      }
     };
 
     document.addEventListener('pointerdown', handlePointerDown);
@@ -79,7 +86,7 @@ export function TopHeader({
       document.removeEventListener('pointerdown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [menuOpen]);
+  }, [menuOpen, shareMenuOpen]);
 
   const beginRename = () => {
     setDraftTitle(title);
@@ -123,7 +130,10 @@ export function TopHeader({
             )}
 
             <IconButton
-              onClick={() => setMenuOpen((open) => !open)}
+              onClick={() => {
+                setShareMenuOpen(false);
+                setMenuOpen((open) => !open);
+              }}
               size="sm"
               title="会话操作"
             >
@@ -157,22 +167,6 @@ export function TopHeader({
                     copySessionId();
                   }}
                 />
-                <MenuAction
-                  icon={FileJson}
-                  label="导出 JSON"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    exportSessionJson();
-                  }}
-                />
-                <MenuAction
-                  icon={ImageDown}
-                  label="导出图片"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    exportSessionImage();
-                  }}
-                />
 
                 <MenuSwitchAction
                   checked={isWideChatMode}
@@ -198,9 +192,46 @@ export function TopHeader({
 
         <div className="flex items-center gap-1 md:gap-2">
           <ThemeToggle />
-          <IconButton onClick={copyConversation} title="复制对话">
-            <Share2 size={20} />
-          </IconButton>
+          <div className="relative" ref={shareMenuRef}>
+            <IconButton
+              onClick={() => {
+                setMenuOpen(false);
+                setShareMenuOpen((open) => !open);
+              }}
+              title="分享与导出"
+            >
+              <Share2 size={20} />
+            </IconButton>
+
+            {shareMenuOpen && (
+              <DropdownSurface className="absolute right-0 top-11 w-48">
+                <MenuAction
+                  icon={Copy}
+                  label="复制对话"
+                  onClick={() => {
+                    setShareMenuOpen(false);
+                    copyConversation();
+                  }}
+                />
+                <MenuAction
+                  icon={FileJson}
+                  label="导出 JSON"
+                  onClick={() => {
+                    setShareMenuOpen(false);
+                    exportSessionJson();
+                  }}
+                />
+                <MenuAction
+                  icon={ImageDown}
+                  label="导出图片"
+                  onClick={() => {
+                    setShareMenuOpen(false);
+                    exportSessionImage();
+                  }}
+                />
+              </DropdownSurface>
+            )}
+          </div>
         </div>
       </header>
 
