@@ -1,5 +1,24 @@
 import type { ComponentType } from 'react';
 
+export type ThinkingSegment = {
+  type: 'thinking';
+  content: string;
+  duration?: number;
+  isActive?: boolean;
+};
+
+export type ToolSegment = {
+  type: 'tool';
+  webSearch: WebSearchState;
+};
+
+export type ContentSegment = {
+  type: 'content';
+  content: string;
+};
+
+export type MessageSegment = ThinkingSegment | ToolSegment | ContentSegment;
+
 export type Message = {
   id: string;
   role: 'user' | 'model';
@@ -17,6 +36,7 @@ export type Message = {
   model?: string;
   provider?: string;
   webSearch?: WebSearchState[];
+  segments?: MessageSegment[];
 };
 
 export type WebSearchResult = {

@@ -74,6 +74,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   const multiSelectMode = useUIStore((s) => s.multiSelectMode);
   const selectedMessageIds = useUIStore((s) => s.selectedMessageIds);
   const availableModels = useUIStore((s) => s.availableModels);
+  const providerNames = useUIStore((s) => s.providerNames);
   const isLoadingModels = useUIStore((s) => s.isLoadingModels);
   const selectedModelKey = useUIStore((s) => s.selectedModelKey);
   const modelSearchKeyword = useUIStore((s) => s.modelSearchKeyword);
@@ -511,6 +512,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                 onSend={handleSend}
                 onToggleWebSearch={() => useUIStore.getState().toggleWebSearch()}
                 placement="center"
+                providerNames={providerNames}
                 selectedModel={selectedModel}
                 selectedModelKey={selectedModelKey}
                 setModelSearchKeyword={(kw) => useUIStore.getState().setModelSearchKeyword(kw)}
@@ -602,6 +604,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
             onMic={() => toast(NOT_IMPLEMENTED_TOAST)}
             onSend={handleSend}
             onToggleWebSearch={() => useUIStore.getState().toggleWebSearch()}
+            providerNames={providerNames}
             selectedModel={selectedModel}
             selectedModelKey={selectedModelKey}
             setModelSearchKeyword={(kw) => useUIStore.getState().setModelSearchKeyword(kw)}

@@ -22,7 +22,7 @@ import {
   X,
 } from 'lucide-react';
 
-import type { ConfiguredModel, MenuItem, Message, WebSearchState } from '@/lib/chat/types';
+import type { ConfiguredModel, MenuItem, Message, MessageSegment, WebSearchState } from '@/lib/chat/types';
 import { formatDuration, formatRelativeTime } from '@/lib/chat/metrics';
 import { cn } from '@/lib/utils';
 
@@ -561,15 +561,50 @@ export function MessageItem({
           </div>
         ) : (
           <>
-            <ThinkingPanel
-              content={message.reasoning}
-              duration={message.reasoningDuration}
-              thinking={message.isReasoning}
-            />
-            <WebSearchToolBlock webSearch={message.webSearch} />
-            {message.content ? <MarkdownContent>{message.content}</MarkdownContent> : null}
-            {message.isStreaming && message.content && (
-              <span className="ml-1 inline-block h-4 w-2 animate-pulse rounded-full bg-primary align-middle" />
+            {message.segments && message.segments.length > 0 ? (
+              <>
+                {message.segments.map((seg, i) => {
+                  if (seg.type === 'thinking') {
+                    return (
+                      <ThinkingPanel
+                        content={seg.content}
+                        duration={seg.duration}
+                        key={`seg-${i}`}
+                        thinking={seg.isActive}
+                      />
+                    );
+                  }
+                  if (seg.type === 'tool') {
+                    return (
+                      <WebSearchToolBlockItem
+                        key={`seg-${i}`}
+                        webSearch={seg.webSearch}
+                      />
+                    );
+                  }
+                  return seg.content ? (
+                    <div key={`seg-${i}`}>
+                      <MarkdownContent>{seg.content}</MarkdownContent>
+                      {message.isStreaming && i === message.segments!.length - 1 && (
+                        <span className="ml-1 inline-block h-4 w-2 animate-pulse rounded-full bg-primary align-middle" />
+                      )}
+                    </div>
+                  ) : null;
+                })}
+              </>
+            ) : (
+              <>
+                <ThinkingPanel
+                  content={message.reasoning}
+                  duration={message.reasoningDuration}
+                  thinking={message.isReasoning}
+                />
+                <WebSearchToolBlock webSearch={message.webSearch} />
+                {message.content ? <MarkdownContent>{message.content}</MarkdownContent> : null}
+                {message.isStreaming && message.content && (
+                  <span className="ml-1 inline-block h-4 w-2 animate-pulse rounded-full bg-primary align-middle" />
+                )}
+              </>
             )}
             {message.interrupted && (
               <InterruptedHint

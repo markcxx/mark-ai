@@ -35,6 +35,24 @@ const BUILTIN_PROVIDERS: ProviderEnvConfig[] = [
     provider: 'deepseek',
     runtime: 'openai-compatible',
   },
+  {
+    defaultBaseUrl: 'https://api-inference.huggingface.co/v1',
+    prefix: 'HUGGINGFACE',
+    provider: 'huggingface',
+    runtime: 'openai-compatible',
+  },
+  {
+    defaultBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    prefix: 'BAILIAN',
+    provider: 'bailian',
+    runtime: 'openai-compatible',
+  },
+  {
+    defaultBaseUrl: 'https://cloud.infini-ai.com/maas/v1',
+    prefix: 'INFINIAI',
+    provider: 'infiniai',
+    runtime: 'openai-compatible',
+  },
 ];
 
 const parseModelIds = (value?: string) => {
@@ -200,14 +218,68 @@ export const getConfiguredModels = (): ConfiguredModel[] => {
   });
 };
 
+const isMarkProvider = (provider: string) =>
+  provider.startsWith('mark') && provider !== 'markai';
+
+const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
+  bailian: '阿里云百炼',
+  deepseek: 'DeepSeek',
+  gemini: 'Google Gemini',
+  huggingface: 'HuggingFace',
+  infiniai: '无问芯穹',
+  markai: 'MarkAI',
+  openai: 'OpenAI',
+};
+
+export const getProviderDisplayName = (provider: string): string => {
+  if (isMarkProvider(provider)) return 'MarkAI';
+  return PROVIDER_DISPLAY_NAMES[provider] || provider;
+};
+
 export const getPublicConfiguredModels = (): PublicConfiguredModel[] => {
-  return getConfiguredModels().map(({ id, provider }) => ({ id, provider }));
+  const models = getConfiguredModels();
+  const seen = new Set<string>();
+
+  return models
+    .map(({ id, provider }) => ({
+      id,
+      provider: isMarkProvider(provider) ? 'markai' : provider,
+    }))
+    .filter((model) => {
+      const key = `${model.provider}:${model.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+};
+
+const pickRandomKey = (apiKey: string): string => {
+  const keys = apiKey.split(',').map((k) => k.trim()).filter(Boolean);
+  return keys.length > 1 ? keys[Math.floor(Math.random() * keys.length)] : apiKey;
 };
 
 export const findConfiguredModel = (modelId?: string, provider?: string) => {
   if (!modelId) return undefined;
-  return getConfiguredModels().find(model => {
-    if (provider && model.provider !== provider) return false;
-    return model.id === modelId;
-  });
+  const models = getConfiguredModels();
+
+  let found: ConfiguredModel | undefined;
+
+  if (provider === 'markai') {
+    const candidates = models.filter(
+      (m) => isMarkProvider(m.provider) && m.id === modelId,
+    );
+    if (candidates.length > 0) {
+      found = candidates[Math.floor(Math.random() * candidates.length)];
+    }
+  }
+
+  if (!found) {
+    found = models.find((model) => {
+      if (provider && model.provider !== provider) return false;
+      return model.id === modelId;
+    });
+  }
+
+  if (!found) return undefined;
+  return { ...found, apiKey: pickRandomKey(found.apiKey) };
 };

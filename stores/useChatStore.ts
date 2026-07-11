@@ -5,13 +5,13 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { THINKING_TEXTS } from '@/lib/chat/constants';
 import { createMessageId, extractThinkingFromText } from '@/lib/chat/helpers';
 import { estimateMessageTokens, estimateMessagesTokens, estimateTextTokens } from '@/lib/chat/metrics';
-import type { ChatStreamEvent, ConfiguredModel, Message } from '@/lib/chat/types';
+import type { ChatStreamEvent, ConfiguredModel, Message, MessageSegment } from '@/lib/chat/types';
 import { useSessionStore } from './useSessionStore';
 import { useUIStore } from './useUIStore';
 
 type StreamedMessageResult = Pick<
   Message,
-  'content' | 'isReasoning' | 'isStreaming' | 'reasoning' | 'reasoningDuration'
+  'content' | 'isReasoning' | 'isStreaming' | 'reasoning' | 'reasoningDuration' | 'segments'
 > & Pick<
   Message,
   'generationDuration' | 'inputTokens' | 'interrupted' | 'outputTokens' | 'totalTokens' | 'webSearch'
@@ -122,12 +122,11 @@ export const useChatStore = create<ChatStore>()(
     streamAssistantMessage: async (historyMessages, modelMessageId, modelConfig, options = {}) => {
       const startedAt = Date.now();
       let plainContent = options.initialContent || '';
-      let eventReasoning = '';
       let inputTokens = estimateMessagesTokens(historyMessages);
       let outputTokens = 0;
       let totalTokens = inputTokens;
-      let reasoningDuration: number | undefined;
-      let finalWebSearch: Message['webSearch'] = [];
+      const segments: MessageSegment[] = [];
+      let currentReasoningStart: number | undefined;
 
       const controller = new AbortController();
       set({ abortController: controller });
@@ -171,17 +170,24 @@ export const useChatStore = create<ChatStore>()(
           ?.includes('application/x-ndjson');
         let done = false;
         let buffer = '';
-        let reasoningStartedAt: number | undefined;
 
-        const beginReasoning = () => { reasoningStartedAt = reasoningStartedAt || Date.now(); };
-        const endReasoning = () => {
-          if (reasoningStartedAt && !reasoningDuration) {
-            reasoningDuration = Date.now() - reasoningStartedAt;
-          }
+        const getLastThinkingSegment = () => {
+          const last = segments[segments.length - 1];
+          return last?.type === 'thinking' ? last : undefined;
         };
 
-        const updateStreamingMessage = (isReasoning?: boolean) => {
+        const getAllReasoning = () =>
+          segments
+            .filter((s): s is Extract<MessageSegment, { type: 'thinking' }> => s.type === 'thinking')
+            .map((s) => s.content)
+            .join('');
+
+        const isAnyThinkingActive = () =>
+          segments.some((s) => s.type === 'thinking' && s.isActive);
+
+        const updateStreamingMessage = () => {
           const extracted = extractThinkingFromText(plainContent);
+          const eventReasoning = getAllReasoning();
           const reasoning = `${eventReasoning}${extracted.reasoning}`;
           const estimatedOutputTokens = estimateMessageTokens({
             content: extracted.content,
@@ -189,6 +195,7 @@ export const useChatStore = create<ChatStore>()(
           });
           const nextOutputTokens = outputTokens || estimatedOutputTokens;
           const nextTotalTokens = getTotalTokens(inputTokens, nextOutputTokens, totalTokens);
+          const anyActive = isAnyThinkingActive() || extracted.hasOpenThinking;
           set((s) => ({
             messages: s.messages.map((m) =>
               m.id === modelMessageId
@@ -196,11 +203,11 @@ export const useChatStore = create<ChatStore>()(
                     ...m,
                     content: extracted.content,
                     inputTokens,
-                    isReasoning: Boolean(isReasoning || extracted.hasOpenThinking),
+                    isReasoning: anyActive,
                     outputTokens: nextOutputTokens,
                     reasoning,
-                    reasoningDuration,
                     totalTokens: nextTotalTokens,
+                    segments: [...segments],
                   }
                 : m,
             ),
@@ -210,16 +217,50 @@ export const useChatStore = create<ChatStore>()(
         const appendContent = (chunk: string) => {
           plainContent += chunk;
           const extracted = extractThinkingFromText(plainContent);
-          if (extracted.reasoning) beginReasoning();
-          if (eventReasoning && reasoningStartedAt && !reasoningDuration) endReasoning();
-          if (extracted.reasoning && !extracted.hasOpenThinking) endReasoning();
-          updateStreamingMessage(extracted.hasOpenThinking);
+          if (extracted.reasoning && !extracted.hasOpenThinking) {
+            const last = getLastThinkingSegment();
+            if (last && last.isActive) {
+              last.isActive = false;
+              last.duration = currentReasoningStart ? Date.now() - currentReasoningStart : undefined;
+              currentReasoningStart = undefined;
+            }
+          }
+          const cleanContent = extracted.content;
+          if (cleanContent) {
+            const prevContentLength = segments
+              .filter((s): s is Extract<MessageSegment, { type: 'content' }> => s.type === 'content')
+              .reduce((sum, s) => sum + s.content.length, 0);
+            const newPart = cleanContent.slice(prevContentLength);
+            if (newPart) {
+              const lastSeg = segments[segments.length - 1];
+              if (lastSeg && lastSeg.type === 'content') {
+                lastSeg.content = lastSeg.content + newPart;
+              } else {
+                segments.push({ type: 'content', content: newPart });
+              }
+            }
+          }
+          updateStreamingMessage();
         };
 
         const appendReasoning = (chunk: string) => {
-          beginReasoning();
-          eventReasoning += chunk;
-          updateStreamingMessage(true);
+          let seg = getLastThinkingSegment();
+          if (!seg || !seg.isActive) {
+            seg = { type: 'thinking', content: '', isActive: true };
+            segments.push(seg);
+            currentReasoningStart = Date.now();
+          }
+          seg.content += chunk;
+          updateStreamingMessage();
+        };
+
+        const finishCurrentReasoning = () => {
+          const seg = getLastThinkingSegment();
+          if (seg && seg.isActive) {
+            seg.isActive = false;
+            seg.duration = currentReasoningStart ? Date.now() - currentReasoningStart : undefined;
+            currentReasoningStart = undefined;
+          }
         };
 
         const handleStreamLine = (line: string) => {
@@ -235,20 +276,17 @@ export const useChatStore = create<ChatStore>()(
               return;
             }
             if (event.type === 'tool' && event.webSearch) {
+              finishCurrentReasoning();
               const ws = event.webSearch;
-              const existingIndex = finalWebSearch.findIndex(
-                (s) => s.tool === ws.tool && s.query === ws.query,
+              const existingIdx = segments.findIndex(
+                (s) => s.type === 'tool' && s.webSearch.tool === ws.tool && s.webSearch.query === ws.query,
               );
-              if (existingIndex >= 0) {
-                finalWebSearch[existingIndex] = ws;
+              if (existingIdx >= 0) {
+                (segments[existingIdx] as Extract<MessageSegment, { type: 'tool' }>).webSearch = ws;
               } else {
-                finalWebSearch.push(ws);
+                segments.push({ type: 'tool', webSearch: ws });
               }
-              set((s) => ({
-                messages: s.messages.map((m) =>
-                  m.id === modelMessageId ? { ...m, webSearch: [...finalWebSearch] } : m,
-                ),
-              }));
+              updateStreamingMessage();
               return;
             }
             if (event.type === 'reasoning' && event.text) { appendReasoning(event.text); return; }
@@ -271,10 +309,17 @@ export const useChatStore = create<ChatStore>()(
         }
 
         if (isStructuredStream && buffer) handleStreamLine(buffer);
-        if (reasoningStartedAt && !reasoningDuration) { endReasoning(); updateStreamingMessage(false); }
+        finishCurrentReasoning();
 
         const extracted = extractThinkingFromText(plainContent);
-        const reasoning = `${eventReasoning}${extracted.reasoning}` || undefined;
+        const finalEventReasoning = getAllReasoning();
+        const reasoning = `${finalEventReasoning}${extracted.reasoning}` || undefined;
+        const allWebSearch = segments
+          .filter((s): s is Extract<MessageSegment, { type: 'tool' }> => s.type === 'tool')
+          .map((s) => s.webSearch);
+        const reasoningDuration = segments
+          .filter((s): s is Extract<MessageSegment, { type: 'thinking' }> => s.type === 'thinking')
+          .reduce((sum, s) => sum + (s.duration || 0), 0) || undefined;
         const estimatedOutputTokens = estimateMessageTokens({
           content: extracted.content,
           reasoning,
@@ -290,13 +335,22 @@ export const useChatStore = create<ChatStore>()(
           outputTokens: finalOutputTokens,
           reasoning,
           reasoningDuration,
+          segments: segments.length > 0 ? [...segments] : undefined,
           totalTokens: finalTotalTokens,
-          webSearch: finalWebSearch.length > 0 ? finalWebSearch : undefined,
+          webSearch: allWebSearch.length > 0 ? allWebSearch : undefined,
         };
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') {
+          finishCurrentReasoning();
           const extracted = extractThinkingFromText(plainContent);
-          const reasoning = `${eventReasoning}${extracted.reasoning}` || undefined;
+          const abortReasoning = getAllReasoning();
+          const reasoning = `${abortReasoning}${extracted.reasoning}` || undefined;
+          const allWebSearch = segments
+            .filter((s): s is Extract<MessageSegment, { type: 'tool' }> => s.type === 'tool')
+            .map((s) => s.webSearch);
+          const reasoningDuration = segments
+            .filter((s): s is Extract<MessageSegment, { type: 'thinking' }> => s.type === 'thinking')
+            .reduce((sum, s) => sum + (s.duration || 0), 0) || undefined;
           const estimatedOutputTokens = estimateMessageTokens({
             content: extracted.content || plainContent,
             reasoning,
@@ -313,8 +367,9 @@ export const useChatStore = create<ChatStore>()(
             outputTokens: finalOutputTokens,
             reasoning,
             reasoningDuration,
+            segments: segments.length > 0 ? [...segments] : undefined,
             totalTokens: finalTotalTokens,
-            webSearch: finalWebSearch.length > 0 ? finalWebSearch : undefined,
+            webSearch: allWebSearch.length > 0 ? allWebSearch : undefined,
           };
         }
         console.error('Chat error:', error);
@@ -326,6 +381,7 @@ export const useChatStore = create<ChatStore>()(
               : m,
           ),
         }));
+        const errReasoning = getAllReasoning();
         return {
           content: 'Sorry, I encountered an error. Please try again.',
           generationDuration: Date.now() - startedAt,
@@ -333,10 +389,9 @@ export const useChatStore = create<ChatStore>()(
           isReasoning: false,
           isStreaming: false,
           outputTokens: estimateTextTokens('Sorry, I encountered an error. Please try again.'),
-          reasoning: eventReasoning || undefined,
-          reasoningDuration,
+          reasoning: errReasoning || undefined,
+          segments: segments.length > 0 ? [...segments] : undefined,
           totalTokens: inputTokens + estimateTextTokens('Sorry, I encountered an error. Please try again.'),
-          webSearch: finalWebSearch.length > 0 ? finalWebSearch : undefined,
         };
       } finally {
         set((s) => ({

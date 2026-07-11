@@ -102,6 +102,7 @@ const ensureDatabase = () => {
   ensureColumn('output_tokens', 'output_tokens INTEGER');
   ensureColumn('total_tokens', 'total_tokens INTEGER');
   ensureColumn('web_search', 'web_search TEXT');
+  ensureColumn('segments', 'segments TEXT');
 
   return db;
 };
@@ -142,6 +143,7 @@ const toMessage = (row: any): Message => ({
   reasoningDuration:
     typeof row.reasoning_duration === 'number' ? row.reasoning_duration : undefined,
   role: row.role === 'user' ? 'user' : 'model',
+  segments: parseJsonValue(row.segments),
   totalTokens: typeof row.total_tokens === 'number' ? row.total_tokens : undefined,
   webSearch: parseJsonValue(row.web_search),
 });
@@ -237,6 +239,7 @@ export const getChatMessages = (sessionId: string) => {
         output_tokens,
         total_tokens,
         web_search,
+        segments,
         model,
         provider,
         created_at
@@ -295,12 +298,13 @@ export const replaceChatMessages = (sessionId: string, messages: Message[]) => {
           output_tokens,
           total_tokens,
           web_search,
+          segments,
           model,
           provider,
           position,
           created_at
         )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
 
     messages.forEach((message, index) => {
@@ -321,6 +325,7 @@ export const replaceChatMessages = (sessionId: string, messages: Message[]) => {
         message.outputTokens || null,
         message.totalTokens || null,
         message.webSearch ? JSON.stringify(message.webSearch) : null,
+        message.segments ? JSON.stringify(message.segments) : null,
         message.model || null,
         message.provider || null,
         index,

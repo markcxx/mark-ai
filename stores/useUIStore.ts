@@ -16,6 +16,7 @@ interface UIState {
   wideChatMode: boolean;
   modelSearchKeyword: string;
   availableModels: ConfiguredModel[];
+  providerNames: Record<string, string>;
   isLoadingModels: boolean;
   selectedModelKey: string;
   webSearchEnabled: boolean;
@@ -63,6 +64,7 @@ export const useUIStore = create<UIStore>()(
     wideChatMode: false,
     modelSearchKeyword: '',
     availableModels: [],
+    providerNames: {},
     isLoadingModels: true,
     selectedModelKey: '',
     webSearchEnabled: false,
@@ -151,14 +153,17 @@ export const useUIStore = create<UIStore>()(
         if (!response.ok) throw new Error('Failed to load models');
         const data = await response.json();
         const models: ConfiguredModel[] = Array.isArray(data.models) ? data.models : [];
+        const providerNames: Record<string, string> =
+          data.providerNames && typeof data.providerNames === 'object' ? data.providerNames : {};
         set({
           availableModels: models,
+          providerNames,
           selectedModelKey: models[0] ? getModelKey(models[0]) : '',
           isLoadingModels: false,
         });
       } catch (error) {
         console.error('Model config error:', error);
-        set({ availableModels: [], selectedModelKey: '', isLoadingModels: false });
+        set({ availableModels: [], providerNames: {}, selectedModelKey: '', isLoadingModels: false });
       }
     },
 
