@@ -132,8 +132,7 @@ const getHost = (url: string) => {
   }
 };
 
-function WebSearchToolBlock({ webSearch }: { webSearch?: WebSearchState }) {
-  if (!webSearch) return null;
+function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchState }) {
 
   const searching = webSearch.status === 'searching';
   const failed = webSearch.status === 'error';
@@ -318,6 +317,19 @@ function WebSearchToolBlock({ webSearch }: { webSearch?: WebSearchState }) {
         </div>
       )}
     </details>
+  );
+}
+
+function WebSearchToolBlock({ webSearch }: { webSearch?: WebSearchState[] | WebSearchState }) {
+  if (!webSearch) return null;
+  const items = Array.isArray(webSearch) ? webSearch : [webSearch];
+  if (items.length === 0) return null;
+  return (
+    <>
+      {items.map((ws, i) => (
+        <WebSearchToolBlockItem key={`${ws.tool}-${ws.query}-${i}`} webSearch={ws} />
+      ))}
+    </>
   );
 }
 

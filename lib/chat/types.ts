@@ -16,7 +16,7 @@ export type Message = {
   isStreaming?: boolean;
   model?: string;
   provider?: string;
-  webSearch?: WebSearchState;
+  webSearch?: WebSearchState[];
 };
 
 export type WebSearchResult = {

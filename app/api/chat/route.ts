@@ -401,49 +401,96 @@ const createOpenAICompatibleStream = async (
       };
 
       try {
-        const firstPass = await streamModelResponse(openAIMessages, webSearchEnabled);
-        const executableToolCalls = firstPass.toolCalls.filter(
-          toolCall => ['web_search', 'read_webpage'].includes(toolCall.function.name),
-        );
+        const MAX_TOOL_ROUNDS = 5;
+        let currentMessages = openAIMessages;
 
-        if (executableToolCalls.length === 0) {
-          controller.close();
-          return;
-        }
+        for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+          const pass = await streamModelResponse(currentMessages, webSearchEnabled);
+          const executableToolCalls = pass.toolCalls.filter(
+            toolCall => ['web_search', 'read_webpage'].includes(toolCall.function.name),
+          );
 
-        const assistantToolMessage: OpenAIChatMessage = {
-          content: firstPass.assistantContent || null,
-          role: 'assistant',
-          tool_calls: executableToolCalls,
-        };
-        const toolResultMessages: OpenAIChatMessage[] = [];
+          if (executableToolCalls.length === 0) break;
 
-        for (const toolCall of executableToolCalls) {
-          if (toolCall.function.name === 'read_webpage') {
-            const url = getToolWebpageUrl(toolCall);
-            const readingState: WebSearchState = {
-              query: url,
+          const assistantToolMessage: OpenAIChatMessage = {
+            content: pass.assistantContent || null,
+            role: 'assistant',
+            tool_calls: executableToolCalls,
+          };
+          const toolResultMessages: OpenAIChatMessage[] = [];
+
+          for (const toolCall of executableToolCalls) {
+            if (toolCall.function.name === 'read_webpage') {
+              const url = getToolWebpageUrl(toolCall);
+              const readingState: WebSearchState = {
+                query: url,
+                results: [],
+                status: 'searching',
+                tool: 'read_webpage',
+                url,
+              };
+              controller.enqueue(encodeToolEvent(encoder, readingState));
+
+              try {
+                const result = await readWebpage({ url });
+                const doneState: WebSearchState = {
+                  completedAt: Date.now(),
+                  content: result.content,
+                  costTime: result.costTime,
+                  description: result.description,
+                  query: result.url,
+                  results: [],
+                  siteName: result.siteName,
+                  status: 'done',
+                  title: result.title,
+                  tool: 'read_webpage',
+                  url: result.url,
+                };
+                controller.enqueue(encodeToolEvent(encoder, doneState));
+                toolResultMessages.push({
+                  content: formatToolResultForModel(doneState),
+                  role: 'tool',
+                  tool_call_id: toolCall.id,
+                });
+              } catch (error) {
+                const errorState: WebSearchState = {
+                  completedAt: Date.now(),
+                  error: error instanceof Error ? error.message : '网页读取失败',
+                  query: url,
+                  results: [],
+                  status: 'error',
+                  tool: 'read_webpage',
+                  url,
+                };
+                controller.enqueue(encodeToolEvent(encoder, errorState));
+                toolResultMessages.push({
+                  content: formatToolResultForModel(errorState),
+                  role: 'tool',
+                  tool_call_id: toolCall.id,
+                });
+              }
+              continue;
+            }
+
+            const query = getToolSearchQuery(toolCall);
+            const searchingState: WebSearchState = {
+              query,
               results: [],
               status: 'searching',
-              tool: 'read_webpage',
-              url,
+              tool: 'web_search',
             };
-            controller.enqueue(encodeToolEvent(encoder, readingState));
+            controller.enqueue(encodeToolEvent(encoder, searchingState));
 
             try {
-              const result = await readWebpage({ url });
+              const result = await searchTavily({ query });
               const doneState: WebSearchState = {
+                answer: result.answer,
                 completedAt: Date.now(),
-                content: result.content,
                 costTime: result.costTime,
-                description: result.description,
-                query: result.url,
-                results: [],
-                siteName: result.siteName,
+                query: result.query,
+                results: result.results,
                 status: 'done',
-                title: result.title,
-                tool: 'read_webpage',
-                url: result.url,
+                tool: 'web_search',
               };
               controller.enqueue(encodeToolEvent(encoder, doneState));
               toolResultMessages.push({
@@ -454,12 +501,11 @@ const createOpenAICompatibleStream = async (
             } catch (error) {
               const errorState: WebSearchState = {
                 completedAt: Date.now(),
-                error: error instanceof Error ? error.message : '网页读取失败',
-                query: url,
+                error: error instanceof Error ? error.message : '联网搜索失败',
+                query,
                 results: [],
                 status: 'error',
-                tool: 'read_webpage',
-                url,
+                tool: 'web_search',
               };
               controller.enqueue(encodeToolEvent(encoder, errorState));
               toolResultMessages.push({
@@ -468,57 +514,11 @@ const createOpenAICompatibleStream = async (
                 tool_call_id: toolCall.id,
               });
             }
-            continue;
           }
 
-          const query = getToolSearchQuery(toolCall);
-          const searchingState: WebSearchState = {
-            query,
-            results: [],
-            status: 'searching',
-            tool: 'web_search',
-          };
-          controller.enqueue(encodeToolEvent(encoder, searchingState));
-
-          try {
-            const result = await searchTavily({ query });
-            const doneState: WebSearchState = {
-              answer: result.answer,
-              completedAt: Date.now(),
-              costTime: result.costTime,
-              query: result.query,
-              results: result.results,
-              status: 'done',
-              tool: 'web_search',
-            };
-            controller.enqueue(encodeToolEvent(encoder, doneState));
-            toolResultMessages.push({
-              content: formatToolResultForModel(doneState),
-              role: 'tool',
-              tool_call_id: toolCall.id,
-            });
-          } catch (error) {
-            const errorState: WebSearchState = {
-              completedAt: Date.now(),
-              error: error instanceof Error ? error.message : '联网搜索失败',
-              query,
-              results: [],
-              status: 'error',
-              tool: 'web_search',
-            };
-            controller.enqueue(encodeToolEvent(encoder, errorState));
-            toolResultMessages.push({
-              content: formatToolResultForModel(errorState),
-              role: 'tool',
-              tool_call_id: toolCall.id,
-            });
-          }
+          currentMessages = [...currentMessages, assistantToolMessage, ...toolResultMessages];
         }
 
-        await streamModelResponse(
-          [...openAIMessages, assistantToolMessage, ...toolResultMessages],
-          false,
-        );
         controller.close();
       } catch (error) {
         console.error('OpenAI compatible chat error:', error);

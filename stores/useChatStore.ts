@@ -127,7 +127,7 @@ export const useChatStore = create<ChatStore>()(
       let outputTokens = 0;
       let totalTokens = inputTokens;
       let reasoningDuration: number | undefined;
-      let finalWebSearch: Message['webSearch'];
+      let finalWebSearch: Message['webSearch'] = [];
 
       const controller = new AbortController();
       set({ abortController: controller });
@@ -235,10 +235,18 @@ export const useChatStore = create<ChatStore>()(
               return;
             }
             if (event.type === 'tool' && event.webSearch) {
-              finalWebSearch = event.webSearch;
+              const ws = event.webSearch;
+              const existingIndex = finalWebSearch.findIndex(
+                (s) => s.tool === ws.tool && s.query === ws.query,
+              );
+              if (existingIndex >= 0) {
+                finalWebSearch[existingIndex] = ws;
+              } else {
+                finalWebSearch.push(ws);
+              }
               set((s) => ({
                 messages: s.messages.map((m) =>
-                  m.id === modelMessageId ? { ...m, webSearch: event.webSearch } : m,
+                  m.id === modelMessageId ? { ...m, webSearch: [...finalWebSearch] } : m,
                 ),
               }));
               return;
@@ -283,7 +291,7 @@ export const useChatStore = create<ChatStore>()(
           reasoning,
           reasoningDuration,
           totalTokens: finalTotalTokens,
-          webSearch: finalWebSearch,
+          webSearch: finalWebSearch.length > 0 ? finalWebSearch : undefined,
         };
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') {
@@ -306,7 +314,7 @@ export const useChatStore = create<ChatStore>()(
             reasoning,
             reasoningDuration,
             totalTokens: finalTotalTokens,
-            webSearch: finalWebSearch,
+            webSearch: finalWebSearch.length > 0 ? finalWebSearch : undefined,
           };
         }
         console.error('Chat error:', error);
@@ -328,7 +336,7 @@ export const useChatStore = create<ChatStore>()(
           reasoning: eventReasoning || undefined,
           reasoningDuration,
           totalTokens: inputTokens + estimateTextTokens('Sorry, I encountered an error. Please try again.'),
-          webSearch: finalWebSearch,
+          webSearch: finalWebSearch.length > 0 ? finalWebSearch : undefined,
         };
       } finally {
         set((s) => ({
