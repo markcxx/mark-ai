@@ -36,7 +36,7 @@ const BUILTIN_PROVIDERS: ProviderEnvConfig[] = [
     runtime: 'openai-compatible',
   },
   {
-    defaultBaseUrl: 'https://api-inference.huggingface.co/v1',
+    defaultBaseUrl: 'https://router.huggingface.co/v1',
     prefix: 'HUGGINGFACE',
     provider: 'huggingface',
     runtime: 'openai-compatible',

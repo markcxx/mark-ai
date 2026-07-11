@@ -216,6 +216,7 @@ export const useChatStore = create<ChatStore>()(
 
         const appendContent = (chunk: string) => {
           plainContent += chunk;
+          finishCurrentReasoning();
           const extracted = extractThinkingFromText(plainContent);
           if (extracted.reasoning && !extracted.hasOpenThinking) {
             const last = getLastThinkingSegment();

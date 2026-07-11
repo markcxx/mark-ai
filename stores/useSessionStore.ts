@@ -13,7 +13,7 @@ interface SessionState {
 }
 
 interface SessionActions {
-  loadSessions: (initialSessionId?: string) => Promise<void>;
+  loadSessions: () => Promise<void>;
   loadSession: (sessionId: string, options?: { history?: 'push' | 'replace' | 'none' }) => Promise<Message[] | undefined>;
   createSession: (initialMessage: string, model?: ConfiguredModel) => Promise<ChatSession>;
   deleteSession: (sessionId: string) => Promise<void>;
@@ -76,7 +76,7 @@ export const useSessionStore = create<SessionStore>()(
 
     resetActiveSession: () => set({ activeSessionId: null, isLoadingActiveSession: false }),
 
-    loadSessions: async (initialSessionId) => {
+    loadSessions: async () => {
       try {
         const response = await fetch('/api/sessions', { cache: 'no-store' });
         if (!response.ok) throw new Error('Failed to load sessions');
@@ -84,10 +84,6 @@ export const useSessionStore = create<SessionStore>()(
         const data = await response.json();
         const nextSessions: ChatSession[] = Array.isArray(data.sessions) ? data.sessions : [];
         set({ sessions: nextSessions });
-
-        if (initialSessionId) {
-          await get().loadSession(initialSessionId, { history: 'none' });
-        }
       } catch (error) {
         console.error('Sessions list error:', error);
         toast.error('加载历史会话失败');

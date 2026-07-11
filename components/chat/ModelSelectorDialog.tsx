@@ -5,7 +5,7 @@ import { ModelIcon } from '@lobehub/icons';
 import { Check, Search, X } from 'lucide-react';
 
 import type { ConfiguredModel } from '@/lib/chat/types';
-import { getModelKey } from '@/lib/chat/helpers';
+import { getModelDisplayName, getModelKey } from '@/lib/chat/helpers';
 import { cn } from '@/lib/utils';
 
 type ModelGroup = {
@@ -63,7 +63,7 @@ export function ModelSelectorDialog({
     const providerMap = new Map<string, ConfiguredModel[]>();
 
     for (const model of availableModels) {
-      if (keyword && !model.id.toLowerCase().includes(keyword)) continue;
+      if (keyword && !model.id.toLowerCase().includes(keyword) && !getModelDisplayName(model.id).toLowerCase().includes(keyword)) continue;
       const p = model.provider;
       if (!providerMap.has(p)) {
         providerOrder.push(p);
@@ -154,7 +154,7 @@ export function ModelSelectorDialog({
                         type="button"
                       >
                         <ModelIcon model={model.id} size={22} type="avatar" />
-                        <span className="min-w-0 flex-1 truncate">{model.id}</span>
+                        <span className="min-w-0 flex-1 truncate">{getModelDisplayName(model.id)}</span>
                         {isSelected && (
                           <Check className="shrink-0 text-gray-400" size={16} />
                         )}

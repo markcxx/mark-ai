@@ -304,7 +304,7 @@ export const replaceChatMessages = (sessionId: string, messages: Message[]) => {
           position,
           created_at
         )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
 
     messages.forEach((message, index) => {

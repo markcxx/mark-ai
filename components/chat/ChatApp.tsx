@@ -193,8 +193,14 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
 
   // Load sessions on mount
   useEffect(() => {
-    useSessionStore.getState().loadSessions(initialSessionId);
-  }, [initialSessionId]);
+    const init = async () => {
+      await useSessionStore.getState().loadSessions();
+      if (initialSessionId) {
+        handleLoadSession(initialSessionId, { history: 'none' });
+      }
+    };
+    init();
+  }, [initialSessionId, handleLoadSession]);
 
   // Mobile uses the sidebar as a temporary drawer instead of a persistent column.
   useEffect(() => {

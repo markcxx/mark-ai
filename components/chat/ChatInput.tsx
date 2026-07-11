@@ -6,6 +6,7 @@ import { ModelIcon } from '@lobehub/icons';
 import { ChevronRight, Globe2, Mic, Paperclip, Search, SendHorizontal, Square } from 'lucide-react';
 
 import type { ConfiguredModel } from '@/lib/chat/types';
+import { getModelDisplayName } from '@/lib/chat/helpers';
 import { cn } from '@/lib/utils';
 import { ModelSelectorDialog } from './ModelSelectorDialog';
 
@@ -145,7 +146,7 @@ export function ChatInput({
                     <>
                       <ModelIcon model={selectedModel.id} size={20} type="avatar" />
                       <span className="hidden max-w-[160px] truncate text-[13px] sm:inline">
-                        {selectedModel.id}
+                        {getModelDisplayName(selectedModel.id)}
                       </span>
                     </>
                   ) : (

@@ -10,6 +10,11 @@ export const createMessageId = () => {
 
 export const getModelKey = (model: ConfiguredModel) => `${model.provider}:${model.id}`;
 
+export const getModelDisplayName = (modelId: string) => {
+  const slashIndex = modelId.lastIndexOf('/');
+  return slashIndex >= 0 ? modelId.slice(slashIndex + 1) : modelId;
+};
+
 const THINKING_TAGS = [
   { close: '</think>', open: '<think>' },
   { close: '</lobeThinking>', open: '<lobeThinking>' },
