@@ -128,6 +128,26 @@ export const useChatStore = create<ChatStore>()(
       const segments: MessageSegment[] = [];
       let currentReasoningStart: number | undefined;
 
+      const getLastThinkingSegment = () => {
+        const last = segments[segments.length - 1];
+        return last?.type === 'thinking' ? last : undefined;
+      };
+
+      const getAllReasoning = () =>
+        segments
+          .filter((s): s is Extract<MessageSegment, { type: 'thinking' }> => s.type === 'thinking')
+          .map((s) => s.content)
+          .join('');
+
+      const finishCurrentReasoning = () => {
+        const seg = getLastThinkingSegment();
+        if (seg && seg.isActive) {
+          seg.isActive = false;
+          seg.duration = currentReasoningStart ? Date.now() - currentReasoningStart : undefined;
+          currentReasoningStart = undefined;
+        }
+      };
+
       const controller = new AbortController();
       set({ abortController: controller });
 
@@ -170,17 +190,6 @@ export const useChatStore = create<ChatStore>()(
           ?.includes('application/x-ndjson');
         let done = false;
         let buffer = '';
-
-        const getLastThinkingSegment = () => {
-          const last = segments[segments.length - 1];
-          return last?.type === 'thinking' ? last : undefined;
-        };
-
-        const getAllReasoning = () =>
-          segments
-            .filter((s): s is Extract<MessageSegment, { type: 'thinking' }> => s.type === 'thinking')
-            .map((s) => s.content)
-            .join('');
 
         const isAnyThinkingActive = () =>
           segments.some((s) => s.type === 'thinking' && s.isActive);
@@ -255,15 +264,6 @@ export const useChatStore = create<ChatStore>()(
           updateStreamingMessage();
         };
 
-        const finishCurrentReasoning = () => {
-          const seg = getLastThinkingSegment();
-          if (seg && seg.isActive) {
-            seg.isActive = false;
-            seg.duration = currentReasoningStart ? Date.now() - currentReasoningStart : undefined;
-            currentReasoningStart = undefined;
-          }
-        };
-
         const handleStreamLine = (line: string) => {
           const trimmed = line.trim();
           if (!trimmed) return;
@@ -273,7 +273,7 @@ export const useChatStore = create<ChatStore>()(
               inputTokens = event.inputTokens || inputTokens;
               outputTokens = event.outputTokens || outputTokens;
               totalTokens = getTotalTokens(inputTokens, outputTokens, event.totalTokens);
-              updateStreamingMessage(false);
+              updateStreamingMessage();
               return;
             }
             if (event.type === 'tool' && event.webSearch) {

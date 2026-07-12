@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { getCurrentUserId } from '@/lib/auth-helpers';
 import { getChatSession, replaceChatMessages } from '@/lib/chat/storage';
 import type { Message } from '@/lib/chat/types';
 
@@ -22,13 +23,14 @@ export async function PUT(
 ) {
   try {
     const { sessionId } = await context.params;
-    if (!getChatSession(sessionId)) {
+    const userId = await getCurrentUserId();
+    if (!(await getChatSession(sessionId, userId))) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
     const body = await req.json().catch(() => ({}));
     const messages = Array.isArray(body.messages) ? body.messages.filter(isMessage) : [];
-    const result = replaceChatMessages(sessionId, messages);
+    const result = await replaceChatMessages(sessionId, messages, userId);
 
     return NextResponse.json(result);
   } catch (error) {

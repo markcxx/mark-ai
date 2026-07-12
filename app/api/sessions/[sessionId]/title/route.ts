@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { getCurrentUserId } from '@/lib/auth-helpers';
 import { getChatSession, updateChatSessionTitle } from '@/lib/chat/storage';
 import { generateConversationTitle } from '@/lib/chat/title';
 import type { Message } from '@/lib/chat/types';
@@ -22,7 +23,8 @@ export async function POST(
   context: { params: Promise<{ sessionId: string }> },
 ) {
   const { sessionId } = await context.params;
-  const currentSession = getChatSession(sessionId);
+  const userId = await getCurrentUserId();
+  const currentSession = await getChatSession(sessionId, userId);
   if (!currentSession) {
     return NextResponse.json({ error: 'Session not found' }, { status: 404 });
   }
@@ -30,7 +32,7 @@ export async function POST(
   const body = await req.json().catch(() => ({}));
   const messages = Array.isArray(body.messages) ? body.messages.filter(isMessage) : [];
   const result = await generateConversationTitle(messages, currentSession.title);
-  const session = updateChatSessionTitle(sessionId, result.title);
+  const session = await updateChatSessionTitle(sessionId, result.title, userId);
 
   return NextResponse.json({ session, title: result.title, titleModel: result.titleModel });
 }

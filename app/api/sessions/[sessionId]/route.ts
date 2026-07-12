@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { getCurrentUserId } from '@/lib/auth-helpers';
 import {
   deleteChatSession,
   getChatMessages,
@@ -16,7 +17,8 @@ export async function GET(
   context: { params: Promise<{ sessionId: string }> },
 ) {
   const { sessionId } = await context.params;
-  const session = getChatSession(sessionId);
+  const userId = await getCurrentUserId();
+  const session = await getChatSession(sessionId, userId);
 
   if (!session) {
     return NextResponse.json({ error: 'Session not found' }, { status: 404 });
@@ -24,7 +26,7 @@ export async function GET(
 
   return NextResponse.json(
     {
-      messages: getChatMessages(sessionId),
+      messages: await getChatMessages(sessionId, userId),
       session,
     },
     { headers: { 'Cache-Control': 'no-store' } },
@@ -36,11 +38,12 @@ export async function DELETE(
   context: { params: Promise<{ sessionId: string }> },
 ) {
   const { sessionId } = await context.params;
-  if (!getChatSession(sessionId)) {
+  const userId = await getCurrentUserId();
+  if (!(await getChatSession(sessionId, userId))) {
     return NextResponse.json({ error: 'Session not found' }, { status: 404 });
   }
 
-  deleteChatSession(sessionId);
+  await deleteChatSession(sessionId, userId);
   return NextResponse.json({ ok: true });
 }
 
@@ -49,18 +52,19 @@ export async function PATCH(
   context: { params: Promise<{ sessionId: string }> },
 ) {
   const { sessionId } = await context.params;
-  if (!getChatSession(sessionId)) {
+  const userId = await getCurrentUserId();
+  if (!(await getChatSession(sessionId, userId))) {
     return NextResponse.json({ error: 'Session not found' }, { status: 404 });
   }
 
   const body = await req.json().catch(() => ({}));
   if (typeof body.favorite === 'boolean') {
-    const session = updateChatSessionFavorite(sessionId, body.favorite);
+    const session = await updateChatSessionFavorite(sessionId, body.favorite, userId);
     return NextResponse.json({ session });
   }
 
   const title = typeof body.title === 'string' ? body.title : '';
-  const session = updateChatSessionTitle(sessionId, title);
+  const session = await updateChatSessionTitle(sessionId, title, userId);
 
   return NextResponse.json({ session });
 }
