@@ -105,11 +105,16 @@ export const useChatStore = create<ChatStore>()(
       const { abortController } = get();
       if (abortController) {
         abortController.abort();
-        set({ abortController: null, isLoading: false });
+        set((state) =>
+          state.abortController === abortController
+            ? { abortController: null, isLoading: false }
+            : {},
+        );
       }
     },
 
-    reset: () =>
+    reset: () => {
+      get().abortController?.abort();
       set({
         messages: [],
         input: '',
@@ -117,7 +122,8 @@ export const useChatStore = create<ChatStore>()(
         editingMessageId: null,
         editingContent: '',
         abortController: null,
-      }),
+      });
+    },
 
     streamAssistantMessage: async (historyMessages, modelMessageId, modelConfig, options = {}) => {
       const startedAt = Date.now();
@@ -396,8 +402,9 @@ export const useChatStore = create<ChatStore>()(
         };
       } finally {
         set((s) => ({
-          isLoading: false,
-          abortController: null,
+          ...(s.abortController === controller
+            ? { isLoading: false, abortController: null }
+            : {}),
           messages: s.messages.map((m) =>
             m.id === modelMessageId ? { ...m, isReasoning: false, isStreaming: false } : m,
           ),
@@ -470,7 +477,9 @@ export const useChatStore = create<ChatStore>()(
           userMessage,
           { ...modelMessage, ...(latestModelMessage || {}), ...streamedMessage },
         ];
-        set({ messages: savedMessages });
+        if (useSessionStore.getState().activeSessionId === targetSessionId) {
+          set({ messages: savedMessages });
+        }
 
         await sessionStore.persistSessionMessages(targetSessionId, savedMessages);
         if (createdSession) {
@@ -494,6 +503,9 @@ export const useChatStore = create<ChatStore>()(
       const { isLoading, messages, streamAssistantMessage } = get();
       if (isLoading) { toast.error('请等待当前回复完成'); return; }
       if (message.role !== 'model') return;
+
+      const targetSessionId = useSessionStore.getState().activeSessionId;
+      if (!targetSessionId) return;
 
       const index = messages.findIndex((item) => item.id === message.id);
       if (index < 0) return;
@@ -545,12 +557,12 @@ export const useChatStore = create<ChatStore>()(
       const savedMessages = nextMessages.map((item) =>
         item.id === message.id ? { ...item, ...streamedMessage } : item,
       );
-      set({ messages: savedMessages });
+      if (useSessionStore.getState().activeSessionId === targetSessionId) {
+        set({ messages: savedMessages });
+      }
 
       const sessionStore = useSessionStore.getState();
-      if (sessionStore.activeSessionId) {
-        await sessionStore.persistSessionMessages(sessionStore.activeSessionId, savedMessages);
-      }
+      await sessionStore.persistSessionMessages(targetSessionId, savedMessages);
     },
 
     regenerateMessage: async (message, deleteCurrent = false) => {
@@ -578,6 +590,8 @@ export const useChatStore = create<ChatStore>()(
 
       const targetId = createMessageId();
       const sessionStore = useSessionStore.getState();
+      const targetSessionId = sessionStore.activeSessionId;
+      if (!targetSessionId) return;
 
       if (message.role === 'user') {
         const historyMessages = messages.slice(0, index + 1);
@@ -599,8 +613,10 @@ export const useChatStore = create<ChatStore>()(
           ...historyMessages,
           { ...modelMessage, ...(latestUserRetryMessage || {}), ...streamedMessage },
         ];
-        set({ messages: savedMessages });
-        if (sessionStore.activeSessionId) await sessionStore.persistSessionMessages(sessionStore.activeSessionId, savedMessages);
+        if (useSessionStore.getState().activeSessionId === targetSessionId) {
+          set({ messages: savedMessages });
+        }
+        await sessionStore.persistSessionMessages(targetSessionId, savedMessages);
         return;
       }
 
@@ -644,8 +660,10 @@ export const useChatStore = create<ChatStore>()(
         ...nextMessages.slice(0, -1),
         { ...nextModelMessage, ...(latestRetryMessage || {}), ...streamedMessage },
       ];
-      set({ messages: savedMessages });
-      if (sessionStore.activeSessionId) await sessionStore.persistSessionMessages(sessionStore.activeSessionId, savedMessages);
+      if (useSessionStore.getState().activeSessionId === targetSessionId) {
+        set({ messages: savedMessages });
+      }
+      await sessionStore.persistSessionMessages(targetSessionId, savedMessages);
     },
 
     startEditing: (message) => {

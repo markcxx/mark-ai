@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { authorizeApiRequest, enforceRateLimit } from '@/lib/api/security';
 import { searchTavily } from '@/lib/search/tavily';
 
 export const dynamic = 'force-dynamic';
@@ -6,10 +7,15 @@ export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   try {
+    const authorization = await authorizeApiRequest(req);
+    if (!authorization.authorized) return authorization.response;
+    const limited = enforceRateLimit({ key: authorization.key, limit: 30, scope: 'search' });
+    if (limited) return limited;
+
     const body = await req.json().catch(() => ({}));
     const query = typeof body.query === 'string' ? body.query.trim() : '';
 
-    if (!query) {
+    if (!query || query.length > 500) {
       return NextResponse.json({ error: 'Query is required' }, { status: 400 });
     }
 

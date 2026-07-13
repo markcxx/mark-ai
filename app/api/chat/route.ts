@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
+import { authorizeApiRequest, enforceRateLimit } from '@/lib/api/security';
 import { findConfiguredModel } from '@/lib/models';
 import { searchTavily } from '@/lib/search/tavily';
 import { readWebpage } from '@/lib/search/webpage';
@@ -33,6 +34,10 @@ type UsagePayload = {
   outputTokens?: number;
   totalTokens?: number;
 };
+
+const MAX_CHAT_MESSAGES = 200;
+const MAX_CHAT_MESSAGE_CHARS = 200_000;
+const MAX_CHAT_PAYLOAD_BYTES = 2_000_000;
 
 const WEB_SEARCH_TOOL = {
   function: {
@@ -246,6 +251,7 @@ const createOpenAICompatibleStream = async (
   baseUrl?: string,
   webSearchEnabled = false,
   timezone?: unknown,
+  signal?: AbortSignal,
 ) => {
   const endpoint = toOpenAIChatEndpoint(baseUrl);
   if (!endpoint) {
@@ -275,6 +281,7 @@ const createOpenAICompatibleStream = async (
             'Content-Type': 'application/json',
           },
           method: 'POST',
+          signal,
         });
 
         if (!upstream.ok) {
@@ -432,7 +439,7 @@ const createOpenAICompatibleStream = async (
               controller.enqueue(encodeToolEvent(encoder, readingState));
 
               try {
-                const result = await readWebpage({ url });
+                const result = await readWebpage({ signal, url });
                 const doneState: WebSearchState = {
                   completedAt: Date.now(),
                   content: result.content,
@@ -482,7 +489,7 @@ const createOpenAICompatibleStream = async (
             controller.enqueue(encodeToolEvent(encoder, searchingState));
 
             try {
-              const result = await searchTavily({ query });
+              const result = await searchTavily({ query, signal });
               const doneState: WebSearchState = {
                 answer: result.answer,
                 completedAt: Date.now(),
@@ -538,14 +545,40 @@ const createOpenAICompatibleStream = async (
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, model, provider, timezone, webSearchEnabled } = await req.json();
+    const authorization = await authorizeApiRequest(req);
+    if (!authorization.authorized) return authorization.response;
+    const limited = enforceRateLimit({ key: authorization.key, limit: 30, scope: 'chat' });
+    if (limited) return limited;
+
+    const contentLength = Number(req.headers.get('content-length'));
+    if (Number.isFinite(contentLength) && contentLength > MAX_CHAT_PAYLOAD_BYTES) {
+      return NextResponse.json({ error: 'Chat payload is too large' }, { status: 413 });
+    }
+
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json({ error: 'Invalid request payload' }, { status: 400 });
+    }
+
+    const { messages, model, provider, timezone, webSearchEnabled } = body;
     const selectedModel = findConfiguredModel(model, provider);
 
     if (!selectedModel) {
       return NextResponse.json({ error: 'Model is not configured' }, { status: 400 });
     }
 
-    if (!Array.isArray(messages) || messages.length === 0) {
+    if (
+      !Array.isArray(messages) ||
+      messages.length === 0 ||
+      messages.length > MAX_CHAT_MESSAGES ||
+      !messages.every((message) =>
+        message &&
+        typeof message === 'object' &&
+        (message.role === 'user' || message.role === 'model') &&
+        typeof message.content === 'string' &&
+        message.content.length <= MAX_CHAT_MESSAGE_CHARS,
+      )
+    ) {
       return NextResponse.json({ error: 'Messages are required' }, { status: 400 });
     }
 
@@ -557,6 +590,7 @@ export async function POST(req: NextRequest) {
         selectedModel.baseUrl,
         Boolean(webSearchEnabled),
         timezone,
+        req.signal,
       );
     }
 

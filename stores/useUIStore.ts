@@ -5,6 +5,9 @@ import type { ConfiguredModel, Message } from '@/lib/chat/types';
 import { getModelKey } from '@/lib/chat/helpers';
 
 interface UIState {
+  isAppReady: boolean;
+  bootMessage: string;
+  bootProgress: number;
   isSidebarOpen: boolean;
   sidebarWidth: number;
   isResizingSidebar: boolean;
@@ -23,6 +26,8 @@ interface UIState {
 }
 
 interface UIActions {
+  setAppReady: (ready: boolean) => void;
+  setBootProgress: (progress: number, message: string) => void;
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
   setSidebarWidth: (width: number) => void;
@@ -53,6 +58,9 @@ const clampSidebarWidth = (width: number) =>
 
 export const useUIStore = create<UIStore>()(
   subscribeWithSelector((set, get) => ({
+    isAppReady: false,
+    bootMessage: '正在启动 MarkAI…',
+    bootProgress: 8,
     isSidebarOpen: true,
     sidebarWidth: 260,
     isResizingSidebar: false,
@@ -69,6 +77,12 @@ export const useUIStore = create<UIStore>()(
     selectedModelKey: '',
     webSearchEnabled: false,
 
+    setAppReady: (ready) => set({ isAppReady: ready }),
+    setBootProgress: (progress, message) =>
+      set((state) => ({
+        bootMessage: message,
+        bootProgress: Math.max(state.bootProgress, Math.min(100, Math.max(0, progress))),
+      })),
     toggleSidebar: () => set((s) => ({ isSidebarOpen: !s.isSidebarOpen })),
     setSidebarOpen: (open) => set({ isSidebarOpen: open }),
     setSidebarWidth: (width) => set({ sidebarWidth: clampSidebarWidth(width) }),
@@ -150,6 +164,11 @@ export const useUIStore = create<UIStore>()(
     loadModels: async () => {
       try {
         const response = await fetch('/api/models', { cache: 'no-store' });
+        if (response.status === 401) {
+          const callbackUrl = `${window.location.pathname}${window.location.search}`;
+          window.location.replace(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+          throw new Error('Unauthorized');
+        }
         if (!response.ok) throw new Error('Failed to load models');
         const data = await response.json();
         const models: ConfiguredModel[] = Array.isArray(data.models) ? data.models : [];

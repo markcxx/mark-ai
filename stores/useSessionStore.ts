@@ -48,6 +48,10 @@ const navigateToNewChat = (history: 'push' | 'replace' | 'none' = 'push') => {
   }
 };
 
+let activeSessionLoadController: AbortController | null = null;
+let activeSessionLoadRequest = 0;
+let sessionsLoadPromise: Promise<void> | null = null;
+
 export const useSessionStore = create<SessionStore>()(
   subscribeWithSelector((set, get) => ({
     sessions: [],
@@ -74,31 +78,58 @@ export const useSessionStore = create<SessionStore>()(
           : s.loadingSessionIds.filter((id) => id !== sessionId),
       })),
 
-    resetActiveSession: () => set({ activeSessionId: null, isLoadingActiveSession: false }),
+    resetActiveSession: () => {
+      activeSessionLoadRequest += 1;
+      activeSessionLoadController?.abort();
+      activeSessionLoadController = null;
+      set({ activeSessionId: null, isLoadingActiveSession: false });
+    },
 
     loadSessions: async () => {
-      try {
-        const response = await fetch('/api/sessions', { cache: 'no-store' });
-        if (!response.ok) throw new Error('Failed to load sessions');
+      if (sessionsLoadPromise) return sessionsLoadPromise;
 
-        const data = await response.json();
-        const nextSessions: ChatSession[] = Array.isArray(data.sessions) ? data.sessions : [];
-        set({ sessions: nextSessions });
-      } catch (error) {
-        console.error('Sessions list error:', error);
-        toast.error('加载历史会话失败');
-      } finally {
-        set({ isLoadingSessions: false });
-      }
+      set({ isLoadingSessions: true });
+      sessionsLoadPromise = (async () => {
+        try {
+          const response = await fetch('/api/sessions', { cache: 'no-store' });
+          if (response.status === 401) {
+            const callbackUrl = `${window.location.pathname}${window.location.search}`;
+            window.location.replace(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+            throw new Error('Unauthorized');
+          }
+          if (!response.ok) throw new Error('Failed to load sessions');
+
+          const data = await response.json();
+          const nextSessions: ChatSession[] = Array.isArray(data.sessions) ? data.sessions : [];
+          set({ sessions: nextSessions });
+        } catch (error) {
+          console.error('Sessions list error:', error);
+          toast.error('加载历史会话失败');
+        } finally {
+          set({ isLoadingSessions: false });
+          sessionsLoadPromise = null;
+        }
+      })();
+
+      return sessionsLoadPromise;
     },
 
     loadSession: async (sessionId, options = {}) => {
+      activeSessionLoadController?.abort();
+      const controller = new AbortController();
+      const requestId = ++activeSessionLoadRequest;
+      activeSessionLoadController = controller;
+
       try {
         set({ isLoadingActiveSession: true });
-        const response = await fetch(`/api/sessions/${sessionId}`, { cache: 'no-store' });
+        const response = await fetch(`/api/sessions/${sessionId}`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
         if (!response.ok) throw new Error('Failed to load session');
 
         const data = await response.json();
+        if (requestId !== activeSessionLoadRequest) return undefined;
         const messages: Message[] = Array.isArray(data.messages) ? data.messages : [];
 
         set({ activeSessionId: data.session?.id || sessionId });
@@ -109,11 +140,15 @@ export const useSessionStore = create<SessionStore>()(
 
         return messages;
       } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return undefined;
         console.error('Session load error:', error);
         toast.error('加载会话失败');
         return undefined;
       } finally {
-        set({ isLoadingActiveSession: false });
+        if (requestId === activeSessionLoadRequest) {
+          activeSessionLoadController = null;
+          set({ isLoadingActiveSession: false });
+        }
       }
     },
 

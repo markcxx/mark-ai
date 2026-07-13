@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Github } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
@@ -100,12 +101,12 @@ export default function LoginPage() {
             <label htmlFor="password" className="text-sm text-gray-700 dark:text-gray-300">
               密码
             </label>
-            <a
+            <Link
               href="/reset-password"
               className="text-xs text-primary hover:underline dark:text-blue-400"
             >
               忘记密码？
-            </a>
+            </Link>
           </div>
           <input
             id="password"
@@ -130,9 +131,9 @@ export default function LoginPage() {
 
       <p className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
         还没有账户？{' '}
-        <a href="/register" className="text-primary hover:underline dark:text-blue-400">
+        <Link href="/register" className="text-primary hover:underline dark:text-blue-400">
           注册
-        </a>
+        </Link>
       </p>
     </div>
   );

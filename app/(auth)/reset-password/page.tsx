@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function ResetPasswordPage() {
@@ -41,12 +42,12 @@ export default function ResetPasswordPage() {
         <p className="mb-4 text-center text-sm text-gray-500 dark:text-gray-400">
           我们已向 <span className="font-medium text-gray-700 dark:text-gray-300">{email}</span> 发送了重置密码链接，请查收邮件。
         </p>
-        <a
+        <Link
           href="/login"
           className="block text-center text-sm text-primary hover:underline dark:text-blue-400"
         >
           返回登录
-        </a>
+        </Link>
       </div>
     );
   }
@@ -88,9 +89,9 @@ export default function ResetPasswordPage() {
       </form>
 
       <p className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
-        <a href="/login" className="text-primary hover:underline dark:text-blue-400">
+        <Link href="/login" className="text-primary hover:underline dark:text-blue-400">
           返回登录
-        </a>
+        </Link>
       </p>
     </div>
   );

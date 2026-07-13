@@ -1,10 +1,13 @@
 import { betterAuth } from 'better-auth';
+import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { admin } from 'better-auth/plugins';
+import { and, eq, gt } from 'drizzle-orm';
 
 import { getDb } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
 import { sendResetPasswordEmail, sendVerificationEmail } from '@/lib/email';
+import { isCloudMode } from '@/lib/env';
 
 const getSSOProviders = () => {
   const providers: ReturnType<typeof betterAuth>['options']['socialProviders'] = {};
@@ -52,6 +55,38 @@ export const auth = betterAuth({
 
   baseURL: process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL,
   secret: process.env.AUTH_SECRET,
+
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      if (!isCloudMode() || ctx.path !== '/sign-up/email') return;
+
+      const email = typeof ctx.body?.email === 'string' ? ctx.body.email.trim().toLowerCase() : '';
+      const registrationToken = ctx.headers?.get('x-markai-email-verification')?.trim() || '';
+      if (!email || !registrationToken) {
+        throw new APIError('BAD_REQUEST', { message: '请先完成邮箱验证码验证' });
+      }
+
+      const db = getDb();
+      const tokenId = `email-register:${registrationToken}`;
+      const verified = await db
+        .select({ id: schema.verifications.id })
+        .from(schema.verifications)
+        .where(
+          and(
+            eq(schema.verifications.identifier, tokenId),
+            eq(schema.verifications.value, email),
+            gt(schema.verifications.expiresAt, new Date()),
+          ),
+        )
+        .limit(1);
+
+      if (!verified.length) {
+        throw new APIError('BAD_REQUEST', { message: '邮箱验证已失效，请重新验证' });
+      }
+
+      await db.delete(schema.verifications).where(eq(schema.verifications.identifier, tokenId));
+    }),
+  },
 
   emailAndPassword: {
     enabled: true,

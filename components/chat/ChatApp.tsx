@@ -188,18 +188,51 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
   useEffect(() => { if (!isLoadingActiveSession) scrollToBottom(); }, [isLoadingActiveSession, scrollToBottom]);
 
-  // Load models on mount
-  useEffect(() => { useUIStore.getState().loadModels(); }, []);
-
-  // Load sessions on mount
+  // Keep the boot splash visible until all startup data has settled and rendered.
   useEffect(() => {
+    let cancelled = false;
+
     const init = async () => {
-      await useSessionStore.getState().loadSessions();
-      if (initialSessionId) {
-        handleLoadSession(initialSessionId, { history: 'none' });
+      try {
+        const uiStore = useUIStore.getState();
+        const totalTasks = initialSessionId ? 3 : 2;
+        let completedTasks = 0;
+        const finishTask = (message: string) => {
+          completedTasks += 1;
+          useUIStore.getState().setBootProgress(
+            12 + Math.round((completedTasks / totalTasks) * 76),
+            message,
+          );
+        };
+
+        uiStore.setBootProgress(12, '正在加载模型与会话…');
+        await Promise.all([
+          uiStore.loadModels().then(() => finishTask('模型配置已加载')),
+          (async () => {
+            await useSessionStore.getState().loadSessions();
+            finishTask('会话历史已加载');
+            if (initialSessionId) {
+              useUIStore.getState().setBootProgress(72, '正在恢复当前会话…');
+              await handleLoadSession(initialSessionId, { history: 'none' });
+              finishTask('当前会话已恢复');
+            }
+          })(),
+        ]);
+      } finally {
+        if (!cancelled) {
+          useUIStore.getState().setBootProgress(94, '正在渲染界面…');
+          window.requestAnimationFrame(() => {
+            if (!cancelled) {
+              useUIStore.getState().setBootProgress(100, '加载完成');
+              useUIStore.getState().setAppReady(true);
+            }
+          });
+        }
       }
     };
-    init();
+
+    void init();
+    return () => { cancelled = true; };
   }, [initialSessionId, handleLoadSession]);
 
   // Mobile uses the sidebar as a temporary drawer instead of a persistent column.

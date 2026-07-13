@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { authorizeApiRequest, enforceRateLimit } from '@/lib/api/security';
 import { readWebpage } from '@/lib/search/webpage';
 
 export const dynamic = 'force-dynamic';
@@ -6,10 +7,15 @@ export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   try {
+    const authorization = await authorizeApiRequest(req);
+    if (!authorization.authorized) return authorization.response;
+    const limited = enforceRateLimit({ key: authorization.key, limit: 20, scope: 'read-webpage' });
+    if (limited) return limited;
+
     const body = await req.json().catch(() => ({}));
     const url = typeof body.url === 'string' ? body.url.trim() : '';
 
-    if (!url) {
+    if (!url || url.length > 2_048) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
     }
 

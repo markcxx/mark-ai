@@ -186,7 +186,7 @@ const looksLikeBlockedPage = (content: string, title?: string) => {
   ].some((keyword) => text.includes(keyword.toLowerCase()));
 };
 
-const getReaderUrl = (url: URL) => `https://r.jina.ai/http://${url.toString()}`;
+const getReaderUrl = (url: URL) => `https://r.jina.ai/${url.toString()}`;
 
 const parseReaderMarkdown = (markdown: string, fallbackUrl: URL) => {
   const title = markdown.match(/^Title:\s*(.+)$/im)?.[1]?.trim() || fallbackUrl.hostname;

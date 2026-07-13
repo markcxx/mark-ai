@@ -190,10 +190,14 @@ export class PostgresStorage implements StorageAdapter {
       throw new Error('Session not found or access denied');
     }
 
-    await db.delete(chatMessages).where(eq(chatMessages.sessionId, sessionId));
+    const deleteMessages = db.delete(chatMessages).where(eq(chatMessages.sessionId, sessionId));
+    const updateSession = db
+      .update(chatSessions)
+      .set({ updatedAt: new Date() })
+      .where(and(eq(chatSessions.id, sessionId), eq(chatSessions.userId, userId)));
 
     if (messages.length > 0) {
-      await db.insert(chatMessages).values(
+      const insertMessages = db.insert(chatMessages).values(
         messages.map((message, index) => ({
           id: message.id.startsWith(`${sessionId}:`)
             ? message.id
@@ -216,12 +220,10 @@ export class PostgresStorage implements StorageAdapter {
           createdAt: message.createdAt ? new Date(message.createdAt) : new Date(now.getTime() + index),
         })),
       );
+      await db.batch([deleteMessages, insertMessages, updateSession]);
+    } else {
+      await db.batch([deleteMessages, updateSession]);
     }
-
-    await db
-      .update(chatSessions)
-      .set({ updatedAt: new Date() })
-      .where(eq(chatSessions.id, sessionId));
 
     return {
       messages: await this.getChatMessages(sessionId, userId),

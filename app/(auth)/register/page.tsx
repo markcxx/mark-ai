@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Github } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
@@ -19,6 +20,7 @@ export default function RegisterPage() {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [registrationToken, setRegistrationToken] = useState('');
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -98,6 +100,7 @@ export default function RegisterPage() {
         return;
       }
       toast.success('验证通过');
+      setRegistrationToken(data.registrationToken || '');
       setStep('password');
     } catch {
       toast.error('验证失败，请重试');
@@ -112,6 +115,11 @@ export default function RegisterPage() {
       toast.error('密码至少需要 8 位字符');
       return;
     }
+    if (!registrationToken) {
+      toast.error('邮箱验证已失效，请重新验证');
+      setStep('code');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -119,6 +127,8 @@ export default function RegisterPage() {
         email: email.trim(),
         password,
         name: name.trim() || email.split('@')[0],
+      }, {
+        headers: { 'x-markai-email-verification': registrationToken },
       });
       if (result.error) {
         toast.error(result.error.message || '注册失败');
@@ -301,9 +311,9 @@ export default function RegisterPage() {
 
       <p className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
         已有账户？{' '}
-        <a href="/login" className="text-primary hover:underline dark:text-blue-400">
+        <Link href="/login" className="text-primary hover:underline dark:text-blue-400">
           登录
-        </a>
+        </Link>
       </p>
     </div>
   );
