@@ -7,6 +7,8 @@ import {
   ChevronDown,
   Copy,
   ExternalLink,
+  FileText,
+  Download,
   Globe2,
   Languages,
   Loader2,
@@ -468,10 +470,28 @@ export function MessageItem({
           </div>
         </div>
       ) : (
-        <div
-          className="w-fit max-w-[92%] break-words rounded-2xl rounded-tr-sm bg-[var(--chat-user-bubble-bg)] px-4 py-3 text-left text-[15px] text-gray-900 shadow-sm whitespace-pre-wrap dark:text-gray-100 md:max-w-[85%] md:px-5"
-        >
-          <CollapsibleContent>{collapsed ? '消息已收起' : message.content}</CollapsibleContent>
+        <div className="flex w-fit max-w-[92%] flex-col gap-3 break-words rounded-2xl rounded-tr-sm bg-[var(--chat-user-bubble-bg)] px-4 py-3 text-left text-[15px] text-gray-900 shadow-sm dark:text-gray-100 md:max-w-[85%] md:px-5">
+          {message.attachments && message.attachments.length > 0 && !collapsed && (
+            <div className="flex flex-wrap gap-2">
+              {message.attachments.map((file) => (
+                <a
+                  className="flex min-w-0 max-w-[260px] items-center gap-2 rounded-xl border border-black/[0.06] bg-white/60 px-2.5 py-2 transition-all hover:-translate-y-0.5 hover:bg-white hover:shadow-sm dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/[0.1]"
+                  href={`/api/files/${file.id}/download`}
+                  key={file.id}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-500 dark:bg-blue-500/15 dark:text-blue-300"><FileText size={16} /></span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs font-semibold">{file.name}</span>
+                    <span className="block text-[10px] text-gray-400">{file.size < 1024 * 1024 ? `${Math.ceil(file.size / 1024)} KB` : `${(file.size / 1024 / 1024).toFixed(1)} MB`}</span>
+                  </span>
+                  <Download className="shrink-0 text-gray-400" size={14} />
+                </a>
+              ))}
+            </div>
+          )}
+          <div className="whitespace-pre-wrap"><CollapsibleContent>{collapsed ? '消息已收起' : message.content}</CollapsibleContent></div>
         </div>
       )}
       {!multiSelectMode && (

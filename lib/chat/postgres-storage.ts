@@ -6,7 +6,7 @@ import { getDb } from '@/lib/db';
 import { chatMessages, chatSessions } from '@/lib/db/schema';
 
 import type { StorageAdapter } from './storage-adapter';
-import type { ChatSession, Message, MessageSegment, WebSearchState } from './types';
+import type { ChatSession, FileAttachment, Message, MessageSegment, WebSearchState } from './types';
 
 const DEFAULT_SESSION_TITLE = '新对话';
 
@@ -43,6 +43,7 @@ const toMessage = (row: typeof chatMessages.$inferSelect): Message => ({
   reasoningDuration: row.reasoningDuration ?? undefined,
   role: row.role === 'user' ? 'user' : 'model',
   segments: (row.segments as MessageSegment[] | null) ?? undefined,
+  attachments: (row.attachments as FileAttachment[] | null) ?? undefined,
   totalTokens: row.totalTokens ?? undefined,
   webSearch: (row.webSearch as WebSearchState[] | null) ?? undefined,
 });
@@ -214,6 +215,7 @@ export class PostgresStorage implements StorageAdapter {
           totalTokens: message.totalTokens || null,
           webSearch: message.webSearch || null,
           segments: message.segments || null,
+          attachments: message.attachments || null,
           model: message.model || null,
           provider: message.provider || null,
           position: index,

@@ -95,6 +95,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   const loadingText = useChatStore((s) => s.loadingText);
   const editingMessageId = useChatStore((s) => s.editingMessageId);
   const editingContent = useChatStore((s) => s.editingContent);
+  const pendingAttachments = useChatStore((s) => s.pendingAttachments);
 
   // Refs
   const messagesScrollRef = useRef<HTMLDivElement>(null);
@@ -102,6 +103,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   const userHasScrolledAwayRef = useRef(false);
   const isAutoScrollingRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectionLayoutMode, setSelectionLayoutMode] = useState(false);
   const [activeMiniMapMessageId, setActiveMiniMapMessageId] = useState<string | null>(null);
   const [activeHtmlPreview, setActiveHtmlPreview] = useState<HtmlPreviewPayload | null>(null);
@@ -109,6 +111,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exportDialogMode, setExportDialogMode] = useState<ExportMode>('image');
+  const [attachmentUploading, setAttachmentUploading] = useState(false);
 
   // Derived
   const selectedModel = availableModels.find((m) => getModelKey(m) === selectedModelKey);
@@ -343,8 +346,59 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
+      if (attachmentUploading) return;
       useChatStore.getState().sendMessage();
     }
+  };
+
+  const uploadAttachment = async (file: File) => {
+    const presign = await fetch('/api/files/presign', {
+      body: JSON.stringify({ contentType: file.type, kind: 'attachment', name: file.name, size: file.size }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    });
+    const presignData = await presign.json();
+    if (!presign.ok) throw new Error(presignData.error || '无法创建上传任务');
+
+    const upload = await fetch(presignData.uploadUrl, {
+      body: file,
+      headers: { 'Content-Type': file.type },
+      method: 'PUT',
+    });
+    if (!upload.ok) {
+      await fetch(`/api/files/${presignData.file.id}`, { method: 'DELETE' }).catch(() => undefined);
+      throw new Error('上传到 R2 失败');
+    }
+
+    const complete = await fetch('/api/files/complete', {
+      body: JSON.stringify({ id: presignData.file.id }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    });
+    const completeData = await complete.json();
+    if (!complete.ok) throw new Error(completeData.error || '文件校验失败');
+    useChatStore.getState().addPendingAttachment(completeData.file);
+  };
+
+  const handleAttachmentFiles = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const slots = Math.max(0, 4 - useChatStore.getState().pendingAttachments.length);
+    const files = Array.from(event.target.files || []).slice(0, slots);
+    event.target.value = '';
+    if (files.length === 0) return;
+    setAttachmentUploading(true);
+    try {
+      for (const file of files) await uploadAttachment(file);
+      toast.success(files.length === 1 ? '附件已就绪' : `${files.length} 个附件已就绪`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '附件上传失败');
+    } finally {
+      setAttachmentUploading(false);
+    }
+  };
+
+  const removeAttachment = (id: string) => {
+    useChatStore.getState().removePendingAttachment(id);
+    void fetch(`/api/files/${id}`, { method: 'DELETE' });
   };
 
   const handleSend = () => {
@@ -404,6 +458,14 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
             boxShadow: '0 12px 36px rgba(0,0,0,0.12)',
           },
         }}
+      />
+      <input
+        accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.csv,.docx,.xlsx,.pptx"
+        className="hidden"
+        multiple
+        onChange={handleAttachmentFiles}
+        ref={fileInputRef}
+        type="file"
       />
 
       <Sidebar
@@ -540,14 +602,17 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
             <WelcomePanel>
               <ChatInput
                 availableModels={availableModels}
+                attachments={pendingAttachments}
+                attachmentUploading={attachmentUploading}
                 input={input}
                 isLoading={isLoading}
                 isLoadingModels={isLoadingModels}
                 modelSearchKeyword={modelSearchKeyword}
-                onAttachment={() => toast(NOT_IMPLEMENTED_TOAST)}
+                onAttachment={() => fileInputRef.current?.click()}
                 onInput={handleInput}
                 onKeyDown={handleKeyDown}
                 onMic={() => toast(NOT_IMPLEMENTED_TOAST)}
+                onRemoveAttachment={removeAttachment}
                 onSend={handleSend}
                 onToggleWebSearch={() => useUIStore.getState().toggleWebSearch()}
                 placement="center"
@@ -633,14 +698,17 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
         ) : (
           <ChatInput
             availableModels={availableModels}
+            attachments={pendingAttachments}
+            attachmentUploading={attachmentUploading}
             input={input}
             isLoading={isLoading}
             isLoadingModels={isLoadingModels}
             modelSearchKeyword={modelSearchKeyword}
-            onAttachment={() => toast(NOT_IMPLEMENTED_TOAST)}
+            onAttachment={() => fileInputRef.current?.click()}
             onInput={handleInput}
             onKeyDown={handleKeyDown}
             onMic={() => toast(NOT_IMPLEMENTED_TOAST)}
+            onRemoveAttachment={removeAttachment}
             onSend={handleSend}
             onToggleWebSearch={() => useUIStore.getState().toggleWebSearch()}
             providerNames={providerNames}

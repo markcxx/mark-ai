@@ -1,4 +1,4 @@
-import { boolean, index, jsonb, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+import { boolean, index, integer, jsonb, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 import { accounts, authSessions } from './auth';
@@ -13,6 +13,8 @@ export const users = pgTable(
     emailVerified: boolean('email_verified').default(false).notNull(),
     avatar: text('avatar'),
     fullName: text('full_name'),
+    age: integer('age'),
+    profileCompleted: boolean('profile_completed').default(false).notNull(),
     role: text('role').default('user'),
     banned: boolean('banned'),
     banReason: text('ban_reason'),

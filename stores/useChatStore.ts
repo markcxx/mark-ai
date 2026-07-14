@@ -5,7 +5,7 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { THINKING_TEXTS } from '@/lib/chat/constants';
 import { createMessageId, extractThinkingFromText } from '@/lib/chat/helpers';
 import { estimateMessageTokens, estimateMessagesTokens, estimateTextTokens } from '@/lib/chat/metrics';
-import type { ChatStreamEvent, ConfiguredModel, Message, MessageSegment } from '@/lib/chat/types';
+import type { ChatStreamEvent, ConfiguredModel, FileAttachment, Message, MessageSegment } from '@/lib/chat/types';
 import { useSessionStore } from './useSessionStore';
 import { useUIStore } from './useUIStore';
 
@@ -45,12 +45,15 @@ interface ChatState {
   editingMessageId: string | null;
   editingContent: string;
   abortController: AbortController | null;
+  pendingAttachments: FileAttachment[];
 }
 
 interface ChatActions {
   setMessages: (messages: Message[]) => void;
   setInput: (input: string) => void;
   setLoadingText: (text: string) => void;
+  addPendingAttachment: (attachment: FileAttachment) => void;
+  removePendingAttachment: (id: string) => void;
   sendMessage: () => Promise<void>;
   streamAssistantMessage: (
     historyMessages: Message[],
@@ -96,10 +99,17 @@ export const useChatStore = create<ChatStore>()(
     editingMessageId: null,
     editingContent: '',
     abortController: null,
+    pendingAttachments: [],
 
     setMessages: (messages) => set({ messages }),
     setInput: (input) => set({ input }),
     setLoadingText: (text) => set({ loadingText: text }),
+    addPendingAttachment: (attachment) => set((state) => ({
+      pendingAttachments: [...state.pendingAttachments, attachment],
+    })),
+    removePendingAttachment: (id) => set((state) => ({
+      pendingAttachments: state.pendingAttachments.filter((item) => item.id !== id),
+    })),
 
     abortStreaming: () => {
       const { abortController } = get();
@@ -122,6 +132,7 @@ export const useChatStore = create<ChatStore>()(
         editingMessageId: null,
         editingContent: '',
         abortController: null,
+        pendingAttachments: [],
       });
     },
 
@@ -165,7 +176,12 @@ export const useChatStore = create<ChatStore>()(
 
         const response = await fetch('/api/chat', {
           body: JSON.stringify({
-            messages: historyMessages.map((m) => ({ content: m.content, role: m.role })),
+            messages: historyMessages.map((m) => ({
+              content: m.attachments?.length
+                ? `${m.content}\n\n${m.attachments.map((file) => `[用户附件：${file.name}，类型 ${file.contentType}，大小 ${file.size} 字节]`).join('\n')}`
+                : m.content,
+              role: m.role,
+            })),
             model: modelConfig.id,
             provider: modelConfig.provider,
             timezone: getClientTimezone(),
@@ -413,14 +429,14 @@ export const useChatStore = create<ChatStore>()(
     },
 
     sendMessage: async () => {
-      const { input, isLoading, messages, streamAssistantMessage } = get();
+      const { input, isLoading, messages, pendingAttachments, streamAssistantMessage } = get();
       const { availableModels, selectedModelKey, webSearchEnabled } = useUIStore.getState();
       const { getModelKey } = await import('@/lib/chat/helpers');
       const selectedModel = availableModels.find((m) => getModelKey(m) === selectedModelKey);
 
-      if (!input.trim() || isLoading || !selectedModel) return;
+      if ((!input.trim() && pendingAttachments.length === 0) || isLoading || !selectedModel) return;
 
-      const prompt = input.trim();
+      const prompt = input.trim() || '请查看我上传的附件。';
       const sessionStore = useSessionStore.getState();
       let targetSessionId = sessionStore.activeSessionId;
       let createdSession = false;
@@ -446,6 +462,7 @@ export const useChatStore = create<ChatStore>()(
         const now = Date.now();
         const userMessage: Message = {
           content: prompt,
+          attachments: pendingAttachments,
           createdAt: now,
           id: createMessageId(),
           role: 'user',
@@ -462,7 +479,7 @@ export const useChatStore = create<ChatStore>()(
           role: 'model',
         };
 
-        set({ messages: [...messages, userMessage, modelMessage], input: '' });
+        set({ messages: [...messages, userMessage, modelMessage], input: '', pendingAttachments: [] });
 
         startedStream = true;
         const streamedMessage = await streamAssistantMessage(

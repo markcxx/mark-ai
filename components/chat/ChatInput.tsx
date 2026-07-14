@@ -3,9 +3,9 @@
 import type { RefObject } from 'react';
 import { useState } from 'react';
 import { ModelIcon } from '@lobehub/icons';
-import { ChevronRight, Globe2, Mic, Paperclip, Search, SendHorizontal, Square } from 'lucide-react';
+import { ChevronRight, FileText, Globe2, LoaderCircle, Mic, Paperclip, SendHorizontal, Square, X } from 'lucide-react';
 
-import type { ConfiguredModel } from '@/lib/chat/types';
+import type { ConfiguredModel, FileAttachment } from '@/lib/chat/types';
 import { getModelDisplayName } from '@/lib/chat/helpers';
 import { cn } from '@/lib/utils';
 import { ModelSelectorDialog } from './ModelSelectorDialog';
@@ -17,6 +17,9 @@ export function ChatInput({
   isLoadingModels,
   modelSearchKeyword,
   onAttachment,
+  attachments,
+  attachmentUploading,
+  onRemoveAttachment,
   onInput,
   onKeyDown,
   onMic,
@@ -32,11 +35,14 @@ export function ChatInput({
   onToggleWebSearch,
 }: {
   availableModels: ConfiguredModel[];
+  attachments: FileAttachment[];
+  attachmentUploading: boolean;
   input: string;
   isLoading: boolean;
   isLoadingModels: boolean;
   modelSearchKeyword: string;
   onAttachment: () => void;
+  onRemoveAttachment: (id: string) => void;
   onInput: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onMic: () => void;
@@ -84,11 +90,37 @@ export function ChatInput({
               value={input}
             />
 
+            {(attachments.length > 0 || attachmentUploading) && (
+              <div className="flex gap-2 overflow-x-auto px-3 pb-2 md:px-4">
+                {attachments.map((file) => (
+                  <div className="group/file flex max-w-[240px] shrink-0 items-center gap-2 rounded-xl border border-gray-200 bg-gray-50/80 px-2.5 py-2 dark:border-white/10 dark:bg-white/[0.05]" key={file.id}>
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-blue-500 shadow-sm dark:bg-white/10 dark:text-blue-300">
+                      <FileText size={16} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-medium text-gray-700 dark:text-gray-200">{file.name}</p>
+                      <p className="text-[10px] text-gray-400">{file.size < 1024 * 1024 ? `${Math.ceil(file.size / 1024)} KB` : `${(file.size / 1024 / 1024).toFixed(1)} MB`}</p>
+                    </div>
+                    <button aria-label="移除附件" className="ml-1 rounded-full p-1 text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-white" onClick={() => onRemoveAttachment(file.id)} type="button">
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+                {attachmentUploading && (
+                  <div className="flex shrink-0 items-center gap-2 rounded-xl border border-dashed border-blue-300 bg-blue-50/70 px-3 py-2 text-xs text-blue-600 dark:border-blue-400/30 dark:bg-blue-500/10 dark:text-blue-300">
+                    <LoaderCircle className="animate-spin" size={16} />
+                    正在安全上传…
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex items-center justify-between px-2.5 pb-2.5 pt-1 md:px-3 md:pb-3">
               <div className="flex items-center gap-1">
                 <button
                   className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-200"
                   onClick={onAttachment}
+                  disabled={isLoading || attachmentUploading || attachments.length >= 4}
                   title="添加附件"
                   type="button"
                 >
@@ -165,7 +197,7 @@ export function ChatInput({
                     'relative flex h-9 w-9 min-w-9 items-center justify-center overflow-hidden rounded-full bg-gray-950 text-white shadow-sm transition-transform duration-150 ease-out hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 disabled:hover:scale-100 dark:bg-white dark:text-gray-950 dark:disabled:bg-gray-700 dark:disabled:text-gray-400',
                     isLoading && 'bg-red-500 text-white hover:bg-red-600 dark:bg-red-500 dark:text-white dark:hover:bg-red-600',
                   )}
-                  disabled={(!input.trim() && !isLoading) || !selectedModel}
+                  disabled={(!input.trim() && attachments.length === 0 && !isLoading) || !selectedModel || attachmentUploading}
                   onClick={onSend}
                   title={isLoading ? '停止生成' : '发送'}
                   type="button"

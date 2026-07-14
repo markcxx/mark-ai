@@ -41,6 +41,7 @@ export const chatMessages = pgTable(
     totalTokens: integer('total_tokens'),
     webSearch: jsonb('web_search'),
     segments: jsonb('segments'),
+    attachments: jsonb('attachments'),
     model: text('model'),
     provider: text('provider'),
     position: integer('position').notNull(),

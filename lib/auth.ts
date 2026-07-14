@@ -135,6 +135,16 @@ export const auth = betterAuth({
         type: 'string',
         required: false,
       },
+      age: {
+        type: 'number',
+        required: false,
+      },
+      profileCompleted: {
+        type: 'boolean',
+        required: false,
+        defaultValue: false,
+        input: false,
+      },
     },
   },
 

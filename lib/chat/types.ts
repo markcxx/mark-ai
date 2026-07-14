@@ -19,6 +19,14 @@ export type ContentSegment = {
 
 export type MessageSegment = ThinkingSegment | ToolSegment | ContentSegment;
 
+export type FileAttachment = {
+  id: string;
+  name: string;
+  size: number;
+  contentType: string;
+  kind?: 'attachment' | 'avatar';
+};
+
 export type Message = {
   id: string;
   role: 'user' | 'model';
@@ -37,6 +45,7 @@ export type Message = {
   provider?: string;
   webSearch?: WebSearchState[];
   segments?: MessageSegment[];
+  attachments?: FileAttachment[];
 };
 
 export type WebSearchResult = {

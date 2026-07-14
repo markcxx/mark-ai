@@ -11,6 +11,15 @@ const MAX_MESSAGE_COUNT = 500;
 const MAX_MESSAGE_CONTENT_CHARS = 200_000;
 const MAX_MESSAGES_JSON_CHARS = 4_000_000;
 
+const hasValidAttachments = (message: Partial<Message>) => !message.attachments || (
+  Array.isArray(message.attachments) &&
+  message.attachments.length <= 4 &&
+  message.attachments.every((file) =>
+    file && typeof file.id === 'string' && typeof file.name === 'string' &&
+    typeof file.size === 'number' && typeof file.contentType === 'string'
+  )
+);
+
 const isMessage = (value: unknown): value is Message => {
   if (!value || typeof value !== 'object') return false;
   const message = value as Partial<Message>;
@@ -20,7 +29,8 @@ const isMessage = (value: unknown): value is Message => {
     message.id.length <= 256 &&
     typeof message.content === 'string' &&
     message.content.length <= MAX_MESSAGE_CONTENT_CHARS &&
-    (message.role === 'user' || message.role === 'model')
+    (message.role === 'user' || message.role === 'model') &&
+    hasValidAttachments(message)
   );
 };
 

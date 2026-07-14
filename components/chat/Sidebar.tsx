@@ -1,6 +1,6 @@
 'use client';
 
-import { HelpCircle, PanelLeftClose, Plus, Puzzle, Settings } from 'lucide-react';
+import { PanelLeftClose, Plus, Puzzle } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 
@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { SessionGroupHeader } from './SessionGroupHeader';
 import { SidebarNavItem } from './SidebarNavItem';
 import { SessionRow } from './SessionRow';
+import { UserAccountMenu } from './UserAccountMenu';
 
 const getSessionTimeGroup = (updatedAt: number) => {
   const now = new Date();
@@ -243,19 +244,8 @@ export function Sidebar({
           </div>
         </div>
 
-        <div className="mt-auto border-t border-gray-200/50 dark:border-gray-700/50 p-4">
-          <nav className="flex flex-col gap-1">
-            <SidebarNavItem
-              icon={Settings}
-              label="设置"
-              onClick={() => onUnavailable(NOT_IMPLEMENTED_TOAST)}
-            />
-            <SidebarNavItem
-              icon={HelpCircle}
-              label="帮助"
-              onClick={() => onUnavailable(NOT_IMPLEMENTED_TOAST)}
-            />
-          </nav>
+        <div className="mt-auto border-t border-gray-200/50 p-3 dark:border-gray-700/50">
+          <UserAccountMenu />
         </div>
       </div>
       <ConfirmDialog
