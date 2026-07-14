@@ -4,9 +4,11 @@ import { authorizeApiRequest, enforceRateLimit } from '@/lib/api/security';
 import { findConfiguredModel } from '@/lib/models';
 import { searchTavily } from '@/lib/search/tavily';
 import { readWebpage } from '@/lib/search/webpage';
-import type { WebSearchState } from '@/lib/chat/types';
+import type { FileAttachment, WebSearchState } from '@/lib/chat/types';
+import { injectFileContexts } from '@/lib/storage/file-context';
 
 type ChatMessage = {
+  attachments?: FileAttachment[];
   content: string;
   role: 'user' | 'model' | 'assistant' | 'system';
 };
@@ -576,15 +578,24 @@ export async function POST(req: NextRequest) {
         typeof message === 'object' &&
         (message.role === 'user' || message.role === 'model') &&
         typeof message.content === 'string' &&
-        message.content.length <= MAX_CHAT_MESSAGE_CHARS,
+        message.content.length <= MAX_CHAT_MESSAGE_CHARS &&
+        (!message.attachments || (
+          Array.isArray(message.attachments) &&
+          message.attachments.length <= 4 &&
+          message.attachments.every((file: unknown) => file && typeof file === 'object' && typeof (file as FileAttachment).id === 'string')
+        )),
       )
     ) {
       return NextResponse.json({ error: 'Messages are required' }, { status: 400 });
     }
 
+    const resolvedMessages = authorization.userId
+      ? await injectFileContexts(messages as ChatMessage[], authorization.userId)
+      : messages as ChatMessage[];
+
     if (selectedModel.runtime === 'openai-compatible') {
       return createOpenAICompatibleStream(
-        messages,
+        resolvedMessages,
         selectedModel.id,
         selectedModel.apiKey,
         selectedModel.baseUrl,
@@ -599,12 +610,12 @@ export async function POST(req: NextRequest) {
       ...(selectedModel.baseUrl ? { httpOptions: { baseUrl: selectedModel.baseUrl } } : {}),
     });
 
-    const prompt = messages[messages.length - 1].content;
+    const prompt = resolvedMessages[resolvedMessages.length - 1].content;
     const runtimeSystemPrompt = getRuntimeSystemPrompt({
       timezone,
       webSearchEnabled: false,
     });
-    const history = messages.slice(0, -1).map((message: ChatMessage) => ({
+    const history = resolvedMessages.slice(0, -1).map((message: ChatMessage) => ({
       parts: [{ text: message.content }],
       role: message.role === 'model' ? 'model' : 'user',
     }));

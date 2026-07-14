@@ -177,9 +177,8 @@ export const useChatStore = create<ChatStore>()(
         const response = await fetch('/api/chat', {
           body: JSON.stringify({
             messages: historyMessages.map((m) => ({
-              content: m.attachments?.length
-                ? `${m.content}\n\n${m.attachments.map((file) => `[用户附件：${file.name}，类型 ${file.contentType}，大小 ${file.size} 字节]`).join('\n')}`
-                : m.content,
+              attachments: m.attachments,
+              content: m.content,
               role: m.role,
             })),
             model: modelConfig.id,

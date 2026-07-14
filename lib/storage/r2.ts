@@ -55,6 +55,12 @@ export const createDownloadUrl = async (bucket: string, key: string, filename: s
 export const headR2Object = (bucket: string, key: string) =>
   getR2Client().send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
 
+export const getR2ObjectBytes = async (bucket: string, key: string) => {
+  const response = await getR2Client().send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+  if (!response.Body) throw new Error('R2 object has no body');
+  return response.Body.transformToByteArray();
+};
+
 export const deleteR2Object = (bucket: string, key: string) =>
   getR2Client().send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
 
