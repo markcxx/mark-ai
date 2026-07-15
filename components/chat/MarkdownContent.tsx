@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { Check, Copy } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -35,6 +36,58 @@ const renderAdmonitionParagraph = (children: React.ReactNode) => {
     </p>
   );
 };
+
+const tableToMarkdown = (table: HTMLTableElement) => {
+  const rows = Array.from(table.rows).map((row) =>
+    Array.from(row.cells).map((cell) =>
+      (cell.textContent || '').trim().replaceAll('|', '\\|').replace(/\r?\n/g, '<br>'),
+    ),
+  );
+  if (rows.length === 0) return '';
+
+  const columnCount = Math.max(...rows.map((row) => row.length));
+  const formatRow = (row: string[]) =>
+    `| ${Array.from({ length: columnCount }, (_, index) => row[index] || '').join(' | ')} |`;
+
+  return [
+    formatRow(rows[0]),
+    `| ${Array.from({ length: columnCount }, () => '---').join(' | ')} |`,
+    ...rows.slice(1).map(formatRow),
+  ].join('\n');
+};
+
+function MarkdownTable({
+  children,
+  node: _node,
+  ...props
+}: React.TableHTMLAttributes<HTMLTableElement> & { node?: unknown }) {
+  const tableRef = React.useRef<HTMLTableElement>(null);
+  const [copied, setCopied] = React.useState(false);
+
+  const copyTable = async () => {
+    if (!tableRef.current) return;
+    await navigator.clipboard.writeText(tableToMarkdown(tableRef.current));
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  };
+
+  return (
+    <div className="lobe-markdown-table-wrapper">
+      <button
+        aria-label={copied ? '表格已复制' : '复制表格'}
+        className="lobe-markdown-table-copy"
+        onClick={() => void copyTable()}
+        title={copied ? '已复制' : '复制表格'}
+        type="button"
+      >
+        {copied ? <Check size={14} /> : <Copy size={14} />}
+      </button>
+      <table className="lobe-markdown-table" ref={tableRef} {...props}>
+        {children}
+      </table>
+    </div>
+  );
+}
 
 const markdownComponents = {
   a: (props: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
@@ -72,19 +125,12 @@ const markdownComponents = {
   ),
   p: ({ children }: { children?: React.ReactNode }) => renderAdmonitionParagraph(children),
   pre: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
-  table: (props: React.TableHTMLAttributes<HTMLTableElement>) => (
-    <div className="my-4 overflow-x-auto rounded-lg border border-gray-200 shadow-sm dark:border-gray-700">
-      <table className="w-full border-collapse" {...props} />
-    </div>
-  ),
+  table: MarkdownTable,
   td: (props: React.TdHTMLAttributes<HTMLTableCellElement>) => (
-    <td className="border-b border-gray-200 px-4 py-3 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-300" {...props} />
+    <td {...props} />
   ),
   th: (props: React.ThHTMLAttributes<HTMLTableCellElement>) => (
-    <th
-      className="border-b border-gray-200 bg-gray-50 px-4 py-3 text-left text-sm font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-      {...props}
-    />
+    <th {...props} />
   ),
   ul: (props: React.HTMLAttributes<HTMLUListElement>) => (
     <ul className="mb-4 ml-2 list-inside list-disc space-y-1 text-gray-700 dark:text-gray-300" {...props} />

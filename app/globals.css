@@ -184,9 +184,106 @@ button:disabled {
 .markdown-body a {
   @apply text-primary hover:underline;
 }
-.markdown-body table {
-  @apply w-full mb-4 border-collapse;
+.markdown-body .lobe-markdown-table-wrapper {
+  position: relative;
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  margin-block: 0.5em;
 }
-.markdown-body th, .markdown-body td {
-  @apply border border-gray-200 dark:border-gray-700 px-4 py-2;
+
+.markdown-body .lobe-markdown-table {
+  unicode-bidi: isolate;
+  overflow: auto hidden;
+  display: block;
+  border-spacing: 0;
+  border-collapse: collapse;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: 100%;
+  margin-block: 0;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.6;
+  text-align: start;
+  text-indent: initial;
+  text-wrap: pretty;
+  word-break: auto-phrase;
+  overflow-wrap: break-word;
+  box-shadow: 0 0 0 1px #f0f0f0;
+}
+
+.markdown-body .lobe-markdown-table thead {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.markdown-body .lobe-markdown-table tr {
+  box-shadow: 0 1px 0 #f0f0f0;
+}
+
+.markdown-body .lobe-markdown-table th,
+.markdown-body .lobe-markdown-table td {
+  min-width: 120px;
+  padding-block: 0.75em;
+  padding-inline: 1em;
+  border: 0;
+  text-align: start;
+}
+
+.markdown-body .lobe-markdown-table thead th:last-child {
+  padding-inline-end: calc(1em + 32px);
+}
+
+.markdown-body .lobe-markdown-table-copy {
+  position: absolute;
+  z-index: 1;
+  inset-block-start: 1.55em;
+  inset-inline-end: 0.5em;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: #595959;
+  opacity: 0;
+  background: #ffffff;
+  box-shadow: 0 0 0 1px #f0f0f0;
+  transition: color 0.2s, opacity 0.2s, background-color 0.2s;
+}
+
+.markdown-body .lobe-markdown-table-wrapper:hover .lobe-markdown-table-copy,
+.markdown-body .lobe-markdown-table-wrapper:focus-within .lobe-markdown-table-copy {
+  opacity: 1;
+}
+
+.markdown-body .lobe-markdown-table-copy:hover {
+  color: #1677ff;
+  background: #f5f5f5;
+}
+
+.dark .markdown-body .lobe-markdown-table {
+  box-shadow: 0 0 0 1px #303030;
+}
+
+.dark .markdown-body .lobe-markdown-table thead {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.dark .markdown-body .lobe-markdown-table tr {
+  box-shadow: 0 1px 0 #303030;
+}
+
+.dark .markdown-body .lobe-markdown-table-copy {
+  color: #bfbfbf;
+  background: #141414;
+  box-shadow: 0 0 0 1px #303030;
+}
+
+.dark .markdown-body .lobe-markdown-table-copy:hover {
+  color: #69b1ff;
+  background: #262626;
 }

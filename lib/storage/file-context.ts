@@ -5,6 +5,7 @@ import { getDb } from '@/lib/db';
 import { storageFiles } from '@/lib/db/schema';
 import type { FileAttachment } from '@/lib/chat/types';
 import { getR2ObjectBytes } from './r2';
+import { extractSpreadsheetContent } from './spreadsheet';
 
 const MAX_FILE_CONTEXT_CHARS = 120_000;
 const MAX_TOTAL_CONTEXT_CHARS = 180_000;
@@ -45,6 +46,8 @@ const extractFileContent = async (file: FileRecord) => {
   if (extension === 'docx') {
     const result = await mammoth.extractRawText({ buffer: Buffer.from(bytes) });
     content = result.value;
+  } else if (extension === 'xlsx') {
+    content = extractSpreadsheetContent(bytes, MAX_FILE_CONTEXT_CHARS);
   } else if (
     file.contentType.startsWith('text/') ||
     ['txt', 'md', 'markdown', 'csv', 'json', 'xml', 'yaml', 'yml', 'log'].includes(extension)
