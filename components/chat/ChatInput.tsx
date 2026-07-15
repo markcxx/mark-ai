@@ -85,7 +85,7 @@ export function ChatInput({
               disabled={isLoading || !selectedModel}
               onChange={onInput}
               onKeyDown={onKeyDown}
-              placeholder={selectedModel ? '尽管问，带图也行...' : '请先在环境变量中配置可用模型'}
+              placeholder={selectedModel ? '尽管问，带图也行...' : '正在加载可用模型列表……'}
               ref={textareaRef}
               rows={1}
               value={input}
