@@ -3,7 +3,8 @@
 import type { RefObject } from 'react';
 import { useState } from 'react';
 import { ModelIcon } from '@lobehub/icons';
-import { ChevronRight, FileText, Globe2, LoaderCircle, Mic, Paperclip, SendHorizontal, Square, X } from 'lucide-react';
+import { GlobeOffIcon } from '@lobehub/ui/icons';
+import { ChevronRight, FileText, Globe, LoaderCircle, Mic, Paperclip, SendHorizontal, Square, X } from 'lucide-react';
 
 import type { ConfiguredModel, FileAttachment } from '@/lib/chat/types';
 import { getModelDisplayName } from '@/lib/chat/helpers';
@@ -147,7 +148,7 @@ export function ChatInput({
                   title={webSearchEnabled ? '关闭联网搜索' : '开启联网搜索'}
                   type="button"
                 >
-                  <Globe2 size={18} />
+                  {webSearchEnabled ? <Globe size={18} /> : <GlobeOffIcon size={18} />}
                   <span className="hidden text-sm sm:inline">联网搜索</span>
                   <span
                     className={cn(

@@ -8,10 +8,11 @@ import toast from 'react-hot-toast';
 import { signOut, useSession } from '@/lib/auth-client';
 
 import { FileManagerDrawer } from './FileManagerDrawer';
+import { ProfileDialog } from './ProfileDialog';
+import type { UserProfile } from './ProfileDialog';
 
 const menuItems = [
   { icon: SlidersHorizontal, label: '个性化' },
-  { icon: CircleUserRound, label: '个人资料' },
   { icon: Settings, label: '设置' },
   { icon: Palette, label: '外观' },
 ];
@@ -20,7 +21,8 @@ export function UserAccountMenu() {
   const { data } = useSession();
   const [fileManagerOpen, setFileManagerOpen] = useState(false);
   const [open, setOpen] = useState(false);
-  const [profile, setProfile] = useState<{ avatar?: string; fullName?: string } | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const user = data?.user;
   const name = profile?.fullName || user?.name || user?.email?.split('@')[0] || 'MarkAI 用户';
@@ -62,6 +64,14 @@ export function UserAccountMenu() {
               >
                 <FolderOpen className="text-gray-400" size={17} />
                 文件管理
+              </button>
+              <button
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-gray-700 transition-all hover:bg-gray-100 active:scale-[0.98] dark:text-gray-200 dark:hover:bg-white/[0.07]"
+                onClick={() => { setOpen(false); setProfileOpen(true); }}
+                type="button"
+              >
+                <CircleUserRound className="text-gray-400" size={17} />
+                个人资料
               </button>
               {menuItems.map(({ icon: Icon, label }) => (
                 <button
@@ -105,6 +115,16 @@ export function UserAccountMenu() {
         </button>
       </div>
       <FileManagerDrawer onClose={() => setFileManagerOpen(false)} open={fileManagerOpen} />
+      {profileOpen && (
+        <ProfileDialog
+          email={user.email}
+          fallbackAvatar={user.image}
+          fallbackName={name}
+          onClose={() => setProfileOpen(false)}
+          onProfileUpdated={setProfile}
+          profile={profile}
+        />
+      )}
     </>
   );
 }

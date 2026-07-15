@@ -264,8 +264,8 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
             role="dialog"
             transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
           >
-            <header className="shrink-0 border-b border-gray-200/80 bg-white/90 px-4 backdrop-blur-xl dark:border-white/[0.08] dark:bg-[#111214]/90 sm:px-6">
-              <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 sm:h-[72px]">
+            <header className="relative shrink-0 border-b border-gray-200/80 bg-white/90 px-4 backdrop-blur-xl dark:border-white/[0.08] dark:bg-[#111214]/90 sm:px-6">
+              <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 pr-11 sm:h-[72px]">
                 <div className="min-w-0 flex-1">
                   <h2 className="text-base font-semibold sm:text-lg">文件管理</h2>
                   <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">管理已上传的附件</p>
@@ -280,10 +280,14 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
                   <span className="hidden sm:inline">上传文件</span>
                   <span className="sm:hidden">上传</span>
                 </button>
-                <IconButton className="h-9 w-9 bg-gray-100 dark:bg-white/[0.07] sm:h-10 sm:w-10" onClick={onClose} title="关闭文件管理">
-                  <X size={19} />
-                </IconButton>
               </div>
+              <IconButton
+                className="absolute right-3 top-1/2 h-9 w-9 -translate-y-1/2 bg-transparent hover:bg-gray-100 dark:bg-transparent dark:hover:bg-white/[0.08] sm:right-5 sm:h-10 sm:w-10"
+                onClick={onClose}
+                title="关闭文件管理"
+              >
+                <X size={19} />
+              </IconButton>
             </header>
 
             <input
