@@ -42,7 +42,11 @@ export async function POST(request: Request) {
     const [usage] = await db
       .select({ total: sql<number>`coalesce(sum(${storageFiles.size}), 0)`, files: count(storageFiles.id) })
       .from(storageFiles)
-      .where(and(eq(storageFiles.userId, userId), eq(storageFiles.status, 'ready')));
+      .where(and(
+        eq(storageFiles.userId, userId),
+        eq(storageFiles.kind, 'attachment'),
+        eq(storageFiles.status, 'ready'),
+      ));
     if (Number(usage?.files || 0) >= storageLimits.maxFileCount) {
       return NextResponse.json({ error: '文件数量已达到上限' }, { status: 413 });
     }

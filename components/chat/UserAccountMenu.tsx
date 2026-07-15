@@ -1,11 +1,13 @@
 'use client';
 
-import { ChevronUp, CircleUserRound, LogOut, Palette, Settings, SlidersHorizontal } from 'lucide-react';
+import { ChevronUp, CircleUserRound, FolderOpen, LogOut, Palette, Settings, SlidersHorizontal } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 
 import { signOut, useSession } from '@/lib/auth-client';
+
+import { FileManagerDrawer } from './FileManagerDrawer';
 
 const menuItems = [
   { icon: SlidersHorizontal, label: '个性化' },
@@ -16,6 +18,7 @@ const menuItems = [
 
 export function UserAccountMenu() {
   const { data } = useSession();
+  const [fileManagerOpen, setFileManagerOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [profile, setProfile] = useState<{ avatar?: string; fullName?: string } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -43,54 +46,65 @@ export function UserAccountMenu() {
   if (!user) return null;
 
   return (
-    <div className="relative" ref={rootRef}>
-      {open && (
-        <div className="absolute bottom-[calc(100%+10px)] left-0 right-0 origin-bottom animate-[menu-in_180ms_cubic-bezier(0.22,1,0.36,1)] overflow-hidden rounded-2xl border border-black/[0.06] bg-white/95 p-1.5 shadow-[0_18px_55px_rgba(15,23,42,0.18)] backdrop-blur-xl dark:border-white/10 dark:bg-[#171717]/95">
-          <div className="border-b border-gray-100 px-3 py-2.5 dark:border-white/[0.07]">
-            <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{name}</p>
-            <p className="mt-0.5 truncate text-xs text-gray-400">{user.email}</p>
-          </div>
-          <div className="py-1">
-            {menuItems.map(({ icon: Icon, label }) => (
+    <>
+      <div className="relative" ref={rootRef}>
+        {open && (
+          <div className="absolute bottom-[calc(100%+10px)] left-0 right-0 origin-bottom animate-[menu-in_180ms_cubic-bezier(0.22,1,0.36,1)] overflow-hidden rounded-2xl border border-black/[0.06] bg-white/95 p-1.5 shadow-[0_18px_55px_rgba(15,23,42,0.18)] backdrop-blur-xl dark:border-white/10 dark:bg-[#171717]/95">
+            <div className="border-b border-gray-100 px-3 py-2.5 dark:border-white/[0.07]">
+              <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{name}</p>
+              <p className="mt-0.5 truncate text-xs text-gray-400">{user.email}</p>
+            </div>
+            <div className="py-1">
               <button
                 className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-gray-700 transition-all hover:bg-gray-100 active:scale-[0.98] dark:text-gray-200 dark:hover:bg-white/[0.07]"
-                key={label}
-                onClick={() => { setOpen(false); toast(`${label}功能即将开放`); }}
+                onClick={() => { setOpen(false); setFileManagerOpen(true); }}
                 type="button"
               >
-                <Icon className="text-gray-400" size={17} />
-                {label}
+                <FolderOpen className="text-gray-400" size={17} />
+                文件管理
               </button>
-            ))}
+              {menuItems.map(({ icon: Icon, label }) => (
+                <button
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-gray-700 transition-all hover:bg-gray-100 active:scale-[0.98] dark:text-gray-200 dark:hover:bg-white/[0.07]"
+                  key={label}
+                  onClick={() => { setOpen(false); toast(`${label}功能即将开放`); }}
+                  type="button"
+                >
+                  <Icon className="text-gray-400" size={17} />
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="border-t border-gray-100 pt-1 dark:border-white/[0.07]">
+              <button
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-red-600 transition-all hover:bg-red-50 active:scale-[0.98] dark:text-red-400 dark:hover:bg-red-500/10"
+                onClick={async () => { setOpen(false); await signOut(); window.location.href = '/login'; }}
+                type="button"
+              >
+                <LogOut size={17} />
+                退出登录
+              </button>
+            </div>
           </div>
-          <div className="border-t border-gray-100 pt-1 dark:border-white/[0.07]">
-            <button
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-red-600 transition-all hover:bg-red-50 active:scale-[0.98] dark:text-red-400 dark:hover:bg-red-500/10"
-              onClick={async () => { setOpen(false); await signOut(); window.location.href = '/login'; }}
-              type="button"
-            >
-              <LogOut size={17} />
-              退出登录
-            </button>
-          </div>
-        </div>
-      )}
+        )}
 
-      <button
-        aria-expanded={open}
-        className="group flex w-full items-center gap-3 rounded-2xl p-2 text-left transition-all hover:bg-black/[0.045] active:scale-[0.985] dark:hover:bg-white/[0.07]"
-        onClick={() => setOpen((value) => !value)}
-        type="button"
-      >
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-violet-500 via-blue-500 to-cyan-400 text-sm font-bold text-white shadow-sm ring-2 ring-white dark:ring-black">
-          {profile?.avatar || user.image ? <Image alt={name} className="h-full w-full object-cover" height={40} src={profile?.avatar || user.image || ''} unoptimized width={40} /> : initials}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{name}</p>
-          <p className="truncate text-xs text-gray-400">{user.email}</p>
-        </div>
-        <ChevronUp className={`text-gray-400 transition-transform duration-200 ${open ? '' : 'rotate-180'}`} size={16} />
-      </button>
-    </div>
+        <button
+          aria-expanded={open}
+          className="group flex w-full items-center gap-3 rounded-2xl p-2 text-left transition-all hover:bg-black/[0.045] active:scale-[0.985] dark:hover:bg-white/[0.07]"
+          onClick={() => setOpen((value) => !value)}
+          type="button"
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-violet-500 via-blue-500 to-cyan-400 text-sm font-bold text-white shadow-sm ring-2 ring-white dark:ring-black">
+            {profile?.avatar || user.image ? <Image alt={name} className="h-full w-full object-cover" height={40} src={profile?.avatar || user.image || ''} unoptimized width={40} /> : initials}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{name}</p>
+            <p className="truncate text-xs text-gray-400">{user.email}</p>
+          </div>
+          <ChevronUp className={`text-gray-400 transition-transform duration-200 ${open ? '' : 'rotate-180'}`} size={16} />
+        </button>
+      </div>
+      <FileManagerDrawer onClose={() => setFileManagerOpen(false)} open={fileManagerOpen} />
+    </>
   );
 }
