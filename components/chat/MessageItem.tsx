@@ -27,6 +27,7 @@ import {
 import type { ConfiguredModel, MenuItem, Message, MessageSegment, WebSearchState } from '@/lib/chat/types';
 import { formatDuration, formatRelativeTime } from '@/lib/chat/metrics';
 import { cn } from '@/lib/utils';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 
 import { CollapsibleContent } from './CollapsibleContent';
 import { FloatingMenu } from './FloatingMenu';
@@ -386,6 +387,7 @@ export function MessageItem({
   toggleCollapseMessage: (id: string) => void;
   toggleSelectedMessage: (id: string, shiftKey?: boolean) => void;
 }) {
+  const generalSettings = useSettingsStore((state) => state.general);
   const moreItems = useMemo<MenuItem[]>(
     () => [
       { icon: Pencil, label: '编辑', onClick: () => startEditingMessage(message) },
@@ -470,7 +472,7 @@ export function MessageItem({
           </div>
         </div>
       ) : (
-        <div className="flex w-fit max-w-[92%] flex-col gap-3 break-words rounded-2xl rounded-tr-sm bg-[var(--chat-user-bubble-bg)] px-4 py-3 text-left text-[15px] text-gray-900 shadow-sm dark:text-gray-100 md:max-w-[85%] md:px-5">
+        <div className="flex w-fit max-w-[92%] flex-col gap-3 break-words rounded-2xl rounded-tr-sm bg-[var(--chat-user-bubble-bg)] px-4 py-3 text-left text-[length:var(--chat-font-size)] text-gray-900 shadow-sm dark:text-gray-100 md:max-w-[85%] md:px-5">
           {message.attachments && message.attachments.length > 0 && !collapsed && (
             <div className="flex flex-wrap gap-2">
               {message.attachments.map((file) => (
@@ -549,7 +551,11 @@ export function MessageItem({
         </div>
       </div>
 
-      <div className="markdown-body ml-10 text-[15px] leading-relaxed text-gray-900 dark:text-gray-100">
+      <div className={cn(
+        'markdown-body ml-10 text-[length:var(--chat-font-size)] leading-relaxed text-gray-900 dark:text-gray-100',
+        message.isStreaming && generalSettings.responseAnimation === 'fade' && 'animate-[fade-up_180ms_ease-out]',
+        message.isStreaming && generalSettings.responseAnimation === 'smooth' && 'animate-[fade-up_320ms_cubic-bezier(0.22,1,0.36,1)]',
+      )}>
         {editing ? (
           <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-3">
             <textarea
@@ -639,7 +645,7 @@ export function MessageItem({
                 onRegenerate={() => regenerateMessage(message)}
               />
             )}
-            <MessageStats message={message} />
+            {generalSettings.showMessageStats && <MessageStats message={message} />}
           </>
         )}
       </div>

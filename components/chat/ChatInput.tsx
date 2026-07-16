@@ -9,6 +9,7 @@ import { ChevronRight, FileText, Globe, LoaderCircle, Mic, Paperclip, SendHorizo
 import type { ConfiguredModel, FileAttachment } from '@/lib/chat/types';
 import { getModelDisplayName } from '@/lib/chat/helpers';
 import { cn } from '@/lib/utils';
+import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { ModelSelectorDialog } from './ModelSelectorDialog';
 
 export function ChatInput({
@@ -139,7 +140,7 @@ export function ChatInput({
                   className={cn(
                     'flex h-9 items-center gap-1.5 rounded-lg px-2 text-sm transition-colors',
                     webSearchEnabled
-                      ? 'text-sky-700 hover:bg-sky-50 dark:text-sky-200 dark:hover:bg-sky-500/10'
+                      ? 'text-primary hover:bg-primary/5 dark:text-primary dark:hover:bg-primary/10'
                       : 'text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-200',
                     isLoading && 'cursor-not-allowed opacity-60',
                   )}
@@ -150,19 +151,7 @@ export function ChatInput({
                 >
                   {webSearchEnabled ? <Globe size={18} /> : <GlobeOffIcon size={18} />}
                   <span className="hidden text-sm sm:inline">联网搜索</span>
-                  <span
-                    className={cn(
-                      'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors',
-                      webSearchEnabled ? 'bg-sky-500' : 'bg-gray-300 dark:bg-gray-600',
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        'inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform',
-                        webSearchEnabled ? 'translate-x-[18px]' : 'translate-x-[3px]',
-                      )}
-                    />
-                  </span>
+                  <ToggleSwitch checked={webSearchEnabled} disabled={isLoading} />
                 </button>
               </div>
               <div className="flex items-center gap-2">

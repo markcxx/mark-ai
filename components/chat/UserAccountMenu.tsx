@@ -1,21 +1,15 @@
 'use client';
 
-import { ChevronUp, CircleUserRound, FolderOpen, LogOut, Palette, Settings, SlidersHorizontal } from 'lucide-react';
+import { ChevronUp, CircleUserRound, FolderOpen, LogOut, Settings } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
-import toast from 'react-hot-toast';
 
 import { signOut, useSession } from '@/lib/auth-client';
 
 import { FileManagerDrawer } from './FileManagerDrawer';
 import { ProfileDialog } from './ProfileDialog';
+import { SettingsDialog } from './SettingsDialog';
 import type { UserProfile } from './ProfileDialog';
-
-const menuItems = [
-  { icon: SlidersHorizontal, label: '个性化' },
-  { icon: Settings, label: '设置' },
-  { icon: Palette, label: '外观' },
-];
 
 export function UserAccountMenu() {
   const { data } = useSession();
@@ -23,6 +17,7 @@ export function UserAccountMenu() {
   const [open, setOpen] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const user = data?.user;
   const name = profile?.fullName || user?.name || user?.email?.split('@')[0] || 'MarkAI 用户';
@@ -73,17 +68,14 @@ export function UserAccountMenu() {
                 <CircleUserRound className="text-gray-400" size={17} />
                 个人资料
               </button>
-              {menuItems.map(({ icon: Icon, label }) => (
-                <button
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-gray-700 transition-all hover:bg-gray-100 active:scale-[0.98] dark:text-gray-200 dark:hover:bg-white/[0.07]"
-                  key={label}
-                  onClick={() => { setOpen(false); toast(`${label}功能即将开放`); }}
-                  type="button"
-                >
-                  <Icon className="text-gray-400" size={17} />
-                  {label}
-                </button>
-              ))}
+              <button
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-gray-700 transition-all hover:bg-gray-100 active:scale-[0.98] dark:text-gray-200 dark:hover:bg-white/[0.07]"
+                onClick={() => { setOpen(false); setSettingsOpen(true); }}
+                type="button"
+              >
+                <Settings className="text-gray-400" size={17} />
+                设置
+              </button>
             </div>
             <div className="border-t border-gray-100 pt-1 dark:border-white/[0.07]">
               <button
@@ -125,6 +117,7 @@ export function UserAccountMenu() {
           profile={profile}
         />
       )}
+      {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
     </>
   );
 }

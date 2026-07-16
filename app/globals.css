@@ -31,6 +31,16 @@
   --chat-input-overlay-via: rgba(255, 255, 255, 0.8);
   --chat-popover-bg: #ffffff;
   --chat-user-bubble-bg: #f3f4f5;
+  --chat-font-size: 15px;
+}
+
+html[data-reduce-motion="true"] *,
+html[data-reduce-motion="true"] *::before,
+html[data-reduce-motion="true"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+  transition-duration: 0.01ms !important;
 }
 
 html,

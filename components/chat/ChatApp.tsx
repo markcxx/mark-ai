@@ -1,13 +1,16 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTheme } from 'next-themes';
 import toast, { Toaster } from 'react-hot-toast';
 
 import { NOT_IMPLEMENTED_TOAST, THINKING_TEXTS } from '@/lib/chat/constants';
 import { getModelKey } from '@/lib/chat/helpers';
+import { PRIMARY_COLOR_VALUES } from '@/lib/settings';
 import { cn } from '@/lib/utils';
 import { useChatStore } from '@/stores/useChatStore';
 import { useSessionStore, navigateToNewChat } from '@/stores/useSessionStore';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useUIStore } from '@/stores/useUIStore';
 
 import { ChatInput } from './ChatInput';
@@ -65,6 +68,9 @@ function MessageSkeletonList() {
 }
 
 export default function ChatApp({ initialSessionId }: { initialSessionId?: string }) {
+  const { setTheme } = useTheme();
+  const generalSettings = useSettingsStore((s) => s.general);
+  const settingsLoaded = useSettingsStore((s) => s.isLoaded);
   // UI Store
   const isSidebarOpen = useUIStore((s) => s.isSidebarOpen);
   const sidebarWidth = useUIStore((s) => s.sidebarWidth);
@@ -121,6 +127,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
 
   // Scroll helpers
   const scrollToBottom = useCallback((force = false) => {
+    if (!force && !generalSettings.autoScroll) return;
     const container = messagesScrollRef.current;
     if (!container) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
@@ -132,7 +139,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
       container.scrollTop = container.scrollHeight;
       requestAnimationFrame(() => { isAutoScrollingRef.current = false; });
     });
-  }, []);
+  }, [generalSettings.autoScroll]);
 
   const handleMessagesScroll = useCallback(() => {
     if (isAutoScrollingRef.current) return;
@@ -187,6 +194,20 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
 
   // PLACEHOLDER_EFFECTS
 
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    const root = document.documentElement;
+    root.style.setProperty('--color-primary', PRIMARY_COLOR_VALUES[generalSettings.primaryColor]);
+    root.style.setProperty('--color-primary-container', PRIMARY_COLOR_VALUES[generalSettings.primaryColor]);
+    root.style.setProperty('--chat-font-size', `${generalSettings.chatFontSize}px`);
+    root.dataset.density = generalSettings.density;
+    root.dataset.reduceMotion = generalSettings.reduceMotion ? 'true' : 'false';
+    setTheme(generalSettings.themeMode);
+    useUIStore.getState().setWebSearchEnabled(generalSettings.defaultWebSearch);
+    useUIStore.getState().setWideChatMode(generalSettings.wideChatMode);
+    useUIStore.getState().setSidebarWidth(generalSettings.sidebarWidth);
+  }, [generalSettings, setTheme, settingsLoaded]);
+
   // Auto-scroll on new messages
   useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
   useEffect(() => { if (!isLoadingActiveSession) scrollToBottom(); }, [isLoadingActiveSession, scrollToBottom]);
@@ -209,7 +230,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
           return;
         }
 
-        const totalTasks = initialSessionId ? 3 : 2;
+        const totalTasks = initialSessionId ? 4 : 3;
         let completedTasks = 0;
         const finishTask = (message: string) => {
           completedTasks += 1;
@@ -221,6 +242,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
 
         uiStore.setBootProgress(12, '正在加载模型与会话…');
         await Promise.all([
+          useSettingsStore.getState().loadSettings().then(() => finishTask('个性化设置已加载')),
           uiStore.loadModels().then(() => finishTask('模型配置已加载')),
           (async () => {
             await useSessionStore.getState().loadSessions();
@@ -339,6 +361,9 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
     };
     const handlePointerUp = () => {
       useUIStore.getState().setIsResizingSidebar(false);
+      useSettingsStore.getState().updateGeneral({
+        sidebarWidth: useUIStore.getState().sidebarWidth,
+      });
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
     };
@@ -355,7 +380,10 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
+    const shouldSend = generalSettings.sendShortcut === 'enter'
+      ? event.key === 'Enter' && !event.shiftKey
+      : event.key === 'Enter' && (event.ctrlKey || event.metaKey);
+    if (shouldSend) {
       event.preventDefault();
       if (attachmentUploading) return;
       useChatStore.getState().sendMessage();
@@ -590,7 +618,10 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
               !activeSession?.favorite,
             );
           }}
-          toggleWideChatMode={() => useUIStore.getState().setWideChatMode(!wideChatMode)}
+          toggleWideChatMode={() => {
+            useUIStore.getState().setWideChatMode(!wideChatMode);
+            useSettingsStore.getState().updateGeneral({ wideChatMode: !wideChatMode });
+          }}
           updateSessionTitle={(title) => {
             if (!activeSessionId) { toast.error('当前没有可重命名的会话'); return; }
             void useSessionStore.getState().updateSessionTitle(activeSessionId, title);
@@ -625,7 +656,13 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                 onMic={() => toast(NOT_IMPLEMENTED_TOAST)}
                 onRemoveAttachment={removeAttachment}
                 onSend={handleSend}
-                onToggleWebSearch={() => useUIStore.getState().toggleWebSearch()}
+                onToggleWebSearch={() => {
+                  const enabled = !useUIStore.getState().webSearchEnabled;
+                  useUIStore.getState().setWebSearchEnabled(enabled);
+                  useSettingsStore.getState().updateGeneral({
+                    defaultWebSearch: enabled,
+                  });
+                }}
                 placement="center"
                 providerNames={providerNames}
                 selectedModel={selectedModel}
@@ -641,10 +678,17 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
               className={cn(
                 'flex w-full flex-col transition-[max-width,gap] duration-200 ease-out',
                 selectionLayoutMode
-                  ? 'max-w-none gap-0'
+                  ? 'max-w-none'
                   : wideChatMode
-                    ? 'max-w-[1120px] gap-8'
-                    : 'max-w-[840px] gap-8',
+                    ? 'max-w-[1120px]'
+                    : 'max-w-[840px]',
+                selectionLayoutMode
+                  ? 'gap-0'
+                  : generalSettings.density === 'compact'
+                    ? 'gap-5'
+                    : generalSettings.density === 'spacious'
+                      ? 'gap-10'
+                      : 'gap-8',
               )}
             >
               {messages.map((message) => (
@@ -721,7 +765,13 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
             onMic={() => toast(NOT_IMPLEMENTED_TOAST)}
             onRemoveAttachment={removeAttachment}
             onSend={handleSend}
-            onToggleWebSearch={() => useUIStore.getState().toggleWebSearch()}
+            onToggleWebSearch={() => {
+              const enabled = !useUIStore.getState().webSearchEnabled;
+              useUIStore.getState().setWebSearchEnabled(enabled);
+              useSettingsStore.getState().updateGeneral({
+                defaultWebSearch: enabled,
+              });
+            }}
             providerNames={providerNames}
             selectedModel={selectedModel}
             selectedModelKey={selectedModelKey}

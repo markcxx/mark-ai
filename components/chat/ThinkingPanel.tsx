@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Atom, ChevronDown, Loader2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 
 import { MarkdownContent } from './MarkdownContent';
 
@@ -16,10 +17,17 @@ export function ThinkingPanel({
   duration?: number;
   thinking?: boolean;
 }) {
-  const [showDetail, setShowDetail] = useState(() => Boolean(thinking));
+  const thinkingDisplay = useSettingsStore((state) => state.general.thinkingDisplay);
+  const [showDetail, setShowDetail] = useState(() =>
+    thinkingDisplay === 'expanded' || (thinkingDisplay === 'auto' && Boolean(thinking)),
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
   const hasContent = Boolean(content?.trim());
-  const expanded = Boolean(thinking || showDetail);
+  const expanded = Boolean(
+    thinkingDisplay === 'expanded' ||
+    (thinkingDisplay === 'auto' && thinking) ||
+    showDetail,
+  );
 
   useEffect(() => {
     if (thinking && expanded && scrollRef.current) {

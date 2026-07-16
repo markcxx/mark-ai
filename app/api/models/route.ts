@@ -1,9 +1,9 @@
 import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { authorizeApiRequest, enforceRateLimit } from '@/lib/api/security';
+import { getAvailableProviderNames, getAvailablePublicModels } from '@/lib/available-models';
 import { getDb } from '@/lib/db';
 import { userSettings } from '@/lib/db/schema';
-import { getProviderDisplayName, getPublicConfiguredModels } from '@/lib/models';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,12 +11,10 @@ export async function GET(req: NextRequest) {
   const authorization = await authorizeApiRequest(req);
   if (!authorization.authorized) return authorization.response;
 
-  const models = getPublicConfiguredModels();
-  const providers = [...new Set(models.map((m) => m.provider))];
-  const providerNames: Record<string, string> = {};
-  for (const p of providers) {
-    providerNames[p] = getProviderDisplayName(p);
-  }
+  const [models, providerNames] = await Promise.all([
+    getAvailablePublicModels(authorization.userId),
+    getAvailableProviderNames(authorization.userId),
+  ]);
 
   let selectedModel: { id: string; provider: string } | undefined;
   if (authorization.userId) {
@@ -63,7 +61,7 @@ export async function PATCH(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const id = typeof body?.id === 'string' ? body.id.trim() : '';
   const provider = typeof body?.provider === 'string' ? body.provider.trim() : '';
-  const modelExists = getPublicConfiguredModels().some(
+  const modelExists = (await getAvailablePublicModels(authorization.userId)).some(
     (model) => model.id === id && model.provider === provider,
   );
 

@@ -22,7 +22,7 @@ export function ConfirmDialog({
   if (!open || typeof document === 'undefined') return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/30 px-4 backdrop-blur-sm">
       <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-4 shadow-[0_18px_60px_rgba(0,0,0,0.2)] dark:border-white/10 dark:bg-[#191919]">
         <h3 className="text-base font-semibold text-gray-950 dark:text-gray-50">{title}</h3>
         <p className="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">{description}</p>

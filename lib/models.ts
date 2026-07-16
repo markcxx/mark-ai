@@ -225,10 +225,20 @@ const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   bailian: '阿里云百炼',
   deepseek: 'DeepSeek',
   gemini: 'Google Gemini',
+  groq: 'Groq',
   huggingface: 'HuggingFace',
   infiniai: '无问芯穹',
   markai: 'MarkAI',
+  minimax: 'MiniMax',
+  mistral: 'Mistral AI',
+  moonshot: 'Moonshot AI',
   openai: 'OpenAI',
+  openrouter: 'OpenRouter',
+  siliconflow: '硅基流动',
+  together: 'Together AI',
+  volcengine: '火山方舟',
+  xai: 'xAI',
+  zhipu: '智谱 AI',
 };
 
 export const getProviderDisplayName = (provider: string): string => {

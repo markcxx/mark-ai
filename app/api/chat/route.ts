@@ -1,7 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
 import { authorizeApiRequest, enforceRateLimit } from '@/lib/api/security';
-import { findConfiguredModel } from '@/lib/models';
+import { findAvailableModel } from '@/lib/available-models';
 import { searchTavily } from '@/lib/search/tavily';
 import { readWebpage } from '@/lib/search/webpage';
 import type { FileAttachment, WebSearchState } from '@/lib/chat/types';
@@ -119,11 +119,10 @@ const getRuntimeSystemPrompt = ({
 }: {
   timezone?: unknown;
   webSearchEnabled: boolean;
-}) =>
-  [
-    getCurrentDatePrompt(timezone),
-    webSearchEnabled ? WEB_SEARCH_SYSTEM_PROMPT : '',
-  ].filter(Boolean).join('\n\n');
+}) => [
+  getCurrentDatePrompt(timezone),
+  webSearchEnabled ? WEB_SEARCH_SYSTEM_PROMPT : '',
+].filter(Boolean).join('\n\n');
 
 const toOpenAIChatEndpoint = (baseUrl?: string) => {
   if (!baseUrl) return undefined;
@@ -261,7 +260,11 @@ const createOpenAICompatibleStream = async (
   }
 
   const encoder = new TextEncoder();
-  const openAIMessages = toOpenAIMessages({ messages, timezone, webSearchEnabled });
+  const openAIMessages = toOpenAIMessages({
+    messages,
+    timezone,
+    webSearchEnabled,
+  });
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -565,7 +568,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { messages, model, provider, timezone, webSearchEnabled } = body;
-    const selectedModel = findConfiguredModel(model, provider);
+    const selectedModel = await findAvailableModel(model, provider, authorization.userId);
 
     if (!selectedModel) {
       return NextResponse.json({ error: 'Model is not configured' }, { status: 400 });

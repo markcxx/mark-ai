@@ -1,9 +1,29 @@
 import React, { useState } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import {
+  atomDark,
+  coldarkCold,
+  dracula,
+  duotoneDark,
+  duotoneLight,
+  ghcolors,
+  gruvboxDark,
+  gruvboxLight,
+  materialDark,
+  materialLight,
+  nightOwl,
+  nord,
+  oneDark,
+  oneLight,
+  solarizedDarkAtom,
+  solarizedlight,
+  vs,
+  vscDarkPlus,
+} from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Check, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 
 const countLines = (value: string) => (value.match(/\n/g)?.length || 0) + 1;
 
@@ -12,15 +32,46 @@ const normalizeLanguage = (language?: string) => {
   return language.trim().toLowerCase();
 };
 
+type SyntaxTheme = Record<string, Record<string, string | number>>;
+
+const normalizeThemeBackgrounds = (theme: SyntaxTheme): SyntaxTheme =>
+  Object.fromEntries(Object.entries(theme).map(([selector, styles]) => {
+    const { background, backgroundColor, ...rest } = styles;
+    const resolvedBackground = backgroundColor || background;
+    return [selector, resolvedBackground === undefined
+      ? rest
+      : {
+          ...rest,
+          backgroundColor: resolvedBackground === 'none' ? 'transparent' : resolvedBackground,
+        }];
+  }));
+
 export const Pre = ({ children, language }: { children: string, language: string }) => {
   const [copied, setCopied] = useState(false);
   const { resolvedTheme } = useTheme();
   const normalizedLanguage = normalizeLanguage(language);
   const lineCount = countLines(children.replace(/\n$/, ''));
-  const collapsible = lineCount > 8;
+  const settings = useSettingsStore((state) => state.general);
+  const collapsible = settings.codeCollapseLines > 0 && lineCount > settings.codeCollapseLines;
   const [collapsed, setCollapsed] = useState(false);
-  const isDark = resolvedTheme === 'dark';
-  const syntaxTheme = isDark ? oneDark : oneLight;
+  const isDark = settings.codeColorMode === 'dark' || (
+    settings.codeColorMode === 'auto' && resolvedTheme === 'dark'
+  );
+  const themePairs = {
+    dracula: [duotoneLight, dracula],
+    duotone: [duotoneLight, duotoneDark],
+    github: [ghcolors, atomDark],
+    gruvbox: [gruvboxLight, gruvboxDark],
+    material: [materialLight, materialDark],
+    'night-owl': [coldarkCold, nightOwl],
+    nord: [coldarkCold, nord],
+    one: [oneLight, oneDark],
+    solarized: [solarizedlight, solarizedDarkAtom],
+    vscode: [vs, vscDarkPlus],
+  } as const;
+  const syntaxTheme = normalizeThemeBackgrounds(
+    themePairs[settings.codeTheme][isDark ? 1 : 0] as SyntaxTheme,
+  );
 
   const handleCopy = () => {
     navigator.clipboard.writeText(children);
@@ -29,12 +80,13 @@ export const Pre = ({ children, language }: { children: string, language: string
   };
 
   return (
-    <div className="group relative my-5 overflow-hidden rounded-xl border border-gray-200 bg-[#f8f9fa] shadow-sm dark:border-white/10 dark:bg-[#0d1117] dark:shadow-none">
+    <div className={cn('group relative my-5 overflow-hidden rounded-xl border shadow-sm', isDark ? 'border-white/10 bg-[#0d1117] shadow-none' : 'border-gray-200 bg-[#f8f9fa]')}>
       <div
         className={cn(
-          'flex h-10 w-full items-center justify-between bg-white/80 px-3 text-left transition-colors dark:bg-[#161b22]',
-          !collapsed && 'border-b border-gray-200/80 dark:border-white/10',
-          collapsible && 'cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.06]',
+          'flex h-10 w-full items-center justify-between px-3 text-left transition-colors',
+          isDark ? 'bg-[#161b22]' : 'bg-white/80',
+          !collapsed && (isDark ? 'border-b border-white/10' : 'border-b border-gray-200/80'),
+          collapsible && (isDark ? 'cursor-pointer hover:bg-white/[0.06]' : 'cursor-pointer hover:bg-gray-50'),
         )}
         onClick={() => {
           if (collapsible) setCollapsed((value) => !value);
@@ -49,20 +101,20 @@ export const Pre = ({ children, language }: { children: string, language: string
         role={collapsible ? 'button' : undefined}
         tabIndex={collapsible ? 0 : undefined}
       >
-        <span className="rounded-md bg-gray-100 px-2 py-1 font-jakarta text-xs font-medium uppercase text-gray-500 dark:bg-white/[0.06] dark:text-gray-300">
+        <span className={cn('rounded-md px-2 py-1 font-jakarta text-xs font-medium uppercase', isDark ? 'bg-white/[0.06] text-gray-300' : 'bg-gray-100 text-gray-500')}>
           {normalizedLanguage}
         </span>
         <div className="flex items-center gap-1">
           {collapsible && (
             <span
-              className="flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.08] dark:hover:text-gray-100"
+              className={cn('flex h-7 w-7 items-center justify-center rounded-md transition-colors', isDark ? 'text-gray-400 hover:bg-white/[0.08] hover:text-gray-100' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900')}
               title={collapsed ? '展开代码' : '折叠代码'}
             >
               {collapsed ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
             </span>
           )}
           <button
-            className="flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.08] dark:hover:text-gray-100"
+            className={cn('flex h-7 w-7 items-center justify-center rounded-md transition-colors', isDark ? 'text-gray-400 hover:bg-white/[0.08] hover:text-gray-100' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900')}
             onClick={(event) => {
               event.stopPropagation();
               handleCopy();
@@ -76,16 +128,16 @@ export const Pre = ({ children, language }: { children: string, language: string
       </div>
       <div
         className={cn(
-          'relative overflow-x-auto px-4 py-4 font-mono text-[13px] leading-relaxed transition-[max-height,padding] duration-200 ease-out',
-          collapsed && 'max-h-0 overflow-hidden py-0',
+          'relative overflow-x-auto font-mono text-[13px] leading-relaxed transition-[max-height] duration-200 ease-out',
+          collapsed && 'max-h-0 overflow-hidden',
         )}
       >
         <SyntaxHighlighter
           language={normalizedLanguage}
           style={syntaxTheme as any}
-          showLineNumbers={true}
-          customStyle={{ background: 'transparent', margin: 0, padding: 0 }}
-          codeTagProps={{ style: { background: 'transparent' } }}
+          showLineNumbers={settings.codeLineNumbers}
+          wrapLongLines={settings.codeWrap}
+          customStyle={{ borderRadius: 0, margin: 0, padding: '1rem' }}
           lineNumberStyle={{
             color: isDark ? '#6e7681' : '#94a3b8',
             minWidth: '2.5em',
@@ -93,7 +145,6 @@ export const Pre = ({ children, language }: { children: string, language: string
             textAlign: 'right',
             userSelect: 'none',
           }}
-          lineProps={{ style: { background: 'transparent' } }}
           PreTag="div"
         >
           {children.replace(/\n$/, '')}
