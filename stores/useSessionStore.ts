@@ -15,7 +15,11 @@ interface SessionState {
 interface SessionActions {
   loadSessions: () => Promise<void>;
   loadSession: (sessionId: string, options?: { history?: 'push' | 'replace' | 'none' }) => Promise<Message[] | undefined>;
-  createSession: (initialMessage: string, model?: ConfiguredModel) => Promise<ChatSession>;
+  createSession: (
+    initialMessage: string,
+    model?: ConfiguredModel,
+    options?: { signal?: AbortSignal },
+  ) => Promise<ChatSession>;
   deleteSession: (sessionId: string) => Promise<void>;
   renameSession: (sessionId: string) => Promise<void>;
   updateSessionTitle: (sessionId: string, title: string) => Promise<void>;
@@ -152,7 +156,7 @@ export const useSessionStore = create<SessionStore>()(
       }
     },
 
-    createSession: async (initialMessage, model) => {
+    createSession: async (initialMessage, model, options = {}) => {
       const response = await fetch('/api/sessions', {
         body: JSON.stringify({
           initialMessage,
@@ -161,6 +165,7 @@ export const useSessionStore = create<SessionStore>()(
         }),
         headers: { 'Content-Type': 'application/json' },
         method: 'POST',
+        signal: options.signal,
       });
 
       if (!response.ok) throw new Error('Failed to create session');

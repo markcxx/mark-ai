@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 
 import { THINKING_TEXTS } from '@/lib/chat/constants';
-import { createMessageId, extractThinkingFromText } from '@/lib/chat/helpers';
+import { createMessageId, extractThinkingFromText, getModelKey } from '@/lib/chat/helpers';
 import { estimateMessageTokens, estimateMessagesTokens, estimateTextTokens } from '@/lib/chat/metrics';
 import type { ChatStreamEvent, ConfiguredModel, FileAttachment, Message, MessageSegment } from '@/lib/chat/types';
 import { useSessionStore } from './useSessionStore';
@@ -430,7 +430,6 @@ export const useChatStore = create<ChatStore>()(
     sendMessage: async () => {
       const { input, isLoading, messages, pendingAttachments, streamAssistantMessage } = get();
       const { availableModels, selectedModelKey, webSearchEnabled } = useUIStore.getState();
-      const { getModelKey } = await import('@/lib/chat/helpers');
       const selectedModel = availableModels.find((m) => getModelKey(m) === selectedModelKey);
 
       if ((!input.trim() && pendingAttachments.length === 0) || isLoading || !selectedModel) return;
@@ -440,45 +439,62 @@ export const useChatStore = create<ChatStore>()(
       let targetSessionId = sessionStore.activeSessionId;
       let createdSession = false;
       let startedStream = false;
+      const sessionCreationController = targetSessionId ? null : new AbortController();
+      const now = Date.now();
+      const userMessage: Message = {
+        content: prompt,
+        attachments: pendingAttachments,
+        createdAt: now,
+        id: createMessageId(),
+        role: 'user',
+        totalTokens: estimateMessageTokens({ content: prompt }),
+      };
+      const modelMessageId = createMessageId();
+      const modelMessage: Message = {
+        content: '',
+        createdAt: now,
+        id: modelMessageId,
+        isStreaming: true,
+        model: selectedModel.id,
+        provider: selectedModel.provider,
+        role: 'model',
+      };
 
-      set({ isLoading: true });
+      set({
+        abortController: sessionCreationController,
+        input: '',
+        isLoading: true,
+        messages: [...messages, userMessage, modelMessage],
+        pendingAttachments: [],
+      });
 
       try {
         if (!targetSessionId) {
           try {
-            const session = await sessionStore.createSession(prompt, selectedModel);
+            const session = await sessionStore.createSession(prompt, selectedModel, {
+              signal: sessionCreationController?.signal,
+            });
             targetSessionId = session.id;
             createdSession = true;
             sessionStore.setSessionLoading(session.id, true);
           } catch (error) {
             console.error('Session create error:', error);
-            toast.error('创建会话失败');
+            set((state) => ({
+              input: state.input || input,
+              messages: state.messages.filter(
+                (item) => item.id !== userMessage.id && item.id !== modelMessageId,
+              ),
+              pendingAttachments: state.pendingAttachments.length > 0
+                ? state.pendingAttachments
+                : pendingAttachments,
+            }));
+            if (!(error instanceof DOMException && error.name === 'AbortError')) {
+              toast.error('创建会话失败');
+            }
             return;
           }
         }
         if (!targetSessionId) return;
-
-        const now = Date.now();
-        const userMessage: Message = {
-          content: prompt,
-          attachments: pendingAttachments,
-          createdAt: now,
-          id: createMessageId(),
-          role: 'user',
-          totalTokens: estimateMessageTokens({ content: prompt }),
-        };
-        const modelMessageId = createMessageId();
-        const modelMessage: Message = {
-          content: '',
-          createdAt: now,
-          id: modelMessageId,
-          isStreaming: true,
-          model: selectedModel.id,
-          provider: selectedModel.provider,
-          role: 'model',
-        };
-
-        set({ messages: [...messages, userMessage, modelMessage], input: '', pendingAttachments: [] });
 
         startedStream = true;
         const streamedMessage = await streamAssistantMessage(
@@ -589,7 +605,6 @@ export const useChatStore = create<ChatStore>()(
       if (index < 0) return;
 
       const { availableModels, selectedModelKey, setOpenMenuMessageId, webSearchEnabled } = useUIStore.getState();
-      const { getModelKey } = await import('@/lib/chat/helpers');
       const selectedModel = availableModels.find((m) => getModelKey(m) === selectedModelKey);
 
       let modelConfig: ConfiguredModel | undefined;
@@ -655,7 +670,7 @@ export const useChatStore = create<ChatStore>()(
         generationDuration: undefined, inputTokens: undefined, interrupted: false,
         isReasoning: false, isStreaming: true, model: modelConfig.id,
         outputTokens: undefined, provider: modelConfig.provider, reasoning: undefined,
-        reasoningDuration: undefined, totalTokens: undefined,
+        reasoningDuration: undefined, segments: undefined, totalTokens: undefined,
         webSearch: undefined,
       };
       const nextMessages = deleteCurrent
