@@ -1,11 +1,9 @@
 import type {Metadata} from 'next';
-import { Noto_Sans_SC, Plus_Jakarta_Sans } from 'next/font/google';
 import { AppBootSplash } from '@/components/AppBootSplash';
 import { ThemeProvider } from '@/components/ThemeProvider';
+import '@fontsource-variable/noto-sans-sc';
+import '@fontsource-variable/plus-jakarta-sans';
 import './globals.css';
-
-const notoSansSC = Noto_Sans_SC({ subsets: ['latin'], variable: '--font-noto-sans-sc' });
-const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-plus-jakarta-sans' });
 
 export const metadata: Metadata = {
   title: 'MarkAI - 个人AI效能工具，给自己一个更聪明的大脑',
@@ -20,7 +18,7 @@ export const metadata: Metadata = {
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
-      <body suppressHydrationWarning className={`${notoSansSC.variable} ${plusJakartaSans.variable} font-sans antialiased text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-950 h-screen w-screen overflow-hidden`}>
+      <body suppressHydrationWarning className="font-sans antialiased text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-950 h-screen w-screen overflow-hidden">
         <ThemeProvider>
           <AppBootSplash />
           {children}

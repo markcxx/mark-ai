@@ -21,6 +21,8 @@
 }
 
 :root {
+  --font-noto-sans-sc: "Noto Sans SC Variable";
+  --font-plus-jakarta-sans: "Plus Jakarta Sans Variable";
   --chat-app-bg: #f8f8f8;
   --chat-panel-bg: #ffffff;
   --chat-header-bg: rgba(255, 255, 255, 0.8);
