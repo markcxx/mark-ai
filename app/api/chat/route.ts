@@ -349,6 +349,8 @@ const createOpenAICompatibleStream = async (
               'thinking_content',
               'thinkingContent',
               'thinking',
+              'reasoning_details',
+              'reasoningDetails',
             ]);
             const content = getChoiceText(choice, ['content', 'text']);
             const deltaToolCalls = choice?.delta?.tool_calls || choice?.message?.tool_calls;

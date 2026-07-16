@@ -198,6 +198,17 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
     const init = async () => {
       try {
         const uiStore = useUIStore.getState();
+
+        // Chat state lives in Zustand and survives route-level remounts. Avoid
+        // rerunning the full boot sequence if the URL changed after startup.
+        if (uiStore.isAppReady) {
+          const sessionStore = useSessionStore.getState();
+          if (initialSessionId && sessionStore.activeSessionId !== initialSessionId) {
+            await handleLoadSession(initialSessionId, { history: 'none' });
+          }
+          return;
+        }
+
         const totalTasks = initialSessionId ? 3 : 2;
         let completedTasks = 0;
         const finishTask = (message: string) => {

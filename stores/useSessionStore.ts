@@ -34,22 +34,24 @@ interface SessionActions {
 
 export type SessionStore = SessionState & SessionActions;
 
+const updateBrowserUrl = (path: string, history: 'push' | 'replace') => {
+  const method = history === 'replace'
+    ? History.prototype.replaceState
+    : History.prototype.pushState;
+
+  // Next.js patches window.history and treats these client-owned chat URLs as
+  // App Router navigations. Use the native method so ChatApp stays mounted.
+  method.call(window.history, null, '', path);
+};
+
 const navigateToSession = (sessionId: string, history: 'push' | 'replace' = 'push') => {
   const path = `/${encodeURIComponent(sessionId)}`;
-  if (history === 'replace') {
-    window.history.replaceState(null, '', path);
-  } else {
-    window.history.pushState(null, '', path);
-  }
+  updateBrowserUrl(path, history);
 };
 
 const navigateToNewChat = (history: 'push' | 'replace' | 'none' = 'push') => {
   if (history === 'none') return;
-  if (history === 'replace') {
-    window.history.replaceState(null, '', '/');
-  } else {
-    window.history.pushState(null, '', '/');
-  }
+  updateBrowserUrl('/', history);
 };
 
 let activeSessionLoadController: AbortController | null = null;

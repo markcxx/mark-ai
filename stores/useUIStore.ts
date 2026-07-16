@@ -52,6 +52,7 @@ export type UIStore = UIState & UIActions;
 
 const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 380;
+const SELECTED_MODEL_STORAGE_KEY = 'markai:selected-model';
 
 const clampSidebarWidth = (width: number) =>
   Math.min(Math.max(width, SIDEBAR_MIN_WIDTH), SIDEBAR_MAX_WIDTH);
@@ -174,10 +175,25 @@ export const useUIStore = create<UIStore>()(
         const models: ConfiguredModel[] = Array.isArray(data.models) ? data.models : [];
         const providerNames: Record<string, string> =
           data.providerNames && typeof data.providerNames === 'object' ? data.providerNames : {};
+        const currentModelKey = get().selectedModelKey;
+        const savedModelKey = data.selectedModel?.id && data.selectedModel?.provider
+          ? getModelKey(data.selectedModel)
+          : '';
+        let localModelKey = '';
+        try {
+          localModelKey = window.localStorage.getItem(SELECTED_MODEL_STORAGE_KEY) || '';
+        } catch {
+          // Storage can be unavailable in private or restricted browser contexts.
+        }
+        const isAvailable = (key: string) =>
+          Boolean(key && models.some((model) => getModelKey(model) === key));
+        const selectedModelKey =
+          [currentModelKey, savedModelKey, localModelKey].find(isAvailable) ||
+          (models[0] ? getModelKey(models[0]) : '');
         set({
           availableModels: models,
           providerNames,
-          selectedModelKey: models[0] ? getModelKey(models[0]) : '',
+          selectedModelKey,
           isLoadingModels: false,
         });
       } catch (error) {
@@ -186,7 +202,27 @@ export const useUIStore = create<UIStore>()(
       }
     },
 
-    setSelectedModelKey: (key) => set({ selectedModelKey: key }),
+    setSelectedModelKey: (key) => {
+      const model = get().availableModels.find((item) => getModelKey(item) === key);
+      if (!model) return;
+
+      set({ selectedModelKey: key });
+      try {
+        window.localStorage.setItem(SELECTED_MODEL_STORAGE_KEY, key);
+      } catch {
+        // Database persistence remains the primary signed-in storage.
+      }
+
+      void fetch('/api/models', {
+        body: JSON.stringify({ id: model.id, provider: model.provider }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'PATCH',
+      }).then((response) => {
+        if (!response.ok) throw new Error('Failed to save selected model');
+      }).catch((error) => {
+        console.error('Model preference save error:', error);
+      });
+    },
     setWideChatMode: (wide) => set({ wideChatMode: wide }),
     setModelSearchKeyword: (keyword) => set({ modelSearchKeyword: keyword }),
     setWebSearchEnabled: (enabled) => set({ webSearchEnabled: enabled }),

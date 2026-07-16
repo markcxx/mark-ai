@@ -583,6 +583,13 @@ export function MessageItem({
           <>
             {message.segments && message.segments.length > 0 ? (
               <>
+                {!message.segments.some((segment) => segment.type === 'thinking') && (
+                  <ThinkingPanel
+                    content={message.reasoning}
+                    duration={message.reasoningDuration}
+                    thinking={message.isReasoning}
+                  />
+                )}
                 {message.segments.map((seg, i) => {
                   if (seg.type === 'thinking') {
                     return (

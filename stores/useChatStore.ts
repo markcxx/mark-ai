@@ -144,11 +144,9 @@ export const useChatStore = create<ChatStore>()(
       let totalTokens = inputTokens;
       const segments: MessageSegment[] = [];
       let currentReasoningStart: number | undefined;
-
-      const getLastThinkingSegment = () => {
-        const last = segments[segments.length - 1];
-        return last?.type === 'thinking' ? last : undefined;
-      };
+      let currentThinkingSegment:
+        | Extract<MessageSegment, { type: 'thinking' }>
+        | undefined;
 
       const getAllReasoning = () =>
         segments
@@ -157,10 +155,12 @@ export const useChatStore = create<ChatStore>()(
           .join('');
 
       const finishCurrentReasoning = () => {
-        const seg = getLastThinkingSegment();
+        const seg = currentThinkingSegment;
         if (seg && seg.isActive) {
           seg.isActive = false;
-          seg.duration = currentReasoningStart ? Date.now() - currentReasoningStart : undefined;
+          if (currentReasoningStart) {
+            seg.duration = (seg.duration || 0) + Date.now() - currentReasoningStart;
+          }
           currentReasoningStart = undefined;
         }
       };
@@ -248,14 +248,6 @@ export const useChatStore = create<ChatStore>()(
           plainContent += chunk;
           finishCurrentReasoning();
           const extracted = extractThinkingFromText(plainContent);
-          if (extracted.reasoning && !extracted.hasOpenThinking) {
-            const last = getLastThinkingSegment();
-            if (last && last.isActive) {
-              last.isActive = false;
-              last.duration = currentReasoningStart ? Date.now() - currentReasoningStart : undefined;
-              currentReasoningStart = undefined;
-            }
-          }
           const cleanContent = extracted.content;
           if (cleanContent) {
             const prevContentLength = segments
@@ -275,13 +267,15 @@ export const useChatStore = create<ChatStore>()(
         };
 
         const appendReasoning = (chunk: string) => {
-          let seg = getLastThinkingSegment();
-          if (!seg || !seg.isActive) {
-            seg = { type: 'thinking', content: '', isActive: true };
-            segments.push(seg);
+          if (!currentThinkingSegment) {
+            currentThinkingSegment = { type: 'thinking', content: '', isActive: true };
+            segments.push(currentThinkingSegment);
+            currentReasoningStart = Date.now();
+          } else if (!currentThinkingSegment.isActive) {
+            currentThinkingSegment.isActive = true;
             currentReasoningStart = Date.now();
           }
-          seg.content += chunk;
+          currentThinkingSegment.content += chunk;
           updateStreamingMessage();
         };
 
@@ -299,6 +293,7 @@ export const useChatStore = create<ChatStore>()(
             }
             if (event.type === 'tool' && event.webSearch) {
               finishCurrentReasoning();
+              currentThinkingSegment = undefined;
               const ws = event.webSearch;
               const existingIdx = segments.findIndex(
                 (s) => s.type === 'tool' && s.webSearch.tool === ws.tool && s.webSearch.query === ws.query,
