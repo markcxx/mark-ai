@@ -1,13 +1,13 @@
 "use client";
 
-import { RefObject, useMemo, useRef } from "react";
+import { RefObject, useMemo, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
   CheckSquare,
   Copy,
   FileText,
-  Download,
+  Eye,
   Languages,
   MessageSquarePlus,
   Minimize2,
@@ -22,6 +22,7 @@ import {
 
 import type {
   ConfiguredModel,
+  FileAttachment,
   MenuItem,
   Message,
   MessageSegment,
@@ -34,6 +35,7 @@ import { useSettingsStore } from "@/stores/useSettingsStore";
 
 import { CollapsibleContent } from "./CollapsibleContent";
 import { FloatingMenu } from "./FloatingMenu";
+import { FilePreviewDialog } from "./FilePreviewDialog";
 import { MarkdownContent } from "./MarkdownContent";
 import { MessageActionButton } from "./MessageActionButton";
 import { MessageSelectionWrapper } from "./MessageSelectionWrapper";
@@ -233,6 +235,7 @@ export function MessageItem({
   toggleSelectedMessage: (id: string, shiftKey?: boolean) => void;
 }) {
   const generalSettings = useSettingsStore((state) => state.general);
+  const [previewFile, setPreviewFile] = useState<FileAttachment | null>(null);
   const regenerateMode: RegenerateMode = generalSettings.overwriteRegeneratedResponse
     ? "replace"
     : "preserve";
@@ -325,12 +328,15 @@ export function MessageItem({
             {message.attachments && message.attachments.length > 0 && !collapsed && (
               <div className="flex flex-wrap gap-2">
                 {message.attachments.map((file) => (
-                  <a
+                  <button
                     className="flex min-w-0 max-w-[260px] items-center gap-2 rounded-xl border border-black/[0.06] bg-white/60 px-2.5 py-2 transition-all hover:-translate-y-0.5 hover:bg-white hover:shadow-sm dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/[0.1]"
-                    href={`/api/files/${file.id}/download`}
                     key={file.id}
-                    rel="noreferrer"
-                    target="_blank"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setPreviewFile(file);
+                    }}
+                    title={`预览 ${file.name}`}
+                    type="button"
                   >
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-500 dark:bg-blue-500/15 dark:text-blue-300">
                       <FileText size={16} />
@@ -343,8 +349,8 @@ export function MessageItem({
                           : `${(file.size / 1024 / 1024).toFixed(1)} MB`}
                       </span>
                     </span>
-                    <Download className="shrink-0 text-gray-400" size={14} />
-                  </a>
+                    <Eye className="shrink-0 text-gray-400" size={14} />
+                  </button>
                 ))}
               </div>
             )}
@@ -544,19 +550,22 @@ export function MessageItem({
     );
 
   return (
-    <div
-      className={cn("relative w-full", message.role === "user" ? "flex justify-end" : "")}
-      data-message-id={message.id}
-    >
-      <MessageSelectionWrapper
-        isSelected={isSelected}
-        message={message}
-        onToggle={toggleSelectedMessage}
-        selectionInteractive={multiSelectMode}
-        selectionMode={selectionLayoutMode}
+    <>
+      <div
+        className={cn("relative w-full", message.role === "user" ? "flex justify-end" : "")}
+        data-message-id={message.id}
       >
-        {body}
-      </MessageSelectionWrapper>
-    </div>
+        <MessageSelectionWrapper
+          isSelected={isSelected}
+          message={message}
+          onToggle={toggleSelectedMessage}
+          selectionInteractive={multiSelectMode}
+          selectionMode={selectionLayoutMode}
+        >
+          {body}
+        </MessageSelectionWrapper>
+      </div>
+      <FilePreviewDialog file={previewFile} onClose={() => setPreviewFile(null)} />
+    </>
   );
 }

@@ -1,4 +1,13 @@
-import { Download, FileImage, FileSpreadsheet, FileText, Presentation, Trash2 } from "lucide-react";
+import {
+  Download,
+  Eye,
+  FileImage,
+  FileSpreadsheet,
+  FileText,
+  Presentation,
+  Trash2,
+} from "lucide-react";
+import { isFilePreviewable } from "../FilePreviewDialog";
 
 export type ManagedFile = {
   contentType: string;
@@ -42,9 +51,11 @@ function FileTypeIcon({ contentType, name }: Pick<ManagedFile, "contentType" | "
 export function ManagedFileRow({
   file,
   onDelete,
+  onPreview,
 }: {
   file: ManagedFile;
   onDelete: (file: ManagedFile) => void;
+  onPreview: (file: ManagedFile) => void;
 }) {
   return (
     <div className="group grid min-h-[68px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-gray-200/80 px-1 py-3 dark:border-white/[0.07] sm:grid-cols-[auto_minmax(0,1fr)_150px_90px_auto] sm:gap-4 sm:px-3">
@@ -69,6 +80,17 @@ export function ManagedFileRow({
         {formatBytes(file.size)}
       </p>
       <div className="flex items-center gap-1">
+        {isFilePreviewable(file) && (
+          <button
+            aria-label={`预览 ${file.name}`}
+            className="flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-800 dark:hover:bg-white/10 dark:hover:text-gray-100"
+            onClick={() => onPreview(file)}
+            title="预览"
+            type="button"
+          >
+            <Eye size={16} />
+          </button>
+        )}
         <a
           aria-label={`下载 ${file.name}`}
           className="flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-800 dark:hover:bg-white/10 dark:hover:text-gray-100"

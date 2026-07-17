@@ -576,6 +576,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                     isLoading={isLoading}
                     isLoadingModels={isLoadingModels}
                     modelSearchKeyword={modelSearchKeyword}
+                    messages={messages}
                     onAttachment={() => fileInputRef.current?.click()}
                     onInput={handleInput}
                     onKeyDown={handleKeyDown}
@@ -697,6 +698,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                 isLoading={isLoading}
                 isLoadingModels={isLoadingModels}
                 modelSearchKeyword={modelSearchKeyword}
+                messages={messages}
                 onAttachment={() => fileInputRef.current?.click()}
                 onInput={handleInput}
                 onKeyDown={handleKeyDown}

@@ -7,6 +7,7 @@ import { Check, Search } from "lucide-react";
 import { AppDialog } from "@/components/ui/AppDialog";
 import type { ConfiguredModel } from "@/lib/chat/types";
 import { getModelDisplayName, getModelKey } from "@/lib/chat/helpers";
+import { formatTokenCount, getModelMetadata } from "@/lib/model-metadata";
 import { cn } from "@/lib/utils";
 
 type ModelGroup = {
@@ -119,11 +120,12 @@ export function ModelSelectorDialog({
                 {group.models.map((model) => {
                   const key = getModelKey(model);
                   const isSelected = key === selectedModelKey;
+                  const metadata = getModelMetadata(model.id);
 
                   return (
                     <button
                       className={cn(
-                        "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                        "flex h-10 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm transition-colors",
                         isSelected
                           ? "bg-gray-100 text-gray-950 dark:bg-white/[0.08] dark:text-gray-50"
                           : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/[0.04]",
@@ -137,10 +139,27 @@ export function ModelSelectorDialog({
                       ref={isSelected ? selectedItemRef : undefined}
                       type="button"
                     >
-                      <ModelIcon model={model.id} size={22} type="avatar" />
+                      <ModelIcon model={model.id} size={20} type="avatar" />
                       <span className="min-w-0 flex-1 truncate">
                         {getModelDisplayName(model.id)}
                       </span>
+                      {metadata && (
+                        <span
+                          className="shrink-0 text-[11px] tabular-nums text-gray-400 dark:text-gray-500"
+                          title={[
+                            `上下文 ${metadata.contextWindowTokens.toLocaleString()} tokens`,
+                            metadata.maxOutputTokens
+                              ? `最大输出 ${metadata.maxOutputTokens.toLocaleString()} tokens`
+                              : "",
+                            metadata.knowledgeCutoff ? `知识截止 ${metadata.knowledgeCutoff}` : "",
+                            `资料核对 ${metadata.verifiedAt}`,
+                          ]
+                            .filter(Boolean)
+                            .join("\n")}
+                        >
+                          {formatTokenCount(metadata.contextWindowTokens)}
+                        </span>
+                      )}
                       {isSelected && <Check className="shrink-0 text-gray-400" size={16} />}
                     </button>
                   );

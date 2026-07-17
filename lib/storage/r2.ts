@@ -59,6 +59,23 @@ export const createDownloadUrl = async (bucket: string, key: string, filename: s
     { expiresIn: 300 },
   );
 
+export const createPreviewUrl = async (
+  bucket: string,
+  key: string,
+  contentType: string,
+  filename: string,
+) =>
+  getSignedUrl(
+    getR2Client(),
+    new GetObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      ResponseContentDisposition: `inline; filename*=UTF-8''${encodeURIComponent(filename)}`,
+      ResponseContentType: contentType,
+    }),
+    { expiresIn: 300 },
+  );
+
 export const headR2Object = (bucket: string, key: string) =>
   getR2Client().send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
 

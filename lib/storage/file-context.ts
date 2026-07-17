@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db";
 import { storageFiles } from "@/lib/db/schema";
 import type { FileAttachment } from "@/lib/chat/types";
 import { getR2ObjectBytes } from "./r2";
+import { extractPdfContent } from "./pdf";
 import { extractSpreadsheetContent } from "./spreadsheet";
 
 const MAX_FILE_CONTEXT_CHARS = 120_000;
@@ -49,6 +50,8 @@ const extractFileContent = async (file: FileRecord) => {
     content = result.value;
   } else if (extension === "xlsx") {
     content = extractSpreadsheetContent(bytes, MAX_FILE_CONTEXT_CHARS);
+  } else if (extension === "pdf" || file.contentType === "application/pdf") {
+    content = (await extractPdfContent(bytes)).content;
   } else if (
     file.contentType.startsWith("text/") ||
     ["txt", "md", "markdown", "csv", "json", "xml", "yaml", "yml", "log"].includes(extension)
@@ -107,38 +110,48 @@ export const injectFileContexts = async <
   const byId = new Map(records.map((file) => [file.id, file]));
   let usedChars = 0;
 
-  return Promise.all(
-    messages.map(async (message) => {
-      if (message.role !== "user" || !message.attachments?.length) return message;
-      const fileNodes = await Promise.all(
-        message.attachments.map(async (attachment) => {
-          const file = byId.get(attachment.id);
-          if (!file || usedChars >= MAX_TOTAL_CONTEXT_CHARS) return "";
-          try {
-            let content = await extractFileContent(file);
-            const remaining = MAX_TOTAL_CONTEXT_CHARS - usedChars;
-            if (content.length > remaining)
-              content = `${content.slice(0, remaining)}\n[总附件内容过长，已截断]`;
-            usedChars += content.length;
-            return `<file id="${escapeAttribute(file.id)}" name="${escapeAttribute(file.originalName)}" type="${escapeAttribute(file.contentType)}" size="${file.size}">${content}</file>`;
-          } catch (error) {
-            const detail = error instanceof Error ? error.message : "文件解析失败";
-            return `<file id="${escapeAttribute(file.id)}" name="${escapeAttribute(file.originalName)}" type="${escapeAttribute(file.contentType)}" size="${file.size}">[${detail}]</file>`;
-          }
-        }),
-      );
-      const validNodes = fileNodes.filter(Boolean);
-      if (validNodes.length === 0) return message;
-      const context = `<!-- SYSTEM CONTEXT (NOT PART OF USER QUERY) -->
+  const prepared = [...messages];
+
+  // Newer attachments are more likely to belong to the active question. Process messages from
+  // newest to oldest so historical files cannot consume the shared context budget first.
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.role !== "user" || !message.attachments?.length) continue;
+
+    const fileNodes: string[] = [];
+    for (const attachment of message.attachments) {
+      const file = byId.get(attachment.id);
+      if (!file || usedChars >= MAX_TOTAL_CONTEXT_CHARS) continue;
+      try {
+        let content = await extractFileContent(file);
+        const remaining = MAX_TOTAL_CONTEXT_CHARS - usedChars;
+        if (content.length > remaining) {
+          content = `${content.slice(0, remaining)}\n[总附件内容过长，已截断]`;
+        }
+        usedChars += content.length;
+        fileNodes.push(
+          `<file id="${escapeAttribute(file.id)}" name="${escapeAttribute(file.originalName)}" type="${escapeAttribute(file.contentType)}" size="${file.size}">${content}</file>`,
+        );
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : "文件解析失败";
+        fileNodes.push(
+          `<file id="${escapeAttribute(file.id)}" name="${escapeAttribute(file.originalName)}" type="${escapeAttribute(file.contentType)}" size="${file.size}">[${detail}]</file>`,
+        );
+      }
+    }
+
+    if (fileNodes.length === 0) continue;
+    const context = `<!-- SYSTEM CONTEXT (NOT PART OF USER QUERY) -->
 <context.instruction>以下内容是系统从用户上传文件中提取的正文。回答依赖附件的问题时，请直接阅读并使用这些内容，不要声称无法访问附件。</context.instruction>
 <files_info>
 <files>
 <files_docstring>here are user upload files you can refer to</files_docstring>
-${validNodes.join("\n")}
+${fileNodes.join("\n")}
 </files>
 </files_info>
 <!-- END SYSTEM CONTEXT -->`;
-      return { ...message, content: `${message.content}\n\n${context}`.trim() };
-    }),
-  );
+    prepared[index] = { ...message, content: `${message.content}\n\n${context}`.trim() };
+  }
+
+  return prepared;
 };

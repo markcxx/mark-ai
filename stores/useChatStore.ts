@@ -238,6 +238,16 @@ export const useChatStore = create<ChatStore>()(
         }
         if (!response.body) throw new Error("No response body");
 
+        const removedContextMessages = Number(response.headers.get("X-MarkAI-Context-Removed"));
+        const contextContentTruncated = response.headers.get("X-MarkAI-Context-Truncated") === "1";
+        if (removedContextMessages > 0 || contextContentTruncated) {
+          const details = [
+            removedContextMessages > 0 ? `${removedContextMessages} 条较早消息` : "",
+            contextContentTruncated ? "过长的附件或消息内容" : "",
+          ].filter(Boolean);
+          toast(`上下文已自动裁剪：${details.join("、")}`);
+        }
+
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         const isStructuredStream = response.headers

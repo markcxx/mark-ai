@@ -23,6 +23,7 @@ import { useChatStore } from "@/stores/useChatStore";
 
 import { formatBytes, ManagedFileRow } from "./files/ManagedFileRow";
 import type { ManagedFile } from "./files/ManagedFileRow";
+import { FilePreviewDialog } from "./FilePreviewDialog";
 
 const ACCEPTED_FILES = ".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.csv,.docx,.xlsx,.pptx";
 
@@ -47,6 +48,7 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
+  const [previewFile, setPreviewFile] = useState<ManagedFile | null>(null);
   const [upload, setUpload] = useState<{
     completed: number;
     current: string;
@@ -94,13 +96,14 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      if (deletingFile) setDeletingFile(null);
+      if (previewFile) setPreviewFile(null);
+      else if (deletingFile) setDeletingFile(null);
       else onClose();
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [deletingFile, onClose, open]);
+  }, [deletingFile, onClose, open, previewFile]);
 
   const visibleFiles = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -374,7 +377,12 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
                   )}
 
                   {visibleFiles.map((file) => (
-                    <ManagedFileRow file={file} key={file.id} onDelete={setDeletingFile} />
+                    <ManagedFileRow
+                      file={file}
+                      key={file.id}
+                      onDelete={setDeletingFile}
+                      onPreview={setPreviewFile}
+                    />
                   ))}
                 </section>
               </div>
@@ -403,6 +411,7 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
             open={Boolean(deletingFile)}
             title="删除这个文件？"
           />
+          <FilePreviewDialog file={previewFile} onClose={() => setPreviewFile(null)} />
         </motion.div>
       )}
     </AnimatePresence>,

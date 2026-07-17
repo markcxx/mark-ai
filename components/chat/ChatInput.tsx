@@ -16,10 +16,12 @@ import {
   X,
 } from "lucide-react";
 
-import type { ConfiguredModel, FileAttachment } from "@/lib/chat/types";
+import type { ConfiguredModel, FileAttachment, Message } from "@/lib/chat/types";
 import { getModelDisplayName } from "@/lib/chat/helpers";
 import { cn } from "@/lib/utils";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
+import { ContextWindowIndicator } from "./ContextWindowIndicator";
+import { FilePreviewDialog } from "./FilePreviewDialog";
 import { ModelSelectorDialog } from "./ModelSelectorDialog";
 
 export function ChatInput({
@@ -28,6 +30,7 @@ export function ChatInput({
   isLoading,
   isLoadingModels,
   modelSearchKeyword,
+  messages,
   onAttachment,
   attachments,
   attachmentUploading,
@@ -53,6 +56,7 @@ export function ChatInput({
   isLoading: boolean;
   isLoadingModels: boolean;
   modelSearchKeyword: string;
+  messages: Message[];
   onAttachment: () => void;
   onRemoveAttachment: (id: string) => void;
   onInput: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
@@ -70,10 +74,7 @@ export function ChatInput({
   onToggleWebSearch: () => void;
 }) {
   const [isModelDialogOpen, setIsModelDialogOpen] = useState(false);
-
-  const providerDisplayName = selectedModel
-    ? providerNames[selectedModel.provider] || selectedModel.provider
-    : undefined;
+  const [previewFile, setPreviewFile] = useState<FileAttachment | null>(null);
 
   return (
     <>
@@ -109,19 +110,26 @@ export function ChatInput({
                     className="group/file flex max-w-[240px] shrink-0 items-center gap-2 rounded-xl border border-gray-200 bg-gray-50/80 px-2.5 py-2 dark:border-white/10 dark:bg-white/[0.05]"
                     key={file.id}
                   >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-blue-500 shadow-sm dark:bg-white/10 dark:text-blue-300">
-                      <FileText size={16} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-xs font-medium text-gray-700 dark:text-gray-200">
-                        {file.name}
-                      </p>
-                      <p className="text-[10px] text-gray-400">
-                        {file.size < 1024 * 1024
-                          ? `${Math.ceil(file.size / 1024)} KB`
-                          : `${(file.size / 1024 / 1024).toFixed(1)} MB`}
-                      </p>
-                    </div>
+                    <button
+                      className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                      onClick={() => setPreviewFile(file)}
+                      title={`预览 ${file.name}`}
+                      type="button"
+                    >
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-blue-500 shadow-sm dark:bg-white/10 dark:text-blue-300">
+                        <FileText size={16} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-xs font-medium text-gray-700 dark:text-gray-200">
+                          {file.name}
+                        </span>
+                        <span className="block text-[10px] text-gray-400">
+                          {file.size < 1024 * 1024
+                            ? `${Math.ceil(file.size / 1024)} KB`
+                            : `${(file.size / 1024 / 1024).toFixed(1)} MB`}
+                        </span>
+                      </span>
+                    </button>
                     <button
                       aria-label="移除附件"
                       className="ml-1 rounded-full p-1 text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-white"
@@ -179,6 +187,13 @@ export function ChatInput({
                 </button>
               </div>
               <div className="flex items-center gap-2">
+                <ContextWindowIndicator
+                  attachments={attachments}
+                  draft={input}
+                  messages={messages}
+                  modelId={selectedModel?.id}
+                  webSearchEnabled={webSearchEnabled}
+                />
                 <button
                   className="flex h-9 max-w-[240px] items-center gap-2 rounded-lg px-2.5 text-sm text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-60"
                   disabled={isLoadingModels || availableModels.length === 0}
@@ -250,6 +265,7 @@ export function ChatInput({
         setModelSearchKeyword={setModelSearchKeyword}
         setSelectedModelKey={setSelectedModelKey}
       />
+      <FilePreviewDialog file={previewFile} onClose={() => setPreviewFile(null)} />
     </>
   );
 }

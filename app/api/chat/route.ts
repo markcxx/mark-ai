@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
 import { authorizeApiRequest, enforceRateLimit } from "@/lib/api/security";
 import { findAvailableModel } from "@/lib/available-models";
+import { prepareMessagesForContext, type ContextPreparation } from "@/lib/chat/context-window";
 import { estimateTextTokens } from "@/lib/chat/metrics";
 import {
   addTokenUsage,
@@ -13,6 +14,7 @@ import {
 import { searchTavily } from "@/lib/search/tavily";
 import { readWebpage } from "@/lib/search/webpage";
 import type { FileAttachment, WebSearchState } from "@/lib/chat/types";
+import { getModelMetadata } from "@/lib/model-metadata";
 import { injectFileContexts } from "@/lib/storage/file-context";
 
 type ChatMessage = {
@@ -181,6 +183,16 @@ const isUnsupportedStreamUsageError = (status: number, detail: string) =>
 const encodeToolEvent = (encoder: TextEncoder, webSearch: WebSearchState) =>
   encoder.encode(`${JSON.stringify({ type: "tool", webSearch })}\n`);
 
+const getContextHeaders = (context?: ContextPreparation<ChatMessage>): Record<string, string> =>
+  context
+    ? {
+        "X-MarkAI-Context-Input": String(context.estimatedInputTokens),
+        "X-MarkAI-Context-Removed": String(context.removedMessageCount),
+        "X-MarkAI-Context-Truncated": context.contentTruncated ? "1" : "0",
+        "X-MarkAI-Context-Window": String(context.contextWindowTokens),
+      }
+    : {};
+
 const toOpenAIMessages = ({
   messages,
   timezone,
@@ -225,8 +237,8 @@ const getToolWebpageUrl = (toolCall: OpenAIToolCall) => {
   return url || toolCall.function.arguments.trim();
 };
 
-const formatToolResultForModel = (webSearch: WebSearchState) =>
-  JSON.stringify({
+const formatToolResultForModel = (webSearch: WebSearchState, maxChars = 18_000) => {
+  const payload = {
     answer: webSearch.answer,
     content: webSearch.content,
     description: webSearch.description,
@@ -243,7 +255,41 @@ const formatToolResultForModel = (webSearch: WebSearchState) =>
     title: webSearch.title,
     tool: webSearch.tool,
     url: webSearch.url,
+  };
+  const content = JSON.stringify(payload);
+  if (content.length <= maxChars) return content;
+
+  const resultContentChars = Math.max(
+    160,
+    Math.floor(maxChars / Math.max(webSearch.results.length * 3, 3)),
+  );
+  const compact = JSON.stringify({
+    ...payload,
+    answer: webSearch.answer?.slice(0, Math.floor(maxChars / 5)),
+    content: webSearch.content?.slice(0, Math.floor(maxChars / 3)),
+    results: webSearch.results.slice(0, 8).map((item) => ({
+      citationId: item.citationId,
+      content: item.content?.slice(0, resultContentChars),
+      title: item.title,
+      url: item.url,
+    })),
+    truncated: true,
   });
+  if (compact.length <= maxChars) return compact;
+
+  return JSON.stringify({
+    query: webSearch.query,
+    results: webSearch.results.slice(0, 8).map((item) => ({
+      citationId: item.citationId,
+      title: item.title,
+      url: item.url,
+    })),
+    status: webSearch.status,
+    tool: webSearch.tool,
+    truncated: true,
+    url: webSearch.url,
+  });
+};
 
 const normalizeToolCalls = (toolCalls: OpenAIToolCall[]) =>
   toolCalls
@@ -265,6 +311,7 @@ const createOpenAICompatibleStream = async (
   webSearchEnabled = false,
   timezone?: unknown,
   signal?: AbortSignal,
+  contextPreparation?: ContextPreparation<ChatMessage>,
 ) => {
   const endpoint = toOpenAIChatEndpoint(baseUrl);
   if (!endpoint) {
@@ -272,6 +319,9 @@ const createOpenAICompatibleStream = async (
   }
 
   const encoder = new TextEncoder();
+  const toolResultMaxChars = contextPreparation
+    ? Math.min(18_000, Math.max(2000, Math.floor(contextPreparation.inputBudgetTokens * 0.4)))
+    : 18_000;
   const openAIMessages = toOpenAIMessages({
     messages,
     timezone,
@@ -557,7 +607,7 @@ const createOpenAICompatibleStream = async (
                 };
                 controller.enqueue(encodeToolEvent(encoder, doneState));
                 toolResultMessages.push({
-                  content: formatToolResultForModel(doneState),
+                  content: formatToolResultForModel(doneState, toolResultMaxChars),
                   role: "tool",
                   tool_call_id: toolCall.id,
                 });
@@ -573,7 +623,7 @@ const createOpenAICompatibleStream = async (
                 };
                 controller.enqueue(encodeToolEvent(encoder, errorState));
                 toolResultMessages.push({
-                  content: formatToolResultForModel(errorState),
+                  content: formatToolResultForModel(errorState, toolResultMaxChars),
                   role: "tool",
                   tool_call_id: toolCall.id,
                 });
@@ -603,7 +653,7 @@ const createOpenAICompatibleStream = async (
               };
               controller.enqueue(encodeToolEvent(encoder, doneState));
               toolResultMessages.push({
-                content: formatToolResultForModel(doneState),
+                content: formatToolResultForModel(doneState, toolResultMaxChars),
                 role: "tool",
                 tool_call_id: toolCall.id,
               });
@@ -618,7 +668,7 @@ const createOpenAICompatibleStream = async (
               };
               controller.enqueue(encodeToolEvent(encoder, errorState));
               toolResultMessages.push({
-                content: formatToolResultForModel(errorState),
+                content: formatToolResultForModel(errorState, toolResultMaxChars),
                 role: "tool",
                 tool_call_id: toolCall.id,
               });
@@ -644,6 +694,7 @@ const createOpenAICompatibleStream = async (
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
       "Content-Type": "application/x-ndjson; charset=utf-8",
+      ...getContextHeaders(contextPreparation),
     },
   });
 };
@@ -700,16 +751,42 @@ export async function POST(req: NextRequest) {
     const resolvedMessages = authorization.userId
       ? await injectFileContexts(messages as ChatMessage[], authorization.userId)
       : (messages as ChatMessage[]);
+    const modelMetadata = getModelMetadata(selectedModel.id);
+    const runtimeSystemPrompt = getRuntimeSystemPrompt({
+      timezone,
+      webSearchEnabled: selectedModel.runtime === "openai-compatible" && Boolean(webSearchEnabled),
+    });
+    const contextOverheadTokens =
+      selectedModel.runtime === "openai-compatible"
+        ? estimateTextTokens(
+            JSON.stringify({
+              messages: [{ content: runtimeSystemPrompt, role: "system" }],
+              ...(webSearchEnabled
+                ? { tool_choice: "auto", tools: [WEB_SEARCH_TOOL, READ_WEBPAGE_TOOL] }
+                : {}),
+            }),
+          )
+        : estimateTextTokens(
+            JSON.stringify([
+              { role: "user", parts: [{ text: runtimeSystemPrompt }] },
+              { role: "model", parts: [{ text: "了解。" }] },
+            ]),
+          );
+    const contextPreparation = modelMetadata
+      ? prepareMessagesForContext(resolvedMessages, modelMetadata, contextOverheadTokens)
+      : undefined;
+    const preparedMessages = contextPreparation?.messages || resolvedMessages;
 
     if (selectedModel.runtime === "openai-compatible") {
       return createOpenAICompatibleStream(
-        resolvedMessages,
+        preparedMessages,
         selectedModel.id,
         selectedModel.apiKey,
         selectedModel.baseUrl,
         Boolean(webSearchEnabled),
         timezone,
         req.signal,
+        contextPreparation,
       );
     }
 
@@ -718,12 +795,8 @@ export async function POST(req: NextRequest) {
       ...(selectedModel.baseUrl ? { httpOptions: { baseUrl: selectedModel.baseUrl } } : {}),
     });
 
-    const prompt = resolvedMessages[resolvedMessages.length - 1].content;
-    const runtimeSystemPrompt = getRuntimeSystemPrompt({
-      timezone,
-      webSearchEnabled: false,
-    });
-    const history = resolvedMessages.slice(0, -1).map((message: ChatMessage) => ({
+    const prompt = preparedMessages[preparedMessages.length - 1].content;
+    const history = preparedMessages.slice(0, -1).map((message: ChatMessage) => ({
       parts: [{ text: message.content }],
       role: message.role === "model" ? "model" : "user",
     }));
@@ -787,6 +860,7 @@ export async function POST(req: NextRequest) {
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
         "Content-Type": "application/x-ndjson; charset=utf-8",
+        ...getContextHeaders(contextPreparation),
       },
     });
   } catch (error) {
