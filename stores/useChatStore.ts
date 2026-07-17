@@ -5,12 +5,19 @@ import { subscribeWithSelector } from "zustand/middleware";
 import { THINKING_TEXTS } from "@/lib/chat/constants";
 import { createSmoothTextController, parseChatStreamLine } from "@/lib/chat/client/streaming";
 import { createMessageId, extractThinkingFromText, getModelKey } from "@/lib/chat/helpers";
+import { applyMessageVariant, toMessageVariant } from "@/lib/chat/message-variants";
 import {
   estimateMessageTokens,
   estimateMessagesTokens,
   estimateTextTokens,
 } from "@/lib/chat/metrics";
-import type { ConfiguredModel, FileAttachment, Message, MessageSegment } from "@/lib/chat/types";
+import type {
+  ConfiguredModel,
+  FileAttachment,
+  Message,
+  MessageSegment,
+  RegenerateMode,
+} from "@/lib/chat/types";
 import { useSettingsStore } from "./useSettingsStore";
 import { useSessionStore } from "./useSessionStore";
 import { useUIStore } from "./useUIStore";
@@ -73,7 +80,8 @@ interface ChatActions {
     options?: StreamOptions,
   ) => Promise<StreamedMessageResult>;
   continueMessage: (message: Message) => Promise<void>;
-  regenerateMessage: (message: Message, deleteCurrent?: boolean) => Promise<void>;
+  regenerateMessage: (message: Message, mode?: RegenerateMode) => Promise<void>;
+  selectMessageVariant: (messageId: string, variantId: string) => Promise<void>;
   startEditing: (message: Message) => void;
   saveEditing: () => void;
   cancelEditing: () => void;
@@ -602,7 +610,6 @@ export const useChatStore = create<ChatStore>()(
       if (index < 0) return;
 
       const { availableModels, selectedModelKey, setOpenMenuMessageId } = useUIStore.getState();
-      const { getModelKey } = await import("@/lib/chat/helpers");
       const selectedModel = availableModels.find((m) => getModelKey(m) === selectedModelKey);
       const modelConfig =
         availableModels.find((m) => m.id === message.model && m.provider === message.provider) ||
@@ -648,9 +655,23 @@ export const useChatStore = create<ChatStore>()(
         modelConfig,
         { initialContent },
       );
-      const savedMessages = nextMessages.map((item) =>
-        item.id === message.id ? { ...item, ...streamedMessage } : item,
-      );
+      const savedMessages = nextMessages.map((item) => {
+        if (item.id !== message.id) return item;
+        let completedMessage: Message = { ...item, ...streamedMessage };
+        if (completedMessage.variants && completedMessage.activeVariantId) {
+          const activeVariant = toMessageVariant(
+            completedMessage,
+            completedMessage.activeVariantId,
+          );
+          completedMessage = {
+            ...completedMessage,
+            variants: completedMessage.variants.map((variant) =>
+              variant.id === activeVariant.id ? activeVariant : variant,
+            ),
+          };
+        }
+        return completedMessage;
+      });
       if (useSessionStore.getState().activeSessionId === targetSessionId) {
         set({ messages: savedMessages });
       }
@@ -659,7 +680,7 @@ export const useChatStore = create<ChatStore>()(
       await sessionStore.persistSessionMessages(targetSessionId, savedMessages);
     },
 
-    regenerateMessage: async (message, deleteCurrent = false) => {
+    regenerateMessage: async (message, mode = "replace") => {
       const { isLoading, messages, streamAssistantMessage } = get();
       if (isLoading) {
         toast.error("请等待当前回复完成");
@@ -694,6 +715,11 @@ export const useChatStore = create<ChatStore>()(
       if (!targetSessionId) return;
 
       if (message.role === "user") {
+        const followingReply = messages[index + 1];
+        if (followingReply?.role === "model") {
+          return get().regenerateMessage(followingReply, mode);
+        }
+
         const historyMessages = messages.slice(0, index + 1);
         const modelMessage: Message = {
           content: "",
@@ -739,11 +765,33 @@ export const useChatStore = create<ChatStore>()(
       }
 
       const regenerateHistoryMessages = messages.slice(0, promptIndex + 1);
+      const activeVariantId = message.activeVariantId || createMessageId();
+      const activeVariant = toMessageVariant(message, activeVariantId);
+      const storedVariants = message.variants || [];
+      const hasStoredActiveVariant = storedVariants.some(
+        (variant) => variant.id === activeVariantId,
+      );
+      const existingVariants = hasStoredActiveVariant
+        ? storedVariants.map((variant) =>
+            variant.id === activeVariantId ? activeVariant : variant,
+          )
+        : [...storedVariants, activeVariant];
+      const trackVariants = mode === "preserve" || (message.variants?.length || 0) > 1;
+      const nextVariantId = mode === "preserve" ? createMessageId() : activeVariantId;
+      const replacedVariantIndex = existingVariants.findIndex(
+        (variant) => variant.id === activeVariantId,
+      );
+      const retainedVariants = trackVariants
+        ? mode === "preserve"
+          ? existingVariants
+          : existingVariants.filter((variant) => variant.id !== activeVariantId)
+        : undefined;
       const nextModelMessage: Message = {
         ...message,
+        activeVariantId: trackVariants ? nextVariantId : undefined,
         content: "",
         createdAt: Date.now(),
-        id: deleteCurrent ? targetId : message.id,
+        id: message.id,
         generationDuration: undefined,
         inputTokens: undefined,
         interrupted: false,
@@ -756,11 +804,10 @@ export const useChatStore = create<ChatStore>()(
         reasoningDuration: undefined,
         segments: undefined,
         totalTokens: undefined,
+        variants: retainedVariants,
         webSearch: undefined,
       };
-      const nextMessages = deleteCurrent
-        ? [...historyMessages, nextModelMessage]
-        : [...messages.slice(0, index), nextModelMessage];
+      const nextMessages = [...messages.slice(0, index), nextModelMessage];
 
       set({ messages: nextMessages });
       setOpenMenuMessageId(null);
@@ -772,14 +819,50 @@ export const useChatStore = create<ChatStore>()(
         { webSearchEnabled },
       );
       const latestRetryMessage = get().messages.find((item) => item.id === nextModelMessage.id);
-      const savedMessages = [
-        ...nextMessages.slice(0, -1),
-        { ...nextModelMessage, ...(latestRetryMessage || {}), ...streamedMessage },
-      ];
+      let completedMessage: Message = {
+        ...nextModelMessage,
+        ...(latestRetryMessage || {}),
+        ...streamedMessage,
+      };
+      if (trackVariants) {
+        const completedVariant = toMessageVariant(completedMessage, nextVariantId);
+        const completedVariants = [...(retainedVariants || [])];
+        const insertAt =
+          mode === "replace" && replacedVariantIndex >= 0
+            ? Math.min(replacedVariantIndex, completedVariants.length)
+            : completedVariants.length;
+        completedVariants.splice(insertAt, 0, completedVariant);
+        completedMessage = {
+          ...completedMessage,
+          activeVariantId: nextVariantId,
+          variants: completedVariants,
+        };
+      }
+      const savedMessages = [...nextMessages.slice(0, -1), completedMessage];
       if (useSessionStore.getState().activeSessionId === targetSessionId) {
         set({ messages: savedMessages });
       }
       await sessionStore.persistSessionMessages(targetSessionId, savedMessages);
+    },
+
+    selectMessageVariant: async (messageId, variantId) => {
+      const { isLoading, messages } = get();
+      if (isLoading) return;
+
+      const messageIndex = messages.findIndex((message) => message.id === messageId);
+      const message = messages[messageIndex];
+      const variant = message?.variants?.find((item) => item.id === variantId);
+      if (!message || !variant) return;
+
+      const nextMessages = messages.map((item, index) =>
+        index === messageIndex ? applyMessageVariant(item, variant) : item,
+      );
+      set({ messages: nextMessages });
+
+      const sessionId = useSessionStore.getState().activeSessionId;
+      if (sessionId) {
+        await useSessionStore.getState().persistSessionMessages(sessionId, nextMessages);
+      }
     },
 
     startEditing: (message) => {
@@ -799,9 +882,18 @@ export const useChatStore = create<ChatStore>()(
         return;
       }
 
-      const nextMessages = messages.map((m) =>
-        m.id === editingMessageId ? { ...m, content: editingContent.trim() } : m,
-      );
+      const nextMessages = messages.map((message) => {
+        if (message.id !== editingMessageId) return message;
+        const nextMessage = { ...message, content: editingContent.trim() };
+        if (!nextMessage.variants || !nextMessage.activeVariantId) return nextMessage;
+        const activeVariant = toMessageVariant(nextMessage, nextMessage.activeVariantId);
+        return {
+          ...nextMessage,
+          variants: nextMessage.variants.map((variant) =>
+            variant.id === activeVariant.id ? activeVariant : variant,
+          ),
+        };
+      });
       set({ messages: nextMessages, editingMessageId: null, editingContent: "" });
 
       const sessionStore = useSessionStore.getState();

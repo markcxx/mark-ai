@@ -65,6 +65,8 @@ const ensureDatabase = () => {
       input_tokens INTEGER,
       output_tokens INTEGER,
       total_tokens INTEGER,
+      active_variant_id TEXT,
+      variants TEXT,
       model TEXT,
       provider TEXT,
       position INTEGER NOT NULL,
@@ -107,6 +109,8 @@ const ensureDatabase = () => {
   ensureColumn("input_tokens", "input_tokens INTEGER");
   ensureColumn("output_tokens", "output_tokens INTEGER");
   ensureColumn("total_tokens", "total_tokens INTEGER");
+  ensureColumn("active_variant_id", "active_variant_id TEXT");
+  ensureColumn("variants", "variants TEXT");
   ensureColumn("web_search", "web_search TEXT");
   ensureColumn("segments", "segments TEXT");
 
@@ -135,6 +139,7 @@ const toSession = (row: any): ChatSession => ({
 });
 
 const toMessage = (row: any): Message => ({
+  activeVariantId: row.active_variant_id || undefined,
   content: String(row.content || ""),
   createdAt: typeof row.created_at === "number" ? row.created_at : undefined,
   generationDuration:
@@ -151,6 +156,7 @@ const toMessage = (row: any): Message => ({
   role: row.role === "user" ? "user" : "model",
   segments: parseJsonValue(row.segments),
   totalTokens: typeof row.total_tokens === "number" ? row.total_tokens : undefined,
+  variants: parseJsonValue(row.variants),
   webSearch: parseJsonValue(row.web_search),
 });
 
@@ -249,6 +255,8 @@ export class SqliteStorage implements StorageAdapter {
           input_tokens,
           output_tokens,
           total_tokens,
+          active_variant_id,
+          variants,
           web_search,
           segments,
           model,
@@ -308,6 +316,8 @@ export class SqliteStorage implements StorageAdapter {
             input_tokens,
             output_tokens,
             total_tokens,
+            active_variant_id,
+            variants,
             web_search,
             segments,
             model,
@@ -315,7 +325,7 @@ export class SqliteStorage implements StorageAdapter {
             position,
             created_at
           )
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
 
       messages.forEach((message, index) => {
@@ -335,6 +345,8 @@ export class SqliteStorage implements StorageAdapter {
           message.inputTokens || null,
           message.outputTokens || null,
           message.totalTokens || null,
+          message.activeVariantId || null,
+          message.variants ? JSON.stringify(message.variants) : null,
           message.webSearch ? JSON.stringify(message.webSearch) : null,
           message.segments ? JSON.stringify(message.segments) : null,
           message.model || null,

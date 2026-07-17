@@ -643,10 +643,13 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                       message={message}
                       multiSelectMode={multiSelectMode}
                       openMenuMessageId={openMenuMessageId}
-                      regenerateMessage={(m, del) =>
-                        useChatStore.getState().regenerateMessage(m, del)
+                      regenerateMessage={(message, mode) =>
+                        useChatStore.getState().regenerateMessage(message, mode)
                       }
                       saveEditingMessage={() => useChatStore.getState().saveEditing()}
+                      selectMessageVariant={(messageId, variantId) =>
+                        useChatStore.getState().selectMessageVariant(messageId, variantId)
+                      }
                       selectedModel={selectedModel}
                       selectionLayoutMode={selectionLayoutMode}
                       setEditingContent={(c) => useChatStore.setState({ editingContent: c })}

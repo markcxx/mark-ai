@@ -27,9 +27,8 @@ export type FileAttachment = {
   kind?: "attachment" | "avatar";
 };
 
-export type Message = {
+export type MessageVariant = {
   id: string;
-  role: "user" | "model";
   content: string;
   createdAt?: number;
   reasoning?: string;
@@ -45,10 +44,19 @@ export type Message = {
   provider?: string;
   webSearch?: WebSearchState[];
   segments?: MessageSegment[];
-  attachments?: FileAttachment[];
 };
 
+export type Message = MessageVariant & {
+  activeVariantId?: string;
+  attachments?: FileAttachment[];
+  role: "user" | "model";
+  variants?: MessageVariant[];
+};
+
+export type RegenerateMode = "preserve" | "replace";
+
 export type WebSearchResult = {
+  citationId?: number;
   content?: string;
   favicon?: string;
   publishedDate?: string;

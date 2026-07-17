@@ -83,7 +83,7 @@ const READ_WEBPAGE_TOOL = {
 } as const;
 
 const WEB_SEARCH_SYSTEM_PROMPT =
-  "联网工具可用：web_search 用于搜索公开网页，read_webpage 用于读取具体公开网页 URL。只有当用户问题需要实时信息、外部事实核验、最新资料、明确要求联网，或用户提供 URL 需要阅读时才调用；普通推理、写作、翻译、代码解释不要调用。回答中应引用使用过的来源 URL。";
+  "联网工具可用：web_search 用于搜索公开网页，read_webpage 用于读取具体公开网页 URL。只有当用户问题需要实时信息、外部事实核验、最新资料、明确要求联网，或用户提供 URL 需要阅读时才调用；普通推理、写作、翻译、代码解释不要调用。工具结果中的 citationId 是可信来源编号；凡是依据工具来源陈述的事实，都应在对应句子后使用 [citationId] 标注，例如 [1]。只能引用工具实际返回的编号，不要自行编造编号或 URL。";
 
 const getSafeTimeZone = (timezone?: unknown) => {
   const candidate =
@@ -222,9 +222,9 @@ const formatToolResultForModel = (webSearch: WebSearchState) =>
     description: webSearch.description,
     error: webSearch.error,
     query: webSearch.query,
-    results: webSearch.results.slice(0, 8).map((item, index) => ({
+    results: webSearch.results.slice(0, 8).map((item) => ({
+      citationId: item.citationId,
       content: item.content,
-      index: index + 1,
       title: item.title,
       url: item.url,
     })),
@@ -270,6 +270,21 @@ const createOpenAICompatibleStream = async (
 
   const stream = new ReadableStream({
     async start(controller) {
+      const citationIdsByUrl = new Map<string, number>();
+      let nextCitationId = 1;
+
+      const assignCitationIds = (results: WebSearchState["results"]) =>
+        results.map((result) => {
+          const key = result.url.trim();
+          let citationId = citationIdsByUrl.get(key);
+          if (!citationId) {
+            citationId = nextCitationId;
+            nextCitationId += 1;
+            citationIdsByUrl.set(key, citationId);
+          }
+          return { ...result, citationId };
+        });
+
       const requestUpstream = async (requestMessages: OpenAIChatMessage[], allowTools: boolean) => {
         const upstream = await fetch(endpoint, {
           body: JSON.stringify({
@@ -460,7 +475,14 @@ const createOpenAICompatibleStream = async (
                   costTime: result.costTime,
                   description: result.description,
                   query: result.url,
-                  results: [],
+                  results: assignCitationIds([
+                    {
+                      content: result.description || result.content.slice(0, 600),
+                      favicon: result.favicon,
+                      title: result.title,
+                      url: result.url,
+                    },
+                  ]),
                   siteName: result.siteName,
                   status: "done",
                   title: result.title,
@@ -509,7 +531,7 @@ const createOpenAICompatibleStream = async (
                 completedAt: Date.now(),
                 costTime: result.costTime,
                 query: result.query,
-                results: result.results,
+                results: assignCitationIds(result.results),
                 status: "done",
                 tool: "web_search",
               };

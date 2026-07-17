@@ -1,7 +1,16 @@
-import { Check, ChevronDown, ExternalLink, Globe2, Loader2, X } from "lucide-react";
+import { ChevronDown, ExternalLink, Globe, Loader2, X } from "lucide-react";
 
-import type { WebSearchState } from "@/lib/chat/types";
+import type { WebCitation } from "@/lib/chat/citations";
+import type { WebSearchResult, WebSearchState } from "@/lib/chat/types";
 import { cn } from "@/lib/utils";
+
+import { SourceFavicon, SourcePopover } from "./MessageSources";
+
+const toCitation = (result: WebSearchResult, fallbackId: number): WebCitation => ({
+  ...result,
+  citationId: result.citationId || fallbackId,
+  structured: Boolean(result.citationId),
+});
 
 export function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchState }) {
   const searching = webSearch.status === "searching";
@@ -26,7 +35,7 @@ export function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchStat
               failed
                 ? "border-red-200 bg-red-50 text-red-600 dark:border-red-400/20 dark:bg-red-500/10 dark:text-red-300"
                 : done
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-300"
+                  ? "border-primary/20 bg-primary/5 text-primary dark:border-primary/25 dark:bg-primary/10"
                   : "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-400/20 dark:bg-sky-500/15 dark:text-sky-200",
             )}
           >
@@ -35,7 +44,7 @@ export function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchStat
             ) : failed ? (
               <X size={15} />
             ) : (
-              <Check size={15} />
+              <Globe size={15} />
             )}
           </div>
           <div className="min-w-0">
@@ -77,7 +86,7 @@ export function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchStat
       {searching ? (
         <div className="border-t border-gray-100 p-3 dark:border-white/10">
           <div className="mb-3 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-            <Globe2 size={14} />
+            <Globe size={14} />
             <span>
               {isWebpageRead
                 ? "正在读取网页、提取正文和页面信息..."
@@ -108,33 +117,47 @@ export function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchStat
         </div>
       ) : isWebpageRead ? (
         <div className="border-t border-gray-100 px-3 py-3 dark:border-white/10">
-          <div className="flex min-w-0 items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
-                {webSearch.title || webSearch.url}
-              </div>
-              {webSearch.description && (
-                <div className="mt-1 line-clamp-2 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-                  {webSearch.description}
-                </div>
+          {webSearch.url ? (
+            <SourcePopover
+              citation={toCitation(
+                webSearch.results[0] || {
+                  content: webSearch.description || webSearch.content?.slice(0, 600),
+                  title: webSearch.title || webSearch.url,
+                  url: webSearch.url,
+                },
+                1,
               )}
-              <div className="mt-1 truncate text-xs text-gray-400 dark:text-gray-500">
-                {webSearch.siteName ? `${webSearch.siteName} · ` : ""}
-                {webSearch.url}
-              </div>
-            </div>
-            {webSearch.url && (
-              <a
-                className="shrink-0 rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/[0.06] dark:hover:text-gray-200"
-                href={webSearch.url}
-                rel="noreferrer"
-                target="_blank"
-                title="打开网页"
+            >
+              <div
+                className="flex min-w-0 items-start justify-between gap-3 rounded-lg px-1 py-1 transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.04]"
+                tabIndex={0}
               >
-                <ExternalLink size={14} />
-              </a>
-            )}
-          </div>
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                    {webSearch.title || webSearch.url}
+                  </div>
+                  {webSearch.description && (
+                    <div className="mt-1 line-clamp-2 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+                      {webSearch.description}
+                    </div>
+                  )}
+                  <div className="mt-1 truncate text-xs text-gray-400 dark:text-gray-500">
+                    {webSearch.siteName ? `${webSearch.siteName} · ` : ""}
+                    {webSearch.url}
+                  </div>
+                </div>
+                <a
+                  className="shrink-0 rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/[0.06] dark:hover:text-gray-200"
+                  href={webSearch.url}
+                  rel="noreferrer"
+                  target="_blank"
+                  title="打开网页"
+                >
+                  <ExternalLink size={14} />
+                </a>
+              </div>
+            </SourcePopover>
+          ) : null}
           {webSearch.content && (
             <pre className="mt-3 max-h-[220px] overflow-auto whitespace-pre-wrap rounded-lg bg-gray-50 px-3 py-2 font-sans text-[13px] leading-relaxed text-gray-600 dark:bg-white/[0.04] dark:text-gray-300">
               {webSearch.content.slice(0, 2400)}
@@ -156,33 +179,40 @@ export function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchStat
             </pre>
           )}
           <div className="flex min-w-0 flex-col">
-            {webSearch.results.slice(0, 8).map((result) => (
-              <a
-                className="group/search-result min-w-0 border-b border-gray-100 px-2 py-1.5 transition-colors last:border-b-0 hover:bg-gray-50 dark:border-white/10 dark:hover:bg-white/[0.04]"
-                href={result.url}
-                key={result.url}
-                rel="noreferrer"
-                target="_blank"
-              >
-                <div className="flex min-w-0 items-center gap-1.5">
-                  <span className="min-w-0 truncate text-[13px] font-medium leading-relaxed text-gray-900 group-hover/search-result:text-sky-600 dark:text-gray-100 dark:group-hover/search-result:text-sky-300">
-                    {result.title}
-                  </span>
-                  <ExternalLink
-                    className="shrink-0 text-gray-400 opacity-0 transition-opacity group-hover/search-result:opacity-100"
-                    size={12}
-                  />
-                </div>
-                <div className="mt-0.5 truncate text-xs text-gray-400 dark:text-gray-500">
-                  {result.url}
-                </div>
-                {result.content && (
-                  <div className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-                    {result.content}
-                  </div>
-                )}
-              </a>
-            ))}
+            {webSearch.results.slice(0, 8).map((result, index) => {
+              const citation = toCitation(result, index + 1);
+              return (
+                <SourcePopover citation={citation} key={result.url}>
+                  <a
+                    className="group/search-result flex min-w-0 items-start gap-2.5 border-b border-gray-100 px-2 py-2 transition-colors last:border-b-0 hover:bg-gray-50 dark:border-white/10 dark:hover:bg-white/[0.04]"
+                    href={result.url}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    <SourceFavicon citation={citation} size={20} />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span className="min-w-0 truncate text-[13px] font-medium leading-relaxed text-gray-900 group-hover/search-result:text-primary dark:text-gray-100">
+                          {result.title}
+                        </span>
+                        <ExternalLink
+                          className="shrink-0 text-gray-400 opacity-0 transition-opacity group-hover/search-result:opacity-100"
+                          size={12}
+                        />
+                      </span>
+                      <span className="mt-0.5 block truncate text-xs text-gray-400 dark:text-gray-500">
+                        {result.url}
+                      </span>
+                      {result.content && (
+                        <span className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+                          {result.content}
+                        </span>
+                      )}
+                    </span>
+                  </a>
+                </SourcePopover>
+              );
+            })}
           </div>
         </div>
       )}

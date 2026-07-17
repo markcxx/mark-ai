@@ -2,6 +2,8 @@
 
 import { RefObject, useMemo, useRef } from "react";
 import {
+  ChevronLeft,
+  ChevronRight,
   CheckSquare,
   Copy,
   FileText,
@@ -18,7 +20,14 @@ import {
   Volume2,
 } from "lucide-react";
 
-import type { ConfiguredModel, MenuItem, Message, MessageSegment } from "@/lib/chat/types";
+import type {
+  ConfiguredModel,
+  MenuItem,
+  Message,
+  MessageSegment,
+  RegenerateMode,
+} from "@/lib/chat/types";
+import { collectMessageCitations } from "@/lib/chat/citations";
 import { formatDuration, formatRelativeTime } from "@/lib/chat/metrics";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/useSettingsStore";
@@ -31,6 +40,7 @@ import { MessageSelectionWrapper } from "./MessageSelectionWrapper";
 import { ModelAvatar } from "./ModelAvatar";
 import { ThinkingPanel } from "./ThinkingPanel";
 import { WebSearchToolBlock, WebSearchToolBlockItem } from "./message/WebSearchToolBlock";
+import { MessageSources } from "./message/MessageSources";
 
 function MoreMenuButton({
   align,
@@ -122,6 +132,52 @@ function InterruptedHint({
   );
 }
 
+function MessageVariantSwitcher({
+  message,
+  onSelect,
+}: {
+  message: Message;
+  onSelect: (messageId: string, variantId: string) => Promise<void>;
+}) {
+  const variants = message.variants || [];
+  if (variants.length < 2) return null;
+
+  const activeIndex = Math.max(
+    0,
+    variants.findIndex((variant) => variant.id === message.activeVariantId),
+  );
+  const selectAt = (index: number) => {
+    const variant = variants[index];
+    if (variant) void onSelect(message.id, variant.id);
+  };
+
+  return (
+    <div className="inline-flex h-7 items-center rounded-md bg-gray-50/80 text-xs text-gray-400 dark:bg-white/[0.04] dark:text-gray-500">
+      <button
+        aria-label="查看上一个答案"
+        className="flex h-full w-7 items-center justify-center rounded-l-lg transition-colors hover:bg-gray-100 hover:text-gray-800 disabled:opacity-30 dark:hover:bg-white/[0.07] dark:hover:text-gray-100"
+        disabled={activeIndex === 0}
+        onClick={() => selectAt(activeIndex - 1)}
+        type="button"
+      >
+        <ChevronLeft size={14} />
+      </button>
+      <span className="min-w-10 px-1 text-center tabular-nums">
+        {activeIndex + 1} / {variants.length}
+      </span>
+      <button
+        aria-label="查看下一个答案"
+        className="flex h-full w-7 items-center justify-center rounded-r-lg transition-colors hover:bg-gray-100 hover:text-gray-800 disabled:opacity-30 dark:hover:bg-white/[0.07] dark:hover:text-gray-100"
+        disabled={activeIndex === variants.length - 1}
+        onClick={() => selectAt(activeIndex + 1)}
+        type="button"
+      >
+        <ChevronRight size={14} />
+      </button>
+    </div>
+  );
+}
+
 export function MessageItem({
   cancelEditingMessage,
   collapsed,
@@ -140,6 +196,7 @@ export function MessageItem({
   openMenuMessageId,
   regenerateMessage,
   saveEditingMessage,
+  selectMessageVariant,
   selectedModel,
   selectionLayoutMode,
   setEditingContent,
@@ -163,8 +220,9 @@ export function MessageItem({
   message: Message;
   multiSelectMode: boolean;
   openMenuMessageId: string | null;
-  regenerateMessage: (message: Message, deleteCurrent?: boolean) => Promise<void>;
+  regenerateMessage: (message: Message, mode?: RegenerateMode) => Promise<void>;
   saveEditingMessage: () => void;
+  selectMessageVariant: (messageId: string, variantId: string) => Promise<void>;
   selectedModel?: ConfiguredModel;
   selectionLayoutMode: boolean;
   setEditingContent: (content: string) => void;
@@ -174,6 +232,9 @@ export function MessageItem({
   toggleSelectedMessage: (id: string, shiftKey?: boolean) => void;
 }) {
   const generalSettings = useSettingsStore((state) => state.general);
+  const regenerateMode: RegenerateMode = generalSettings.overwriteRegeneratedResponse
+    ? "replace"
+    : "preserve";
   const moreItems = useMemo<MenuItem[]>(
     () => [
       { icon: Pencil, label: "编辑", onClick: () => startEditingMessage(message) },
@@ -188,12 +249,10 @@ export function MessageItem({
       { icon: Languages, label: "翻译", onClick: menuUnavailable },
       { icon: Share2, label: "分享", onClick: menuUnavailable },
       { icon: CheckSquare, label: "多选", onClick: () => enableMultiSelect(message.id) },
-      { icon: RotateCw, label: "重新生成", onClick: () => regenerateMessage(message) },
       {
-        danger: true,
         icon: RotateCw,
-        label: "删除并重新生成",
-        onClick: () => regenerateMessage(message, true),
+        label: "重新生成",
+        onClick: () => regenerateMessage(message, regenerateMode),
       },
       { danger: true, icon: Trash2, label: "删除", onClick: () => deleteMessage(message.id) },
     ],
@@ -204,6 +263,7 @@ export function MessageItem({
       enableMultiSelect,
       menuUnavailable,
       message,
+      regenerateMode,
       regenerateMessage,
       startEditingMessage,
       toggleCollapseMessage,
@@ -211,6 +271,7 @@ export function MessageItem({
   );
 
   const editing = editingMessageId === message.id;
+  const citations = useMemo(() => collectMessageCitations(message), [message]);
   const relativeTime = formatRelativeTime(message.createdAt);
   const absoluteTime = message.createdAt
     ? new Intl.DateTimeFormat("zh-CN", {
@@ -403,6 +464,7 @@ export function MessageItem({
                       <div key={`seg-${i}`}>
                         <MarkdownContent
                           animation={generalSettings.responseAnimation}
+                          citations={citations}
                           streaming={message.isStreaming && i === message.segments!.length - 1}
                         >
                           {seg.content}
@@ -425,6 +487,7 @@ export function MessageItem({
                   {message.content ? (
                     <MarkdownContent
                       animation={generalSettings.responseAnimation}
+                      citations={citations}
                       streaming={message.isStreaming}
                     >
                       {message.content}
@@ -435,10 +498,11 @@ export function MessageItem({
                   )}
                 </>
               )}
+              {!message.isStreaming && <MessageSources citations={citations} />}
               {message.interrupted && (
                 <InterruptedHint
                   onContinue={() => continueMessage(message)}
-                  onRegenerate={() => regenerateMessage(message)}
+                  onRegenerate={() => void regenerateMessage(message, "replace")}
                 />
               )}
               {generalSettings.showMessageStats && <MessageStats message={message} />}
@@ -451,9 +515,10 @@ export function MessageItem({
             <MessageActionButton icon={Copy} onClick={() => copyMessage(message)} title="复制" />
             <MessageActionButton
               icon={RotateCw}
-              onClick={() => regenerateMessage(message)}
+              onClick={() => regenerateMessage(message, regenerateMode)}
               title="重新生成"
             />
+            <MessageVariantSwitcher message={message} onSelect={selectMessageVariant} />
             <MessageActionButton
               icon={Pencil}
               onClick={() => startEditingMessage(message)}

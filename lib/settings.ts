@@ -26,6 +26,7 @@ export type GeneralSettings = {
   codeWrap: boolean;
   defaultWebSearch: boolean;
   density: "compact" | "comfortable" | "spacious";
+  overwriteRegeneratedResponse: boolean;
   primaryColor: PrimaryColor;
   reduceMotion: boolean;
   responseAnimation: "none" | "fade" | "smooth";
@@ -74,6 +75,7 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
   codeWrap: false,
   defaultWebSearch: false,
   density: "comfortable",
+  overwriteRegeneratedResponse: true,
   primaryColor: "blue",
   reduceMotion: false,
   responseAnimation: "fade",
@@ -146,6 +148,10 @@ export const sanitizeGeneralSettings = (
     codeWrap: booleanValue(input.codeWrap, fallback.codeWrap),
     defaultWebSearch: booleanValue(input.defaultWebSearch, fallback.defaultWebSearch),
     density: stringOption(input.density, ["compact", "comfortable", "spacious"], fallback.density),
+    overwriteRegeneratedResponse: booleanValue(
+      input.overwriteRegeneratedResponse,
+      fallback.overwriteRegeneratedResponse,
+    ),
     primaryColor: stringOption(
       input.primaryColor,
       ["blue", "indigo", "violet", "magenta", "red", "orange", "green", "cyan"],

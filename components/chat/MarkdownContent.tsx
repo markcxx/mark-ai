@@ -7,10 +7,61 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { Pre, PreSingleLine } from "@/components/CodeBlock";
+import type { WebCitation } from "@/lib/chat/citations";
 import type { GeneralSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 
 import { HtmlPreviewBlock } from "./HtmlPreviewBlock";
+import { CitationReference } from "./message/MessageSources";
+
+type MarkdownNode = {
+  children?: MarkdownNode[];
+  type: string;
+  url?: string;
+  value?: string;
+};
+
+const createCitationPlugin = (citationIds: Set<number>) => () => (tree: MarkdownNode) => {
+  const transform = (node: MarkdownNode) => {
+    if (!node.children || node.type === "link" || node.type === "linkReference") return;
+
+    for (let index = 0; index < node.children.length; index += 1) {
+      const child = node.children[index];
+      if (child.type !== "text" || !child.value) {
+        transform(child);
+        continue;
+      }
+
+      const parts: MarkdownNode[] = [];
+      const pattern = /\[(\d+)\]/g;
+      let cursor = 0;
+      let match: RegExpExecArray | null;
+
+      while ((match = pattern.exec(child.value))) {
+        const citationId = Number(match[1]);
+        if (!citationIds.has(citationId)) continue;
+        if (match.index > cursor) {
+          parts.push({ type: "text", value: child.value.slice(cursor, match.index) });
+        }
+        parts.push({
+          children: [{ type: "text", value: match[0] }],
+          type: "link",
+          url: `#citation-${citationId}`,
+        });
+        cursor = match.index + match[0].length;
+      }
+
+      if (parts.length === 0) continue;
+      if (cursor < child.value.length) {
+        parts.push({ type: "text", value: child.value.slice(cursor) });
+      }
+      node.children.splice(index, 1, ...parts);
+      index += parts.length - 1;
+    }
+  };
+
+  transform(tree);
+};
 
 const getTextFromNode = (node: React.ReactNode): string => {
   if (typeof node === "string" || typeof node === "number") return String(node);
@@ -148,22 +199,62 @@ const markdownComponents = {
 export function MarkdownContent({
   animation = "none",
   children,
+  citations = [],
   streaming = false,
 }: {
   animation?: GeneralSettings["responseAnimation"];
   children: string;
+  citations?: WebCitation[];
   streaming?: boolean;
 }) {
   const animateNewWords = streaming && animation === "fade";
+  const citationById = React.useMemo(
+    () => new Map(citations.map((citation) => [citation.citationId, citation])),
+    [citations],
+  );
+  const citationPlugin = React.useMemo(
+    () =>
+      createCitationPlugin(
+        new Set(
+          citations
+            .filter((citation) => citation.structured)
+            .map((citation) => citation.citationId),
+        ),
+      ),
+    [citations],
+  );
+  const components = React.useMemo(
+    () => ({
+      ...markdownComponents,
+      a: ({
+        href,
+        node: _node,
+        ...props
+      }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { node?: unknown }) => {
+        const match = href?.match(/^#citation-(\d+)$/);
+        const citation = match ? citationById.get(Number(match[1])) : undefined;
+        if (citation) return <CitationReference citation={citation} />;
+
+        return (
+          <a
+            className="text-primary transition-colors hover:text-blue-700 hover:underline dark:hover:text-blue-300"
+            href={href}
+            {...props}
+          />
+        );
+      },
+    }),
+    [citationById],
+  );
 
   return (
     <div className={cn(animateNewWords && "streaming-markdown")}>
       <ReactMarkdown
-        components={markdownComponents}
+        components={components}
         rehypePlugins={
           animateNewWords ? [[rehypeStreamAnimated, { granularity: "word" }]] : undefined
         }
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, citationPlugin]}
       >
         {children}
       </ReactMarkdown>

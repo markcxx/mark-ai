@@ -6,7 +6,14 @@ import { getDb } from "@/lib/db";
 import { chatMessages, chatSessions } from "@/lib/db/schema";
 
 import type { StorageAdapter } from "./storage-adapter";
-import type { ChatSession, FileAttachment, Message, MessageSegment, WebSearchState } from "./types";
+import type {
+  ChatSession,
+  FileAttachment,
+  Message,
+  MessageSegment,
+  MessageVariant,
+  WebSearchState,
+} from "./types";
 
 const DEFAULT_SESSION_TITLE = "新对话";
 
@@ -27,6 +34,7 @@ const toSession = (row: typeof chatSessions.$inferSelect, messageCount: number):
 });
 
 const toMessage = (row: typeof chatMessages.$inferSelect): Message => ({
+  activeVariantId: row.activeVariantId ?? undefined,
   content: row.content || "",
   createdAt: row.createdAt ? new Date(row.createdAt).getTime() : undefined,
   generationDuration: row.generationDuration ?? undefined,
@@ -42,6 +50,7 @@ const toMessage = (row: typeof chatMessages.$inferSelect): Message => ({
   segments: (row.segments as MessageSegment[] | null) ?? undefined,
   attachments: (row.attachments as FileAttachment[] | null) ?? undefined,
   totalTokens: row.totalTokens ?? undefined,
+  variants: (row.variants as MessageVariant[] | null) ?? undefined,
   webSearch: (row.webSearch as WebSearchState[] | null) ?? undefined,
 });
 
@@ -210,6 +219,8 @@ export class PostgresStorage implements StorageAdapter {
           inputTokens: message.inputTokens || null,
           outputTokens: message.outputTokens || null,
           totalTokens: message.totalTokens || null,
+          activeVariantId: message.activeVariantId || null,
+          variants: message.variants || null,
           webSearch: message.webSearch || null,
           segments: message.segments || null,
           attachments: message.attachments || null,

@@ -201,6 +201,12 @@ export function ChatSettings() {
           value={general.responseAnimation}
         />
       </SettingRow>
+      <SettingRow description="关闭后，重新生成会保留旧回答并提供版本切换" title="覆盖旧回答">
+        <ToggleSwitch
+          checked={general.overwriteRegeneratedResponse}
+          onChange={(overwriteRegeneratedResponse) => update({ overwriteRegeneratedResponse })}
+        />
+      </SettingRow>
       <SettingRow description="“自动”会在生成时展开，结束后保留面板" title="思考面板">
         <AppSelect
           onChange={(value) => {

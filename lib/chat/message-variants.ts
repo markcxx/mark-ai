@@ -1,0 +1,40 @@
+import type { Message, MessageVariant } from "@/lib/chat/types";
+
+export const toMessageVariant = (message: Message, id: string): MessageVariant => ({
+  content: message.content,
+  createdAt: message.createdAt,
+  generationDuration: message.generationDuration,
+  id,
+  inputTokens: message.inputTokens,
+  interrupted: message.interrupted,
+  isReasoning: message.isReasoning,
+  isStreaming: false,
+  model: message.model,
+  outputTokens: message.outputTokens,
+  provider: message.provider,
+  reasoning: message.reasoning,
+  reasoningDuration: message.reasoningDuration,
+  segments: message.segments,
+  totalTokens: message.totalTokens,
+  webSearch: message.webSearch,
+});
+
+export const applyMessageVariant = (message: Message, variant: MessageVariant): Message => ({
+  ...message,
+  activeVariantId: variant.id,
+  content: variant.content,
+  createdAt: variant.createdAt,
+  generationDuration: variant.generationDuration,
+  inputTokens: variant.inputTokens,
+  interrupted: variant.interrupted,
+  isReasoning: variant.isReasoning,
+  isStreaming: false,
+  model: variant.model,
+  outputTokens: variant.outputTokens,
+  provider: variant.provider,
+  reasoning: variant.reasoning,
+  reasoningDuration: variant.reasoningDuration,
+  segments: variant.segments,
+  totalTokens: variant.totalTokens,
+  webSearch: variant.webSearch,
+});

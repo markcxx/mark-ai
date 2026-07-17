@@ -15,6 +15,13 @@
       "when": 1784211223389,
       "tag": "0001_old_catseye",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784279768778,
+      "tag": "0002_hard_ravenous",
+      "breakpoints": true
     }
   ]
 }
