@@ -1,9 +1,9 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq } from "drizzle-orm";
 
-import { decryptCredential } from './credential-crypto';
-import { getDb } from './db';
-import { userModelProviders } from './db/schema';
-import type { ConfiguredModel, ModelRuntime, PublicConfiguredModel } from './models';
+import { decryptCredential } from "./credential-crypto";
+import { getDb } from "./db";
+import { userModelProviders } from "./db/schema";
+import type { ConfiguredModel, ModelRuntime, PublicConfiguredModel } from "./models";
 
 export type PublicUserModelProvider = {
   baseUrl: string;
@@ -18,9 +18,11 @@ export type PublicUserModelProvider = {
 };
 
 const normalizeRuntime = (runtime: string): ModelRuntime =>
-  runtime === 'gemini' ? 'gemini' : 'openai-compatible';
+  runtime === "gemini" ? "gemini" : "openai-compatible";
 
-export const listUserModelProviders = async (userId: string): Promise<PublicUserModelProvider[]> => {
+export const listUserModelProviders = async (
+  userId: string,
+): Promise<PublicUserModelProvider[]> => {
   const rows = await getDb()
     .select()
     .from(userModelProviders)
@@ -48,7 +50,7 @@ export const getUserConfiguredModels = async (userId: string): Promise<Configure
   return rows.flatMap((row) => {
     if (!row.apiKeyEncrypted) return [];
 
-    let apiKey = '';
+    let apiKey = "";
     try {
       apiKey = decryptCredential(row.apiKeyEncrypted);
     } catch (error) {

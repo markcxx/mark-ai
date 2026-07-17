@@ -6,14 +6,20 @@ export const storageLimits = {
 };
 
 const ALLOWED_ATTACHMENT_TYPES = new Set([
-  'image/jpeg', 'image/png', 'image/webp', 'image/gif',
-  'application/pdf', 'text/plain', 'text/csv', 'text/markdown',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "application/pdf",
+  "text/plain",
+  "text/csv",
+  "text/markdown",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 ]);
 
-const ALLOWED_AVATAR_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const ALLOWED_AVATAR_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
-export const isAllowedUploadType = (contentType: string, kind: 'attachment' | 'avatar') =>
-  (kind === 'avatar' ? ALLOWED_AVATAR_TYPES : ALLOWED_ATTACHMENT_TYPES).has(contentType);
+export const isAllowedUploadType = (contentType: string, kind: "attachment" | "avatar") =>
+  (kind === "avatar" ? ALLOWED_AVATAR_TYPES : ALLOWED_ATTACHMENT_TYPES).has(contentType);

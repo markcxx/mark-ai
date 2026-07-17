@@ -1,35 +1,42 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useTheme } from 'next-themes';
-import toast, { Toaster } from 'react-hot-toast';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useTheme } from "next-themes";
+import toast, { Toaster } from "react-hot-toast";
 
-import { NOT_IMPLEMENTED_TOAST, THINKING_TEXTS } from '@/lib/chat/constants';
-import { getModelKey } from '@/lib/chat/helpers';
-import { PRIMARY_COLOR_VALUES } from '@/lib/settings';
-import { cn } from '@/lib/utils';
-import { useChatStore } from '@/stores/useChatStore';
-import { useSessionStore, navigateToNewChat } from '@/stores/useSessionStore';
-import { useSettingsStore } from '@/stores/useSettingsStore';
-import { useUIStore } from '@/stores/useUIStore';
+import { NOT_IMPLEMENTED_TOAST, THINKING_TEXTS } from "@/lib/chat/constants";
+import {
+  deleteChatSession,
+  loadChatSession,
+  renameChatSession,
+  startNewChat,
+} from "@/lib/chat/client/chat-controller";
+import { getModelKey } from "@/lib/chat/helpers";
+import { useChatAttachments } from "@/hooks/use-chat-attachments";
+import { useConversationScroll } from "@/hooks/use-conversation-scroll";
+import { useSidebarResize } from "@/hooks/use-sidebar-resize";
+import { PRIMARY_COLOR_VALUES } from "@/lib/settings";
+import { cn } from "@/lib/utils";
+import { useChatStore } from "@/stores/useChatStore";
+import { useSessionStore } from "@/stores/useSessionStore";
+import { useSettingsStore } from "@/stores/useSettingsStore";
+import { useUIStore } from "@/stores/useUIStore";
 
-import { ChatInput } from './ChatInput';
-import { ChatMiniMap } from './ChatMiniMap';
-import { ExportDialog, type ExportMode } from './ExportDialog';
-import { HtmlPreviewContext } from './HtmlPreviewContext';
-import { HtmlPreviewPanel } from './HtmlPreviewPanel';
-import type { HtmlPreviewPayload } from './htmlPreviewUtils';
-import { MessageItem } from './MessageItem';
-import { SelectToHereButton } from './SelectToHereButton';
-import { SelectionFooterBar } from './SelectionFooterBar';
-import { Sidebar } from './Sidebar';
-import { TopHeader } from './TopHeader';
-import { WelcomePanel } from './WelcomePanel';
-
-const BOTTOM_SCROLL_THRESHOLD = 48;
+import { ChatInput } from "./ChatInput";
+import { ChatMiniMap } from "./ChatMiniMap";
+import { ExportDialog, type ExportMode } from "./ExportDialog";
+import { HtmlPreviewContext } from "./HtmlPreviewContext";
+import { HtmlPreviewPanel } from "./HtmlPreviewPanel";
+import type { HtmlPreviewPayload } from "./htmlPreviewUtils";
+import { MessageItem } from "./MessageItem";
+import { SelectToHereButton } from "./SelectToHereButton";
+import { SelectionFooterBar } from "./SelectionFooterBar";
+import { Sidebar } from "./Sidebar";
+import { TopHeader } from "./TopHeader";
+import { WelcomePanel } from "./WelcomePanel";
 
 function MessageSkeletonList() {
-  const lineWidths = ['100%', '88%', '64%'];
+  const lineWidths = ["100%", "88%", "64%"];
 
   return (
     <div className="mt-6 flex h-full w-full max-w-[840px] flex-col gap-9 px-3">
@@ -38,7 +45,7 @@ function MessageSkeletonList() {
           <div
             className="h-4 animate-pulse rounded-md bg-gray-200/80 dark:bg-gray-700/80"
             key={width}
-            style={{ width: index === lineWidths.length - 1 ? '56%' : width }}
+            style={{ width: index === lineWidths.length - 1 ? "56%" : width }}
           />
         ))}
       </div>
@@ -103,21 +110,25 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   const editingContent = useChatStore((s) => s.editingContent);
   const pendingAttachments = useChatStore((s) => s.pendingAttachments);
 
-  // Refs
-  const messagesScrollRef = useRef<HTMLDivElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const userHasScrolledAwayRef = useRef(false);
-  const isAutoScrollingRef = useRef(false);
+  const {
+    activeMessageId: activeMiniMapMessageId,
+    handleScroll: handleMessagesScroll,
+    messagesEndRef,
+    messagesScrollRef,
+    resetScrollIntent,
+    scrollToBottom,
+  } = useConversationScroll(generalSettings.autoScroll);
+  const { attachmentUploading, fileInputRef, handleAttachmentFiles, removeAttachment } =
+    useChatAttachments();
+  const handleSidebarResizePointerDown = useSidebarResize(sidebarWidth);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectionLayoutMode, setSelectionLayoutMode] = useState(false);
-  const [activeMiniMapMessageId, setActiveMiniMapMessageId] = useState<string | null>(null);
   const [activeHtmlPreview, setActiveHtmlPreview] = useState<HtmlPreviewPayload | null>(null);
   const [htmlPreviewFullscreen, setHtmlPreviewFullscreen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
-  const [exportDialogMode, setExportDialogMode] = useState<ExportMode>('image');
-  const [attachmentUploading, setAttachmentUploading] = useState(false);
+  const [exportDialogMode, setExportDialogMode] = useState<ExportMode>("image");
 
   // Derived
   const selectedModel = availableModels.find((m) => getModelKey(m) === selectedModelKey);
@@ -125,83 +136,39 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   const showWelcome = messages.length === 0 && !multiSelectMode;
   const mobileSidebarOffset = `min(${sidebarWidth}px, 86vw)`;
 
-  // Scroll helpers
-  const scrollToBottom = useCallback((force = false) => {
-    if (!force && !generalSettings.autoScroll) return;
-    const container = messagesScrollRef.current;
-    if (!container) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
-      return;
-    }
-    if (!force && userHasScrolledAwayRef.current) return;
-    isAutoScrollingRef.current = true;
-    requestAnimationFrame(() => {
-      container.scrollTop = container.scrollHeight;
-      requestAnimationFrame(() => { isAutoScrollingRef.current = false; });
-    });
-  }, [generalSettings.autoScroll]);
+  const handleLoadSession = useCallback(
+    async (sessionId: string, options: { history?: "push" | "replace" | "none" } = {}) => {
+      setActiveHtmlPreview(null);
+      setHtmlPreviewFullscreen(false);
+      resetScrollIntent();
+      await loadChatSession(sessionId, options);
+    },
+    [resetScrollIntent],
+  );
 
-  const handleMessagesScroll = useCallback(() => {
-    if (isAutoScrollingRef.current) return;
-    const container = messagesScrollRef.current;
-    if (!container) return;
-    userHasScrolledAwayRef.current =
-      container.scrollHeight - container.scrollTop - container.clientHeight > BOTTOM_SCROLL_THRESHOLD;
-
-    const containerTop = container.getBoundingClientRect().top;
-    const nodes = Array.from(container.querySelectorAll<HTMLElement>('[data-message-id]'));
-    let activeId: string | null = null;
-
-    for (const node of nodes) {
-      if (node.getBoundingClientRect().top - containerTop <= 96) {
-        activeId = node.dataset.messageId || activeId;
-      } else {
-        break;
-      }
-    }
-
-    if (!activeId && nodes[0]) activeId = nodes[0].dataset.messageId || null;
-    setActiveMiniMapMessageId((current) => (current === activeId ? current : activeId));
-  }, []);
-
-  const handleLoadSession = useCallback(async (
-    sessionId: string,
-    options: { history?: 'push' | 'replace' | 'none' } = {},
-  ) => {
-    useChatStore.getState().abortStreaming();
-    setActiveHtmlPreview(null);
-    setHtmlPreviewFullscreen(false);
-    userHasScrolledAwayRef.current = false;
-    const loadedMessages = await useSessionStore.getState().loadSession(sessionId, options);
-    if (loadedMessages) {
-      useChatStore.getState().setMessages(loadedMessages);
-      useChatStore.setState({ editingMessageId: null, editingContent: '' });
-      useUIStore.getState().exitMultiSelect();
-      useUIStore.getState().setOpenMenuMessageId(null);
-    }
-  }, []);
-
-  const handleNewChat = useCallback((history: 'push' | 'replace' | 'none' = 'push') => {
-    setActiveHtmlPreview(null);
-    setHtmlPreviewFullscreen(false);
-    userHasScrolledAwayRef.current = false;
-    useChatStore.getState().reset();
-    useSessionStore.getState().resetActiveSession();
-    useUIStore.getState().exitMultiSelect();
-    useUIStore.getState().setOpenMenuMessageId(null);
-    navigateToNewChat(history);
-  }, []);
+  const handleNewChat = useCallback(
+    (history: "push" | "replace" | "none" = "push") => {
+      setActiveHtmlPreview(null);
+      setHtmlPreviewFullscreen(false);
+      resetScrollIntent();
+      startNewChat(history);
+    },
+    [resetScrollIntent],
+  );
 
   // PLACEHOLDER_EFFECTS
 
   useEffect(() => {
     if (!settingsLoaded) return;
     const root = document.documentElement;
-    root.style.setProperty('--color-primary', PRIMARY_COLOR_VALUES[generalSettings.primaryColor]);
-    root.style.setProperty('--color-primary-container', PRIMARY_COLOR_VALUES[generalSettings.primaryColor]);
-    root.style.setProperty('--chat-font-size', `${generalSettings.chatFontSize}px`);
+    root.style.setProperty("--color-primary", PRIMARY_COLOR_VALUES[generalSettings.primaryColor]);
+    root.style.setProperty(
+      "--color-primary-container",
+      PRIMARY_COLOR_VALUES[generalSettings.primaryColor],
+    );
+    root.style.setProperty("--chat-font-size", `${generalSettings.chatFontSize}px`);
     root.dataset.density = generalSettings.density;
-    root.dataset.reduceMotion = generalSettings.reduceMotion ? 'true' : 'false';
+    root.dataset.reduceMotion = generalSettings.reduceMotion ? "true" : "false";
     setTheme(generalSettings.themeMode);
     useUIStore.getState().setWebSearchEnabled(generalSettings.defaultWebSearch);
     useUIStore.getState().setWideChatMode(generalSettings.wideChatMode);
@@ -209,8 +176,12 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   }, [generalSettings, setTheme, settingsLoaded]);
 
   // Auto-scroll on new messages
-  useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
-  useEffect(() => { if (!isLoadingActiveSession) scrollToBottom(); }, [isLoadingActiveSession, scrollToBottom]);
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
+  useEffect(() => {
+    if (!isLoadingActiveSession) scrollToBottom();
+  }, [isLoadingActiveSession, scrollToBottom]);
 
   // Keep the boot splash visible until all startup data has settled and rendered.
   useEffect(() => {
@@ -225,7 +196,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
         if (uiStore.isAppReady) {
           const sessionStore = useSessionStore.getState();
           if (initialSessionId && sessionStore.activeSessionId !== initialSessionId) {
-            await handleLoadSession(initialSessionId, { history: 'none' });
+            await handleLoadSession(initialSessionId, { history: "none" });
           }
           return;
         }
@@ -234,32 +205,34 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
         let completedTasks = 0;
         const finishTask = (message: string) => {
           completedTasks += 1;
-          useUIStore.getState().setBootProgress(
-            12 + Math.round((completedTasks / totalTasks) * 76),
-            message,
-          );
+          useUIStore
+            .getState()
+            .setBootProgress(12 + Math.round((completedTasks / totalTasks) * 76), message);
         };
 
-        uiStore.setBootProgress(12, '正在加载模型与会话…');
+        uiStore.setBootProgress(12, "正在加载模型与会话…");
         await Promise.all([
-          useSettingsStore.getState().loadSettings().then(() => finishTask('个性化设置已加载')),
-          uiStore.loadModels().then(() => finishTask('模型配置已加载')),
+          useSettingsStore
+            .getState()
+            .loadSettings()
+            .then(() => finishTask("个性化设置已加载")),
+          uiStore.loadModels().then(() => finishTask("模型配置已加载")),
           (async () => {
             await useSessionStore.getState().loadSessions();
-            finishTask('会话历史已加载');
+            finishTask("会话历史已加载");
             if (initialSessionId) {
-              useUIStore.getState().setBootProgress(72, '正在恢复当前会话…');
-              await handleLoadSession(initialSessionId, { history: 'none' });
-              finishTask('当前会话已恢复');
+              useUIStore.getState().setBootProgress(72, "正在恢复当前会话…");
+              await handleLoadSession(initialSessionId, { history: "none" });
+              finishTask("当前会话已恢复");
             }
           })(),
         ]);
       } finally {
         if (!cancelled) {
-          useUIStore.getState().setBootProgress(94, '正在渲染界面…');
+          useUIStore.getState().setBootProgress(94, "正在渲染界面…");
           window.requestAnimationFrame(() => {
             if (!cancelled) {
-              useUIStore.getState().setBootProgress(100, '加载完成');
+              useUIStore.getState().setBootProgress(100, "加载完成");
               useUIStore.getState().setAppReady(true);
             }
           });
@@ -268,12 +241,14 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
     };
 
     void init();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [initialSessionId, handleLoadSession]);
 
   // Mobile uses the sidebar as a temporary drawer instead of a persistent column.
   useEffect(() => {
-    const query = window.matchMedia('(max-width: 767px)');
+    const query = window.matchMedia("(max-width: 767px)");
     const syncMobileViewport = () => {
       const mobile = query.matches;
       setIsMobileViewport(mobile);
@@ -281,15 +256,15 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
     };
 
     syncMobileViewport();
-    query.addEventListener('change', syncMobileViewport);
-    return () => query.removeEventListener('change', syncMobileViewport);
+    query.addEventListener("change", syncMobileViewport);
+    return () => query.removeEventListener("change", syncMobileViewport);
   }, []);
 
   useEffect(() => {
     if (!isMobileViewport || !isSidebarOpen) return;
 
     const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = previousOverflow;
     };
@@ -311,17 +286,22 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
     if (!isResizingSidebar) return;
     const prev = document.body.style.cursor;
     const prevSelect = document.body.style.userSelect;
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-    return () => { document.body.style.cursor = prev; document.body.style.userSelect = prevSelect; };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    return () => {
+      document.body.style.cursor = prev;
+      document.body.style.userSelect = prevSelect;
+    };
   }, [isResizingSidebar]);
 
   // Multi-select escape key
   useEffect(() => {
     if (!multiSelectMode) return;
-    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') useUIStore.getState().exitMultiSelect(); };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") useUIStore.getState().exitMultiSelect();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [multiSelectMode]);
 
   // Keep the full-width selection layout briefly after exit so the row can animate closed.
@@ -336,108 +316,37 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   useEffect(() => {
     const handlePopState = () => {
       const nextSessionId = decodeURIComponent(
-        window.location.pathname.split('/').filter(Boolean)[0] || '',
+        window.location.pathname.split("/").filter(Boolean)[0] || "",
       );
       if (nextSessionId) {
-        handleLoadSession(nextSessionId, { history: 'none' });
+        handleLoadSession(nextSessionId, { history: "none" });
         return;
       }
-      handleNewChat('none');
+      handleNewChat("none");
     };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
   }, [handleLoadSession, handleNewChat]);
 
   // Handlers
-  const handleSidebarResizePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    useUIStore.getState().setIsResizingSidebar(true);
-    const startX = event.clientX;
-    const startWidth = sidebarWidth;
-
-    const handlePointerMove = (e: PointerEvent) => {
-      e.preventDefault();
-      useUIStore.getState().setSidebarWidth(startWidth + e.clientX - startX);
-    };
-    const handlePointerUp = () => {
-      useUIStore.getState().setIsResizingSidebar(false);
-      useSettingsStore.getState().updateGeneral({
-        sidebarWidth: useUIStore.getState().sidebarWidth,
-      });
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-    };
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
-  };
-
   const handleInput = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     useChatStore.getState().setInput(event.target.value);
     if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = "auto";
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
     }
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    const shouldSend = generalSettings.sendShortcut === 'enter'
-      ? event.key === 'Enter' && !event.shiftKey
-      : event.key === 'Enter' && (event.ctrlKey || event.metaKey);
+    const shouldSend =
+      generalSettings.sendShortcut === "enter"
+        ? event.key === "Enter" && !event.shiftKey
+        : event.key === "Enter" && (event.ctrlKey || event.metaKey);
     if (shouldSend) {
       event.preventDefault();
       if (attachmentUploading) return;
       useChatStore.getState().sendMessage();
     }
-  };
-
-  const uploadAttachment = async (file: File) => {
-    const presign = await fetch('/api/files/presign', {
-      body: JSON.stringify({ contentType: file.type, kind: 'attachment', name: file.name, size: file.size }),
-      headers: { 'Content-Type': 'application/json' },
-      method: 'POST',
-    });
-    const presignData = await presign.json();
-    if (!presign.ok) throw new Error(presignData.error || '无法创建上传任务');
-
-    const upload = await fetch(presignData.uploadUrl, {
-      body: file,
-      headers: { 'Content-Type': file.type },
-      method: 'PUT',
-    });
-    if (!upload.ok) {
-      await fetch(`/api/files/${presignData.file.id}`, { method: 'DELETE' }).catch(() => undefined);
-      throw new Error('上传到 R2 失败');
-    }
-
-    const complete = await fetch('/api/files/complete', {
-      body: JSON.stringify({ id: presignData.file.id }),
-      headers: { 'Content-Type': 'application/json' },
-      method: 'POST',
-    });
-    const completeData = await complete.json();
-    if (!complete.ok) throw new Error(completeData.error || '文件校验失败');
-    useChatStore.getState().addPendingAttachment(completeData.file);
-  };
-
-  const handleAttachmentFiles = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const slots = Math.max(0, 4 - useChatStore.getState().pendingAttachments.length);
-    const files = Array.from(event.target.files || []).slice(0, slots);
-    event.target.value = '';
-    if (files.length === 0) return;
-    setAttachmentUploading(true);
-    try {
-      for (const file of files) await uploadAttachment(file);
-      toast.success(files.length === 1 ? '附件已就绪' : `${files.length} 个附件已就绪`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : '附件上传失败');
-    } finally {
-      setAttachmentUploading(false);
-    }
-  };
-
-  const removeAttachment = (id: string) => {
-    useChatStore.getState().removePendingAttachment(id);
-    void fetch(`/api/files/${id}`, { method: 'DELETE' });
   };
 
   const handleSend = () => {
@@ -446,12 +355,12 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
       return;
     }
     useChatStore.getState().sendMessage();
-    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
   };
 
   const openExportDialog = (mode: ExportMode) => {
     if (messages.length === 0) {
-      toast.error('没有可导出的消息');
+      toast.error("没有可导出的消息");
       return;
     }
     setExportDialogMode(mode);
@@ -459,10 +368,11 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   };
 
   const getMessageModel = (message: { role: string; model?: string; provider?: string }) => {
-    if (message.role !== 'model') return selectedModel;
-    return availableModels.find(
-      (m) => m.id === message.model && m.provider === message.provider,
-    ) || selectedModel;
+    if (message.role !== "model") return selectedModel;
+    return (
+      availableModels.find((m) => m.id === message.model && m.provider === message.provider) ||
+      selectedModel
+    );
   };
 
   const openHtmlPreview = useCallback((preview: HtmlPreviewPayload) => {
@@ -482,19 +392,19 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   return (
     <div
       className={cn(
-        'flex h-dvh w-screen overflow-hidden bg-[var(--chat-app-bg)] p-0 font-sans text-gray-900 antialiased dark:text-gray-100 md:p-2',
-        isResizingSidebar && 'cursor-col-resize select-none',
+        "flex h-dvh w-screen overflow-hidden bg-[var(--chat-app-bg)] p-0 font-sans text-gray-900 antialiased dark:text-gray-100 md:p-2",
+        isResizingSidebar && "cursor-col-resize select-none",
       )}
     >
       <Toaster
         position="top-center"
         toastOptions={{
-          className: 'text-sm',
+          className: "text-sm",
           duration: 2200,
           style: {
-            border: '1px solid #e5e7eb',
-            borderRadius: '12px',
-            boxShadow: '0 12px 36px rgba(0,0,0,0.12)',
+            border: "1px solid #e5e7eb",
+            borderRadius: "12px",
+            boxShadow: "0 12px 36px rgba(0,0,0,0.12)",
           },
         }}
       />
@@ -514,18 +424,22 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
         isLoadingSessions={isLoadingSessions}
         loadingSessionIds={loadingSessionIds}
         onClose={() => useUIStore.getState().setSidebarOpen(false)}
-        onDeleteSession={(id) => useSessionStore.getState().deleteSession(id)}
+        onDeleteSession={(id) => void deleteChatSession(id)}
         onNewChat={() => {
           handleNewChat();
           if (isMobileViewport) useUIStore.getState().setSidebarOpen(false);
         }}
-        onRenameSession={(id) => useSessionStore.getState().renameSession(id)}
+        onRenameSession={(id) => void renameChatSession(id)}
         onSelectSession={(id) => {
           void handleLoadSession(id);
           if (isMobileViewport) useUIStore.getState().setSidebarOpen(false);
         }}
-        onToggleFavorite={(id, favorite) => useSessionStore.getState().updateSessionFavorite(id, favorite)}
-        onUpdateSessionTitle={(id, title) => useSessionStore.getState().updateSessionTitle(id, title)}
+        onToggleFavorite={(id, favorite) =>
+          useSessionStore.getState().updateSessionFavorite(id, favorite)
+        }
+        onUpdateSessionTitle={(id, title) =>
+          useSessionStore.getState().updateSessionTitle(id, title)
+        }
         onUnavailable={() => toast(NOT_IMPLEMENTED_TOAST)}
         sessions={sessions}
         width={sidebarWidth}
@@ -550,98 +464,228 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
       >
         <div
           className={cn(
-            'grid min-w-0 flex-1 transition-[grid-template-columns,gap,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] md:duration-300 md:ease-out',
-            activeHtmlPreview && (htmlPreviewFullscreen || isMobileViewport) ? 'gap-0' : 'gap-2',
+            "grid min-w-0 flex-1 transition-[grid-template-columns,gap,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] md:duration-300 md:ease-out",
+            activeHtmlPreview && (htmlPreviewFullscreen || isMobileViewport) ? "gap-0" : "gap-2",
           )}
           style={{
             gridTemplateColumns: activeHtmlPreview
               ? htmlPreviewFullscreen || isMobileViewport
-                ? 'minmax(0, 0fr) minmax(0, 1fr)'
-                : 'minmax(0, 1fr) minmax(360px, 48%)'
-              : 'minmax(0, 1fr)',
+                ? "minmax(0, 0fr) minmax(0, 1fr)"
+                : "minmax(0, 1fr) minmax(360px, 48%)"
+              : "minmax(0, 1fr)",
             transform:
-              isMobileViewport && isSidebarOpen
-                ? `translateX(${mobileSidebarOffset})`
-                : undefined,
+              isMobileViewport && isSidebarOpen ? `translateX(${mobileSidebarOffset})` : undefined,
           }}
         >
           <main
             className={cn(
-              'relative flex min-w-0 flex-col overflow-hidden border-0 bg-[var(--chat-panel-bg)] shadow-none transition-[opacity,border-color] duration-300 ease-out dark:border-gray-700 md:rounded-xl md:border md:border-[#e5e5e5]',
+              "relative flex min-w-0 flex-col overflow-hidden border-0 bg-[var(--chat-panel-bg)] shadow-none transition-[opacity,border-color] duration-300 ease-out dark:border-gray-700 md:rounded-xl md:border md:border-[#e5e5e5]",
               activeHtmlPreview && (htmlPreviewFullscreen || isMobileViewport)
-                ? 'pointer-events-none border-transparent opacity-0'
-                : 'opacity-100',
+                ? "pointer-events-none border-transparent opacity-0"
+                : "opacity-100",
             )}
           >
-        {isSidebarOpen && (
-          <div
-            aria-label="调整侧栏宽度"
-            className="group absolute inset-y-0 left-0 z-30 hidden w-3 -translate-x-1/2 touch-none cursor-col-resize md:block"
-            onPointerDown={handleSidebarResizePointerDown}
-            role="separator"
-          >
-            <div
-              className={cn(
-                'absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-transparent transition-colors duration-150 group-hover:bg-gray-300 dark:group-hover:bg-gray-600',
-                isResizingSidebar && 'bg-primary/50',
-              )}
+            {isSidebarOpen && (
+              <div
+                aria-label="调整侧栏宽度"
+                className="group absolute inset-y-0 left-0 z-30 hidden w-3 -translate-x-1/2 touch-none cursor-col-resize md:block"
+                onPointerDown={handleSidebarResizePointerDown}
+                role="separator"
+              >
+                <div
+                  className={cn(
+                    "absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-transparent transition-colors duration-150 group-hover:bg-gray-300 dark:group-hover:bg-gray-600",
+                    isResizingSidebar && "bg-primary/50",
+                  )}
+                />
+              </div>
+            )}
+
+            <TopHeader
+              activeSession={activeSession}
+              copyConversation={() => useChatStore.getState().copyConversation()}
+              copySessionId={() => {
+                if (!activeSessionId) {
+                  toast.error("当前没有会话 ID");
+                  return;
+                }
+                void navigator.clipboard.writeText(activeSessionId);
+                toast.success("会话 ID 已复制");
+              }}
+              deleteSession={() => {
+                if (!activeSessionId) {
+                  toast.error("当前没有可删除的会话");
+                  return;
+                }
+                void deleteChatSession(activeSessionId);
+              }}
+              exportSessionImage={() => openExportDialog("image")}
+              exportSessionJson={() => openExportDialog("json")}
+              isFavorite={Boolean(activeSession?.favorite)}
+              isSidebarOpen={isSidebarOpen}
+              isWideChatMode={wideChatMode}
+              onOpenSidebar={() => useUIStore.getState().setSidebarOpen(true)}
+              smartRenameSession={() => {
+                if (!activeSessionId) {
+                  toast.error("当前没有可重命名的会话");
+                  return;
+                }
+                void renameChatSession(activeSessionId);
+              }}
+              toggleFavorite={() => {
+                if (!activeSessionId) {
+                  toast.error("当前没有可收藏的会话");
+                  return;
+                }
+                void useSessionStore
+                  .getState()
+                  .updateSessionFavorite(activeSessionId, !activeSession?.favorite);
+              }}
+              toggleWideChatMode={() => {
+                useUIStore.getState().setWideChatMode(!wideChatMode);
+                useSettingsStore.getState().updateGeneral({ wideChatMode: !wideChatMode });
+              }}
+              updateSessionTitle={(title) => {
+                if (!activeSessionId) {
+                  toast.error("当前没有可重命名的会话");
+                  return;
+                }
+                void useSessionStore.getState().updateSessionTitle(activeSessionId, title);
+              }}
             />
-          </div>
-        )}
 
-        <TopHeader
-          activeSession={activeSession}
-          copyConversation={() => useChatStore.getState().copyConversation()}
-          copySessionId={() => {
-            if (!activeSessionId) { toast.error('当前没有会话 ID'); return; }
-            void navigator.clipboard.writeText(activeSessionId);
-            toast.success('会话 ID 已复制');
-          }}
-          deleteSession={() => {
-            if (!activeSessionId) { toast.error('当前没有可删除的会话'); return; }
-            void useSessionStore.getState().deleteSession(activeSessionId);
-          }}
-          exportSessionImage={() => openExportDialog('image')}
-          exportSessionJson={() => openExportDialog('json')}
-          isFavorite={Boolean(activeSession?.favorite)}
-          isSidebarOpen={isSidebarOpen}
-          isWideChatMode={wideChatMode}
-          onOpenSidebar={() => useUIStore.getState().setSidebarOpen(true)}
-          smartRenameSession={() => {
-            if (!activeSessionId) { toast.error('当前没有可重命名的会话'); return; }
-            void useSessionStore.getState().renameSession(activeSessionId);
-          }}
-          toggleFavorite={() => {
-            if (!activeSessionId) { toast.error('当前没有可收藏的会话'); return; }
-            void useSessionStore.getState().updateSessionFavorite(
-              activeSessionId,
-              !activeSession?.favorite,
-            );
-          }}
-          toggleWideChatMode={() => {
-            useUIStore.getState().setWideChatMode(!wideChatMode);
-            useSettingsStore.getState().updateGeneral({ wideChatMode: !wideChatMode });
-          }}
-          updateSessionTitle={(title) => {
-            if (!activeSessionId) { toast.error('当前没有可重命名的会话'); return; }
-            void useSessionStore.getState().updateSessionTitle(activeSessionId, title);
-          }}
-        />
+            <div
+              ref={messagesScrollRef}
+              className={cn(
+                "flex flex-1 flex-col items-center overflow-y-auto px-3 md:px-8",
+                showWelcome
+                  ? "justify-center pb-6 pt-0 md:pb-8"
+                  : "pb-[calc(11rem+env(safe-area-inset-bottom))] pt-4 md:pb-40 md:pt-6",
+              )}
+              onScroll={handleMessagesScroll}
+            >
+              {isLoadingActiveSession ? (
+                <MessageSkeletonList />
+              ) : showWelcome ? (
+                <WelcomePanel>
+                  <ChatInput
+                    availableModels={availableModels}
+                    attachments={pendingAttachments}
+                    attachmentUploading={attachmentUploading}
+                    input={input}
+                    isLoading={isLoading}
+                    isLoadingModels={isLoadingModels}
+                    modelSearchKeyword={modelSearchKeyword}
+                    onAttachment={() => fileInputRef.current?.click()}
+                    onInput={handleInput}
+                    onKeyDown={handleKeyDown}
+                    onMic={() => toast(NOT_IMPLEMENTED_TOAST)}
+                    onRemoveAttachment={removeAttachment}
+                    onSend={handleSend}
+                    onToggleWebSearch={() => {
+                      const enabled = !useUIStore.getState().webSearchEnabled;
+                      useUIStore.getState().setWebSearchEnabled(enabled);
+                      useSettingsStore.getState().updateGeneral({
+                        defaultWebSearch: enabled,
+                      });
+                    }}
+                    placement="center"
+                    providerNames={providerNames}
+                    selectedModel={selectedModel}
+                    selectedModelKey={selectedModelKey}
+                    setModelSearchKeyword={(kw) => useUIStore.getState().setModelSearchKeyword(kw)}
+                    setSelectedModelKey={(key) => useUIStore.getState().setSelectedModelKey(key)}
+                    textareaRef={textareaRef}
+                    webSearchEnabled={webSearchEnabled}
+                  />
+                </WelcomePanel>
+              ) : (
+                <div
+                  className={cn(
+                    "flex w-full flex-col transition-[max-width,gap] duration-200 ease-out",
+                    selectionLayoutMode
+                      ? "max-w-none"
+                      : wideChatMode
+                        ? "max-w-[1120px]"
+                        : "max-w-[840px]",
+                    selectionLayoutMode
+                      ? "gap-0"
+                      : generalSettings.density === "compact"
+                        ? "gap-5"
+                        : generalSettings.density === "spacious"
+                          ? "gap-10"
+                          : "gap-8",
+                  )}
+                >
+                  {messages.map((message) => (
+                    <MessageItem
+                      cancelEditingMessage={() => useChatStore.getState().cancelEditing()}
+                      collapsed={collapsedMessageIds.includes(message.id)}
+                      continueMessage={(m) => useChatStore.getState().continueMessage(m)}
+                      copyMessage={(m) => useChatStore.getState().copyMessage(m)}
+                      deleteMessage={(id) => useChatStore.getState().deleteMessage(id)}
+                      editingContent={editingContent}
+                      editingMessageId={editingMessageId}
+                      enableMultiSelect={(id) => {
+                        setSelectionLayoutMode(true);
+                        window.requestAnimationFrame(() => {
+                          useUIStore.getState().enableMultiSelect(id);
+                        });
+                      }}
+                      getMessageModel={getMessageModel}
+                      isSelected={selectedMessageIds.includes(message.id)}
+                      key={message.id}
+                      loadingText={loadingText}
+                      menuUnavailable={() => {
+                        useUIStore.getState().setOpenMenuMessageId(null);
+                        toast(NOT_IMPLEMENTED_TOAST);
+                      }}
+                      message={message}
+                      multiSelectMode={multiSelectMode}
+                      openMenuMessageId={openMenuMessageId}
+                      regenerateMessage={(m, del) =>
+                        useChatStore.getState().regenerateMessage(m, del)
+                      }
+                      saveEditingMessage={() => useChatStore.getState().saveEditing()}
+                      selectedModel={selectedModel}
+                      selectionLayoutMode={selectionLayoutMode}
+                      setEditingContent={(c) => useChatStore.setState({ editingContent: c })}
+                      setOpenMenuMessageId={(id) => useUIStore.getState().setOpenMenuMessageId(id)}
+                      startEditingMessage={(m) => useChatStore.getState().startEditing(m)}
+                      toggleCollapseMessage={(id) =>
+                        useUIStore.getState().toggleCollapseMessage(id)
+                      }
+                      toggleSelectedMessage={(id, shift) =>
+                        useUIStore.getState().toggleSelectedMessage(id, !!shift, messages)
+                      }
+                    />
+                  ))}
+                  <div ref={messagesEndRef} />
+                </div>
+              )}
+            </div>
 
-        <div
-          ref={messagesScrollRef}
-          className={cn(
-            'flex flex-1 flex-col items-center overflow-y-auto px-3 md:px-8',
-            showWelcome
-              ? 'justify-center pb-6 pt-0 md:pb-8'
-              : 'pb-[calc(11rem+env(safe-area-inset-bottom))] pt-4 md:pb-40 md:pt-6',
-          )}
-          onScroll={handleMessagesScroll}
-        >
-          {isLoadingActiveSession ? (
-            <MessageSkeletonList />
-          ) : showWelcome ? (
-            <WelcomePanel>
+            {!isLoadingActiveSession && !showWelcome && !multiSelectMode && (
+              <ChatMiniMap
+                activeMessageId={activeMiniMapMessageId || messages[0]?.id || null}
+                messages={messages}
+              />
+            )}
+
+            {multiSelectMode && !isLoadingActiveSession && !showWelcome && (
+              <SelectToHereButton
+                onSelectToHere={(id) => useUIStore.getState().selectToHere(id, messages)}
+              />
+            )}
+
+            {isLoadingActiveSession || showWelcome ? null : multiSelectMode ? (
+              <SelectionFooterBar
+                onCopy={() => useChatStore.getState().copySelectedMessages()}
+                onDelete={() => useChatStore.getState().deleteSelectedMessages()}
+                onExit={() => useUIStore.getState().exitMultiSelect()}
+                selectedCount={selectedMessageIds.length}
+              />
+            ) : (
               <ChatInput
                 availableModels={availableModels}
                 attachments={pendingAttachments}
@@ -663,7 +707,6 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                     defaultWebSearch: enabled,
                   });
                 }}
-                placement="center"
                 providerNames={providerNames}
                 selectedModel={selectedModel}
                 selectedModelKey={selectedModelKey}
@@ -672,125 +715,17 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                 textareaRef={textareaRef}
                 webSearchEnabled={webSearchEnabled}
               />
-            </WelcomePanel>
-          ) : (
-            <div
-              className={cn(
-                'flex w-full flex-col transition-[max-width,gap] duration-200 ease-out',
-                selectionLayoutMode
-                  ? 'max-w-none'
-                  : wideChatMode
-                    ? 'max-w-[1120px]'
-                    : 'max-w-[840px]',
-                selectionLayoutMode
-                  ? 'gap-0'
-                  : generalSettings.density === 'compact'
-                    ? 'gap-5'
-                    : generalSettings.density === 'spacious'
-                      ? 'gap-10'
-                      : 'gap-8',
-              )}
-            >
-              {messages.map((message) => (
-                <MessageItem
-                  cancelEditingMessage={() => useChatStore.getState().cancelEditing()}
-                  collapsed={collapsedMessageIds.includes(message.id)}
-                  continueMessage={(m) => useChatStore.getState().continueMessage(m)}
-                  copyMessage={(m) => useChatStore.getState().copyMessage(m)}
-                  deleteMessage={(id) => useChatStore.getState().deleteMessage(id)}
-                  editingContent={editingContent}
-                  editingMessageId={editingMessageId}
-                  enableMultiSelect={(id) => {
-                    setSelectionLayoutMode(true);
-                    window.requestAnimationFrame(() => {
-                      useUIStore.getState().enableMultiSelect(id);
-                    });
-                  }}
-                  getMessageModel={getMessageModel}
-                  isSelected={selectedMessageIds.includes(message.id)}
-                  key={message.id}
-                  loadingText={loadingText}
-                  menuUnavailable={() => { useUIStore.getState().setOpenMenuMessageId(null); toast(NOT_IMPLEMENTED_TOAST); }}
-                  message={message}
-                  multiSelectMode={multiSelectMode}
-                  openMenuMessageId={openMenuMessageId}
-                  regenerateMessage={(m, del) => useChatStore.getState().regenerateMessage(m, del)}
-                  saveEditingMessage={() => useChatStore.getState().saveEditing()}
-                  selectedModel={selectedModel}
-                  selectionLayoutMode={selectionLayoutMode}
-                  setEditingContent={(c) => useChatStore.setState({ editingContent: c })}
-                  setOpenMenuMessageId={(id) => useUIStore.getState().setOpenMenuMessageId(id)}
-                  startEditingMessage={(m) => useChatStore.getState().startEditing(m)}
-                  toggleCollapseMessage={(id) => useUIStore.getState().toggleCollapseMessage(id)}
-                  toggleSelectedMessage={(id, shift) => useUIStore.getState().toggleSelectedMessage(id, !!shift, messages)}
-                />
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
+            )}
+          </main>
+
+          {activeHtmlPreview && (
+            <HtmlPreviewPanel
+              fullscreen={htmlPreviewFullscreen}
+              onClose={closeHtmlPreview}
+              onFullscreenChange={setHtmlPreviewFullscreen}
+              preview={activeHtmlPreview}
+            />
           )}
-        </div>
-
-        {!isLoadingActiveSession && !showWelcome && !multiSelectMode && (
-          <ChatMiniMap
-            activeMessageId={activeMiniMapMessageId || messages[0]?.id || null}
-            messages={messages}
-          />
-        )}
-
-        {multiSelectMode && !isLoadingActiveSession && !showWelcome && (
-          <SelectToHereButton
-            onSelectToHere={(id) => useUIStore.getState().selectToHere(id, messages)}
-          />
-        )}
-
-        {isLoadingActiveSession || showWelcome ? null : multiSelectMode ? (
-          <SelectionFooterBar
-            onCopy={() => useChatStore.getState().copySelectedMessages()}
-            onDelete={() => useChatStore.getState().deleteSelectedMessages()}
-            onExit={() => useUIStore.getState().exitMultiSelect()}
-            selectedCount={selectedMessageIds.length}
-          />
-        ) : (
-          <ChatInput
-            availableModels={availableModels}
-            attachments={pendingAttachments}
-            attachmentUploading={attachmentUploading}
-            input={input}
-            isLoading={isLoading}
-            isLoadingModels={isLoadingModels}
-            modelSearchKeyword={modelSearchKeyword}
-            onAttachment={() => fileInputRef.current?.click()}
-            onInput={handleInput}
-            onKeyDown={handleKeyDown}
-            onMic={() => toast(NOT_IMPLEMENTED_TOAST)}
-            onRemoveAttachment={removeAttachment}
-            onSend={handleSend}
-            onToggleWebSearch={() => {
-              const enabled = !useUIStore.getState().webSearchEnabled;
-              useUIStore.getState().setWebSearchEnabled(enabled);
-              useSettingsStore.getState().updateGeneral({
-                defaultWebSearch: enabled,
-              });
-            }}
-            providerNames={providerNames}
-            selectedModel={selectedModel}
-            selectedModelKey={selectedModelKey}
-            setModelSearchKeyword={(kw) => useUIStore.getState().setModelSearchKeyword(kw)}
-            setSelectedModelKey={(key) => useUIStore.getState().setSelectedModelKey(key)}
-            textareaRef={textareaRef}
-            webSearchEnabled={webSearchEnabled}
-          />
-        )}
-      </main>
-
-      {activeHtmlPreview && (
-        <HtmlPreviewPanel
-          fullscreen={htmlPreviewFullscreen}
-          onClose={closeHtmlPreview}
-          onFullscreenChange={setHtmlPreviewFullscreen}
-          preview={activeHtmlPreview}
-        />
-      )}
         </div>
       </HtmlPreviewContext.Provider>
 

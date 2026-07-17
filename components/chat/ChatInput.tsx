@@ -1,16 +1,26 @@
-'use client';
+"use client";
 
-import type { RefObject } from 'react';
-import { useState } from 'react';
-import { ModelIcon } from '@lobehub/icons';
-import { GlobeOffIcon } from '@lobehub/ui/icons';
-import { ChevronRight, FileText, Globe, LoaderCircle, Mic, Paperclip, SendHorizontal, Square, X } from 'lucide-react';
+import type { RefObject } from "react";
+import { useState } from "react";
+import { ModelIcon } from "@lobehub/icons";
+import { GlobeOffIcon } from "@lobehub/ui/icons";
+import {
+  ChevronRight,
+  FileText,
+  Globe,
+  LoaderCircle,
+  Mic,
+  Paperclip,
+  SendHorizontal,
+  Square,
+  X,
+} from "lucide-react";
 
-import type { ConfiguredModel, FileAttachment } from '@/lib/chat/types';
-import { getModelDisplayName } from '@/lib/chat/helpers';
-import { cn } from '@/lib/utils';
-import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
-import { ModelSelectorDialog } from './ModelSelectorDialog';
+import type { ConfiguredModel, FileAttachment } from "@/lib/chat/types";
+import { getModelDisplayName } from "@/lib/chat/helpers";
+import { cn } from "@/lib/utils";
+import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
+import { ModelSelectorDialog } from "./ModelSelectorDialog";
 
 export function ChatInput({
   availableModels,
@@ -26,7 +36,7 @@ export function ChatInput({
   onKeyDown,
   onMic,
   onSend,
-  placement = 'bottom',
+  placement = "bottom",
   providerNames,
   selectedModel,
   selectedModelKey,
@@ -49,7 +59,7 @@ export function ChatInput({
   onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onMic: () => void;
   onSend: () => void;
-  placement?: 'bottom' | 'center';
+  placement?: "bottom" | "center";
   providerNames: Record<string, string>;
   selectedModel?: ConfiguredModel;
   selectedModelKey: string;
@@ -69,15 +79,15 @@ export function ChatInput({
     <>
       <div
         className={cn(
-          placement === 'bottom'
-            ? 'pointer-events-none absolute bottom-0 left-0 right-0 z-20 flex justify-center bg-gradient-to-t from-[var(--chat-input-overlay-from)] via-[var(--chat-input-overlay-via)] to-transparent px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-8 md:p-4 md:px-8 md:pb-8 md:pt-10'
-            : 'w-full',
+          placement === "bottom"
+            ? "pointer-events-none absolute bottom-0 left-0 right-0 z-20 flex justify-center bg-gradient-to-t from-[var(--chat-input-overlay-from)] via-[var(--chat-input-overlay-via)] to-transparent px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-8 md:p-4 md:px-8 md:pb-8 md:pt-10"
+            : "w-full",
         )}
       >
         <div
           className={cn(
-            'w-full',
-            placement === 'bottom' ? 'pointer-events-auto max-w-[840px]' : 'max-w-[760px]',
+            "w-full",
+            placement === "bottom" ? "pointer-events-auto max-w-[840px]" : "max-w-[760px]",
           )}
         >
           <div className="relative flex flex-col rounded-xl border border-gray-200 bg-[var(--chat-input-bg)] shadow-[0_12px_32px_rgba(0,0,0,0.06)] transition-all duration-300 focus-within:border-primary/30 focus-within:ring-2 focus-within:ring-primary/20 dark:border-white/10 dark:shadow-[0_14px_40px_rgba(0,0,0,0.35)] dark:focus-within:border-white/20 dark:focus-within:ring-white/[0.06]">
@@ -86,7 +96,7 @@ export function ChatInput({
               disabled={isLoading || !selectedModel}
               onChange={onInput}
               onKeyDown={onKeyDown}
-              placeholder={selectedModel ? '尽管问，带图也行...' : '正在加载可用模型列表……'}
+              placeholder={selectedModel ? "尽管问，带图也行..." : "正在加载可用模型列表……"}
               ref={textareaRef}
               rows={1}
               value={input}
@@ -95,15 +105,29 @@ export function ChatInput({
             {(attachments.length > 0 || attachmentUploading) && (
               <div className="flex gap-2 overflow-x-auto px-3 pb-2 md:px-4">
                 {attachments.map((file) => (
-                  <div className="group/file flex max-w-[240px] shrink-0 items-center gap-2 rounded-xl border border-gray-200 bg-gray-50/80 px-2.5 py-2 dark:border-white/10 dark:bg-white/[0.05]" key={file.id}>
+                  <div
+                    className="group/file flex max-w-[240px] shrink-0 items-center gap-2 rounded-xl border border-gray-200 bg-gray-50/80 px-2.5 py-2 dark:border-white/10 dark:bg-white/[0.05]"
+                    key={file.id}
+                  >
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-blue-500 shadow-sm dark:bg-white/10 dark:text-blue-300">
                       <FileText size={16} />
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate text-xs font-medium text-gray-700 dark:text-gray-200">{file.name}</p>
-                      <p className="text-[10px] text-gray-400">{file.size < 1024 * 1024 ? `${Math.ceil(file.size / 1024)} KB` : `${(file.size / 1024 / 1024).toFixed(1)} MB`}</p>
+                      <p className="truncate text-xs font-medium text-gray-700 dark:text-gray-200">
+                        {file.name}
+                      </p>
+                      <p className="text-[10px] text-gray-400">
+                        {file.size < 1024 * 1024
+                          ? `${Math.ceil(file.size / 1024)} KB`
+                          : `${(file.size / 1024 / 1024).toFixed(1)} MB`}
+                      </p>
                     </div>
-                    <button aria-label="移除附件" className="ml-1 rounded-full p-1 text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-white" onClick={() => onRemoveAttachment(file.id)} type="button">
+                    <button
+                      aria-label="移除附件"
+                      className="ml-1 rounded-full p-1 text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-white"
+                      onClick={() => onRemoveAttachment(file.id)}
+                      type="button"
+                    >
                       <X size={14} />
                     </button>
                   </div>
@@ -138,15 +162,15 @@ export function ChatInput({
                 </button>
                 <button
                   className={cn(
-                    'flex h-9 items-center gap-1.5 rounded-lg px-2 text-sm transition-colors',
+                    "flex h-9 items-center gap-1.5 rounded-lg px-2 text-sm transition-colors",
                     webSearchEnabled
-                      ? 'text-primary hover:bg-primary/5 dark:text-primary dark:hover:bg-primary/10'
-                      : 'text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-200',
-                    isLoading && 'cursor-not-allowed opacity-60',
+                      ? "text-primary hover:bg-primary/5 dark:text-primary dark:hover:bg-primary/10"
+                      : "text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-200",
+                    isLoading && "cursor-not-allowed opacity-60",
                   )}
                   disabled={isLoading}
                   onClick={onToggleWebSearch}
-                  title={webSearchEnabled ? '关闭联网搜索' : '开启联网搜索'}
+                  title={webSearchEnabled ? "关闭联网搜索" : "开启联网搜索"}
                   type="button"
                 >
                   {webSearchEnabled ? <Globe size={18} /> : <GlobeOffIcon size={18} />}
@@ -173,23 +197,25 @@ export function ChatInput({
                     </>
                   ) : (
                     <span className="max-w-[120px] truncate">
-                      {isLoadingModels ? '加载中' : '未配置模型'}
+                      {isLoadingModels ? "加载中" : "未配置模型"}
                     </span>
                   )}
-                  <ChevronRight
-                    className="shrink-0 text-gray-400"
-                    size={14}
-                  />
+                  <ChevronRight className="shrink-0 text-gray-400" size={14} />
                 </button>
                 <button
-                  aria-label={isLoading ? '停止生成' : '发送消息'}
+                  aria-label={isLoading ? "停止生成" : "发送消息"}
                   className={cn(
-                    'relative flex h-9 w-9 min-w-9 items-center justify-center overflow-hidden rounded-full bg-gray-950 text-white shadow-sm transition-transform duration-150 ease-out hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 disabled:hover:scale-100 dark:bg-white dark:text-gray-950 dark:disabled:bg-gray-700 dark:disabled:text-gray-400',
-                    isLoading && 'bg-red-500 text-white hover:bg-red-600 dark:bg-red-500 dark:text-white dark:hover:bg-red-600',
+                    "relative flex h-9 w-9 min-w-9 items-center justify-center overflow-hidden rounded-full bg-gray-950 text-white shadow-sm transition-transform duration-150 ease-out hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 disabled:hover:scale-100 dark:bg-white dark:text-gray-950 dark:disabled:bg-gray-700 dark:disabled:text-gray-400",
+                    isLoading &&
+                      "bg-red-500 text-white hover:bg-red-600 dark:bg-red-500 dark:text-white dark:hover:bg-red-600",
                   )}
-                  disabled={(!input.trim() && attachments.length === 0 && !isLoading) || !selectedModel || attachmentUploading}
+                  disabled={
+                    (!input.trim() && attachments.length === 0 && !isLoading) ||
+                    !selectedModel ||
+                    attachmentUploading
+                  }
                   onClick={onSend}
-                  title={isLoading ? '停止生成' : '发送'}
+                  title={isLoading ? "停止生成" : "发送"}
                   type="button"
                 >
                   {isLoading ? (
@@ -216,7 +242,7 @@ export function ChatInput({
         modelSearchKeyword={modelSearchKeyword}
         onClose={() => {
           setIsModelDialogOpen(false);
-          setModelSearchKeyword('');
+          setModelSearchKeyword("");
         }}
         open={isModelDialogOpen}
         providerNames={providerNames}

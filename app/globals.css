@@ -297,9 +297,15 @@ button:disabled {
 .markdown-body p:last-child {
   @apply mb-0;
 }
-.markdown-body h1 { @apply text-2xl font-semibold mt-6 mb-4; }
-.markdown-body h2 { @apply text-xl font-semibold mt-6 mb-4; }
-.markdown-body h3 { @apply text-lg font-semibold mt-6 mb-4; }
+.markdown-body h1 {
+  @apply text-2xl font-semibold mt-6 mb-4;
+}
+.markdown-body h2 {
+  @apply text-xl font-semibold mt-6 mb-4;
+}
+.markdown-body h3 {
+  @apply text-lg font-semibold mt-6 mb-4;
+}
 .markdown-body ul {
   @apply list-disc list-inside mb-4;
 }
@@ -380,7 +386,10 @@ button:disabled {
   opacity: 0;
   background: #ffffff;
   box-shadow: 0 0 0 1px #eeeeee;
-  transition: color 0.4s, opacity 0.2s, background-color 0.1s;
+  transition:
+    color 0.4s,
+    opacity 0.2s,
+    background-color 0.1s;
 }
 
 .markdown-body .lobe-markdown-table-wrapper:hover .lobe-markdown-table-copy,

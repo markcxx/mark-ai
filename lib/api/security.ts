@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
 
-import { isCloudMode } from '@/lib/env';
+import { isCloudMode } from "@/lib/env";
 
 type AuthorizedRequest = {
   authorized: true;
@@ -26,9 +26,9 @@ const rateLimits = globalRateLimits.__markaiRateLimits ?? new Map<string, RateLi
 globalRateLimits.__markaiRateLimits = rateLimits;
 
 const getClientAddress = (req: NextRequest) =>
-  req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-  req.headers.get('x-real-ip')?.trim() ||
-  'local';
+  req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+  req.headers.get("x-real-ip")?.trim() ||
+  "local";
 
 export const authorizeApiRequest = async (
   req: NextRequest,
@@ -37,12 +37,12 @@ export const authorizeApiRequest = async (
     return { authorized: true, key: `ip:${getClientAddress(req)}` };
   }
 
-  const { auth } = await import('@/lib/auth');
+  const { auth } = await import("@/lib/auth");
   const session = await auth.api.getSession({ headers: req.headers });
   if (!session?.user?.id) {
     return {
       authorized: false,
-      response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
+      response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
     };
   }
 
@@ -72,8 +72,8 @@ export const enforceRateLimit = ({
   if (current.count >= limit) {
     const retryAfter = Math.max(1, Math.ceil((current.resetAt - now) / 1000));
     return NextResponse.json(
-      { error: 'Too many requests', retryAfter },
-      { headers: { 'Retry-After': String(retryAfter) }, status: 429 },
+      { error: "Too many requests", retryAfter },
+      { headers: { "Retry-After": String(retryAfter) }, status: 429 },
     );
   }
 

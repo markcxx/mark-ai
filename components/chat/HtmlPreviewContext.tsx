@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { createContext, useContext } from 'react';
+import { createContext, useContext } from "react";
 
-import type { HtmlPreviewPayload } from './htmlPreviewUtils';
+import type { HtmlPreviewPayload } from "./htmlPreviewUtils";
 
 export type HtmlPreviewContextValue = {
   activePreview: HtmlPreviewPayload | null;

@@ -1,15 +1,15 @@
-'use client';
+"use client";
 
-import { FluentEmoji } from '@lobehub/fluent-emoji';
-import { useEffect, useState, type ReactNode } from 'react';
+import { FluentEmoji } from "@lobehub/fluent-emoji";
+import { useEffect, useState, type ReactNode } from "react";
 
-const WELCOME_EMOJIS = ['🙂', '😊', '😄', '😁', '🤗', '🤩', '😎', '🫡', '😉'];
-const WELCOME_TEXT = '你好，我是 MarkAI。今天想聊点什么？';
+const WELCOME_EMOJIS = ["🙂", "😊", "😄", "😁", "🤗", "🤩", "😎", "🫡", "😉"];
+const WELCOME_TEXT = "你好，我是 MarkAI。今天想聊点什么？";
 
 const pickWelcomeEmoji = () => WELCOME_EMOJIS[Math.floor(Math.random() * WELCOME_EMOJIS.length)];
 
 function AnimatedEmojiLogo() {
-  const [emoji, setEmoji] = useState('🙂');
+  const [emoji, setEmoji] = useState("🙂");
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => setEmoji(pickWelcomeEmoji()));
@@ -53,10 +53,7 @@ function TypewriterText({ text }: { text: string }) {
   }, [text]);
 
   return (
-    <p
-      aria-label={text}
-      className="mt-2 min-h-6 text-[15px] text-gray-500 dark:text-gray-400"
-    >
+    <p aria-label={text} className="mt-2 min-h-6 text-[15px] text-gray-500 dark:text-gray-400">
       <span aria-hidden="true">{text.slice(0, visibleLength)}</span>
       <span
         aria-hidden="true"
@@ -72,7 +69,9 @@ export function WelcomePanel({ children }: { children: ReactNode }) {
       <div className="mb-6 flex items-center gap-3 md:mb-8 md:gap-4">
         <AnimatedEmojiLogo />
         <div className="min-w-0">
-          <h1 className="font-jakarta text-2xl font-semibold text-gray-950 dark:text-gray-50 md:text-3xl">MARKAI</h1>
+          <h1 className="font-jakarta text-2xl font-semibold text-gray-950 dark:text-gray-50 md:text-3xl">
+            MARKAI
+          </h1>
           <TypewriterText text={WELCOME_TEXT} />
         </div>
       </div>

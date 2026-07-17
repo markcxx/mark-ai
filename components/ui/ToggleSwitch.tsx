@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils';
+import { cn } from "@/lib/utils";
 
 export function ToggleSwitch({
   checked,
@@ -14,16 +14,16 @@ export function ToggleSwitch({
   const track = (
     <span
       className={cn(
-        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors',
-        checked ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600',
-        disabled && 'opacity-60',
+        "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors",
+        checked ? "bg-primary" : "bg-gray-300 dark:bg-gray-600",
+        disabled && "opacity-60",
         className,
       )}
     >
       <span
         className={cn(
-          'inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform',
-          checked ? 'translate-x-[18px]' : 'translate-x-[3px]',
+          "inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform",
+          checked ? "translate-x-[18px]" : "translate-x-[3px]",
         )}
       />
     </span>

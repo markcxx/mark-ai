@@ -1,24 +1,21 @@
-import { randomUUID } from 'node:crypto';
+import { randomUUID } from "node:crypto";
 
-import { and, asc, count, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, sql } from "drizzle-orm";
 
-import { getDb } from '@/lib/db';
-import { chatMessages, chatSessions } from '@/lib/db/schema';
+import { getDb } from "@/lib/db";
+import { chatMessages, chatSessions } from "@/lib/db/schema";
 
-import type { StorageAdapter } from './storage-adapter';
-import type { ChatSession, FileAttachment, Message, MessageSegment, WebSearchState } from './types';
+import type { StorageAdapter } from "./storage-adapter";
+import type { ChatSession, FileAttachment, Message, MessageSegment, WebSearchState } from "./types";
 
-const DEFAULT_SESSION_TITLE = '新对话';
+const DEFAULT_SESSION_TITLE = "新对话";
 
 const getTemporarySessionTitle = (message?: string) => {
-  const title = message?.trim().replace(/\s+/g, ' ').slice(0, 80);
+  const title = message?.trim().replace(/\s+/g, " ").slice(0, 80);
   return title || DEFAULT_SESSION_TITLE;
 };
 
-const toSession = (
-  row: typeof chatSessions.$inferSelect,
-  messageCount: number,
-): ChatSession => ({
+const toSession = (row: typeof chatSessions.$inferSelect, messageCount: number): ChatSession => ({
   createdAt: new Date(row.createdAt).getTime(),
   favorite: row.favorite ?? false,
   id: row.id,
@@ -30,7 +27,7 @@ const toSession = (
 });
 
 const toMessage = (row: typeof chatMessages.$inferSelect): Message => ({
-  content: row.content || '',
+  content: row.content || "",
   createdAt: row.createdAt ? new Date(row.createdAt).getTime() : undefined,
   generationDuration: row.generationDuration ?? undefined,
   id: row.id,
@@ -41,7 +38,7 @@ const toMessage = (row: typeof chatMessages.$inferSelect): Message => ({
   provider: row.provider ?? undefined,
   reasoning: row.reasoning ?? undefined,
   reasoningDuration: row.reasoningDuration ?? undefined,
-  role: row.role === 'user' ? 'user' : 'model',
+  role: row.role === "user" ? "user" : "model",
   segments: (row.segments as MessageSegment[] | null) ?? undefined,
   attachments: (row.attachments as FileAttachment[] | null) ?? undefined,
   totalTokens: row.totalTokens ?? undefined,
@@ -50,7 +47,7 @@ const toMessage = (row: typeof chatMessages.$inferSelect): Message => ({
 
 export class PostgresStorage implements StorageAdapter {
   async listChatSessions(userId?: string) {
-    if (!userId) throw new Error('userId is required in cloud mode');
+    if (!userId) throw new Error("userId is required in cloud mode");
 
     const db = getDb();
     const rows = await db
@@ -80,7 +77,7 @@ export class PostgresStorage implements StorageAdapter {
     title?: string;
     userId?: string;
   }) {
-    if (!userId) throw new Error('userId is required in cloud mode');
+    if (!userId) throw new Error("userId is required in cloud mode");
 
     const db = getDb();
     const id = randomUUID();
@@ -101,7 +98,7 @@ export class PostgresStorage implements StorageAdapter {
   }
 
   async getChatSession(sessionId: string, userId?: string) {
-    if (!userId) throw new Error('userId is required in cloud mode');
+    if (!userId) throw new Error("userId is required in cloud mode");
 
     const db = getDb();
     const rows = await db
@@ -118,7 +115,7 @@ export class PostgresStorage implements StorageAdapter {
   }
 
   async getChatMessages(sessionId: string, userId?: string) {
-    if (!userId) throw new Error('userId is required in cloud mode');
+    if (!userId) throw new Error("userId is required in cloud mode");
 
     const db = getDb();
 
@@ -140,7 +137,7 @@ export class PostgresStorage implements StorageAdapter {
   }
 
   async updateChatSessionTitle(sessionId: string, title: string, userId?: string) {
-    if (!userId) throw new Error('userId is required in cloud mode');
+    if (!userId) throw new Error("userId is required in cloud mode");
 
     const nextTitle = title.trim().slice(0, 40);
     if (!nextTitle) return this.getChatSession(sessionId, userId);
@@ -155,7 +152,7 @@ export class PostgresStorage implements StorageAdapter {
   }
 
   async updateChatSessionFavorite(sessionId: string, favorite: boolean, userId?: string) {
-    if (!userId) throw new Error('userId is required in cloud mode');
+    if (!userId) throw new Error("userId is required in cloud mode");
 
     const db = getDb();
     await db
@@ -167,7 +164,7 @@ export class PostgresStorage implements StorageAdapter {
   }
 
   async deleteChatSession(sessionId: string, userId?: string) {
-    if (!userId) throw new Error('userId is required in cloud mode');
+    if (!userId) throw new Error("userId is required in cloud mode");
 
     const db = getDb();
     await db
@@ -176,7 +173,7 @@ export class PostgresStorage implements StorageAdapter {
   }
 
   async replaceChatMessages(sessionId: string, messages: Message[], userId?: string) {
-    if (!userId) throw new Error('userId is required in cloud mode');
+    if (!userId) throw new Error("userId is required in cloud mode");
 
     const db = getDb();
     const now = new Date();
@@ -188,7 +185,7 @@ export class PostgresStorage implements StorageAdapter {
       .limit(1);
 
     if (!sessionExists.length) {
-      throw new Error('Session not found or access denied');
+      throw new Error("Session not found or access denied");
     }
 
     const deleteMessages = db.delete(chatMessages).where(eq(chatMessages.sessionId, sessionId));
@@ -219,7 +216,9 @@ export class PostgresStorage implements StorageAdapter {
           model: message.model || null,
           provider: message.provider || null,
           position: index,
-          createdAt: message.createdAt ? new Date(message.createdAt) : new Date(now.getTime() + index),
+          createdAt: message.createdAt
+            ? new Date(message.createdAt)
+            : new Date(now.getTime() + index),
         })),
       );
       await db.batch([deleteMessages, insertMessages, updateSession]);

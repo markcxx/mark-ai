@@ -1,13 +1,13 @@
-import { eq } from 'drizzle-orm';
+import { eq } from "drizzle-orm";
 
-import { getDb } from './db';
-import { userSettings } from './db/schema';
+import { getDb } from "./db";
+import { userSettings } from "./db/schema";
 import {
   DEFAULT_SETTINGS,
   sanitizeGeneralSettings,
   sanitizeLanguageModelSettings,
-} from './settings';
-import type { MarkAISettings } from './settings';
+} from "./settings";
+import type { MarkAISettings } from "./settings";
 
 export const getUserSettings = async (userId: string): Promise<MarkAISettings> => {
   const [row] = await getDb()

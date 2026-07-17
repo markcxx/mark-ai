@@ -1,10 +1,10 @@
-import { randomUUID } from 'node:crypto';
-import fs from 'node:fs';
-import { createRequire } from 'node:module';
-import path from 'node:path';
+import { randomUUID } from "node:crypto";
+import fs from "node:fs";
+import { createRequire } from "node:module";
+import path from "node:path";
 
-import type { StorageAdapter } from './storage-adapter';
-import type { ChatSession, Message } from './types';
+import type { StorageAdapter } from "./storage-adapter";
+import type { ChatSession, Message } from "./types";
 
 type DatabaseLike = {
   exec: (sql: string) => void;
@@ -16,18 +16,17 @@ type DatabaseLike = {
 };
 
 const require = createRequire(import.meta.url);
-const DEFAULT_SESSION_TITLE = '新对话';
+const DEFAULT_SESSION_TITLE = "新对话";
 
 const getTemporarySessionTitle = (message?: string) => {
-  const title = message?.trim().replace(/\s+/g, ' ').slice(0, 80);
+  const title = message?.trim().replace(/\s+/g, " ").slice(0, 80);
   return title || DEFAULT_SESSION_TITLE;
 };
 
 let db: DatabaseLike | undefined;
 
 const getDatabasePath = () =>
-  process.env.MARKAI_SQLITE_PATH?.trim() ||
-  path.join(process.cwd(), '.data', 'markai.sqlite');
+  process.env.MARKAI_SQLITE_PATH?.trim() || path.join(process.cwd(), ".data", "markai.sqlite");
 
 const ensureDatabase = () => {
   if (db) return db;
@@ -35,7 +34,7 @@ const ensureDatabase = () => {
   const dbPath = getDatabasePath();
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
-  const { DatabaseSync } = require('node:sqlite') as {
+  const { DatabaseSync } = require("node:sqlite") as {
     DatabaseSync: new (filename: string) => DatabaseLike;
   };
 
@@ -80,36 +79,42 @@ const ensureDatabase = () => {
   `);
 
   const sessionColumns = new Set(
-    db.prepare('PRAGMA table_info(chat_sessions)').all().map((row: any) => String(row.name)),
+    db
+      .prepare("PRAGMA table_info(chat_sessions)")
+      .all()
+      .map((row: any) => String(row.name)),
   );
   const ensureSessionColumn = (name: string, definition: string) => {
     if (sessionColumns.has(name)) return;
     db!.exec(`ALTER TABLE chat_sessions ADD COLUMN ${definition}`);
   };
 
-  ensureSessionColumn('favorite', 'favorite INTEGER');
+  ensureSessionColumn("favorite", "favorite INTEGER");
 
   const columns = new Set(
-    db.prepare('PRAGMA table_info(chat_messages)').all().map((row: any) => String(row.name)),
+    db
+      .prepare("PRAGMA table_info(chat_messages)")
+      .all()
+      .map((row: any) => String(row.name)),
   );
   const ensureColumn = (name: string, definition: string) => {
     if (columns.has(name)) return;
     db!.exec(`ALTER TABLE chat_messages ADD COLUMN ${definition}`);
   };
 
-  ensureColumn('interrupted', 'interrupted INTEGER');
-  ensureColumn('generation_duration', 'generation_duration INTEGER');
-  ensureColumn('input_tokens', 'input_tokens INTEGER');
-  ensureColumn('output_tokens', 'output_tokens INTEGER');
-  ensureColumn('total_tokens', 'total_tokens INTEGER');
-  ensureColumn('web_search', 'web_search TEXT');
-  ensureColumn('segments', 'segments TEXT');
+  ensureColumn("interrupted", "interrupted INTEGER");
+  ensureColumn("generation_duration", "generation_duration INTEGER");
+  ensureColumn("input_tokens", "input_tokens INTEGER");
+  ensureColumn("output_tokens", "output_tokens INTEGER");
+  ensureColumn("total_tokens", "total_tokens INTEGER");
+  ensureColumn("web_search", "web_search TEXT");
+  ensureColumn("segments", "segments TEXT");
 
   return db;
 };
 
 const parseJsonValue = <T>(value: unknown): T | undefined => {
-  if (typeof value !== 'string' || !value.trim()) return undefined;
+  if (typeof value !== "string" || !value.trim()) return undefined;
 
   try {
     return JSON.parse(value) as T;
@@ -130,29 +135,30 @@ const toSession = (row: any): ChatSession => ({
 });
 
 const toMessage = (row: any): Message => ({
-  content: String(row.content || ''),
-  createdAt: typeof row.created_at === 'number' ? row.created_at : undefined,
+  content: String(row.content || ""),
+  createdAt: typeof row.created_at === "number" ? row.created_at : undefined,
   generationDuration:
-    typeof row.generation_duration === 'number' ? row.generation_duration : undefined,
+    typeof row.generation_duration === "number" ? row.generation_duration : undefined,
   id: String(row.id),
-  inputTokens: typeof row.input_tokens === 'number' ? row.input_tokens : undefined,
+  inputTokens: typeof row.input_tokens === "number" ? row.input_tokens : undefined,
   interrupted: Boolean(row.interrupted),
   model: row.model || undefined,
-  outputTokens: typeof row.output_tokens === 'number' ? row.output_tokens : undefined,
+  outputTokens: typeof row.output_tokens === "number" ? row.output_tokens : undefined,
   provider: row.provider || undefined,
   reasoning: row.reasoning || undefined,
   reasoningDuration:
-    typeof row.reasoning_duration === 'number' ? row.reasoning_duration : undefined,
-  role: row.role === 'user' ? 'user' : 'model',
+    typeof row.reasoning_duration === "number" ? row.reasoning_duration : undefined,
+  role: row.role === "user" ? "user" : "model",
   segments: parseJsonValue(row.segments),
-  totalTokens: typeof row.total_tokens === 'number' ? row.total_tokens : undefined,
+  totalTokens: typeof row.total_tokens === "number" ? row.total_tokens : undefined,
   webSearch: parseJsonValue(row.web_search),
 });
 
 export class SqliteStorage implements StorageAdapter {
   listChatSessions() {
     const rows = ensureDatabase()
-      .prepare(`
+      .prepare(
+        `
         SELECT
           s.id,
           s.title,
@@ -166,7 +172,8 @@ export class SqliteStorage implements StorageAdapter {
         LEFT JOIN chat_messages m ON m.session_id = s.id
         GROUP BY s.id
         ORDER BY s.favorite DESC, s.updated_at DESC
-      `)
+      `,
+      )
       .all();
 
     return rows.map(toSession);
@@ -206,7 +213,8 @@ export class SqliteStorage implements StorageAdapter {
 
   getChatSession(sessionId: string) {
     const row = ensureDatabase()
-      .prepare(`
+      .prepare(
+        `
         SELECT
           s.id,
           s.title,
@@ -220,7 +228,8 @@ export class SqliteStorage implements StorageAdapter {
         LEFT JOIN chat_messages m ON m.session_id = s.id
         WHERE s.id = ?
         GROUP BY s.id
-      `)
+      `,
+      )
       .get(sessionId);
 
     return row ? toSession(row) : undefined;
@@ -259,7 +268,7 @@ export class SqliteStorage implements StorageAdapter {
     if (!nextTitle) return this.getChatSession(sessionId);
 
     ensureDatabase()
-      .prepare('UPDATE chat_sessions SET title = ?, updated_at = ? WHERE id = ?')
+      .prepare("UPDATE chat_sessions SET title = ?, updated_at = ? WHERE id = ?")
       .run(nextTitle, Date.now(), sessionId);
 
     return this.getChatSession(sessionId);
@@ -267,23 +276,23 @@ export class SqliteStorage implements StorageAdapter {
 
   updateChatSessionFavorite(sessionId: string, favorite: boolean) {
     ensureDatabase()
-      .prepare('UPDATE chat_sessions SET favorite = ?, updated_at = ? WHERE id = ?')
+      .prepare("UPDATE chat_sessions SET favorite = ?, updated_at = ? WHERE id = ?")
       .run(favorite ? 1 : 0, Date.now(), sessionId);
 
     return this.getChatSession(sessionId);
   }
 
   deleteChatSession(sessionId: string) {
-    ensureDatabase().prepare('DELETE FROM chat_sessions WHERE id = ?').run(sessionId);
+    ensureDatabase().prepare("DELETE FROM chat_sessions WHERE id = ?").run(sessionId);
   }
 
   replaceChatMessages(sessionId: string, messages: Message[]) {
     const database = ensureDatabase();
     const now = Date.now();
 
-    database.exec('BEGIN IMMEDIATE');
+    database.exec("BEGIN IMMEDIATE");
     try {
-      database.prepare('DELETE FROM chat_messages WHERE session_id = ?').run(sessionId);
+      database.prepare("DELETE FROM chat_messages WHERE session_id = ?").run(sessionId);
 
       const insert = database.prepare(
         `INSERT INTO chat_messages
@@ -336,11 +345,11 @@ export class SqliteStorage implements StorageAdapter {
       });
 
       database
-        .prepare('UPDATE chat_sessions SET updated_at = ? WHERE id = ?')
+        .prepare("UPDATE chat_sessions SET updated_at = ? WHERE id = ?")
         .run(Date.now(), sessionId);
-      database.exec('COMMIT');
+      database.exec("COMMIT");
     } catch (error) {
-      database.exec('ROLLBACK');
+      database.exec("ROLLBACK");
       throw error;
     }
 

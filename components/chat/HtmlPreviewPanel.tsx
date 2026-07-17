@@ -1,14 +1,18 @@
-'use client';
+"use client";
 
-import { Code2, Download, Eye, Maximize2, Minimize2, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Code2, Download, Eye, Maximize2, Minimize2, X } from "lucide-react";
+import { useMemo, useState } from "react";
 
-import { Pre } from '@/components/CodeBlock';
-import { cn } from '@/lib/utils';
+import { Pre } from "@/components/CodeBlock";
+import { cn } from "@/lib/utils";
 
-import { downloadHtmlFile, getHtmlPreviewDocument, type HtmlPreviewPayload } from './htmlPreviewUtils';
+import {
+  downloadHtmlFile,
+  getHtmlPreviewDocument,
+  type HtmlPreviewPayload,
+} from "./htmlPreviewUtils";
 
-type PreviewMode = 'preview' | 'code';
+type PreviewMode = "preview" | "code";
 
 function PreviewFrame({ content, title }: { content: string; title: string }) {
   return (
@@ -33,13 +37,13 @@ function PreviewTabs({
     <div className="relative grid h-8 w-[70px] grid-cols-2 rounded-lg bg-gray-100 p-0.5 dark:bg-white/[0.06]">
       <span
         className={cn(
-          'absolute bottom-0.5 top-0.5 w-[33px] rounded-md bg-white shadow-sm transition-transform duration-200 dark:bg-[#262626]',
-          mode === 'code' && 'translate-x-[33px]',
+          "absolute bottom-0.5 top-0.5 w-[33px] rounded-md bg-white shadow-sm transition-transform duration-200 dark:bg-[#262626]",
+          mode === "code" && "translate-x-[33px]",
         )}
       />
       {[
-        { icon: Eye, key: 'preview' as const, title: '预览' },
-        { icon: Code2, key: 'code' as const, title: '源码' },
+        { icon: Eye, key: "preview" as const, title: "预览" },
+        { icon: Code2, key: "code" as const, title: "源码" },
       ].map((item) => {
         const Icon = item.icon;
         const active = mode === item.key;
@@ -47,10 +51,10 @@ function PreviewTabs({
         return (
           <button
             className={cn(
-              'relative z-10 flex h-7 items-center justify-center rounded-md transition-colors',
+              "relative z-10 flex h-7 items-center justify-center rounded-md transition-colors",
               active
-                ? 'text-gray-900 dark:text-gray-100'
-                : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100',
+                ? "text-gray-900 dark:text-gray-100"
+                : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100",
             )}
             key={item.key}
             onClick={() => onModeChange(item.key)}
@@ -76,7 +80,7 @@ export function HtmlPreviewPanel({
   onFullscreenChange: (fullscreen: boolean) => void;
   preview: HtmlPreviewPayload;
 }) {
-  const [mode, setMode] = useState<PreviewMode>('preview');
+  const [mode, setMode] = useState<PreviewMode>("preview");
   const previewDocument = useMemo(() => getHtmlPreviewDocument(preview.content), [preview.content]);
 
   return (
@@ -101,7 +105,7 @@ export function HtmlPreviewPanel({
           <button
             className="hidden h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-gray-100 md:flex"
             onClick={() => onFullscreenChange(!fullscreen)}
-            title={fullscreen ? '恢复分栏' : '全屏预览'}
+            title={fullscreen ? "恢复分栏" : "全屏预览"}
             type="button"
           >
             {fullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
@@ -118,7 +122,7 @@ export function HtmlPreviewPanel({
       </div>
 
       <div className="min-h-0 flex-1 overflow-hidden">
-        {mode === 'preview' ? (
+        {mode === "preview" ? (
           <PreviewFrame content={previewDocument} title={preview.title} />
         ) : (
           <div className="h-full overflow-auto p-4">

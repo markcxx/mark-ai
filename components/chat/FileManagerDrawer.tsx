@@ -3,17 +3,11 @@
 import { AnimatePresence, motion } from "motion/react";
 import {
   AlertCircle,
-  Download,
-  FileImage,
-  FileSpreadsheet,
-  FileText,
   Files,
   HardDrive,
   LoaderCircle,
   Plus,
-  Presentation,
   Search,
-  Trash2,
   UploadCloud,
   X,
 } from "lucide-react";
@@ -22,33 +16,15 @@ import type { DragEvent } from "react";
 import { createPortal } from "react-dom";
 import toast from "react-hot-toast";
 
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { IconButton } from "@/components/ui/IconButton";
+import { uploadFile } from "@/lib/client/file-upload";
 import { useChatStore } from "@/stores/useChatStore";
 
+import { formatBytes, ManagedFileRow } from "./files/ManagedFileRow";
+import type { ManagedFile } from "./files/ManagedFileRow";
+
 const ACCEPTED_FILES = ".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.csv,.docx,.xlsx,.pptx";
-
-const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
-  csv: "text/csv",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  gif: "image/gif",
-  jpeg: "image/jpeg",
-  jpg: "image/jpeg",
-  md: "text/markdown",
-  pdf: "application/pdf",
-  png: "image/png",
-  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  txt: "text/plain",
-  webp: "image/webp",
-  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-};
-
-type ManagedFile = {
-  contentType: string;
-  createdAt: string;
-  id: string;
-  name: string;
-  size: number;
-};
 
 type FilesResponse = {
   files: ManagedFile[];
@@ -63,42 +39,6 @@ type FilesResponse = {
   };
 };
 
-const formatBytes = (bytes: number) => {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
-};
-
-const formatDate = (value: string) => new Intl.DateTimeFormat("zh-CN", {
-  day: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  month: "short",
-  year: "numeric",
-}).format(new Date(value));
-
-const contentTypeFor = (file: File) => {
-  if (file.type) return file.type;
-  const extension = file.name.split(".").pop()?.toLowerCase() || "";
-  return CONTENT_TYPE_BY_EXTENSION[extension] || "application/octet-stream";
-};
-
-function FileTypeIcon({ contentType, name }: Pick<ManagedFile, "contentType" | "name">) {
-  const className = "h-5 w-5";
-
-  if (contentType.startsWith("image/")) {
-    return <FileImage className={`${className} text-blue-600 dark:text-blue-400`} />;
-  }
-  if (contentType.includes("spreadsheet") || name.toLowerCase().endsWith(".csv")) {
-    return <FileSpreadsheet className={`${className} text-emerald-600 dark:text-emerald-400`} />;
-  }
-  if (contentType.includes("presentation")) {
-    return <Presentation className={`${className} text-amber-600 dark:text-amber-400`} />;
-  }
-  return <FileText className={`${className} text-gray-600 dark:text-gray-300`} />;
-}
-
 export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open: boolean }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [data, setData] = useState<FilesResponse | null>(null);
@@ -107,7 +47,11 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
-  const [upload, setUpload] = useState<{ completed: number; current: string; total: number } | null>(null);
+  const [upload, setUpload] = useState<{
+    completed: number;
+    current: string;
+    total: number;
+  } | null>(null);
 
   const loadFiles = useCallback(async () => {
     setError("");
@@ -161,7 +105,9 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
   const visibleFiles = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
     if (!normalizedQuery) return data?.files || [];
-    return (data?.files || []).filter((file) => file.name.toLocaleLowerCase().includes(normalizedQuery));
+    return (data?.files || []).filter((file) =>
+      file.name.toLocaleLowerCase().includes(normalizedQuery),
+    );
   }, [data?.files, query]);
 
   const uploadFiles = async (selectedFiles: File[]) => {
@@ -174,32 +120,7 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
     for (const [index, file] of selectedFiles.entries()) {
       setUpload({ completed: index, current: file.name, total: selectedFiles.length });
       try {
-        const contentType = contentTypeFor(file);
-        const presign = await fetch("/api/files/presign", {
-          body: JSON.stringify({ contentType, kind: "attachment", name: file.name, size: file.size }),
-          headers: { "Content-Type": "application/json" },
-          method: "POST",
-        });
-        const presignData = await presign.json();
-        if (!presign.ok) throw new Error(presignData.error || "无法创建上传任务");
-
-        const storageUpload = await fetch(presignData.uploadUrl, {
-          body: file,
-          headers: { "Content-Type": contentType },
-          method: "PUT",
-        });
-        if (!storageUpload.ok) {
-          await fetch(`/api/files/${presignData.file.id}`, { method: "DELETE" }).catch(() => undefined);
-          throw new Error("文件上传失败");
-        }
-
-        const complete = await fetch("/api/files/complete", {
-          body: JSON.stringify({ id: presignData.file.id }),
-          headers: { "Content-Type": "application/json" },
-          method: "POST",
-        });
-        const completeData = await complete.json();
-        if (!complete.ok) throw new Error(completeData.error || "文件校验失败");
+        await uploadFile(file, { kind: "attachment" });
         uploaded += 1;
       } catch (uploadError) {
         firstError ||= uploadError instanceof Error ? uploadError.message : "文件上传失败";
@@ -221,14 +142,18 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
       if (!response.ok) throw new Error(body?.error || "删除失败");
 
       useChatStore.getState().removePendingAttachment(deletingFile.id);
-      setData((current) => current ? {
-        ...current,
-        files: current.files.filter((file) => file.id !== deletingFile.id),
-        usage: {
-          count: Math.max(0, current.usage.count - 1),
-          size: Math.max(0, current.usage.size - deletingFile.size),
-        },
-      } : current);
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              files: current.files.filter((file) => file.id !== deletingFile.id),
+              usage: {
+                count: Math.max(0, current.usage.count - 1),
+                size: Math.max(0, current.usage.size - deletingFile.size),
+              },
+            }
+          : current,
+      );
       setDeletingFile(null);
       toast.success("文件已删除");
     } catch (deleteError) {
@@ -268,7 +193,9 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
               <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 pr-11 sm:h-[72px]">
                 <div className="min-w-0 flex-1">
                   <h2 className="text-base font-semibold sm:text-lg">文件管理</h2>
-                  <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">管理已上传的附件</p>
+                  <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
+                    管理已上传的附件
+                  </p>
                 </div>
                 <button
                   className="inline-flex h-9 items-center gap-2 rounded-lg bg-gray-950 px-3 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:opacity-50 dark:bg-white dark:text-gray-950 dark:hover:bg-gray-200 sm:h-10 sm:px-4"
@@ -276,7 +203,11 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
                   onClick={() => inputRef.current?.click()}
                   type="button"
                 >
-                  {upload ? <LoaderCircle className="animate-spin" size={17} /> : <Plus size={17} />}
+                  {upload ? (
+                    <LoaderCircle className="animate-spin" size={17} />
+                  ) : (
+                    <Plus size={17} />
+                  )}
                   <span className="hidden sm:inline">上传文件</span>
                   <span className="sm:hidden">上传</span>
                 </button>
@@ -305,10 +236,14 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
 
             <main
               className="min-h-0 flex-1 overflow-y-auto"
-              onDragEnter={(event) => { event.preventDefault(); setDragActive(true); }}
+              onDragEnter={(event) => {
+                event.preventDefault();
+                setDragActive(true);
+              }}
               onDragOver={(event) => event.preventDefault()}
               onDragLeave={(event) => {
-                if (!event.currentTarget.contains(event.relatedTarget as Node)) setDragActive(false);
+                if (!event.currentTarget.contains(event.relatedTarget as Node))
+                  setDragActive(false);
               }}
               onDrop={(event: DragEvent<HTMLElement>) => {
                 event.preventDefault();
@@ -324,7 +259,10 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
                       <p className="text-xs text-gray-500 dark:text-gray-400">文件</p>
                       <p className="mt-1 text-sm font-semibold">
                         {data?.usage.count ?? "-"}
-                        <span className="font-normal text-gray-400"> / {data?.limits.maxFileCount ?? "不限"}</span>
+                        <span className="font-normal text-gray-400">
+                          {" "}
+                          / {data?.limits.maxFileCount ?? "不限"}
+                        </span>
                       </p>
                     </div>
                   </div>
@@ -334,7 +272,13 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
                       <p className="text-xs text-gray-500 dark:text-gray-400">存储空间</p>
                       <p className="mt-1 truncate text-sm font-semibold">
                         {data ? formatBytes(data.usage.size) : "-"}
-                        <span className="font-normal text-gray-400"> / {data?.limits.maxStorageBytes ? formatBytes(data.limits.maxStorageBytes) : "不限"}</span>
+                        <span className="font-normal text-gray-400">
+                          {" "}
+                          /{" "}
+                          {data?.limits.maxStorageBytes
+                            ? formatBytes(data.limits.maxStorageBytes)
+                            : "不限"}
+                        </span>
                       </p>
                     </div>
                   </div>
@@ -342,7 +286,11 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
                     <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-200 dark:bg-white/10">
                       <div
                         className="h-full rounded-full bg-blue-600 transition-[width] duration-500 dark:bg-blue-500"
-                        style={{ width: data?.limits.maxStorageBytes ? `${Math.max(storagePercentage, data.usage.size > 0 ? 1 : 0)}%` : "0%" }}
+                        style={{
+                          width: data?.limits.maxStorageBytes
+                            ? `${Math.max(storagePercentage, data.usage.size > 0 ? 1 : 0)}%`
+                            : "0%",
+                        }}
                       />
                     </div>
                     <span className="shrink-0 text-xs tabular-nums text-gray-500 dark:text-gray-400">
@@ -355,13 +303,18 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
                   <div className="mt-4 flex items-center gap-3 border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-200">
                     <LoaderCircle className="shrink-0 animate-spin" size={18} />
                     <p className="min-w-0 flex-1 truncate">正在上传 {upload.current}</p>
-                    <span className="shrink-0 text-xs tabular-nums opacity-70">{upload.completed + 1} / {upload.total}</span>
+                    <span className="shrink-0 text-xs tabular-nums opacity-70">
+                      {upload.completed + 1} / {upload.total}
+                    </span>
                   </div>
                 )}
 
                 <div className="mt-6 flex shrink-0 items-center gap-3">
                   <div className="relative min-w-0 flex-1 sm:max-w-sm">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                    <Search
+                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                      size={16}
+                    />
                     <input
                       aria-label="搜索文件"
                       className="h-10 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-9 text-sm outline-none transition-colors placeholder:text-gray-400 focus:border-gray-400 dark:border-white/10 dark:bg-[#17181a] dark:focus:border-white/30"
@@ -380,7 +333,9 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
                       </button>
                     )}
                   </div>
-                  <p className="hidden text-xs text-gray-400 sm:block">支持图片、文档、表格、演示文稿</p>
+                  <p className="hidden text-xs text-gray-400 sm:block">
+                    支持图片、文档、表格、演示文稿
+                  </p>
                 </div>
 
                 <section className="mt-4 min-h-[260px] flex-1 border-t border-gray-200 dark:border-white/[0.08]">
@@ -394,7 +349,13 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
                     <div className="flex min-h-[320px] flex-col items-center justify-center text-center">
                       <AlertCircle className="text-red-500" size={25} />
                       <p className="mt-3 text-sm text-gray-600 dark:text-gray-300">{error}</p>
-                      <button className="mt-4 h-9 rounded-lg border border-gray-200 px-3 text-sm hover:bg-white dark:border-white/10 dark:hover:bg-white/[0.06]" onClick={() => void loadFiles()} type="button">重新加载</button>
+                      <button
+                        className="mt-4 h-9 rounded-lg border border-gray-200 px-3 text-sm hover:bg-white dark:border-white/10 dark:hover:bg-white/[0.06]"
+                        onClick={() => void loadFiles()}
+                        type="button"
+                      >
+                        重新加载
+                      </button>
                     </div>
                   )}
 
@@ -403,42 +364,17 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
                       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-white/[0.06]">
                         {query ? <Search size={21} /> : <UploadCloud size={22} />}
                       </div>
-                      <p className="mt-4 text-sm font-medium text-gray-700 dark:text-gray-200">{query ? "没有匹配的文件" : "还没有上传文件"}</p>
-                      {!query && <p className="mt-1.5 text-xs text-gray-400">上传后可在对话中继续使用</p>}
+                      <p className="mt-4 text-sm font-medium text-gray-700 dark:text-gray-200">
+                        {query ? "没有匹配的文件" : "还没有上传文件"}
+                      </p>
+                      {!query && (
+                        <p className="mt-1.5 text-xs text-gray-400">上传后可在对话中继续使用</p>
+                      )}
                     </div>
                   )}
 
                   {visibleFiles.map((file) => (
-                    <div className="group grid min-h-[68px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-gray-200/80 px-1 py-3 dark:border-white/[0.07] sm:grid-cols-[auto_minmax(0,1fr)_150px_90px_auto] sm:gap-4 sm:px-3" key={file.id}>
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white ring-1 ring-gray-200 dark:bg-white/[0.05] dark:ring-white/10">
-                        <FileTypeIcon contentType={file.contentType} name={file.name} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-gray-800 dark:text-gray-100" title={file.name}>{file.name}</p>
-                        <p className="mt-1 text-xs text-gray-400 sm:hidden">{formatBytes(file.size)} · {formatDate(file.createdAt)}</p>
-                      </div>
-                      <p className="hidden text-xs text-gray-500 dark:text-gray-400 sm:block">{formatDate(file.createdAt)}</p>
-                      <p className="hidden text-right text-xs tabular-nums text-gray-500 dark:text-gray-400 sm:block">{formatBytes(file.size)}</p>
-                      <div className="flex items-center gap-1">
-                        <a
-                          aria-label={`下载 ${file.name}`}
-                          className="flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-800 dark:hover:bg-white/10 dark:hover:text-gray-100"
-                          href={`/api/files/${file.id}/download`}
-                          title="下载"
-                        >
-                          <Download size={16} />
-                        </a>
-                        <button
-                          aria-label={`删除 ${file.name}`}
-                          className="flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
-                          onClick={() => setDeletingFile(file)}
-                          title="删除"
-                          type="button"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
+                    <ManagedFileRow file={file} key={file.id} onDelete={setDeletingFile} />
                   ))}
                 </section>
               </div>
@@ -458,38 +394,15 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
             </main>
           </motion.section>
 
-          <AnimatePresence>
-            {deletingFile && (
-              <motion.div
-                animate={{ opacity: 1 }}
-                className="fixed inset-0 z-[80] flex items-center justify-center bg-black/35 px-4 backdrop-blur-sm"
-                exit={{ opacity: 0 }}
-                initial={{ opacity: 0 }}
-                onMouseDown={(event) => {
-                  if (event.target === event.currentTarget && !deleting) setDeletingFile(null);
-                }}
-              >
-                <motion.div
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-4 shadow-[0_18px_60px_rgba(0,0,0,0.22)] dark:border-white/10 dark:bg-[#191919]"
-                  exit={{ opacity: 0, scale: 0.98, y: 8 }}
-                  initial={{ opacity: 0, scale: 0.98, y: 8 }}
-                >
-                  <h3 className="text-base font-semibold">删除这个文件？</h3>
-                  <p className="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">
-                    “{deletingFile.name}”将被永久删除，历史对话中的附件也将无法下载。
-                  </p>
-                  <div className="mt-5 flex justify-end gap-2">
-                    <button className="h-9 rounded-lg px-3 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:text-gray-300 dark:hover:bg-white/[0.06]" disabled={deleting} onClick={() => setDeletingFile(null)} type="button">取消</button>
-                    <button className="inline-flex h-9 items-center gap-2 rounded-lg bg-red-600 px-3 text-sm text-white hover:bg-red-700 disabled:opacity-60" disabled={deleting} onClick={() => void handleDelete()} type="button">
-                      {deleting && <LoaderCircle className="animate-spin" size={15} />}
-                      删除
-                    </button>
-                  </div>
-                </motion.div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <ConfirmDialog
+            confirmText="删除"
+            description={`“${deletingFile?.name || "该文件"}”将被永久删除，历史对话中的附件也将无法下载。`}
+            loading={deleting}
+            onCancel={() => setDeletingFile(null)}
+            onConfirm={() => void handleDelete()}
+            open={Boolean(deletingFile)}
+            title="删除这个文件？"
+          />
         </motion.div>
       )}
     </AnimatePresence>,

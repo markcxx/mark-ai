@@ -1,4 +1,4 @@
-export type ModelRuntime = 'gemini' | 'openai-compatible';
+export type ModelRuntime = "gemini" | "openai-compatible";
 
 export type ConfiguredModel = {
   id: string;
@@ -8,7 +8,7 @@ export type ConfiguredModel = {
   baseUrl?: string;
 };
 
-export type PublicConfiguredModel = Pick<ConfiguredModel, 'id' | 'provider'>;
+export type PublicConfiguredModel = Pick<ConfiguredModel, "id" | "provider">;
 
 type ProviderEnvConfig = {
   defaultBaseUrl?: string;
@@ -19,62 +19,66 @@ type ProviderEnvConfig = {
 
 const BUILTIN_PROVIDERS: ProviderEnvConfig[] = [
   {
-    prefix: 'GEMINI',
-    provider: 'gemini',
-    runtime: 'gemini',
+    prefix: "GEMINI",
+    provider: "gemini",
+    runtime: "gemini",
   },
   {
-    defaultBaseUrl: 'https://api.openai.com/v1',
-    prefix: 'OPENAI',
-    provider: 'openai',
-    runtime: 'openai-compatible',
+    defaultBaseUrl: "https://api.openai.com/v1",
+    prefix: "OPENAI",
+    provider: "openai",
+    runtime: "openai-compatible",
   },
   {
-    defaultBaseUrl: 'https://api.deepseek.com',
-    prefix: 'DEEPSEEK',
-    provider: 'deepseek',
-    runtime: 'openai-compatible',
+    defaultBaseUrl: "https://api.deepseek.com",
+    prefix: "DEEPSEEK",
+    provider: "deepseek",
+    runtime: "openai-compatible",
   },
   {
-    defaultBaseUrl: 'https://router.huggingface.co/v1',
-    prefix: 'HUGGINGFACE',
-    provider: 'huggingface',
-    runtime: 'openai-compatible',
+    defaultBaseUrl: "https://router.huggingface.co/v1",
+    prefix: "HUGGINGFACE",
+    provider: "huggingface",
+    runtime: "openai-compatible",
   },
   {
-    defaultBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    prefix: 'BAILIAN',
-    provider: 'bailian',
-    runtime: 'openai-compatible',
+    defaultBaseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    prefix: "BAILIAN",
+    provider: "bailian",
+    runtime: "openai-compatible",
   },
   {
-    defaultBaseUrl: 'https://cloud.infini-ai.com/maas/v1',
-    prefix: 'INFINIAI',
-    provider: 'infiniai',
-    runtime: 'openai-compatible',
+    defaultBaseUrl: "https://cloud.infini-ai.com/maas/v1",
+    prefix: "INFINIAI",
+    provider: "infiniai",
+    runtime: "openai-compatible",
   },
 ];
 
 const parseModelIds = (value?: string) => {
-  return (value || '')
-    .split(',')
-    .map(model => model.trim())
+  return (value || "")
+    .split(",")
+    .map((model) => model.trim())
     .filter(Boolean);
 };
 
-const envPrefix = (provider: string) => provider.trim().replace(/[^a-zA-Z0-9]+/g, '_').toUpperCase();
+const envPrefix = (provider: string) =>
+  provider
+    .trim()
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .toUpperCase();
 
 const normalizeRuntime = (value?: string): ModelRuntime => {
   const runtime = value?.trim().toLowerCase();
-  return runtime === 'gemini' ? 'gemini' : 'openai-compatible';
+  return runtime === "gemini" ? "gemini" : "openai-compatible";
 };
 
 const getDefaultRuntime = (provider: string): ModelRuntime => {
-  return provider.toLowerCase() === 'gemini' ? 'gemini' : 'openai-compatible';
+  return provider.toLowerCase() === "gemini" ? "gemini" : "openai-compatible";
 };
 
 const getDefaultBaseUrl = (provider: string) => {
-  return BUILTIN_PROVIDERS.find(item => item.provider === provider)?.defaultBaseUrl;
+  return BUILTIN_PROVIDERS.find((item) => item.provider === provider)?.defaultBaseUrl;
 };
 
 const getEnvBaseUrl = (prefix: string, fallback?: string) => {
@@ -93,7 +97,7 @@ const getProviderModels = ({ provider, prefix, runtime, defaultBaseUrl }: Provid
 
   const baseUrl = getEnvBaseUrl(prefix, defaultBaseUrl);
 
-  return modelIds.map(id => ({
+  return modelIds.map((id) => ({
     apiKey,
     baseUrl,
     id,
@@ -103,11 +107,11 @@ const getProviderModels = ({ provider, prefix, runtime, defaultBaseUrl }: Provid
 };
 
 const getCustomProviderModels = () => {
-  return parseModelIds(process.env.AI_PROVIDERS).flatMap(provider => {
+  return parseModelIds(process.env.AI_PROVIDERS).flatMap((provider) => {
     const normalizedProvider = provider.toLowerCase();
     const prefix = envPrefix(provider);
 
-    if (BUILTIN_PROVIDERS.some(item => item.provider === normalizedProvider)) return [];
+    if (BUILTIN_PROVIDERS.some((item) => item.provider === normalizedProvider)) return [];
 
     return getProviderModels({
       defaultBaseUrl: getEnvBaseUrl(prefix),
@@ -119,7 +123,7 @@ const getCustomProviderModels = () => {
 };
 
 const getAutoDiscoveredProviderModels = () => {
-  const builtinPrefixes = new Set(BUILTIN_PROVIDERS.map(item => item.prefix));
+  const builtinPrefixes = new Set(BUILTIN_PROVIDERS.map((item) => item.prefix));
   const explicitPrefixes = new Set(parseModelIds(process.env.AI_PROVIDERS).map(envPrefix));
   const discoveredPrefixes = new Set<string>();
 
@@ -134,7 +138,7 @@ const getAutoDiscoveredProviderModels = () => {
     discoveredPrefixes.add(prefix);
   }
 
-  return [...discoveredPrefixes].flatMap(prefix =>
+  return [...discoveredPrefixes].flatMap((prefix) =>
     getProviderModels({
       defaultBaseUrl: getEnvBaseUrl(prefix),
       prefix,
@@ -153,34 +157,34 @@ const getJsonConfiguredModels = () => {
     if (!Array.isArray(configs)) return [];
 
     return configs.flatMap((item): ConfiguredModel[] => {
-      if (!item || typeof item !== 'object') return [];
+      if (!item || typeof item !== "object") return [];
 
-      const id = typeof item.id === 'string' ? item.id.trim() : '';
+      const id = typeof item.id === "string" ? item.id.trim() : "";
       if (!id) return [];
 
       const provider =
-        typeof item.provider === 'string' && item.provider.trim()
+        typeof item.provider === "string" && item.provider.trim()
           ? item.provider.trim().toLowerCase()
-          : 'custom';
+          : "custom";
       const prefix = envPrefix(provider);
       const apiKey =
-        (typeof item.apiKey === 'string' ? item.apiKey.trim() : '') ||
-        (typeof item.apiKeyEnv === 'string' ? process.env[item.apiKeyEnv]?.trim() : '') ||
+        (typeof item.apiKey === "string" ? item.apiKey.trim() : "") ||
+        (typeof item.apiKeyEnv === "string" ? process.env[item.apiKeyEnv]?.trim() : "") ||
         process.env[`${prefix}_API_KEY`]?.trim() ||
-        '';
+        "";
 
       if (!apiKey) return [];
 
       const baseUrl =
-        (typeof item.baseUrl === 'string' ? item.baseUrl.trim() : '') ||
-        (typeof item.baseUrlEnv === 'string' ? process.env[item.baseUrlEnv]?.trim() : '') ||
+        (typeof item.baseUrl === "string" ? item.baseUrl.trim() : "") ||
+        (typeof item.baseUrlEnv === "string" ? process.env[item.baseUrlEnv]?.trim() : "") ||
         getEnvBaseUrl(prefix) ||
         getDefaultBaseUrl(provider);
 
       const rawRuntime =
-        typeof item.runtime === 'string'
+        typeof item.runtime === "string"
           ? item.runtime
-          : typeof item.type === 'string'
+          : typeof item.type === "string"
             ? item.type
             : getDefaultRuntime(provider);
 
@@ -195,7 +199,7 @@ const getJsonConfiguredModels = () => {
       ];
     });
   } catch (error) {
-    console.error('Invalid AI_MODEL_CONFIGS:', error);
+    console.error("Invalid AI_MODEL_CONFIGS:", error);
     return [];
   }
 };
@@ -210,7 +214,7 @@ export const getConfiguredModels = (): ConfiguredModel[] => {
 
   const seen = new Set<string>();
 
-  return models.filter(model => {
+  return models.filter((model) => {
     const key = `${model.provider}:${model.id}`;
     if (seen.has(key)) return false;
     seen.add(key);
@@ -218,31 +222,30 @@ export const getConfiguredModels = (): ConfiguredModel[] => {
   });
 };
 
-const isMarkProvider = (provider: string) =>
-  provider.startsWith('mark') && provider !== 'markai';
+const isMarkProvider = (provider: string) => provider.startsWith("mark") && provider !== "markai";
 
 const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
-  bailian: '阿里云百炼',
-  deepseek: 'DeepSeek',
-  gemini: 'Google Gemini',
-  groq: 'Groq',
-  huggingface: 'HuggingFace',
-  infiniai: '无问芯穹',
-  markai: 'MarkAI',
-  minimax: 'MiniMax',
-  mistral: 'Mistral AI',
-  moonshot: 'Moonshot AI',
-  openai: 'OpenAI',
-  openrouter: 'OpenRouter',
-  siliconflow: '硅基流动',
-  together: 'Together AI',
-  volcengine: '火山方舟',
-  xai: 'xAI',
-  zhipu: '智谱 AI',
+  bailian: "阿里云百炼",
+  deepseek: "DeepSeek",
+  gemini: "Google Gemini",
+  groq: "Groq",
+  huggingface: "HuggingFace",
+  infiniai: "无问芯穹",
+  markai: "MarkAI",
+  minimax: "MiniMax",
+  mistral: "Mistral AI",
+  moonshot: "Moonshot AI",
+  openai: "OpenAI",
+  openrouter: "OpenRouter",
+  siliconflow: "硅基流动",
+  together: "Together AI",
+  volcengine: "火山方舟",
+  xai: "xAI",
+  zhipu: "智谱 AI",
 };
 
 export const getProviderDisplayName = (provider: string): string => {
-  if (isMarkProvider(provider)) return 'MarkAI';
+  if (isMarkProvider(provider)) return "MarkAI";
   return PROVIDER_DISPLAY_NAMES[provider] || provider;
 };
 
@@ -253,7 +256,7 @@ export const getPublicConfiguredModels = (): PublicConfiguredModel[] => {
   return models
     .map(({ id, provider }) => ({
       id,
-      provider: isMarkProvider(provider) ? 'markai' : provider,
+      provider: isMarkProvider(provider) ? "markai" : provider,
     }))
     .filter((model) => {
       const key = `${model.provider}:${model.id}`;
@@ -264,7 +267,10 @@ export const getPublicConfiguredModels = (): PublicConfiguredModel[] => {
 };
 
 const pickRandomKey = (apiKey: string): string => {
-  const keys = apiKey.split(',').map((k) => k.trim()).filter(Boolean);
+  const keys = apiKey
+    .split(",")
+    .map((k) => k.trim())
+    .filter(Boolean);
   return keys.length > 1 ? keys[Math.floor(Math.random() * keys.length)] : apiKey;
 };
 
@@ -274,10 +280,8 @@ export const findConfiguredModel = (modelId?: string, provider?: string) => {
 
   let found: ConfiguredModel | undefined;
 
-  if (provider === 'markai') {
-    const candidates = models.filter(
-      (m) => isMarkProvider(m.provider) && m.id === modelId,
-    );
+  if (provider === "markai") {
+    const candidates = models.filter((m) => isMarkProvider(m.provider) && m.id === modelId);
     if (candidates.length > 0) {
       found = candidates[Math.floor(Math.random() * candidates.length)];
     }

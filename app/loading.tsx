@@ -1,4 +1,4 @@
-import { MarkAILoadingScreen } from '@/components/MarkAILoadingScreen';
+import { MarkAILoadingScreen } from "@/components/MarkAILoadingScreen";
 
 export default function Loading() {
   return <MarkAILoadingScreen />;

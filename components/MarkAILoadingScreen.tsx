@@ -1,4 +1,4 @@
-function MarkAIText({ className = '', size = 40 }: { className?: string; size?: number }) {
+function MarkAIText({ className = "", size = 40 }: { className?: string; size?: number }) {
   return (
     <svg
       aria-hidden="true"
@@ -28,7 +28,7 @@ function MarkAIText({ className = '', size = 40 }: { className?: string; size?: 
 }
 
 export function MarkAILoadingScreen({
-  className = '',
+  className = "",
   progress,
   status,
 }: {
@@ -47,9 +47,11 @@ export function MarkAILoadingScreen({
         <div className="absolute inset-x-0 bottom-[max(2.5rem,env(safe-area-inset-bottom))] mx-auto w-[min(22rem,calc(100vw-3rem))]">
           <div className="mb-2 flex items-center justify-between gap-4 text-xs text-gray-500 dark:text-gray-400">
             <span className="truncate">{status}</span>
-            {typeof progress === 'number' && <span className="tabular-nums">{Math.round(progress)}%</span>}
+            {typeof progress === "number" && (
+              <span className="tabular-nums">{Math.round(progress)}%</span>
+            )}
           </div>
-          {typeof progress === 'number' && (
+          {typeof progress === "number" && (
             <div className="h-1 overflow-hidden rounded-full bg-gray-200 dark:bg-white/10">
               <div
                 className="h-full rounded-full bg-gray-700 transition-[width] duration-300 ease-out dark:bg-gray-200"

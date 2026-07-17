@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import toast, { Toaster } from 'react-hot-toast';
+import { useState } from "react";
+import Link from "next/link";
+import toast, { Toaster } from "react-hot-toast";
 
 export default function ResetPasswordPage() {
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -14,20 +14,20 @@ export default function ResetPasswordPage() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/forget-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, redirectTo: '/login' }),
+      const res = await fetch("/api/auth/forget-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, redirectTo: "/login" }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        toast.error(data.message || '发送失败');
+        toast.error(data.message || "发送失败");
       } else {
-        toast.success('重置链接已发送');
+        toast.success("重置链接已发送");
         setSent(true);
       }
     } catch {
-      toast.error('发送失败，请重试');
+      toast.error("发送失败，请重试");
     } finally {
       setLoading(false);
     }
@@ -40,7 +40,8 @@ export default function ResetPasswordPage() {
           邮件已发送
         </h2>
         <p className="mb-4 text-center text-sm text-gray-500 dark:text-gray-400">
-          我们已向 <span className="font-medium text-gray-700 dark:text-gray-300">{email}</span> 发送了重置密码链接，请查收邮件。
+          我们已向 <span className="font-medium text-gray-700 dark:text-gray-300">{email}</span>{" "}
+          发送了重置密码链接，请查收邮件。
         </p>
         <Link
           href="/login"
@@ -84,7 +85,7 @@ export default function ResetPasswordPage() {
           disabled={loading}
           className="h-10 w-full rounded-lg bg-gray-950 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-gray-950 dark:hover:bg-gray-200"
         >
-          {loading ? '发送中...' : '发送重置链接'}
+          {loading ? "发送中..." : "发送重置链接"}
         </button>
       </form>
 

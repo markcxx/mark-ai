@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { Copy, Trash2, X } from 'lucide-react';
+import { Copy, Trash2, X } from "lucide-react";
 
 export function SelectionFooterBar({
   onCopy,
@@ -16,7 +16,9 @@ export function SelectionFooterBar({
   return (
     <div className="absolute bottom-0 left-0 right-0 z-20 flex animate-in slide-in-from-bottom-3 fade-in justify-center border-t border-gray-200 bg-white/95 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_32px_rgba(0,0,0,0.08)] backdrop-blur-md duration-200 dark:border-white/10 dark:bg-[var(--chat-panel-bg)]/95 md:px-8 md:py-3">
       <div className="relative flex w-full max-w-[840px] flex-col items-center justify-center gap-2 md:flex-row md:gap-4">
-        <span className="text-sm text-gray-500 dark:text-gray-400 md:absolute md:left-0">已选择 {selectedCount} 条消息</span>
+        <span className="text-sm text-gray-500 dark:text-gray-400 md:absolute md:left-0">
+          已选择 {selectedCount} 条消息
+        </span>
         <div className="flex items-center gap-1">
           <button
             className="flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm text-gray-600 dark:text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"

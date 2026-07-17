@@ -1,6 +1,6 @@
-import { isCloudMode } from '@/lib/env';
+import { isCloudMode } from "@/lib/env";
 
-import type { StorageAdapter } from './storage-adapter';
+import type { StorageAdapter } from "./storage-adapter";
 
 let _storage: StorageAdapter | undefined;
 
@@ -8,18 +8,17 @@ export const getStorage = (): StorageAdapter => {
   if (_storage) return _storage;
 
   if (isCloudMode()) {
-    const { PostgresStorage } = require('./postgres-storage');
+    const { PostgresStorage } = require("./postgres-storage");
     _storage = new PostgresStorage();
   } else {
-    const { SqliteStorage } = require('./sqlite-storage');
+    const { SqliteStorage } = require("./sqlite-storage");
     _storage = new SqliteStorage();
   }
 
   return _storage!;
 };
 
-export const listChatSessions = (userId?: string) =>
-  getStorage().listChatSessions(userId);
+export const listChatSessions = (userId?: string) => getStorage().listChatSessions(userId);
 
 export const createChatSession = (params: {
   initialMessage?: string;
@@ -47,4 +46,4 @@ export const deleteChatSession = (sessionId: string, userId?: string) =>
 export const replaceChatMessages = (sessionId: string, messages: Message[], userId?: string) =>
   getStorage().replaceChatMessages(sessionId, messages, userId);
 
-import type { Message } from './types';
+import type { Message } from "./types";

@@ -1,8 +1,8 @@
-import toast from 'react-hot-toast';
-import { create } from 'zustand';
-import { subscribeWithSelector } from 'zustand/middleware';
+import toast from "react-hot-toast";
+import { create } from "zustand";
+import { subscribeWithSelector } from "zustand/middleware";
 
-import type { ChatSession, ConfiguredModel, Message } from '@/lib/chat/types';
+import type { ChatSession, ConfiguredModel, Message } from "@/lib/chat/types";
 
 interface SessionState {
   sessions: ChatSession[];
@@ -14,17 +14,23 @@ interface SessionState {
 
 interface SessionActions {
   loadSessions: () => Promise<void>;
-  loadSession: (sessionId: string, options?: { history?: 'push' | 'replace' | 'none' }) => Promise<Message[] | undefined>;
+  loadSession: (
+    sessionId: string,
+    options?: { history?: "push" | "replace" | "none" },
+  ) => Promise<Message[] | undefined>;
   createSession: (
     initialMessage: string,
     model?: ConfiguredModel,
     options?: { signal?: AbortSignal },
   ) => Promise<ChatSession>;
-  deleteSession: (sessionId: string) => Promise<void>;
-  renameSession: (sessionId: string) => Promise<void>;
+  deleteSession: (sessionId: string) => Promise<boolean>;
+  renameSession: (sessionId: string, messages?: Message[]) => Promise<void>;
   updateSessionTitle: (sessionId: string, title: string) => Promise<void>;
   updateSessionFavorite: (sessionId: string, favorite: boolean) => Promise<void>;
-  persistSessionMessages: (sessionId: string, messages: Message[]) => Promise<ChatSession | undefined>;
+  persistSessionMessages: (
+    sessionId: string,
+    messages: Message[],
+  ) => Promise<ChatSession | undefined>;
   generateSessionTitle: (sessionId: string, messages: Message[]) => Promise<void>;
   upsertSession: (session: ChatSession) => void;
   setActiveSessionId: (id: string | null) => void;
@@ -34,24 +40,23 @@ interface SessionActions {
 
 export type SessionStore = SessionState & SessionActions;
 
-const updateBrowserUrl = (path: string, history: 'push' | 'replace') => {
-  const method = history === 'replace'
-    ? History.prototype.replaceState
-    : History.prototype.pushState;
+const updateBrowserUrl = (path: string, history: "push" | "replace") => {
+  const method =
+    history === "replace" ? History.prototype.replaceState : History.prototype.pushState;
 
   // Next.js patches window.history and treats these client-owned chat URLs as
   // App Router navigations. Use the native method so ChatApp stays mounted.
-  method.call(window.history, null, '', path);
+  method.call(window.history, null, "", path);
 };
 
-const navigateToSession = (sessionId: string, history: 'push' | 'replace' = 'push') => {
+const navigateToSession = (sessionId: string, history: "push" | "replace" = "push") => {
   const path = `/${encodeURIComponent(sessionId)}`;
   updateBrowserUrl(path, history);
 };
 
-const navigateToNewChat = (history: 'push' | 'replace' | 'none' = 'push') => {
-  if (history === 'none') return;
-  updateBrowserUrl('/', history);
+const navigateToNewChat = (history: "push" | "replace" | "none" = "push") => {
+  if (history === "none") return;
+  updateBrowserUrl("/", history);
 };
 
 let activeSessionLoadController: AbortController | null = null;
@@ -97,20 +102,20 @@ export const useSessionStore = create<SessionStore>()(
       set({ isLoadingSessions: true });
       sessionsLoadPromise = (async () => {
         try {
-          const response = await fetch('/api/sessions', { cache: 'no-store' });
+          const response = await fetch("/api/sessions", { cache: "no-store" });
           if (response.status === 401) {
             const callbackUrl = `${window.location.pathname}${window.location.search}`;
             window.location.replace(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
-            throw new Error('Unauthorized');
+            throw new Error("Unauthorized");
           }
-          if (!response.ok) throw new Error('Failed to load sessions');
+          if (!response.ok) throw new Error("Failed to load sessions");
 
           const data = await response.json();
           const nextSessions: ChatSession[] = Array.isArray(data.sessions) ? data.sessions : [];
           set({ sessions: nextSessions });
         } catch (error) {
-          console.error('Sessions list error:', error);
-          toast.error('加载历史会话失败');
+          console.error("Sessions list error:", error);
+          toast.error("加载历史会话失败");
         } finally {
           set({ isLoadingSessions: false });
           sessionsLoadPromise = null;
@@ -129,26 +134,26 @@ export const useSessionStore = create<SessionStore>()(
       try {
         set({ isLoadingActiveSession: true });
         const response = await fetch(`/api/sessions/${sessionId}`, {
-          cache: 'no-store',
+          cache: "no-store",
           signal: controller.signal,
         });
-        if (!response.ok) throw new Error('Failed to load session');
+        if (!response.ok) throw new Error("Failed to load session");
 
         const data = await response.json();
         if (requestId !== activeSessionLoadRequest) return undefined;
         const messages: Message[] = Array.isArray(data.messages) ? data.messages : [];
 
         set({ activeSessionId: data.session?.id || sessionId });
-        if (options.history !== 'none') {
-          navigateToSession(data.session?.id || sessionId, options.history || 'push');
+        if (options.history !== "none") {
+          navigateToSession(data.session?.id || sessionId, options.history || "push");
         }
         if (data.session) get().upsertSession(data.session);
 
         return messages;
       } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') return undefined;
-        console.error('Session load error:', error);
-        toast.error('加载会话失败');
+        if (error instanceof DOMException && error.name === "AbortError") return undefined;
+        console.error("Session load error:", error);
+        toast.error("加载会话失败");
         return undefined;
       } finally {
         if (requestId === activeSessionLoadRequest) {
@@ -159,18 +164,18 @@ export const useSessionStore = create<SessionStore>()(
     },
 
     createSession: async (initialMessage, model, options = {}) => {
-      const response = await fetch('/api/sessions', {
+      const response = await fetch("/api/sessions", {
         body: JSON.stringify({
           initialMessage,
           model: model?.id,
           provider: model?.provider,
         }),
-        headers: { 'Content-Type': 'application/json' },
-        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
         signal: options.signal,
       });
 
-      if (!response.ok) throw new Error('Failed to create session');
+      if (!response.ok) throw new Error("Failed to create session");
 
       const data = await response.json();
       const session = data.session as ChatSession;
@@ -182,66 +187,55 @@ export const useSessionStore = create<SessionStore>()(
 
     deleteSession: async (sessionId) => {
       try {
-        const response = await fetch(`/api/sessions/${sessionId}`, { method: 'DELETE' });
-        if (!response.ok) throw new Error('Failed to delete session');
+        const deletingActiveSession = get().activeSessionId === sessionId;
+        const response = await fetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+        if (!response.ok) throw new Error("Failed to delete session");
 
         get().setSessionLoading(sessionId, false);
         set((s) => ({
           sessions: s.sessions.filter((session) => session.id !== sessionId),
         }));
 
-        if (get().activeSessionId === sessionId) {
-          const [{ useChatStore }, { useUIStore }] = await Promise.all([
-            import('./useChatStore'),
-            import('./useUIStore'),
-          ]);
-
-          useChatStore.getState().reset();
-          useUIStore.getState().exitMultiSelect();
-          useUIStore.getState().setOpenMenuMessageId(null);
+        if (deletingActiveSession) {
           set({ activeSessionId: null, isLoadingActiveSession: false });
-          navigateToNewChat('replace');
+          navigateToNewChat("replace");
         }
 
-        toast.success('会话已删除');
+        toast.success("会话已删除");
+        return deletingActiveSession;
       } catch (error) {
-        console.error('Session delete error:', error);
-        toast.error('删除会话失败');
+        console.error("Session delete error:", error);
+        toast.error("删除会话失败");
+        return false;
       }
     },
 
-    renameSession: async (sessionId) => {
-      const { sessions, upsertSession, setSessionLoading, activeSessionId } = get();
+    renameSession: async (sessionId, messages) => {
+      const { sessions, upsertSession, setSessionLoading } = get();
       const session = sessions.find((item) => item.id === sessionId);
-      if (session) upsertSession({ ...session, title: '...' });
+      if (session) upsertSession({ ...session, title: "..." });
       setSessionLoading(sessionId, true);
 
       try {
-        let sourceMessages: Message[] | undefined;
-
-        if (activeSessionId === sessionId) {
-          // Caller should provide messages from chat store
-          const { useChatStore } = await import('./useChatStore');
-          sourceMessages = useChatStore.getState().messages;
-        }
+        let sourceMessages = messages;
 
         if (!sourceMessages) {
-          const response = await fetch(`/api/sessions/${sessionId}`, { cache: 'no-store' });
-          if (!response.ok) throw new Error('Failed to load session for title');
+          const response = await fetch(`/api/sessions/${sessionId}`, { cache: "no-store" });
+          if (!response.ok) throw new Error("Failed to load session for title");
           const data = await response.json();
           sourceMessages = Array.isArray(data.messages) ? data.messages : [];
         }
 
         if (!sourceMessages || sourceMessages.length === 0) {
-          toast.error('没有可命名的消息');
+          toast.error("没有可命名的消息");
           if (session) upsertSession(session);
           return;
         }
 
         await get().generateSessionTitle(sessionId, sourceMessages);
       } catch (error) {
-        console.error('Session rename error:', error);
-        toast.error('自动命名失败');
+        console.error("Session rename error:", error);
+        toast.error("自动命名失败");
         if (session) upsertSession(session);
       } finally {
         setSessionLoading(sessionId, false);
@@ -253,17 +247,17 @@ export const useSessionStore = create<SessionStore>()(
       try {
         const response = await fetch(`/api/sessions/${sessionId}`, {
           body: JSON.stringify({ title }),
-          headers: { 'Content-Type': 'application/json' },
-          method: 'PATCH',
+          headers: { "Content-Type": "application/json" },
+          method: "PATCH",
         });
-        if (!response.ok) throw new Error('Failed to update session title');
+        if (!response.ok) throw new Error("Failed to update session title");
 
         const data = await response.json();
         if (data.session) get().upsertSession(data.session);
-        toast.success('会话已重命名');
+        toast.success("会话已重命名");
       } catch (error) {
-        console.error('Session title update error:', error);
-        toast.error('重命名失败');
+        console.error("Session title update error:", error);
+        toast.error("重命名失败");
       } finally {
         get().setSessionLoading(sessionId, false);
       }
@@ -274,17 +268,17 @@ export const useSessionStore = create<SessionStore>()(
       try {
         const response = await fetch(`/api/sessions/${sessionId}`, {
           body: JSON.stringify({ favorite }),
-          headers: { 'Content-Type': 'application/json' },
-          method: 'PATCH',
+          headers: { "Content-Type": "application/json" },
+          method: "PATCH",
         });
-        if (!response.ok) throw new Error('Failed to update session favorite');
+        if (!response.ok) throw new Error("Failed to update session favorite");
 
         const data = await response.json();
         if (data.session) get().upsertSession(data.session);
-        toast.success(favorite ? '已收藏会话' : '已取消收藏');
+        toast.success(favorite ? "已收藏会话" : "已取消收藏");
       } catch (error) {
-        console.error('Session favorite update error:', error);
-        toast.error('收藏状态更新失败');
+        console.error("Session favorite update error:", error);
+        toast.error("收藏状态更新失败");
       } finally {
         get().setSessionLoading(sessionId, false);
       }
@@ -294,13 +288,13 @@ export const useSessionStore = create<SessionStore>()(
       try {
         const response = await fetch(`/api/sessions/${sessionId}/messages`, {
           body: JSON.stringify({ messages }),
-          headers: { 'Content-Type': 'application/json' },
-          method: 'PUT',
+          headers: { "Content-Type": "application/json" },
+          method: "PUT",
         });
 
         if (!response.ok) {
           const errorPayload = await response.text();
-          let message = errorPayload || 'Failed to save messages';
+          let message = errorPayload || "Failed to save messages";
           try {
             const parsed = JSON.parse(errorPayload);
             message = parsed.detail || parsed.error || message;
@@ -314,10 +308,8 @@ export const useSessionStore = create<SessionStore>()(
         if (data.session) get().upsertSession(data.session);
         return data.session as ChatSession | undefined;
       } catch (error) {
-        console.error('Session save error:', error);
-        toast.error(
-          error instanceof Error ? `保存会话失败：${error.message}` : '保存会话失败',
-        );
+        console.error("Session save error:", error);
+        toast.error(error instanceof Error ? `保存会话失败：${error.message}` : "保存会话失败");
         return undefined;
       }
     },
@@ -326,16 +318,16 @@ export const useSessionStore = create<SessionStore>()(
       try {
         const response = await fetch(`/api/sessions/${sessionId}/title`, {
           body: JSON.stringify({ messages }),
-          headers: { 'Content-Type': 'application/json' },
-          method: 'POST',
+          headers: { "Content-Type": "application/json" },
+          method: "POST",
         });
 
-        if (!response.ok) throw new Error('Failed to generate title');
+        if (!response.ok) throw new Error("Failed to generate title");
 
         const data = await response.json();
         if (data.session) get().upsertSession(data.session);
       } catch (error) {
-        console.error('Session title error:', error);
+        console.error("Session title error:", error);
       }
     },
   })),

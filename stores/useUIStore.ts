@@ -1,8 +1,8 @@
-import { create } from 'zustand';
-import { subscribeWithSelector } from 'zustand/middleware';
+import { create } from "zustand";
+import { subscribeWithSelector } from "zustand/middleware";
 
-import type { ConfiguredModel, Message } from '@/lib/chat/types';
-import { getModelKey } from '@/lib/chat/helpers';
+import type { ConfiguredModel, Message } from "@/lib/chat/types";
+import { getModelKey } from "@/lib/chat/helpers";
 
 interface UIState {
   isAppReady: boolean;
@@ -52,7 +52,7 @@ export type UIStore = UIState & UIActions;
 
 const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 380;
-const SELECTED_MODEL_STORAGE_KEY = 'markai:selected-model';
+const SELECTED_MODEL_STORAGE_KEY = "markai:selected-model";
 
 const clampSidebarWidth = (width: number) =>
   Math.min(Math.max(width, SIDEBAR_MIN_WIDTH), SIDEBAR_MAX_WIDTH);
@@ -60,7 +60,7 @@ const clampSidebarWidth = (width: number) =>
 export const useUIStore = create<UIStore>()(
   subscribeWithSelector((set, get) => ({
     isAppReady: false,
-    bootMessage: '正在启动 MarkAI…',
+    bootMessage: "正在启动 MarkAI…",
     bootProgress: 8,
     isSidebarOpen: true,
     sidebarWidth: 260,
@@ -71,11 +71,11 @@ export const useUIStore = create<UIStore>()(
     selectedMessageIds: [],
     selectionAnchorId: undefined,
     wideChatMode: false,
-    modelSearchKeyword: '',
+    modelSearchKeyword: "",
     availableModels: [],
     providerNames: {},
     isLoadingModels: true,
-    selectedModelKey: '',
+    selectedModelKey: "",
     webSearchEnabled: false,
 
     setAppReady: (ready) => set({ isAppReady: ready }),
@@ -164,24 +164,25 @@ export const useUIStore = create<UIStore>()(
 
     loadModels: async () => {
       try {
-        const response = await fetch('/api/models', { cache: 'no-store' });
+        const response = await fetch("/api/models", { cache: "no-store" });
         if (response.status === 401) {
           const callbackUrl = `${window.location.pathname}${window.location.search}`;
           window.location.replace(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
-          throw new Error('Unauthorized');
+          throw new Error("Unauthorized");
         }
-        if (!response.ok) throw new Error('Failed to load models');
+        if (!response.ok) throw new Error("Failed to load models");
         const data = await response.json();
         const models: ConfiguredModel[] = Array.isArray(data.models) ? data.models : [];
         const providerNames: Record<string, string> =
-          data.providerNames && typeof data.providerNames === 'object' ? data.providerNames : {};
+          data.providerNames && typeof data.providerNames === "object" ? data.providerNames : {};
         const currentModelKey = get().selectedModelKey;
-        const savedModelKey = data.selectedModel?.id && data.selectedModel?.provider
-          ? getModelKey(data.selectedModel)
-          : '';
-        let localModelKey = '';
+        const savedModelKey =
+          data.selectedModel?.id && data.selectedModel?.provider
+            ? getModelKey(data.selectedModel)
+            : "";
+        let localModelKey = "";
         try {
-          localModelKey = window.localStorage.getItem(SELECTED_MODEL_STORAGE_KEY) || '';
+          localModelKey = window.localStorage.getItem(SELECTED_MODEL_STORAGE_KEY) || "";
         } catch {
           // Storage can be unavailable in private or restricted browser contexts.
         }
@@ -189,7 +190,7 @@ export const useUIStore = create<UIStore>()(
           Boolean(key && models.some((model) => getModelKey(model) === key));
         const selectedModelKey =
           [currentModelKey, savedModelKey, localModelKey].find(isAvailable) ||
-          (models[0] ? getModelKey(models[0]) : '');
+          (models[0] ? getModelKey(models[0]) : "");
         set({
           availableModels: models,
           providerNames,
@@ -197,8 +198,13 @@ export const useUIStore = create<UIStore>()(
           isLoadingModels: false,
         });
       } catch (error) {
-        console.error('Model config error:', error);
-        set({ availableModels: [], providerNames: {}, selectedModelKey: '', isLoadingModels: false });
+        console.error("Model config error:", error);
+        set({
+          availableModels: [],
+          providerNames: {},
+          selectedModelKey: "",
+          isLoadingModels: false,
+        });
       }
     },
 
@@ -213,15 +219,17 @@ export const useUIStore = create<UIStore>()(
         // Database persistence remains the primary signed-in storage.
       }
 
-      void fetch('/api/models', {
+      void fetch("/api/models", {
         body: JSON.stringify({ id: model.id, provider: model.provider }),
-        headers: { 'Content-Type': 'application/json' },
-        method: 'PATCH',
-      }).then((response) => {
-        if (!response.ok) throw new Error('Failed to save selected model');
-      }).catch((error) => {
-        console.error('Model preference save error:', error);
-      });
+        headers: { "Content-Type": "application/json" },
+        method: "PATCH",
+      })
+        .then((response) => {
+          if (!response.ok) throw new Error("Failed to save selected model");
+        })
+        .catch((error) => {
+          console.error("Model preference save error:", error);
+        });
     },
     setWideChatMode: (wide) => set({ wideChatMode: wide }),
     setModelSearchKeyword: (keyword) => set({ modelSearchKeyword: keyword }),

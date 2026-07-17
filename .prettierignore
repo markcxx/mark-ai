@@ -1,0 +1,9 @@
+.data/
+.next/
+coverage/
+drizzle/migrations/
+lobehub/
+node_modules/
+package-lock.json
+public/
+tsconfig.tsbuildinfo

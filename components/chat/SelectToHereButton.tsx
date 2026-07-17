@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useCallback, useRef } from 'react';
-import { ArrowDownToLine } from 'lucide-react';
+import { useCallback, useRef } from "react";
+import { ArrowDownToLine } from "lucide-react";
 
 export function SelectToHereButton({
   onSelectToHere,
@@ -18,7 +18,7 @@ export function SelectToHereButton({
     const lineY = rect.top + rect.height / 2;
     let targetId: string | undefined;
 
-    for (const node of wrap.ownerDocument.querySelectorAll<HTMLElement>('[data-message-id]')) {
+    for (const node of wrap.ownerDocument.querySelectorAll<HTMLElement>("[data-message-id]")) {
       if (node.getBoundingClientRect().top <= lineY) {
         targetId = node.dataset.messageId || targetId;
       }

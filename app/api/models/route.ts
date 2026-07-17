@@ -1,11 +1,11 @@
-import { eq } from 'drizzle-orm';
-import { NextRequest, NextResponse } from 'next/server';
-import { authorizeApiRequest, enforceRateLimit } from '@/lib/api/security';
-import { getAvailableProviderNames, getAvailablePublicModels } from '@/lib/available-models';
-import { getDb } from '@/lib/db';
-import { userSettings } from '@/lib/db/schema';
+import { eq } from "drizzle-orm";
+import { NextRequest, NextResponse } from "next/server";
+import { authorizeApiRequest, enforceRateLimit } from "@/lib/api/security";
+import { getAvailableProviderNames, getAvailablePublicModels } from "@/lib/available-models";
+import { getDb } from "@/lib/db";
+import { userSettings } from "@/lib/db/schema";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const authorization = await authorizeApiRequest(req);
@@ -36,15 +36,18 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({
-    models,
-    providerNames,
-    selectedModel,
-  }, {
-    headers: {
-      'Cache-Control': 'no-store',
+  return NextResponse.json(
+    {
+      models,
+      providerNames,
+      selectedModel,
     },
-  });
+    {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    },
+  );
 }
 
 export async function PATCH(req: NextRequest) {
@@ -54,19 +57,19 @@ export async function PATCH(req: NextRequest) {
   const limited = enforceRateLimit({
     key: authorization.key,
     limit: 60,
-    scope: 'model-preference',
+    scope: "model-preference",
   });
   if (limited) return limited;
 
   const body = await req.json().catch(() => null);
-  const id = typeof body?.id === 'string' ? body.id.trim() : '';
-  const provider = typeof body?.provider === 'string' ? body.provider.trim() : '';
+  const id = typeof body?.id === "string" ? body.id.trim() : "";
+  const provider = typeof body?.provider === "string" ? body.provider.trim() : "";
   const modelExists = (await getAvailablePublicModels(authorization.userId)).some(
     (model) => model.id === id && model.provider === provider,
   );
 
   if (!id || !provider || !modelExists) {
-    return NextResponse.json({ error: 'Model is not configured' }, { status: 400 });
+    return NextResponse.json({ error: "Model is not configured" }, { status: 400 });
   }
 
   if (authorization.userId) {

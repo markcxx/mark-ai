@@ -1,35 +1,35 @@
-import { betterAuth } from 'better-auth';
-import { APIError, createAuthMiddleware } from 'better-auth/api';
-import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { admin } from 'better-auth/plugins';
-import { and, eq, gt } from 'drizzle-orm';
+import { betterAuth } from "better-auth";
+import { APIError, createAuthMiddleware } from "better-auth/api";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { admin } from "better-auth/plugins";
+import { and, eq, gt } from "drizzle-orm";
 
-import { getDb } from '@/lib/db';
-import * as schema from '@/lib/db/schema';
-import { sendResetPasswordEmail, sendVerificationEmail } from '@/lib/email';
-import { isCloudMode } from '@/lib/env';
+import { getDb } from "@/lib/db";
+import * as schema from "@/lib/db/schema";
+import { sendResetPasswordEmail, sendVerificationEmail } from "@/lib/email";
+import { isCloudMode } from "@/lib/env";
 
 const getSSOProviders = () => {
-  const providers: ReturnType<typeof betterAuth>['options']['socialProviders'] = {};
-  const enabledProviders = (process.env.AUTH_SSO_PROVIDERS || '')
-    .split(',')
+  const providers: ReturnType<typeof betterAuth>["options"]["socialProviders"] = {};
+  const enabledProviders = (process.env.AUTH_SSO_PROVIDERS || "")
+    .split(",")
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
 
   if (
-    enabledProviders.includes('google') &&
+    enabledProviders.includes("google") &&
     process.env.AUTH_GOOGLE_ID &&
     process.env.AUTH_GOOGLE_SECRET
   ) {
     providers.google = {
       clientId: process.env.AUTH_GOOGLE_ID,
       clientSecret: process.env.AUTH_GOOGLE_SECRET,
-      prompt: 'select_account',
+      prompt: "select_account",
     };
   }
 
   if (
-    enabledProviders.includes('github') &&
+    enabledProviders.includes("github") &&
     process.env.AUTH_GITHUB_ID &&
     process.env.AUTH_GITHUB_SECRET
   ) {
@@ -44,7 +44,7 @@ const getSSOProviders = () => {
 
 export const auth = betterAuth({
   database: drizzleAdapter(getDb(), {
-    provider: 'pg',
+    provider: "pg",
     schema: {
       user: schema.users,
       session: schema.authSessions,
@@ -58,12 +58,12 @@ export const auth = betterAuth({
 
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
-      if (!isCloudMode() || ctx.path !== '/sign-up/email') return;
+      if (!isCloudMode() || ctx.path !== "/sign-up/email") return;
 
-      const email = typeof ctx.body?.email === 'string' ? ctx.body.email.trim().toLowerCase() : '';
-      const registrationToken = ctx.headers?.get('x-markai-email-verification')?.trim() || '';
+      const email = typeof ctx.body?.email === "string" ? ctx.body.email.trim().toLowerCase() : "";
+      const registrationToken = ctx.headers?.get("x-markai-email-verification")?.trim() || "";
       if (!email || !registrationToken) {
-        throw new APIError('BAD_REQUEST', { message: '请先完成邮箱验证码验证' });
+        throw new APIError("BAD_REQUEST", { message: "请先完成邮箱验证码验证" });
       }
 
       const db = getDb();
@@ -81,7 +81,7 @@ export const auth = betterAuth({
         .limit(1);
 
       if (!verified.length) {
-        throw new APIError('BAD_REQUEST', { message: '邮箱验证已失效，请重新验证' });
+        throw new APIError("BAD_REQUEST", { message: "邮箱验证已失效，请重新验证" });
       }
 
       await db.delete(schema.verifications).where(eq(schema.verifications.identifier, tokenId));
@@ -92,7 +92,7 @@ export const auth = betterAuth({
     enabled: true,
     minPasswordLength: 8,
     maxPasswordLength: 64,
-    requireEmailVerification: process.env.AUTH_EMAIL_VERIFICATION === '1',
+    requireEmailVerification: process.env.AUTH_EMAIL_VERIFICATION === "1",
     sendResetPassword: async ({ user, url }) => {
       await sendResetPasswordEmail(user.email, url);
     },
@@ -121,26 +121,26 @@ export const auth = betterAuth({
   account: {
     accountLinking: {
       enabled: true,
-      trustedProviders: ['google', 'github'],
+      trustedProviders: ["google", "github"],
     },
   },
 
   user: {
     fields: {
-      image: 'avatar',
-      name: 'fullName',
+      image: "avatar",
+      name: "fullName",
     },
     additionalFields: {
       username: {
-        type: 'string',
+        type: "string",
         required: false,
       },
       age: {
-        type: 'number',
+        type: "number",
         required: false,
       },
       profileCompleted: {
-        type: 'boolean',
+        type: "boolean",
         required: false,
         defaultValue: false,
         input: false,
@@ -150,8 +150,8 @@ export const auth = betterAuth({
 
   plugins: [
     admin({
-      defaultRole: 'user',
-      adminRole: 'admin',
+      defaultRole: "user",
+      adminRole: "admin",
     }),
   ],
 });

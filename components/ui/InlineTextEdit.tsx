@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef } from "react";
 
-import { cn } from '@/lib/utils';
+import { cn } from "@/lib/utils";
 
 export function InlineTextEdit({
   className,
@@ -27,7 +27,7 @@ export function InlineTextEdit({
   return (
     <input
       className={cn(
-        'rounded-lg border border-gray-200 bg-white px-3 text-gray-900 outline-none transition-colors focus:border-primary/40 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-[#191919] dark:text-gray-100 dark:focus:border-white/20 dark:focus:ring-white/[0.06]',
+        "rounded-lg border border-gray-200 bg-white px-3 text-gray-900 outline-none transition-colors focus:border-primary/40 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-[#191919] dark:text-gray-100 dark:focus:border-white/20 dark:focus:ring-white/[0.06]",
         className,
       )}
       onBlur={onSave}
@@ -35,8 +35,8 @@ export function InlineTextEdit({
       onClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => {
         event.stopPropagation();
-        if (event.key === 'Enter') onSave();
-        if (event.key === 'Escape') onCancel();
+        if (event.key === "Enter") onSave();
+        if (event.key === "Escape") onCancel();
       }}
       ref={inputRef}
       value={value}

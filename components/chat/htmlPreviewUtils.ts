@@ -36,21 +36,21 @@ export const getHtmlPreviewDocument = (content: string) => {
 
 export const extractHtmlTitle = (content: string) => {
   const match = content.match(/<title>([\S\s]*?)<\/title>/i);
-  return match?.[1]?.replaceAll(/\s+/g, ' ').trim();
+  return match?.[1]?.replaceAll(/\s+/g, " ").trim();
 };
 
 export const sanitizeHtmlFileName = (value: string) =>
   value
-    .replaceAll(/["*/:<>?\\|]/g, '-')
-    .replaceAll(/\s+/g, ' ')
+    .replaceAll(/["*/:<>?\\|]/g, "-")
+    .replaceAll(/\s+/g, " ")
     .trim()
     .slice(0, 80);
 
 export const downloadHtmlFile = (content: string, title: string) => {
   const documentContent = getHtmlPreviewDocument(content);
-  const blob = new Blob([documentContent], { type: 'text/html;charset=utf-8' });
+  const blob = new Blob([documentContent], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
+  const link = document.createElement("a");
   link.href = url;
   link.download = `${sanitizeHtmlFileName(title) || `markai-html-preview-${Date.now()}`}.html`;
   link.click();

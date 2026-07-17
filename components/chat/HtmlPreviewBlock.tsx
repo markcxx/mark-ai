@@ -1,15 +1,15 @@
-'use client';
+"use client";
 
-import { Code2, FileCode2, PanelRightOpen, X } from 'lucide-react';
+import { Code2, FileCode2, PanelRightOpen, X } from "lucide-react";
 
-import { useHtmlPreview } from './HtmlPreviewContext';
-import { extractHtmlTitle, getHtmlPreviewId } from './htmlPreviewUtils';
+import { useHtmlPreview } from "./HtmlPreviewContext";
+import { extractHtmlTitle, getHtmlPreviewId } from "./htmlPreviewUtils";
 
 export function HtmlPreviewBlock({ children }: { children: string }) {
   const htmlPreview = useHtmlPreview();
   const id = getHtmlPreviewId(children);
-  const title = extractHtmlTitle(children) || 'HTML 预览';
-  const lineCount = children.trim().split('\n').length;
+  const title = extractHtmlTitle(children) || "HTML 预览";
+  const lineCount = children.trim().split("\n").length;
   const active = htmlPreview?.activePreview?.id === id;
 
   const togglePreview = () => {
@@ -37,7 +37,7 @@ export function HtmlPreviewBlock({ children }: { children: string }) {
         </span>
         <span className="mt-1 flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500">
           <Code2 size={13} />
-          HTML · {lineCount} 行 · {active ? '点击关闭右侧预览' : '点击打开右侧预览'}
+          HTML · {lineCount} 行 · {active ? "点击关闭右侧预览" : "点击打开右侧预览"}
         </span>
       </span>
 

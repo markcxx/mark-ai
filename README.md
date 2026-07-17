@@ -89,10 +89,10 @@ npm run dev
 
 ### 内置供应商
 
-| 供应商 | API Key | 模型列表 | Base URL |
-|--------|---------|----------|----------|
-| Gemini | `GEMINI_API_KEY` | `GEMINI_MODELS` | `GEMINI_BASE_URL` |
-| OpenAI | `OPENAI_API_KEY` | `OPENAI_MODELS` | `OPENAI_BASE_URL` |
+| 供应商   | API Key            | 模型列表          | Base URL            |
+| -------- | ------------------ | ----------------- | ------------------- |
+| Gemini   | `GEMINI_API_KEY`   | `GEMINI_MODELS`   | `GEMINI_BASE_URL`   |
+| OpenAI   | `OPENAI_API_KEY`   | `OPENAI_MODELS`   | `OPENAI_BASE_URL`   |
 | DeepSeek | `DEEPSEEK_API_KEY` | `DEEPSEEK_MODELS` | `DEEPSEEK_BASE_URL` |
 
 ```env
@@ -126,10 +126,10 @@ FIRECRAWL_API_KEY=fc-xxxxx       # 网页阅读（可选，缺省回退到 Tavil
 
 ### 其他选项
 
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `MARKAI_SQLITE_PATH` | `.data/markai.sqlite` | SQLite 数据库路径 |
-| `MARKAI_CONVERSATION_TITLE_MODEL` | — | 自动生成会话标题的模型（格式：`provider/model`） |
+| 变量                              | 默认值                | 说明                                             |
+| --------------------------------- | --------------------- | ------------------------------------------------ |
+| `MARKAI_SQLITE_PATH`              | `.data/markai.sqlite` | SQLite 数据库路径                                |
+| `MARKAI_CONVERSATION_TITLE_MODEL` | —                     | 自动生成会话标题的模型（格式：`provider/model`） |
 
 ---
 
@@ -174,20 +174,20 @@ docker run -p 3000:3000 --env-file .env.local markai
 
 ## 🛠 技术栈
 
-| 层级 | 技术 |
-|------|------|
-| 框架 | [Next.js 15](https://nextjs.org/)（App Router, Standalone） |
-| 视图层 | [React 19](https://react.dev/) |
-| 状态管理 | [Zustand 5](https://zustand.docs.pmnd.rs/) |
-| 样式 | [Tailwind CSS 4](https://tailwindcss.com/) |
-| 动画 | [Motion](https://motion.dev/)（Framer Motion） |
-| Markdown | [react-markdown](https://github.com/remarkjs/react-markdown) + remark-gfm |
+| 层级     | 技术                                                                                                      |
+| -------- | --------------------------------------------------------------------------------------------------------- |
+| 框架     | [Next.js 15](https://nextjs.org/)（App Router, Standalone）                                               |
+| 视图层   | [React 19](https://react.dev/)                                                                            |
+| 状态管理 | [Zustand 5](https://zustand.docs.pmnd.rs/)                                                                |
+| 样式     | [Tailwind CSS 4](https://tailwindcss.com/)                                                                |
+| 动画     | [Motion](https://motion.dev/)（Framer Motion）                                                            |
+| Markdown | [react-markdown](https://github.com/remarkjs/react-markdown) + remark-gfm                                 |
 | 代码高亮 | [react-syntax-highlighter](https://github.com/react-syntax-highlighter/react-syntax-highlighter)（Prism） |
-| 图标 | [Lucide](https://lucide.dev/) + [@lobehub/icons](https://github.com/lobehub/lobe-icons) |
-| 数据库 | SQLite（Node.js 内置 `node:sqlite`） |
-| 联网搜索 | [Tavily](https://tavily.com/) + [Firecrawl](https://firecrawl.dev/) |
-| 图片导出 | [@zumer/snapdom](https://github.com/nicepkg/snapdom) |
-| 类型系统 | TypeScript 5.9, strict 模式 |
+| 图标     | [Lucide](https://lucide.dev/) + [@lobehub/icons](https://github.com/lobehub/lobe-icons)                   |
+| 数据库   | SQLite（Node.js 内置 `node:sqlite`）                                                                      |
+| 联网搜索 | [Tavily](https://tavily.com/) + [Firecrawl](https://firecrawl.dev/)                                       |
+| 图片导出 | [@zumer/snapdom](https://github.com/nicepkg/snapdom)                                                      |
+| 类型系统 | TypeScript 5.9, strict 模式                                                                               |
 
 ---
 

@@ -1,4 +1,4 @@
-import type { WebSearchResult } from '@/lib/chat/types';
+import type { WebSearchResult } from "@/lib/chat/types";
 
 type TavilyResult = {
   content?: string;
@@ -18,13 +18,13 @@ export type TavilySearchResponse = {
   results: WebSearchResult[];
 };
 
-const TAVILY_ENDPOINT = 'https://api.tavily.com/search';
+const TAVILY_ENDPOINT = "https://api.tavily.com/search";
 const DEFAULT_MAX_RESULTS = 8;
 const REQUEST_TIMEOUT_MS = 20_000;
 
 const getApiKeys = () =>
-  (process.env.TAVILY_API_KEY || '')
-    .split(',')
+  (process.env.TAVILY_API_KEY || "")
+    .split(",")
     .map((key) => key.trim())
     .filter(Boolean);
 
@@ -32,16 +32,16 @@ const getTavilyErrorMessage = (detail: string) => {
   try {
     const parsed = JSON.parse(detail);
     const message = parsed?.detail?.error || parsed?.error;
-    if (typeof message === 'string' && message.trim()) return message;
+    if (typeof message === "string" && message.trim()) return message;
   } catch {
     // Fall back to the raw response body below.
   }
 
-  return detail || 'Tavily search failed';
+  return detail || "Tavily search failed";
 };
 
 const toPositiveInteger = (value: unknown, fallback: number) => {
-  const number = typeof value === 'number' ? value : Number(value);
+  const number = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(number)) return fallback;
   return Math.min(Math.max(Math.floor(number), 1), 20);
 };
@@ -59,12 +59,12 @@ export async function searchTavily({
 }): Promise<TavilySearchResponse> {
   const apiKeys = getApiKeys();
   if (apiKeys.length === 0) {
-    throw new Error('TAVILY_API_KEY is not configured');
+    throw new Error("TAVILY_API_KEY is not configured");
   }
 
   const cleanQuery = query.trim();
   if (!cleanQuery) {
-    throw new Error('Query is required');
+    throw new Error("Query is required");
   }
 
   const startedAt = Date.now();
@@ -74,7 +74,7 @@ export async function searchTavily({
     include_raw_content: false,
     max_results: toPositiveInteger(maxResults, DEFAULT_MAX_RESULTS),
     query: cleanQuery,
-    search_depth: searchDepth === 'advanced' ? 'advanced' : 'basic',
+    search_depth: searchDepth === "advanced" ? "advanced" : "basic",
   });
 
   let lastError: { detail?: string; error: string; status: number } | undefined;
@@ -83,16 +83,16 @@ export async function searchTavily({
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     const abortRequest = () => controller.abort();
-    signal?.addEventListener('abort', abortRequest, { once: true });
+    signal?.addEventListener("abort", abortRequest, { once: true });
 
     try {
       const response = await fetch(TAVILY_ENDPOINT, {
         body: requestBody,
         headers: {
           Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        method: 'POST',
+        method: "POST",
         signal: controller.signal,
       });
 
@@ -110,18 +110,18 @@ export async function searchTavily({
       const results = Array.isArray(data.results)
         ? data.results
             .map((item: TavilyResult) => ({
-              content: item.content || item.raw_content || '',
+              content: item.content || item.raw_content || "",
               favicon: item.favicon || undefined,
               publishedDate: item.published_date || undefined,
-              score: typeof item.score === 'number' ? item.score : undefined,
-              title: item.title || item.url || 'Untitled',
-              url: item.url || '',
+              score: typeof item.score === "number" ? item.score : undefined,
+              title: item.title || item.url || "Untitled",
+              url: item.url || "",
             }))
             .filter((item: { url: string }) => item.url)
         : [];
 
       return {
-        answer: typeof data.answer === 'string' ? data.answer : undefined,
+        answer: typeof data.answer === "string" ? data.answer : undefined,
         costTime: Date.now() - startedAt,
         query: cleanQuery,
         resultNumbers: results.length,
@@ -129,11 +129,11 @@ export async function searchTavily({
       };
     } finally {
       clearTimeout(timeout);
-      signal?.removeEventListener('abort', abortRequest);
+      signal?.removeEventListener("abort", abortRequest);
     }
   }
 
-  const error = new Error(lastError?.error || 'Tavily search failed') as Error & {
+  const error = new Error(lastError?.error || "Tavily search failed") as Error & {
     detail?: string;
     status?: number;
   };

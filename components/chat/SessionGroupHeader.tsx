@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 export function SessionGroupHeader({
   collapsed,

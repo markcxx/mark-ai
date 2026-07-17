@@ -1,7 +1,7 @@
-import { headers } from 'next/headers';
+import { headers } from "next/headers";
 
-import { auth } from '@/lib/auth';
-import { isCloudMode } from '@/lib/env';
+import { auth } from "@/lib/auth";
+import { isCloudMode } from "@/lib/env";
 
 export const getCurrentUserId = async (): Promise<string | undefined> => {
   if (!isCloudMode()) return undefined;
@@ -16,7 +16,7 @@ export const getCurrentUserId = async (): Promise<string | undefined> => {
 export const requireUserId = async (): Promise<string> => {
   const userId = await getCurrentUserId();
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new Error("Unauthorized");
   }
   return userId;
 };

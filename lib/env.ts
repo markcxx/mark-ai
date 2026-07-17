@@ -1,4 +1,4 @@
-export type StorageMode = 'local' | 'cloud';
+export type StorageMode = "local" | "cloud";
 
 let _mode: StorageMode | undefined;
 
@@ -9,15 +9,15 @@ export const getStorageMode = (): StorageMode => {
   const hasDatabaseUrl = !!process.env.DATABASE_URL?.trim();
 
   if (hasSqlitePath) {
-    _mode = 'local';
+    _mode = "local";
   } else if (hasDatabaseUrl) {
-    _mode = 'cloud';
+    _mode = "cloud";
   } else {
-    _mode = 'local';
+    _mode = "local";
   }
 
   return _mode;
 };
 
-export const isCloudMode = () => getStorageMode() === 'cloud';
-export const isLocalMode = () => getStorageMode() === 'local';
+export const isCloudMode = () => getStorageMode() === "cloud";
+export const isLocalMode = () => getStorageMode() === "local";

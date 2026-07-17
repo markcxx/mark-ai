@@ -1,6 +1,10 @@
-import { getProviderDisplayName, getPublicConfiguredModels, findConfiguredModel } from './models';
-import type { ConfiguredModel, PublicConfiguredModel } from './models';
-import { getPublicUserModels, getUserConfiguredModels, listUserModelProviders } from './user-model-providers';
+import { getProviderDisplayName, getPublicConfiguredModels, findConfiguredModel } from "./models";
+import type { ConfiguredModel, PublicConfiguredModel } from "./models";
+import {
+  getPublicUserModels,
+  getUserConfiguredModels,
+  listUserModelProviders,
+} from "./user-model-providers";
 
 const dedupePublicModels = (models: PublicConfiguredModel[]) => {
   const seen = new Set<string>();

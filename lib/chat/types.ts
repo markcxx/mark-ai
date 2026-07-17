@@ -1,19 +1,19 @@
-import type { ComponentType } from 'react';
+import type { ComponentType } from "react";
 
 export type ThinkingSegment = {
-  type: 'thinking';
+  type: "thinking";
   content: string;
   duration?: number;
   isActive?: boolean;
 };
 
 export type ToolSegment = {
-  type: 'tool';
+  type: "tool";
   webSearch: WebSearchState;
 };
 
 export type ContentSegment = {
-  type: 'content';
+  type: "content";
   content: string;
 };
 
@@ -24,12 +24,12 @@ export type FileAttachment = {
   name: string;
   size: number;
   contentType: string;
-  kind?: 'attachment' | 'avatar';
+  kind?: "attachment" | "avatar";
 };
 
 export type Message = {
   id: string;
-  role: 'user' | 'model';
+  role: "user" | "model";
   content: string;
   createdAt?: number;
   reasoning?: string;
@@ -68,8 +68,8 @@ export type WebSearchState = {
   siteName?: string;
   results: WebSearchResult[];
   title?: string;
-  tool?: 'web_search' | 'read_webpage';
-  status: 'searching' | 'done' | 'error';
+  tool?: "web_search" | "read_webpage";
+  status: "searching" | "done" | "error";
   url?: string;
 };
 
@@ -89,7 +89,7 @@ export type ChatStreamEvent = {
   outputTokens?: number;
   text?: string;
   totalTokens?: number;
-  type?: 'content' | 'reasoning' | 'tool' | 'usage';
+  type?: "content" | "reasoning" | "tool" | "usage";
   webSearch?: WebSearchState;
 };
 

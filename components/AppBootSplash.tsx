@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 
-import { cn } from '@/lib/utils';
-import { useUIStore } from '@/stores/useUIStore';
-import { MarkAILoadingScreen } from './MarkAILoadingScreen';
+import { cn } from "@/lib/utils";
+import { useUIStore } from "@/stores/useUIStore";
+import { MarkAILoadingScreen } from "./MarkAILoadingScreen";
 
-const PUBLIC_AUTH_PATHS = ['/login', '/register', '/reset-password'];
+const PUBLIC_AUTH_PATHS = ["/login", "/register", "/reset-password"];
 
 export function AppBootSplash() {
   const pathname = usePathname();
@@ -37,11 +37,11 @@ export function AppBootSplash() {
   return (
     <MarkAILoadingScreen
       className={cn(
-        'fixed inset-0 z-[9999] transition-opacity duration-300',
-        exiting && 'opacity-0',
+        "fixed inset-0 z-[9999] transition-opacity duration-300",
+        exiting && "opacity-0",
       )}
       progress={requiresChatInitialization ? bootProgress : 100}
-      status={requiresChatInitialization ? bootMessage : '正在准备页面…'}
+      status={requiresChatInitialization ? bootMessage : "正在准备页面…"}
     />
   );
 }

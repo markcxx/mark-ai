@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from "react";
 import {
   Copy,
   Expand,
@@ -14,15 +14,15 @@ import {
   Sparkles,
   Star,
   Trash2,
-} from 'lucide-react';
+} from "lucide-react";
 
-import { ThemeToggle } from '@/components/ThemeToggle';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { DropdownSurface } from '@/components/ui/DropdownSurface';
-import { IconButton } from '@/components/ui/IconButton';
-import { InlineTextEdit } from '@/components/ui/InlineTextEdit';
-import { MenuAction, MenuSwitchAction } from '@/components/ui/MenuAction';
-import type { ChatSession } from '@/lib/chat/types';
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { DropdownSurface } from "@/components/ui/DropdownSurface";
+import { IconButton } from "@/components/ui/IconButton";
+import { InlineTextEdit } from "@/components/ui/InlineTextEdit";
+import { MenuAction, MenuSwitchAction } from "@/components/ui/MenuAction";
+import type { ChatSession } from "@/lib/chat/types";
 
 export function TopHeader({
   activeSession,
@@ -58,11 +58,11 @@ export function TopHeader({
   const [menuOpen, setMenuOpen] = useState(false);
   const [shareMenuOpen, setShareMenuOpen] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
-  const [draftTitle, setDraftTitle] = useState('');
+  const [draftTitle, setDraftTitle] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const shareMenuRef = useRef<HTMLDivElement | null>(null);
-  const title = activeSession?.title || '新对话';
+  const title = activeSession?.title || "新对话";
 
   useEffect(() => {
     if (!menuOpen && !shareMenuOpen) return;
@@ -74,17 +74,17 @@ export function TopHeader({
       setShareMenuOpen(false);
     };
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         setMenuOpen(false);
         setShareMenuOpen(false);
       }
     };
 
-    document.addEventListener('pointerdown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
     return () => {
-      document.removeEventListener('pointerdown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [menuOpen, shareMenuOpen]);
 
@@ -105,11 +105,7 @@ export function TopHeader({
       <header className="sticky top-0 z-20 flex h-14 w-full items-center justify-between bg-[var(--chat-header-bg)] px-2 backdrop-blur-md md:h-16 md:px-6">
         <div className="flex min-w-0 items-center">
           {!isSidebarOpen && (
-            <IconButton
-              className="mr-2"
-              onClick={onOpenSidebar}
-              title="展开侧栏"
-            >
+            <IconButton className="mr-2" onClick={onOpenSidebar} title="展开侧栏">
               <PanelLeftOpen size={18} />
             </IconButton>
           )}
@@ -153,7 +149,7 @@ export function TopHeader({
                 <MenuAction icon={PencilLine} label="重命名" onClick={beginRename} />
                 <MenuAction
                   icon={Star}
-                  label={isFavorite ? '取消收藏' : '收藏'}
+                  label={isFavorite ? "取消收藏" : "收藏"}
                   onClick={() => {
                     setMenuOpen(false);
                     toggleFavorite();

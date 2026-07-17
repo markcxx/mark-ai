@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import type { RefObject } from 'react';
-import { Copy, Hash, MoreHorizontal, PencilLine, Star, Trash2, Wand2 } from 'lucide-react';
+import type { RefObject } from "react";
+import { Copy, Hash, MoreHorizontal, PencilLine, Star, Trash2, Wand2 } from "lucide-react";
 
-import { DropdownSurface } from '@/components/ui/DropdownSurface';
-import { IconButton } from '@/components/ui/IconButton';
-import { InlineTextEdit } from '@/components/ui/InlineTextEdit';
-import { MenuAction } from '@/components/ui/MenuAction';
-import type { ChatSession } from '@/lib/chat/types';
-import { cn } from '@/lib/utils';
+import { DropdownSurface } from "@/components/ui/DropdownSurface";
+import { IconButton } from "@/components/ui/IconButton";
+import { InlineTextEdit } from "@/components/ui/InlineTextEdit";
+import { MenuAction } from "@/components/ui/MenuAction";
+import type { ChatSession } from "@/lib/chat/types";
+import { cn } from "@/lib/utils";
 
 export function SessionRow({
   active,
@@ -51,14 +51,14 @@ export function SessionRow({
     <div className="relative" ref={menuOpen ? menuRef : undefined}>
       <div
         className={cn(
-          'group flex h-9 min-w-0 items-center gap-2 overflow-hidden rounded-lg px-1 text-sm transition-colors',
+          "group flex h-9 min-w-0 items-center gap-2 overflow-hidden rounded-lg px-1 text-sm transition-colors",
           active
-            ? 'bg-[#eceef0] text-gray-900 dark:bg-gray-800 dark:text-gray-100'
-            : 'text-gray-700 hover:bg-[#f0f1f2] dark:text-gray-300 dark:hover:bg-gray-800/60',
+            ? "bg-[#eceef0] text-gray-900 dark:bg-gray-800 dark:text-gray-100"
+            : "text-gray-700 hover:bg-[#f0f1f2] dark:text-gray-300 dark:hover:bg-gray-800/60",
         )}
         onClick={onSelect}
         onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
+          if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
             onSelect();
           }
@@ -79,7 +79,7 @@ export function SessionRow({
             value={editingTitle}
           />
         ) : (
-          <span className="min-w-0 flex-1 truncate text-left">{session.title || '新对话'}</span>
+          <span className="min-w-0 flex-1 truncate text-left">{session.title || "新对话"}</span>
         )}
 
         {session.favorite && (
@@ -104,7 +104,10 @@ export function SessionRow({
           </span>
         ) : (
           <IconButton
-            className={cn('opacity-0 transition-opacity group-hover:opacity-100', menuOpen && 'opacity-100')}
+            className={cn(
+              "opacity-0 transition-opacity group-hover:opacity-100",
+              menuOpen && "opacity-100",
+            )}
             onClick={(event) => {
               event.preventDefault();
               event.stopPropagation();

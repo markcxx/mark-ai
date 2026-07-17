@@ -1,15 +1,15 @@
-'use client';
+"use client";
 
-import { ChevronUp, CircleUserRound, FolderOpen, LogOut, Settings } from 'lucide-react';
-import Image from 'next/image';
-import { useEffect, useRef, useState } from 'react';
+import { ChevronUp, CircleUserRound, FolderOpen, LogOut, Settings } from "lucide-react";
+import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
 
-import { signOut, useSession } from '@/lib/auth-client';
+import { signOut, useSession } from "@/lib/auth-client";
 
-import { FileManagerDrawer } from './FileManagerDrawer';
-import { ProfileDialog } from './ProfileDialog';
-import { SettingsDialog } from './SettingsDialog';
-import type { UserProfile } from './ProfileDialog';
+import { FileManagerDrawer } from "./FileManagerDrawer";
+import { ProfileDialog } from "./ProfileDialog";
+import { SettingsDialog } from "./SettingsDialog";
+import type { UserProfile } from "./ProfileDialog";
 
 export function UserAccountMenu() {
   const { data } = useSession();
@@ -20,7 +20,7 @@ export function UserAccountMenu() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const user = data?.user;
-  const name = profile?.fullName || user?.name || user?.email?.split('@')[0] || 'MarkAI 用户';
+  const name = profile?.fullName || user?.name || user?.email?.split("@")[0] || "MarkAI 用户";
   const initials = name.slice(0, 2).toUpperCase();
 
   useEffect(() => {
@@ -28,13 +28,13 @@ export function UserAccountMenu() {
     const close = (event: PointerEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     };
-    document.addEventListener('pointerdown', close);
-    return () => document.removeEventListener('pointerdown', close);
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
   }, [open]);
 
   useEffect(() => {
     if (!user) return;
-    void fetch('/api/profile')
+    void fetch("/api/profile")
       .then((response) => response.json())
       .then((data) => setProfile(data.user || null))
       .catch(() => undefined);
@@ -48,13 +48,18 @@ export function UserAccountMenu() {
         {open && (
           <div className="absolute bottom-[calc(100%+10px)] left-0 right-0 origin-bottom animate-[menu-in_180ms_cubic-bezier(0.22,1,0.36,1)] overflow-hidden rounded-2xl border border-black/[0.06] bg-white/95 p-1.5 shadow-[0_18px_55px_rgba(15,23,42,0.18)] backdrop-blur-xl dark:border-white/10 dark:bg-[#171717]/95">
             <div className="border-b border-gray-100 px-3 py-2.5 dark:border-white/[0.07]">
-              <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{name}</p>
+              <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+                {name}
+              </p>
               <p className="mt-0.5 truncate text-xs text-gray-400">{user.email}</p>
             </div>
             <div className="py-1">
               <button
                 className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-gray-700 transition-all hover:bg-gray-100 active:scale-[0.98] dark:text-gray-200 dark:hover:bg-white/[0.07]"
-                onClick={() => { setOpen(false); setFileManagerOpen(true); }}
+                onClick={() => {
+                  setOpen(false);
+                  setFileManagerOpen(true);
+                }}
                 type="button"
               >
                 <FolderOpen className="text-gray-400" size={17} />
@@ -62,7 +67,10 @@ export function UserAccountMenu() {
               </button>
               <button
                 className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-gray-700 transition-all hover:bg-gray-100 active:scale-[0.98] dark:text-gray-200 dark:hover:bg-white/[0.07]"
-                onClick={() => { setOpen(false); setProfileOpen(true); }}
+                onClick={() => {
+                  setOpen(false);
+                  setProfileOpen(true);
+                }}
                 type="button"
               >
                 <CircleUserRound className="text-gray-400" size={17} />
@@ -70,7 +78,10 @@ export function UserAccountMenu() {
               </button>
               <button
                 className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-gray-700 transition-all hover:bg-gray-100 active:scale-[0.98] dark:text-gray-200 dark:hover:bg-white/[0.07]"
-                onClick={() => { setOpen(false); setSettingsOpen(true); }}
+                onClick={() => {
+                  setOpen(false);
+                  setSettingsOpen(true);
+                }}
                 type="button"
               >
                 <Settings className="text-gray-400" size={17} />
@@ -80,7 +91,11 @@ export function UserAccountMenu() {
             <div className="border-t border-gray-100 pt-1 dark:border-white/[0.07]">
               <button
                 className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-red-600 transition-all hover:bg-red-50 active:scale-[0.98] dark:text-red-400 dark:hover:bg-red-500/10"
-                onClick={async () => { setOpen(false); await signOut(); window.location.href = '/login'; }}
+                onClick={async () => {
+                  setOpen(false);
+                  await signOut();
+                  window.location.href = "/login";
+                }}
                 type="button"
               >
                 <LogOut size={17} />
@@ -97,13 +112,29 @@ export function UserAccountMenu() {
           type="button"
         >
           <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-violet-500 via-blue-500 to-cyan-400 text-sm font-bold text-white shadow-sm ring-2 ring-white dark:ring-black">
-            {profile?.avatar || user.image ? <Image alt={name} className="h-full w-full object-cover" height={40} src={profile?.avatar || user.image || ''} unoptimized width={40} /> : initials}
+            {profile?.avatar || user.image ? (
+              <Image
+                alt={name}
+                className="h-full w-full object-cover"
+                height={40}
+                src={profile?.avatar || user.image || ""}
+                unoptimized
+                width={40}
+              />
+            ) : (
+              initials
+            )}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{name}</p>
+            <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+              {name}
+            </p>
             <p className="truncate text-xs text-gray-400">{user.email}</p>
           </div>
-          <ChevronUp className={`text-gray-400 transition-transform duration-200 ${open ? '' : 'rotate-180'}`} size={16} />
+          <ChevronUp
+            className={`text-gray-400 transition-transform duration-200 ${open ? "" : "rotate-180"}`}
+            size={16}
+          />
         </button>
       </div>
       <FileManagerDrawer onClose={() => setFileManagerOpen(false)} open={fileManagerOpen} />

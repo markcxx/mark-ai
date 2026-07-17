@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import nodemailer from "nodemailer";
 
 const getTransporter = () => {
   const host = process.env.SMTP_HOST;
@@ -10,7 +10,7 @@ const getTransporter = () => {
   }
 
   const port = Number(process.env.SMTP_PORT_SSL || process.env.SMTP_PORT) || 465;
-  const secure = port === 465 || process.env.SMTP_SECURE === 'true';
+  const secure = port === 465 || process.env.SMTP_SECURE === "true";
 
   return nodemailer.createTransport({
     host,
@@ -33,7 +33,7 @@ const getFromAddress = () =>
   process.env.SMTP_FROM ||
   process.env.SMTP_USERNAME ||
   process.env.SMTP_USER ||
-  'noreply@markai.app';
+  "noreply@markai.app";
 
 export const sendEmail = async ({
   to,
@@ -47,8 +47,8 @@ export const sendEmail = async ({
   const transporter = ensureTransporter();
 
   if (!transporter) {
-    console.warn('[Email] SMTP not configured, skipping email to:', to);
-    console.warn('[Email] Subject:', subject);
+    console.warn("[Email] SMTP not configured, skipping email to:", to);
+    console.warn("[Email] Subject:", subject);
     return;
   }
 
@@ -79,7 +79,7 @@ export const sendVerificationCode = async (email: string, code: string) => {
 export const sendVerificationEmail = async (email: string, url: string) => {
   await sendEmail({
     to: email,
-    subject: 'MarkAI — 验证你的邮箱',
+    subject: "MarkAI — 验证你的邮箱",
     html: `
       <div style="max-width:480px;margin:0 auto;font-family:system-ui,sans-serif;padding:24px">
         <h2 style="color:#111">验证你的邮箱</h2>
@@ -97,7 +97,7 @@ export const sendVerificationEmail = async (email: string, url: string) => {
 export const sendResetPasswordEmail = async (email: string, url: string) => {
   await sendEmail({
     to: email,
-    subject: 'MarkAI — 重置密码',
+    subject: "MarkAI — 重置密码",
     html: `
       <div style="max-width:480px;margin:0 auto;font-family:system-ui,sans-serif;padding:24px">
         <h2 style="color:#111">重置密码</h2>

@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import type { RefObject } from 'react';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import type { RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
-import type { MenuItem } from '@/lib/chat/types';
-import { cn } from '@/lib/utils';
+import type { MenuItem } from "@/lib/chat/types";
+import { cn } from "@/lib/utils";
 
 const MENU_WIDTH = 208;
 const VIEWPORT_PADDING = 8;
@@ -19,13 +19,13 @@ type MenuPosition = {
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
 export function FloatingMenu({
-  align = 'left',
+  align = "left",
   anchorRef,
   items,
   onClose,
   open,
 }: {
-  align?: 'left' | 'right';
+  align?: "left" | "right";
   anchorRef: RefObject<HTMLElement | null>;
   items: MenuItem[];
   onClose: () => void;
@@ -35,7 +35,7 @@ export function FloatingMenu({
   const [position, setPosition] = useState<MenuPosition | null>(null);
 
   useLayoutEffect(() => {
-    if (!open || typeof window === 'undefined') return;
+    if (!open || typeof window === "undefined") return;
 
     const updatePosition = () => {
       const anchor = anchorRef.current;
@@ -47,10 +47,14 @@ export function FloatingMenu({
       const availableAbove = rect.top - VIEWPORT_PADDING;
       const showAbove = availableBelow < menuHeight && availableAbove > availableBelow;
       const maxHeight = Math.max(160, (showAbove ? availableAbove : availableBelow) - 4);
-      const preferredLeft = align === 'right' ? rect.right - MENU_WIDTH : rect.left;
+      const preferredLeft = align === "right" ? rect.right - MENU_WIDTH : rect.left;
 
       setPosition({
-        left: clamp(preferredLeft, VIEWPORT_PADDING, window.innerWidth - MENU_WIDTH - VIEWPORT_PADDING),
+        left: clamp(
+          preferredLeft,
+          VIEWPORT_PADDING,
+          window.innerWidth - MENU_WIDTH - VIEWPORT_PADDING,
+        ),
         maxHeight,
         top: showAbove
           ? Math.max(VIEWPORT_PADDING, rect.top - Math.min(menuHeight, maxHeight) - 6)
@@ -59,11 +63,11 @@ export function FloatingMenu({
     };
 
     updatePosition();
-    window.addEventListener('resize', updatePosition);
-    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
     return () => {
-      window.removeEventListener('resize', updatePosition);
-      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
     };
   }, [align, anchorRef, items.length, open]);
 
@@ -78,18 +82,18 @@ export function FloatingMenu({
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === "Escape") onClose();
     };
 
-    document.addEventListener('pointerdown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
     return () => {
-      document.removeEventListener('pointerdown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [anchorRef, onClose, open]);
 
-  if (!open || typeof document === 'undefined') return null;
+  if (!open || typeof document === "undefined") return null;
 
   return createPortal(
     <div
@@ -104,8 +108,10 @@ export function FloatingMenu({
       {items.map(({ danger, icon: Icon, label, onClick }) => (
         <button
           className={cn(
-            'flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-700',
-            danger ? 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20' : 'text-gray-700 dark:text-gray-300',
+            "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-700",
+            danger
+              ? "text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+              : "text-gray-700 dark:text-gray-300",
           )}
           key={label}
           onClick={() => {

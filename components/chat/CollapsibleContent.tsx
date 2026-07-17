@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import { ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 const DEFAULT_MAX_HEIGHT = 280;
 const VIEWPORT_RATIO = 0.35;
 const OVERFLOW_THRESHOLD = 32;
 
 const computeThreshold = () => {
-  if (typeof window === 'undefined') return DEFAULT_MAX_HEIGHT;
+  if (typeof window === "undefined") return DEFAULT_MAX_HEIGHT;
   return Math.min(DEFAULT_MAX_HEIGHT, Math.round(window.innerHeight * VIEWPORT_RATIO));
 };
 
@@ -25,18 +25,18 @@ export function CollapsibleContent({ children }: { children: ReactNode }) {
     const measure = () => setNaturalHeight(el.scrollHeight);
     measure();
 
-    if (typeof ResizeObserver === 'undefined') return;
+    if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(measure);
     observer.observe(el);
     return () => observer.disconnect();
   }, [children]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
 
     const handleResize = () => setMaxHeight(computeThreshold());
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   const shouldCollapse = naturalHeight > maxHeight + OVERFLOW_THRESHOLD;
@@ -45,14 +45,14 @@ export function CollapsibleContent({ children }: { children: ReactNode }) {
   return (
     <div className="relative w-full">
       <div
-        className={isCollapsed ? 'overflow-hidden' : 'overflow-visible'}
+        className={isCollapsed ? "overflow-hidden" : "overflow-visible"}
         ref={contentRef}
         style={
           isCollapsed
             ? {
                 maxHeight,
-                WebkitMaskImage: 'linear-gradient(to bottom, #000 calc(100% - 48px), transparent)',
-                maskImage: 'linear-gradient(to bottom, #000 calc(100% - 48px), transparent)',
+                WebkitMaskImage: "linear-gradient(to bottom, #000 calc(100% - 48px), transparent)",
+                maskImage: "linear-gradient(to bottom, #000 calc(100% - 48px), transparent)",
               }
             : undefined
         }
@@ -67,11 +67,10 @@ export function CollapsibleContent({ children }: { children: ReactNode }) {
             type="button"
           >
             {collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-            {collapsed ? '展开' : '收起'}
+            {collapsed ? "展开" : "收起"}
           </button>
         </div>
       )}
     </div>
   );
 }
-
