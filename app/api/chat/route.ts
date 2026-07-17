@@ -2,9 +2,10 @@ import { GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
 import { authorizeApiRequest, enforceRateLimit } from "@/lib/api/security";
 import { findAvailableModel } from "@/lib/available-models";
+import { estimateTextTokens } from "@/lib/chat/metrics";
 import { searchTavily } from "@/lib/search/tavily";
 import { readWebpage } from "@/lib/search/webpage";
-import type { FileAttachment, WebSearchState } from "@/lib/chat/types";
+import type { FileAttachment, TokenUsageSource, WebSearchState } from "@/lib/chat/types";
 import { injectFileContexts } from "@/lib/storage/file-context";
 
 type ChatMessage = {
@@ -35,11 +36,17 @@ type UsagePayload = {
   inputTokens?: number;
   outputTokens?: number;
   totalTokens?: number;
+  tokenUsageSource?: TokenUsageSource;
+};
+
+type ResolvedUsage = Required<Omit<UsagePayload, "tokenUsageSource">> & {
+  tokenUsageSource: TokenUsageSource;
 };
 
 const MAX_CHAT_MESSAGES = 200;
 const MAX_CHAT_MESSAGE_CHARS = 200_000;
 const MAX_CHAT_PAYLOAD_BYTES = 2_000_000;
+const unsupportedStreamUsage = new Set<string>();
 
 const WEB_SEARCH_TOOL = {
   function: {
@@ -168,6 +175,68 @@ const encodeStreamEvent = (encoder: TextEncoder, type: StreamEventType, text: st
 const encodeUsageEvent = (encoder: TextEncoder, usage: UsagePayload) =>
   encoder.encode(`${JSON.stringify({ type: "usage", ...usage })}\n`);
 
+const getUsageNumber = (...values: unknown[]) => {
+  const value = values.find((item) => typeof item === "number" && Number.isFinite(item));
+  return typeof value === "number" ? Math.max(0, Math.round(value)) : undefined;
+};
+
+const resolveUsage = ({
+  estimatedInputTokens,
+  estimatedOutputTokens,
+  providerUsage,
+}: {
+  estimatedInputTokens: number;
+  estimatedOutputTokens: number;
+  providerUsage?: UsagePayload;
+}): ResolvedUsage => {
+  let inputTokens = getUsageNumber(providerUsage?.inputTokens);
+  let outputTokens = getUsageNumber(providerUsage?.outputTokens);
+  const providerTotalTokens = getUsageNumber(providerUsage?.totalTokens);
+
+  if (
+    inputTokens === undefined &&
+    outputTokens !== undefined &&
+    providerTotalTokens !== undefined
+  ) {
+    inputTokens = Math.max(providerTotalTokens - outputTokens, 0);
+  }
+  if (
+    outputTokens === undefined &&
+    inputTokens !== undefined &&
+    providerTotalTokens !== undefined
+  ) {
+    outputTokens = Math.max(providerTotalTokens - inputTokens, 0);
+  }
+
+  const isProviderUsage = inputTokens !== undefined && outputTokens !== undefined;
+  const resolvedInputTokens = inputTokens ?? estimatedInputTokens;
+  const resolvedOutputTokens = outputTokens ?? estimatedOutputTokens;
+
+  return {
+    inputTokens: resolvedInputTokens,
+    outputTokens: resolvedOutputTokens,
+    tokenUsageSource: isProviderUsage ? "provider" : "estimated",
+    totalTokens: providerTotalTokens ?? resolvedInputTokens + resolvedOutputTokens,
+  };
+};
+
+const addUsage = (current: ResolvedUsage | undefined, next: ResolvedUsage): ResolvedUsage => ({
+  inputTokens: (current?.inputTokens || 0) + next.inputTokens,
+  outputTokens: (current?.outputTokens || 0) + next.outputTokens,
+  tokenUsageSource:
+    !current || (current.tokenUsageSource === "provider" && next.tokenUsageSource === "provider")
+      ? next.tokenUsageSource
+      : "estimated",
+  totalTokens: (current?.totalTokens || 0) + next.totalTokens,
+});
+
+const isUnsupportedStreamUsageError = (status: number, detail: string) =>
+  [400, 404, 422].includes(status) &&
+  /stream[_ ]options|include[_ ]usage/i.test(detail) &&
+  /unsupported|not support|unknown|unrecognized|unexpected|invalid|extra|not permitted|not allowed|不支持/i.test(
+    detail,
+  );
+
 const encodeToolEvent = (encoder: TextEncoder, webSearch: WebSearchState) =>
   encoder.encode(`${JSON.stringify({ type: "tool", webSearch })}\n`);
 
@@ -286,25 +355,42 @@ const createOpenAICompatibleStream = async (
         });
 
       const requestUpstream = async (requestMessages: OpenAIChatMessage[], allowTools: boolean) => {
-        const upstream = await fetch(endpoint, {
-          body: JSON.stringify({
-            messages: requestMessages,
-            model,
-            stream: true,
-            ...(allowTools
-              ? {
-                  tool_choice: "auto",
-                  tools: [WEB_SEARCH_TOOL, READ_WEBPAGE_TOOL],
-                }
-              : {}),
-          }),
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-          },
-          method: "POST",
-          signal,
+        const usageCapabilityKey = `${endpoint}\n${model}`;
+        const createRequestBody = (includeUsage: boolean) => ({
+          messages: requestMessages,
+          model,
+          stream: true,
+          ...(includeUsage ? { stream_options: { include_usage: true } } : {}),
+          ...(allowTools
+            ? {
+                tool_choice: "auto",
+                tools: [WEB_SEARCH_TOOL, READ_WEBPAGE_TOOL],
+              }
+            : {}),
         });
+        const sendRequest = (includeUsage: boolean) =>
+          fetch(endpoint, {
+            body: JSON.stringify(createRequestBody(includeUsage)),
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+            },
+            method: "POST",
+            signal,
+          });
+
+        const includeUsage = !unsupportedStreamUsage.has(usageCapabilityKey);
+        let upstream = await sendRequest(includeUsage);
+
+        if (!upstream.ok) {
+          const detail = await upstream.text();
+          if (includeUsage && isUnsupportedStreamUsageError(upstream.status, detail)) {
+            unsupportedStreamUsage.add(usageCapabilityKey);
+            upstream = await sendRequest(false);
+          } else {
+            throw new Error(detail || "Upstream model request failed");
+          }
+        }
 
         if (!upstream.ok) {
           const detail = await upstream.text();
@@ -318,6 +404,22 @@ const createOpenAICompatibleStream = async (
         return upstream.body.getReader();
       };
 
+      const estimateOpenAIInputTokens = (
+        requestMessages: OpenAIChatMessage[],
+        allowTools: boolean,
+      ) =>
+        estimateTextTokens(
+          JSON.stringify({
+            messages: requestMessages,
+            ...(allowTools
+              ? {
+                  tool_choice: "auto",
+                  tools: [WEB_SEARCH_TOOL, READ_WEBPAGE_TOOL],
+                }
+              : {}),
+          }),
+        );
+
       const streamModelResponse = async (
         requestMessages: OpenAIChatMessage[],
         allowTools: boolean,
@@ -326,7 +428,9 @@ const createOpenAICompatibleStream = async (
         const decoder = new TextDecoder();
         const toolCallsByIndex = new Map<number, OpenAIToolCall>();
         let assistantContent = "";
+        let assistantReasoning = "";
         let buffer = "";
+        let providerUsage: UsagePayload | undefined;
 
         const appendToolCall = (toolCall: any, fallbackIndex: number) => {
           const index = Number.isFinite(toolCall?.index) ? Number(toolCall.index) : fallbackIndex;
@@ -355,15 +459,16 @@ const createOpenAICompatibleStream = async (
           const usage = parsed.usage;
 
           if (usage && typeof usage === "object") {
-            controller.enqueue(
-              encodeUsageEvent(encoder, {
-                inputTokens: Number.isFinite(usage.prompt_tokens) ? usage.prompt_tokens : undefined,
-                outputTokens: Number.isFinite(usage.completion_tokens)
-                  ? usage.completion_tokens
-                  : undefined,
-                totalTokens: Number.isFinite(usage.total_tokens) ? usage.total_tokens : undefined,
-              }),
-            );
+            providerUsage = {
+              inputTokens:
+                getUsageNumber(usage.prompt_tokens, usage.input_tokens, usage.inputTokens) ??
+                providerUsage?.inputTokens,
+              outputTokens:
+                getUsageNumber(usage.completion_tokens, usage.output_tokens, usage.outputTokens) ??
+                providerUsage?.outputTokens,
+              totalTokens:
+                getUsageNumber(usage.total_tokens, usage.totalTokens) ?? providerUsage?.totalTokens,
+            };
           }
 
           for (const choice of choices) {
@@ -380,7 +485,10 @@ const createOpenAICompatibleStream = async (
             const content = getChoiceText(choice, ["content", "text"]);
             const deltaToolCalls = choice?.delta?.tool_calls || choice?.message?.tool_calls;
 
-            if (reasoning) controller.enqueue(encodeStreamEvent(encoder, "reasoning", reasoning));
+            if (reasoning) {
+              assistantReasoning += reasoning;
+              controller.enqueue(encodeStreamEvent(encoder, "reasoning", reasoning));
+            }
             if (content) {
               assistantContent += content;
               controller.enqueue(encodeStreamEvent(encoder, "content", content));
@@ -389,6 +497,27 @@ const createOpenAICompatibleStream = async (
               deltaToolCalls.forEach(appendToolCall);
             }
           }
+        };
+
+        const getPassResult = () => {
+          const toolCalls = normalizeToolCalls([...toolCallsByIndex.values()]);
+          return {
+            assistantContent,
+            toolCalls,
+            usage: resolveUsage({
+              estimatedInputTokens: estimateOpenAIInputTokens(requestMessages, allowTools),
+              estimatedOutputTokens: estimateTextTokens(
+                [
+                  assistantContent,
+                  assistantReasoning,
+                  toolCalls.length ? JSON.stringify(toolCalls) : "",
+                ]
+                  .filter(Boolean)
+                  .join("\n"),
+              ),
+              providerUsage,
+            }),
+          };
         };
 
         const enqueueDataLine = (line: string) => {
@@ -417,10 +546,7 @@ const createOpenAICompatibleStream = async (
 
             for (const line of lines) {
               if (enqueueDataLine(line)) {
-                return {
-                  assistantContent,
-                  toolCalls: normalizeToolCalls([...toolCallsByIndex.values()]),
-                };
+                return getPassResult();
               }
             }
           }
@@ -430,18 +556,17 @@ const createOpenAICompatibleStream = async (
 
         if (buffer) enqueueDataLine(buffer);
 
-        return {
-          assistantContent,
-          toolCalls: normalizeToolCalls([...toolCallsByIndex.values()]),
-        };
+        return getPassResult();
       };
 
       try {
         const MAX_TOOL_ROUNDS = 5;
         let currentMessages = openAIMessages;
+        let cumulativeUsage: ResolvedUsage | undefined;
 
         for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
           const pass = await streamModelResponse(currentMessages, webSearchEnabled);
+          cumulativeUsage = addUsage(cumulativeUsage, pass.usage);
           const executableToolCalls = pass.toolCalls.filter((toolCall) =>
             ["web_search", "read_webpage"].includes(toolCall.function.name),
           );
@@ -562,6 +687,9 @@ const createOpenAICompatibleStream = async (
           currentMessages = [...currentMessages, assistantToolMessage, ...toolResultMessages];
         }
 
+        if (cumulativeUsage) {
+          controller.enqueue(encodeUsageEvent(encoder, cumulativeUsage));
+        }
         controller.close();
       } catch (error) {
         console.error("OpenAI compatible chat error:", error);
@@ -659,41 +787,56 @@ export async function POST(req: NextRequest) {
       role: message.role === "model" ? "model" : "user",
     }));
 
+    const contents = [
+      { role: "user", parts: [{ text: runtimeSystemPrompt }] },
+      { role: "model", parts: [{ text: "了解。" }] },
+      ...history,
+      { role: "user", parts: [{ text: prompt }] },
+    ];
     const responseStream = await ai.models.generateContentStream({
-      contents: [
-        { role: "user", parts: [{ text: runtimeSystemPrompt }] },
-        { role: "model", parts: [{ text: "了解。" }] },
-        ...history,
-        { role: "user", parts: [{ text: prompt }] },
-      ],
+      contents,
       model: selectedModel.id,
     });
 
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
+        let outputText = "";
+        let providerUsage: UsagePayload | undefined;
 
         for await (const chunk of responseStream) {
           if (chunk.text) {
+            outputText += chunk.text;
             controller.enqueue(encodeStreamEvent(encoder, "content", chunk.text));
           }
           const usageMetadata = (chunk as any).usageMetadata;
           if (usageMetadata) {
-            controller.enqueue(
-              encodeUsageEvent(encoder, {
-                inputTokens: Number.isFinite(usageMetadata.promptTokenCount)
-                  ? usageMetadata.promptTokenCount
-                  : undefined,
-                outputTokens: Number.isFinite(usageMetadata.candidatesTokenCount)
-                  ? usageMetadata.candidatesTokenCount
-                  : undefined,
-                totalTokens: Number.isFinite(usageMetadata.totalTokenCount)
-                  ? usageMetadata.totalTokenCount
-                  : undefined,
-              }),
-            );
+            const inputTokens = getUsageNumber(usageMetadata.promptTokenCount);
+            const candidateTokens = getUsageNumber(usageMetadata.candidatesTokenCount);
+            const reasoningTokens = getUsageNumber(usageMetadata.thoughtsTokenCount) || 0;
+            const totalTokens = getUsageNumber(usageMetadata.totalTokenCount);
+            providerUsage = {
+              inputTokens: inputTokens ?? providerUsage?.inputTokens,
+              outputTokens:
+                (totalTokens !== undefined && inputTokens !== undefined
+                  ? Math.max(totalTokens - inputTokens, 0)
+                  : candidateTokens !== undefined
+                    ? candidateTokens + reasoningTokens
+                    : undefined) ?? providerUsage?.outputTokens,
+              totalTokens: totalTokens ?? providerUsage?.totalTokens,
+            };
           }
         }
+        controller.enqueue(
+          encodeUsageEvent(
+            encoder,
+            resolveUsage({
+              estimatedInputTokens: estimateTextTokens(JSON.stringify(contents)),
+              estimatedOutputTokens: estimateTextTokens(outputText),
+              providerUsage,
+            }),
+          ),
+        );
         controller.close();
       },
     });

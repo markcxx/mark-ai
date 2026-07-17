@@ -81,10 +81,11 @@ function MessageStats({ message }: { message: Message }) {
   if (message.role !== "model" || message.isStreaming) return null;
 
   const duration = formatDuration(message.generationDuration);
+  const approximate = message.tokenUsageSource !== "provider" ? "约 " : "";
   const items = [
-    message.inputTokens ? `输入约 ${message.inputTokens}` : undefined,
-    message.outputTokens ? `输出约 ${message.outputTokens}` : undefined,
-    message.totalTokens ? `共约 ${message.totalTokens} tokens` : undefined,
+    message.inputTokens ? `输入${approximate}${message.inputTokens}` : undefined,
+    message.outputTokens ? `输出${approximate}${message.outputTokens}` : undefined,
+    message.totalTokens ? `共${approximate}${message.totalTokens} tokens` : undefined,
     duration ? `耗时 ${duration}` : undefined,
   ].filter(Boolean);
 

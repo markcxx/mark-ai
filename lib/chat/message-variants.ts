@@ -16,6 +16,7 @@ export const toMessageVariant = (message: Message, id: string): MessageVariant =
   reasoningDuration: message.reasoningDuration,
   segments: message.segments,
   totalTokens: message.totalTokens,
+  tokenUsageSource: message.tokenUsageSource,
   webSearch: message.webSearch,
 });
 
@@ -36,5 +37,6 @@ export const applyMessageVariant = (message: Message, variant: MessageVariant): 
   reasoningDuration: variant.reasoningDuration,
   segments: variant.segments,
   totalTokens: variant.totalTokens,
+  tokenUsageSource: variant.tokenUsageSource,
   webSearch: variant.webSearch,
 });

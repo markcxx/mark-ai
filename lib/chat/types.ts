@@ -37,6 +37,7 @@ export type MessageVariant = {
   inputTokens?: number;
   outputTokens?: number;
   totalTokens?: number;
+  tokenUsageSource?: TokenUsageSource;
   interrupted?: boolean;
   isReasoning?: boolean;
   isStreaming?: boolean;
@@ -45,6 +46,8 @@ export type MessageVariant = {
   webSearch?: WebSearchState[];
   segments?: MessageSegment[];
 };
+
+export type TokenUsageSource = "estimated" | "provider";
 
 export type Message = MessageVariant & {
   activeVariantId?: string;
@@ -97,6 +100,7 @@ export type ChatStreamEvent = {
   outputTokens?: number;
   text?: string;
   totalTokens?: number;
+  tokenUsageSource?: TokenUsageSource;
   type?: "content" | "reasoning" | "tool" | "usage";
   webSearch?: WebSearchState;
 };

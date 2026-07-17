@@ -39,6 +39,7 @@ export const chatMessages = pgTable(
     inputTokens: integer("input_tokens"),
     outputTokens: integer("output_tokens"),
     totalTokens: integer("total_tokens"),
+    tokenUsageSource: text("token_usage_source"),
     activeVariantId: text("active_variant_id"),
     variants: jsonb("variants"),
     webSearch: jsonb("web_search"),

@@ -50,6 +50,10 @@ const toMessage = (row: typeof chatMessages.$inferSelect): Message => ({
   segments: (row.segments as MessageSegment[] | null) ?? undefined,
   attachments: (row.attachments as FileAttachment[] | null) ?? undefined,
   totalTokens: row.totalTokens ?? undefined,
+  tokenUsageSource:
+    row.tokenUsageSource === "provider" || row.tokenUsageSource === "estimated"
+      ? row.tokenUsageSource
+      : undefined,
   variants: (row.variants as MessageVariant[] | null) ?? undefined,
   webSearch: (row.webSearch as WebSearchState[] | null) ?? undefined,
 });
@@ -216,9 +220,10 @@ export class PostgresStorage implements StorageAdapter {
           reasoning: message.reasoning || null,
           reasoningDuration: message.reasoningDuration || null,
           generationDuration: message.generationDuration || null,
-          inputTokens: message.inputTokens || null,
-          outputTokens: message.outputTokens || null,
-          totalTokens: message.totalTokens || null,
+          inputTokens: message.inputTokens ?? null,
+          outputTokens: message.outputTokens ?? null,
+          totalTokens: message.totalTokens ?? null,
+          tokenUsageSource: message.tokenUsageSource || null,
           activeVariantId: message.activeVariantId || null,
           variants: message.variants || null,
           webSearch: message.webSearch || null,

@@ -65,6 +65,7 @@ const ensureDatabase = () => {
       input_tokens INTEGER,
       output_tokens INTEGER,
       total_tokens INTEGER,
+      token_usage_source TEXT,
       active_variant_id TEXT,
       variants TEXT,
       model TEXT,
@@ -109,6 +110,7 @@ const ensureDatabase = () => {
   ensureColumn("input_tokens", "input_tokens INTEGER");
   ensureColumn("output_tokens", "output_tokens INTEGER");
   ensureColumn("total_tokens", "total_tokens INTEGER");
+  ensureColumn("token_usage_source", "token_usage_source TEXT");
   ensureColumn("active_variant_id", "active_variant_id TEXT");
   ensureColumn("variants", "variants TEXT");
   ensureColumn("web_search", "web_search TEXT");
@@ -156,6 +158,10 @@ const toMessage = (row: any): Message => ({
   role: row.role === "user" ? "user" : "model",
   segments: parseJsonValue(row.segments),
   totalTokens: typeof row.total_tokens === "number" ? row.total_tokens : undefined,
+  tokenUsageSource:
+    row.token_usage_source === "provider" || row.token_usage_source === "estimated"
+      ? row.token_usage_source
+      : undefined,
   variants: parseJsonValue(row.variants),
   webSearch: parseJsonValue(row.web_search),
 });
@@ -255,6 +261,7 @@ export class SqliteStorage implements StorageAdapter {
           input_tokens,
           output_tokens,
           total_tokens,
+          token_usage_source,
           active_variant_id,
           variants,
           web_search,
@@ -316,6 +323,7 @@ export class SqliteStorage implements StorageAdapter {
             input_tokens,
             output_tokens,
             total_tokens,
+            token_usage_source,
             active_variant_id,
             variants,
             web_search,
@@ -325,7 +333,7 @@ export class SqliteStorage implements StorageAdapter {
             position,
             created_at
           )
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
 
       messages.forEach((message, index) => {
@@ -342,9 +350,10 @@ export class SqliteStorage implements StorageAdapter {
           message.reasoning || null,
           message.reasoningDuration || null,
           message.generationDuration || null,
-          message.inputTokens || null,
-          message.outputTokens || null,
-          message.totalTokens || null,
+          message.inputTokens ?? null,
+          message.outputTokens ?? null,
+          message.totalTokens ?? null,
+          message.tokenUsageSource || null,
           message.activeVariantId || null,
           message.variants ? JSON.stringify(message.variants) : null,
           message.webSearch ? JSON.stringify(message.webSearch) : null,

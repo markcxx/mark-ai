@@ -32,6 +32,7 @@ type StreamedMessageResult = Pick<
     | "inputTokens"
     | "interrupted"
     | "outputTokens"
+    | "tokenUsageSource"
     | "totalTokens"
     | "webSearch"
   >;
@@ -41,11 +42,8 @@ type StreamOptions = {
   webSearchEnabled?: boolean;
 };
 
-const getTotalTokens = (inputTokens: number, outputTokens: number, totalTokens?: number) => {
-  const estimatedTotal = inputTokens + outputTokens;
-  if (!totalTokens) return estimatedTotal;
-  return Math.max(totalTokens, estimatedTotal);
-};
+const getTotalTokens = (inputTokens: number, outputTokens: number, totalTokens?: number) =>
+  totalTokens ?? inputTokens + outputTokens;
 
 const getClientTimezone = () => {
   try {
@@ -164,7 +162,8 @@ export const useChatStore = create<ChatStore>()(
       let plainContent = options.initialContent || "";
       let inputTokens = estimateMessagesTokens(historyMessages);
       let outputTokens = 0;
-      let totalTokens = inputTokens;
+      let totalTokens: number | undefined;
+      let tokenUsageSource: Message["tokenUsageSource"] = "estimated";
       const segments: MessageSegment[] = [];
       let currentReasoningStart: number | undefined;
       let currentThinkingSegment: Extract<MessageSegment, { type: "thinking" }> | undefined;
@@ -174,6 +173,15 @@ export const useChatStore = create<ChatStore>()(
           .filter((s): s is Extract<MessageSegment, { type: "thinking" }> => s.type === "thinking")
           .map((s) => s.content)
           .join("");
+
+      const estimateGeneratedOutputTokens = () => {
+        const generatedText = plainContent.slice(options.initialContent?.length || 0);
+        const extracted = extractThinkingFromText(generatedText);
+        return estimateMessageTokens({
+          content: extracted.content,
+          reasoning: `${getAllReasoning()}${extracted.reasoning}`,
+        });
+      };
 
       const finishCurrentReasoning = () => {
         const seg = currentThinkingSegment;
@@ -244,10 +252,7 @@ export const useChatStore = create<ChatStore>()(
           const extracted = extractThinkingFromText(plainContent);
           const eventReasoning = getAllReasoning();
           const reasoning = `${eventReasoning}${extracted.reasoning}`;
-          const estimatedOutputTokens = estimateMessageTokens({
-            content: extracted.content,
-            reasoning,
-          });
+          const estimatedOutputTokens = estimateGeneratedOutputTokens();
           const nextOutputTokens = outputTokens || estimatedOutputTokens;
           const nextTotalTokens = getTotalTokens(inputTokens, nextOutputTokens, totalTokens);
           const anyActive = isAnyThinkingActive() || extracted.hasOpenThinking;
@@ -261,6 +266,7 @@ export const useChatStore = create<ChatStore>()(
                     isReasoning: anyActive,
                     outputTokens: nextOutputTokens,
                     reasoning,
+                    tokenUsageSource,
                     totalTokens: nextTotalTokens,
                     segments: [...segments],
                   }
@@ -333,9 +339,10 @@ export const useChatStore = create<ChatStore>()(
           const event = parseChatStreamLine(line);
           if (!event) return;
           if (event.type === "usage") {
-            inputTokens = event.inputTokens || inputTokens;
-            outputTokens = event.outputTokens || outputTokens;
+            inputTokens = event.inputTokens ?? inputTokens;
+            outputTokens = event.outputTokens ?? outputTokens;
             totalTokens = getTotalTokens(inputTokens, outputTokens, event.totalTokens);
+            tokenUsageSource = event.tokenUsageSource ?? "estimated";
             updateStreamingMessage();
             return;
           }
@@ -397,10 +404,7 @@ export const useChatStore = create<ChatStore>()(
               (s): s is Extract<MessageSegment, { type: "thinking" }> => s.type === "thinking",
             )
             .reduce((sum, s) => sum + (s.duration || 0), 0) || undefined;
-        const estimatedOutputTokens = estimateMessageTokens({
-          content: extracted.content,
-          reasoning,
-        });
+        const estimatedOutputTokens = estimateGeneratedOutputTokens();
         const finalOutputTokens = outputTokens || estimatedOutputTokens;
         const finalTotalTokens = getTotalTokens(inputTokens, finalOutputTokens, totalTokens);
         return {
@@ -413,6 +417,7 @@ export const useChatStore = create<ChatStore>()(
           reasoning,
           reasoningDuration,
           segments: segments.length > 0 ? [...segments] : undefined,
+          tokenUsageSource,
           totalTokens: finalTotalTokens,
           webSearch: allWebSearch.length > 0 ? allWebSearch : undefined,
         };
@@ -433,10 +438,7 @@ export const useChatStore = create<ChatStore>()(
                 (s): s is Extract<MessageSegment, { type: "thinking" }> => s.type === "thinking",
               )
               .reduce((sum, s) => sum + (s.duration || 0), 0) || undefined;
-          const estimatedOutputTokens = estimateMessageTokens({
-            content: extracted.content || plainContent,
-            reasoning,
-          });
+          const estimatedOutputTokens = estimateGeneratedOutputTokens();
           const finalOutputTokens = outputTokens || estimatedOutputTokens;
           const finalTotalTokens = getTotalTokens(inputTokens, finalOutputTokens, totalTokens);
           return {
@@ -450,6 +452,7 @@ export const useChatStore = create<ChatStore>()(
             reasoning,
             reasoningDuration,
             segments: segments.length > 0 ? [...segments] : undefined,
+            tokenUsageSource,
             totalTokens: finalTotalTokens,
             webSearch: allWebSearch.length > 0 ? allWebSearch : undefined,
           };
@@ -479,6 +482,7 @@ export const useChatStore = create<ChatStore>()(
           outputTokens: estimateTextTokens("Sorry, I encountered an error. Please try again."),
           reasoning: errReasoning || undefined,
           segments: segments.length > 0 ? [...segments] : undefined,
+          tokenUsageSource: "estimated",
           totalTokens:
             inputTokens + estimateTextTokens("Sorry, I encountered an error. Please try again."),
         };
@@ -621,6 +625,12 @@ export const useChatStore = create<ChatStore>()(
       }
 
       const baseContent = message.content.trimEnd();
+      const previousUsage = {
+        inputTokens: message.inputTokens || 0,
+        outputTokens: message.outputTokens || 0,
+        tokenUsageSource: message.tokenUsageSource || "estimated",
+        totalTokens: message.totalTokens || 0,
+      } as const;
       const initialContent = baseContent ? `${baseContent}\n\n` : "";
       const continuePrompt: Message = {
         content: "请从上次中断的位置继续，不要重复已经输出过的内容。",
@@ -641,6 +651,7 @@ export const useChatStore = create<ChatStore>()(
               isStreaming: true,
               outputTokens: undefined,
               reasoningDuration: undefined,
+              tokenUsageSource: undefined,
               totalTokens: undefined,
             }
           : item,
@@ -657,7 +668,23 @@ export const useChatStore = create<ChatStore>()(
       );
       const savedMessages = nextMessages.map((item) => {
         if (item.id !== message.id) return item;
-        let completedMessage: Message = { ...item, ...streamedMessage };
+        const hasPreviousUsage = previousUsage.totalTokens > 0;
+        let completedMessage: Message = {
+          ...item,
+          ...streamedMessage,
+          ...(hasPreviousUsage
+            ? {
+                inputTokens: previousUsage.inputTokens + (streamedMessage.inputTokens || 0),
+                outputTokens: previousUsage.outputTokens + (streamedMessage.outputTokens || 0),
+                tokenUsageSource:
+                  previousUsage.tokenUsageSource === "provider" &&
+                  streamedMessage.tokenUsageSource === "provider"
+                    ? "provider"
+                    : "estimated",
+                totalTokens: previousUsage.totalTokens + (streamedMessage.totalTokens || 0),
+              }
+            : {}),
+        };
         if (completedMessage.variants && completedMessage.activeVariantId) {
           const activeVariant = toMessageVariant(
             completedMessage,
@@ -803,6 +830,7 @@ export const useChatStore = create<ChatStore>()(
         reasoning: undefined,
         reasoningDuration: undefined,
         segments: undefined,
+        tokenUsageSource: undefined,
         totalTokens: undefined,
         variants: retainedVariants,
         webSearch: undefined,
