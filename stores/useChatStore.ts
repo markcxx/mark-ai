@@ -6,6 +6,7 @@ import { THINKING_TEXTS } from '@/lib/chat/constants';
 import { createMessageId, extractThinkingFromText, getModelKey } from '@/lib/chat/helpers';
 import { estimateMessageTokens, estimateMessagesTokens, estimateTextTokens } from '@/lib/chat/metrics';
 import type { ChatStreamEvent, ConfiguredModel, FileAttachment, Message, MessageSegment } from '@/lib/chat/types';
+import { useSettingsStore } from './useSettingsStore';
 import { useSessionStore } from './useSessionStore';
 import { useUIStore } from './useUIStore';
 
@@ -36,6 +37,75 @@ const getClientTimezone = () => {
   }
 };
 
+const createSmoothTextController = (onChunk: (chunk: string) => void) => {
+  let animationFrame: number | null = null;
+  let carry = 0;
+  let finishing = false;
+  let lastFrameTime = 0;
+  let queue = '';
+  const finishResolvers: Array<() => void> = [];
+
+  const settle = () => {
+    while (finishResolvers.length > 0) finishResolvers.shift()?.();
+  };
+
+  const tick = (timestamp: number) => {
+    if (!lastFrameTime) lastFrameTime = timestamp;
+    const elapsed = Math.min(timestamp - lastFrameTime, 64);
+    lastFrameTime = timestamp;
+    const queueAdjustedSpeed = queue.length * (finishing ? 10 : 5);
+    const charsPerSecond = Math.min(1600, Math.max(finishing ? 120 : 48, queueAdjustedSpeed));
+    carry += (elapsed * charsPerSecond) / 1000;
+
+    const count = Math.min(queue.length, Math.floor(carry));
+    if (count > 0) {
+      const chunk = queue.slice(0, count);
+      queue = queue.slice(count);
+      carry -= count;
+      onChunk(chunk);
+    }
+
+    if (queue.length > 0) {
+      animationFrame = requestAnimationFrame(tick);
+      return;
+    }
+
+    animationFrame = null;
+    lastFrameTime = 0;
+    carry = 0;
+    settle();
+  };
+
+  const schedule = () => {
+    if (animationFrame === null) animationFrame = requestAnimationFrame(tick);
+  };
+
+  return {
+    finish: () => {
+      finishing = true;
+      if (!queue) return Promise.resolve();
+      schedule();
+      return new Promise<void>((resolve) => finishResolvers.push(resolve));
+    },
+    flush: () => {
+      if (animationFrame !== null) cancelAnimationFrame(animationFrame);
+      animationFrame = null;
+      lastFrameTime = 0;
+      carry = 0;
+      if (queue) {
+        const remaining = queue;
+        queue = '';
+        onChunk(remaining);
+      }
+      settle();
+    },
+    push: (chunk: string) => {
+      if (!chunk) return;
+      queue += chunk;
+      schedule();
+    },
+  };
+};
 
 interface ChatState {
   messages: Message[];
@@ -138,6 +208,8 @@ export const useChatStore = create<ChatStore>()(
 
     streamAssistantMessage: async (historyMessages, modelMessageId, modelConfig, options = {}) => {
       const startedAt = Date.now();
+      const settings = useSettingsStore.getState().general;
+      const responseAnimation = settings.reduceMotion ? 'none' : settings.responseAnimation;
       let plainContent = options.initialContent || '';
       let inputTokens = estimateMessagesTokens(historyMessages);
       let outputTokens = 0;
@@ -166,6 +238,8 @@ export const useChatStore = create<ChatStore>()(
       };
 
       const controller = new AbortController();
+      let contentController: ReturnType<typeof createSmoothTextController> | undefined;
+      let reasoningController: ReturnType<typeof createSmoothTextController> | undefined;
       set({ abortController: controller });
 
       try {
@@ -244,7 +318,7 @@ export const useChatStore = create<ChatStore>()(
           }));
         };
 
-        const appendContent = (chunk: string) => {
+        const commitContent = (chunk: string) => {
           plainContent += chunk;
           finishCurrentReasoning();
           const extracted = extractThinkingFromText(plainContent);
@@ -266,7 +340,7 @@ export const useChatStore = create<ChatStore>()(
           updateStreamingMessage();
         };
 
-        const appendReasoning = (chunk: string) => {
+        const commitReasoning = (chunk: string) => {
           if (!currentThinkingSegment) {
             currentThinkingSegment = { type: 'thinking', content: '', isActive: true };
             segments.push(currentThinkingSegment);
@@ -277,6 +351,29 @@ export const useChatStore = create<ChatStore>()(
           }
           currentThinkingSegment.content += chunk;
           updateStreamingMessage();
+        };
+
+        if (responseAnimation === 'smooth') {
+          contentController = createSmoothTextController(commitContent);
+          reasoningController = createSmoothTextController(commitReasoning);
+        }
+
+        const appendContent = (chunk: string) => {
+          reasoningController?.flush();
+          if (contentController) {
+            contentController.push(chunk);
+            return;
+          }
+          commitContent(chunk);
+        };
+
+        const appendReasoning = (chunk: string) => {
+          contentController?.flush();
+          if (reasoningController) {
+            reasoningController.push(chunk);
+            return;
+          }
+          commitReasoning(chunk);
         };
 
         const handleStreamLine = (line: string) => {
@@ -292,6 +389,8 @@ export const useChatStore = create<ChatStore>()(
               return;
             }
             if (event.type === 'tool' && event.webSearch) {
+              contentController?.flush();
+              reasoningController?.flush();
               finishCurrentReasoning();
               currentThinkingSegment = undefined;
               const ws = event.webSearch;
@@ -326,6 +425,8 @@ export const useChatStore = create<ChatStore>()(
         }
 
         if (isStructuredStream && buffer) handleStreamLine(buffer);
+        await reasoningController?.finish();
+        await contentController?.finish();
         finishCurrentReasoning();
 
         const extracted = extractThinkingFromText(plainContent);
@@ -358,6 +459,8 @@ export const useChatStore = create<ChatStore>()(
         };
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') {
+          contentController?.flush();
+          reasoningController?.flush();
           finishCurrentReasoning();
           const extracted = extractThinkingFromText(plainContent);
           const abortReasoning = getAllReasoning();
@@ -389,6 +492,8 @@ export const useChatStore = create<ChatStore>()(
             webSearch: allWebSearch.length > 0 ? allWebSearch : undefined,
           };
         }
+        contentController?.flush();
+        reasoningController?.flush();
         console.error('Chat error:', error);
         toast.error('生成失败，请稍后重试');
         set((s) => ({

@@ -18,7 +18,6 @@ import XAI from '@lobehub/icons/es/XAI';
 import Zhipu from '@lobehub/icons/es/Zhipu';
 import { Check, ChevronRight, KeyRound, Palette, RotateCcw, Settings2, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { Input, InputNumber, InputPassword, SliderWithInput, TextArea } from '@lobehub/ui';
-import { Select } from '@lobehub/ui/base-ui';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
 import { useEffect, useMemo, useState } from 'react';
@@ -28,10 +27,13 @@ import toast from 'react-hot-toast';
 import type { CodeTheme, PrimaryColor } from '@/lib/settings';
 import { MODEL_PROVIDER_TEMPLATES } from '@/lib/model-provider-registry';
 import { cn } from '@/lib/utils';
+import { AppSelect } from '@/components/ui/AppSelect';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useUIStore } from '@/stores/useUIStore';
+
+import { SidebarNavItem } from './SidebarNavItem';
 
 type SettingsSection = 'appearance' | 'chat' | 'providers';
 type ProviderTemplate = {
@@ -150,15 +152,6 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (checked: b
   return <ToggleSwitch checked={checked} onChange={onChange} />;
 }
 
-const selectSurfaceProps = {
-  classNames: {
-    popup: '!border !border-gray-200 !bg-white dark:!border-white/10 dark:!bg-[#202020]',
-    trigger: '!border-gray-200 !bg-white dark:!border-white/10 dark:!bg-[#222222]',
-  },
-  shadow: true,
-  variant: 'outlined' as const,
-};
-
 const readResponse = async (response: Response) => {
   const text = await response.text();
   let data: any = {};
@@ -179,8 +172,7 @@ function AppearanceSettings() {
   return (
     <div>
       <SettingRow description="可跟随操作系统自动切换" title="主题模式">
-        <Select
-          {...selectSurfaceProps}
+        <AppSelect
           onChange={(value) => {
             if (typeof value !== 'string') return;
             const themeMode = value as typeof general.themeMode;
@@ -192,7 +184,6 @@ function AppearanceSettings() {
             { label: '亮色', value: 'light' },
             { label: '暗色', value: 'dark' },
           ]}
-          style={{ width: 160 }}
           value={general.themeMode}
         />
       </SettingRow>
@@ -228,16 +219,16 @@ function AppearanceSettings() {
         </div>
       </SettingRow>
       <SettingRow title="界面密度">
-        <Select {...selectSurfaceProps} onChange={(value) => { if (typeof value === 'string') update({ density: value as typeof general.density }); }} options={[{ label: '紧凑', value: 'compact' }, { label: '默认', value: 'comfortable' }, { label: '宽松', value: 'spacious' }]} style={{ width: 160 }} value={general.density} />
+        <AppSelect onChange={(value) => { if (typeof value === 'string') update({ density: value as typeof general.density }); }} options={[{ label: '紧凑', value: 'compact' }, { label: '默认', value: 'comfortable' }, { label: '宽松', value: 'spacious' }]} value={general.density} />
       </SettingRow>
       <SettingRow description="关闭大部分装饰性动画" title="减少动画">
         <Toggle checked={general.reduceMotion} onChange={(reduceMotion) => update({ reduceMotion })} />
       </SettingRow>
       <SettingRow description="代码主题会自动匹配亮色和暗色模式" title="代码高亮主题">
-        <Select {...selectSurfaceProps} onChange={(value) => { if (typeof value === 'string') update({ codeTheme: value as CodeTheme }); }} options={codeThemes.map((item) => ({ label: item.label, value: item.id }))} style={{ width: 160 }} value={general.codeTheme} />
+        <AppSelect onChange={(value) => { if (typeof value === 'string') update({ codeTheme: value as CodeTheme }); }} options={codeThemes.map((item) => ({ label: item.label, value: item.id }))} value={general.codeTheme} />
       </SettingRow>
       <SettingRow description="可在亮色界面中固定使用暗色代码块，或反过来" title="代码块明暗模式">
-        <Select {...selectSurfaceProps} onChange={(value) => { if (typeof value === 'string') update({ codeColorMode: value as typeof general.codeColorMode }); }} options={[{ label: '跟随界面', value: 'auto' }, { label: '固定亮色', value: 'light' }, { label: '固定暗色', value: 'dark' }]} style={{ width: 160 }} value={general.codeColorMode} />
+        <AppSelect onChange={(value) => { if (typeof value === 'string') update({ codeColorMode: value as typeof general.codeColorMode }); }} options={[{ label: '跟随界面', value: 'auto' }, { label: '固定亮色', value: 'light' }, { label: '固定暗色', value: 'dark' }]} value={general.codeColorMode} />
       </SettingRow>
       <SettingRow title="显示代码行号">
         <Toggle checked={general.codeLineNumbers} onChange={(codeLineNumbers) => update({ codeLineNumbers })} />
@@ -259,15 +250,15 @@ function ChatSettings() {
     <div>
       <SettingRow title="流式输出自动滚动"><Toggle checked={general.autoScroll} onChange={(autoScroll) => update({ autoScroll })} /></SettingRow>
       <SettingRow title="回复动画">
-        <Select {...selectSurfaceProps} onChange={(value) => { if (typeof value === 'string') update({ responseAnimation: value as typeof general.responseAnimation }); }} options={[{ label: '关闭', value: 'none' }, { label: '淡入', value: 'fade' }, { label: '平滑', value: 'smooth' }]} style={{ width: 160 }} value={general.responseAnimation} />
+        <AppSelect onChange={(value) => { if (typeof value === 'string') update({ responseAnimation: value as typeof general.responseAnimation }); }} options={[{ label: '关闭', value: 'none' }, { label: '淡入', value: 'fade' }, { label: '平滑', value: 'smooth' }]} value={general.responseAnimation} />
       </SettingRow>
       <SettingRow description="“自动”会在生成时展开，结束后保留面板" title="思考面板">
-        <Select {...selectSurfaceProps} onChange={(value) => { if (typeof value === 'string') update({ thinkingDisplay: value as typeof general.thinkingDisplay }); }} options={[{ label: '自动', value: 'auto' }, { label: '默认折叠', value: 'collapsed' }, { label: '始终展开', value: 'expanded' }]} style={{ width: 160 }} value={general.thinkingDisplay} />
+        <AppSelect onChange={(value) => { if (typeof value === 'string') update({ thinkingDisplay: value as typeof general.thinkingDisplay }); }} options={[{ label: '自动', value: 'auto' }, { label: '默认折叠', value: 'collapsed' }, { label: '始终展开', value: 'expanded' }]} value={general.thinkingDisplay} />
       </SettingRow>
       <SettingRow title="显示 Token 与耗时统计"><Toggle checked={general.showMessageStats} onChange={(showMessageStats) => update({ showMessageStats })} /></SettingRow>
       <SettingRow title="默认启用联网搜索"><Toggle checked={general.defaultWebSearch} onChange={(defaultWebSearch) => update({ defaultWebSearch })} /></SettingRow>
       <SettingRow title="发送快捷键">
-        <Select {...selectSurfaceProps} onChange={(value) => { if (typeof value === 'string') update({ sendShortcut: value as typeof general.sendShortcut }); }} options={[{ label: 'Enter 发送', value: 'enter' }, { label: 'Ctrl / Cmd + Enter', value: 'mod-enter' }]} style={{ width: 190 }} value={general.sendShortcut} />
+        <AppSelect onChange={(value) => { if (typeof value === 'string') update({ sendShortcut: value as typeof general.sendShortcut }); }} options={[{ label: 'Enter 发送', value: 'enter' }, { label: 'Ctrl / Cmd + Enter', value: 'mod-enter' }]} value={general.sendShortcut} />
       </SettingRow>
       <SettingRow title="默认宽屏对话"><Toggle checked={general.wideChatMode} onChange={(wideChatMode) => update({ wideChatMode })} /></SettingRow>
     </div>
@@ -468,7 +459,17 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
       <div className="flex h-full w-full overflow-hidden bg-white shadow-2xl dark:bg-[#151515] sm:h-[min(760px,90vh)] sm:max-w-5xl sm:rounded-2xl sm:border sm:border-black/5 sm:dark:border-white/10">
         <aside className="relative hidden w-56 shrink-0 border-r border-gray-100 bg-gray-50/70 p-3 dark:border-white/[0.07] dark:bg-white/[0.02] sm:block">
           <div className="flex h-12 items-center gap-2 px-3 text-sm font-semibold"><Settings2 size={18} />设置</div>
-          <nav className="mt-2 space-y-1">{sections.map(({ id, icon: Icon, label }) => <button className={cn('flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors', section === id ? 'bg-white font-medium text-gray-950 shadow-sm dark:bg-white/[0.08] dark:text-white' : 'text-gray-500 hover:bg-white/70 dark:hover:bg-white/[0.05]')} key={id} onClick={() => setSection(id)} type="button"><Icon size={17} />{label}</button>)}</nav>
+          <nav className="mt-2 flex flex-col gap-1">
+            {sections.map(({ id, icon, label }) => (
+              <SidebarNavItem
+                active={section === id}
+                icon={icon}
+                key={id}
+                label={label}
+                onClick={() => setSection(id)}
+              />
+            ))}
+          </nav>
           <button className="absolute bottom-5 flex items-center gap-2 px-3 text-xs text-gray-400 hover:text-red-500" onClick={() => setResetConfirmOpen(true)} type="button"><RotateCcw size={14} />恢复默认</button>
         </aside>
         <main className="flex min-w-0 flex-1 flex-col">

@@ -551,11 +551,7 @@ export function MessageItem({
         </div>
       </div>
 
-      <div className={cn(
-        'markdown-body ml-10 text-[length:var(--chat-font-size)] leading-relaxed text-gray-900 dark:text-gray-100',
-        message.isStreaming && generalSettings.responseAnimation === 'fade' && 'animate-[fade-up_180ms_ease-out]',
-        message.isStreaming && generalSettings.responseAnimation === 'smooth' && 'animate-[fade-up_320ms_cubic-bezier(0.22,1,0.36,1)]',
-      )}>
+      <div className="markdown-body ml-10 text-[length:var(--chat-font-size)] leading-relaxed text-gray-900 dark:text-gray-100">
         {editing ? (
           <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-3">
             <textarea
@@ -617,7 +613,12 @@ export function MessageItem({
                   }
                   return seg.content ? (
                     <div key={`seg-${i}`}>
-                      <MarkdownContent>{seg.content}</MarkdownContent>
+                      <MarkdownContent
+                        animation={generalSettings.responseAnimation}
+                        streaming={message.isStreaming && i === message.segments!.length - 1}
+                      >
+                        {seg.content}
+                      </MarkdownContent>
                       {message.isStreaming && i === message.segments!.length - 1 && (
                         <span className="ml-1 inline-block h-4 w-2 animate-pulse rounded-full bg-primary align-middle" />
                       )}
@@ -633,7 +634,14 @@ export function MessageItem({
                   thinking={message.isReasoning}
                 />
                 <WebSearchToolBlock webSearch={message.webSearch} />
-                {message.content ? <MarkdownContent>{message.content}</MarkdownContent> : null}
+                {message.content ? (
+                  <MarkdownContent
+                    animation={generalSettings.responseAnimation}
+                    streaming={message.isStreaming}
+                  >
+                    {message.content}
+                  </MarkdownContent>
+                ) : null}
                 {message.isStreaming && message.content && (
                   <span className="ml-1 inline-block h-4 w-2 animate-pulse rounded-full bg-primary align-middle" />
                 )}

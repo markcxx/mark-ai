@@ -18,16 +18,18 @@ export function SidebarNavItem({
   return (
     <button
       className={cn(
-        'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+        'flex h-9 w-full min-w-0 items-center gap-2 rounded-lg px-1 text-left text-sm transition-colors',
         active
-          ? 'bg-gray-200 font-medium text-gray-900 dark:bg-gray-800 dark:text-gray-100'
-          : 'text-gray-600 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700',
+          ? 'bg-[#eceef0] font-medium text-gray-900 dark:bg-gray-800 dark:text-gray-100'
+          : 'text-gray-700 hover:bg-[#f0f1f2] dark:text-gray-300 dark:hover:bg-gray-800/60',
       )}
       onClick={onClick}
       type="button"
     >
-      <Icon size={20} />
-      <span>{label}</span>
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center text-gray-400">
+        <Icon size={15} />
+      </span>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
     </button>
   );
 }

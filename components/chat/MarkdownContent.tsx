@@ -1,11 +1,14 @@
 'use client';
 
 import React from 'react';
+import { rehypeStreamAnimated } from '@lobehub/ui';
 import { Check, Copy } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 import { Pre, PreSingleLine } from '@/components/CodeBlock';
+import type { GeneralSettings } from '@/lib/settings';
+import { cn } from '@/lib/utils';
 
 import { HtmlPreviewBlock } from './HtmlPreviewBlock';
 
@@ -137,10 +140,26 @@ const markdownComponents = {
   ),
 };
 
-export function MarkdownContent({ children }: { children: string }) {
+export function MarkdownContent({
+  animation = 'none',
+  children,
+  streaming = false,
+}: {
+  animation?: GeneralSettings['responseAnimation'];
+  children: string;
+  streaming?: boolean;
+}) {
+  const animateNewWords = streaming && animation === 'fade';
+
   return (
-    <ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]}>
-      {children}
-    </ReactMarkdown>
+    <div className={cn(animateNewWords && 'streaming-markdown')}>
+      <ReactMarkdown
+        components={markdownComponents}
+        rehypePlugins={animateNewWords ? [[rehypeStreamAnimated, { granularity: 'word' }]] : undefined}
+        remarkPlugins={[remarkGfm]}
+      >
+        {children}
+      </ReactMarkdown>
+    </div>
   );
 }
