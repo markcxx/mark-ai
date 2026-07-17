@@ -3,9 +3,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { authorizeApiRequest, enforceRateLimit } from "@/lib/api/security";
 import { findAvailableModel } from "@/lib/available-models";
 import { estimateTextTokens } from "@/lib/chat/metrics";
+import {
+  addTokenUsage,
+  getUsageNumber,
+  resolveTokenUsage,
+  type ResolvedTokenUsage,
+  type TokenUsage,
+} from "@/lib/chat/token-usage";
 import { searchTavily } from "@/lib/search/tavily";
 import { readWebpage } from "@/lib/search/webpage";
-import type { FileAttachment, TokenUsageSource, WebSearchState } from "@/lib/chat/types";
+import type { FileAttachment, WebSearchState } from "@/lib/chat/types";
 import { injectFileContexts } from "@/lib/storage/file-context";
 
 type ChatMessage = {
@@ -31,17 +38,6 @@ type OpenAIToolCall = {
 };
 
 type StreamEventType = "content" | "reasoning";
-
-type UsagePayload = {
-  inputTokens?: number;
-  outputTokens?: number;
-  totalTokens?: number;
-  tokenUsageSource?: TokenUsageSource;
-};
-
-type ResolvedUsage = Required<Omit<UsagePayload, "tokenUsageSource">> & {
-  tokenUsageSource: TokenUsageSource;
-};
 
 const MAX_CHAT_MESSAGES = 200;
 const MAX_CHAT_MESSAGE_CHARS = 200_000;
@@ -172,63 +168,8 @@ const getChoiceText = (choice: any, fields: string[]) => {
 const encodeStreamEvent = (encoder: TextEncoder, type: StreamEventType, text: string) =>
   encoder.encode(`${JSON.stringify({ type, text })}\n`);
 
-const encodeUsageEvent = (encoder: TextEncoder, usage: UsagePayload) =>
+const encodeUsageEvent = (encoder: TextEncoder, usage: TokenUsage) =>
   encoder.encode(`${JSON.stringify({ type: "usage", ...usage })}\n`);
-
-const getUsageNumber = (...values: unknown[]) => {
-  const value = values.find((item) => typeof item === "number" && Number.isFinite(item));
-  return typeof value === "number" ? Math.max(0, Math.round(value)) : undefined;
-};
-
-const resolveUsage = ({
-  estimatedInputTokens,
-  estimatedOutputTokens,
-  providerUsage,
-}: {
-  estimatedInputTokens: number;
-  estimatedOutputTokens: number;
-  providerUsage?: UsagePayload;
-}): ResolvedUsage => {
-  let inputTokens = getUsageNumber(providerUsage?.inputTokens);
-  let outputTokens = getUsageNumber(providerUsage?.outputTokens);
-  const providerTotalTokens = getUsageNumber(providerUsage?.totalTokens);
-
-  if (
-    inputTokens === undefined &&
-    outputTokens !== undefined &&
-    providerTotalTokens !== undefined
-  ) {
-    inputTokens = Math.max(providerTotalTokens - outputTokens, 0);
-  }
-  if (
-    outputTokens === undefined &&
-    inputTokens !== undefined &&
-    providerTotalTokens !== undefined
-  ) {
-    outputTokens = Math.max(providerTotalTokens - inputTokens, 0);
-  }
-
-  const isProviderUsage = inputTokens !== undefined && outputTokens !== undefined;
-  const resolvedInputTokens = inputTokens ?? estimatedInputTokens;
-  const resolvedOutputTokens = outputTokens ?? estimatedOutputTokens;
-
-  return {
-    inputTokens: resolvedInputTokens,
-    outputTokens: resolvedOutputTokens,
-    tokenUsageSource: isProviderUsage ? "provider" : "estimated",
-    totalTokens: providerTotalTokens ?? resolvedInputTokens + resolvedOutputTokens,
-  };
-};
-
-const addUsage = (current: ResolvedUsage | undefined, next: ResolvedUsage): ResolvedUsage => ({
-  inputTokens: (current?.inputTokens || 0) + next.inputTokens,
-  outputTokens: (current?.outputTokens || 0) + next.outputTokens,
-  tokenUsageSource:
-    !current || (current.tokenUsageSource === "provider" && next.tokenUsageSource === "provider")
-      ? next.tokenUsageSource
-      : "estimated",
-  totalTokens: (current?.totalTokens || 0) + next.totalTokens,
-});
 
 const isUnsupportedStreamUsageError = (status: number, detail: string) =>
   [400, 404, 422].includes(status) &&
@@ -430,7 +371,7 @@ const createOpenAICompatibleStream = async (
         let assistantContent = "";
         let assistantReasoning = "";
         let buffer = "";
-        let providerUsage: UsagePayload | undefined;
+        let providerUsage: TokenUsage | undefined;
 
         const appendToolCall = (toolCall: any, fallbackIndex: number) => {
           const index = Number.isFinite(toolCall?.index) ? Number(toolCall.index) : fallbackIndex;
@@ -504,7 +445,7 @@ const createOpenAICompatibleStream = async (
           return {
             assistantContent,
             toolCalls,
-            usage: resolveUsage({
+            usage: resolveTokenUsage({
               estimatedInputTokens: estimateOpenAIInputTokens(requestMessages, allowTools),
               estimatedOutputTokens: estimateTextTokens(
                 [
@@ -562,11 +503,11 @@ const createOpenAICompatibleStream = async (
       try {
         const MAX_TOOL_ROUNDS = 5;
         let currentMessages = openAIMessages;
-        let cumulativeUsage: ResolvedUsage | undefined;
+        let cumulativeUsage: ResolvedTokenUsage | undefined;
 
         for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
           const pass = await streamModelResponse(currentMessages, webSearchEnabled);
-          cumulativeUsage = addUsage(cumulativeUsage, pass.usage);
+          cumulativeUsage = addTokenUsage(cumulativeUsage, pass.usage);
           const executableToolCalls = pass.toolCalls.filter((toolCall) =>
             ["web_search", "read_webpage"].includes(toolCall.function.name),
           );
@@ -802,7 +743,7 @@ export async function POST(req: NextRequest) {
       async start(controller) {
         const encoder = new TextEncoder();
         let outputText = "";
-        let providerUsage: UsagePayload | undefined;
+        let providerUsage: TokenUsage | undefined;
 
         for await (const chunk of responseStream) {
           if (chunk.text) {
@@ -830,7 +771,7 @@ export async function POST(req: NextRequest) {
         controller.enqueue(
           encodeUsageEvent(
             encoder,
-            resolveUsage({
+            resolveTokenUsage({
               estimatedInputTokens: estimateTextTokens(JSON.stringify(contents)),
               estimatedOutputTokens: estimateTextTokens(outputText),
               providerUsage,
