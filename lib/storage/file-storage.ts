@@ -30,7 +30,7 @@ import {
 
 export type { StoredFileRecord } from "./local-file-storage";
 
-const toStoredFile = (file: typeof storageFiles.$inferSelect): StoredFileRecord => ({
+export const toStoredFileRecord = (file: typeof storageFiles.$inferSelect): StoredFileRecord => ({
   ...file,
   kind: file.kind === "avatar" ? "avatar" : "attachment",
   status: file.status === "ready" ? "ready" : "pending",
@@ -49,7 +49,7 @@ export const listStoredAttachmentFiles = async (userId: string) => {
       ),
     )
     .orderBy(desc(storageFiles.createdAt));
-  return files.map(toStoredFile);
+  return files.map(toStoredFileRecord);
 };
 
 export const getStoredFileUsage = async (userId: string) => {
@@ -107,7 +107,7 @@ export const getStoredFile = async (id: string, userId: string, readyOnly = fals
     .from(storageFiles)
     .where(and(...conditions))
     .limit(1);
-  return file ? toStoredFile(file) : undefined;
+  return file ? toStoredFileRecord(file) : undefined;
 };
 
 export const getStoredFilesByIds = async (ids: string[], userId: string) => {
@@ -127,7 +127,7 @@ export const getStoredFilesByIds = async (ids: string[], userId: string) => {
         inArray(storageFiles.id, ids),
       ),
     );
-  return files.map(toStoredFile);
+  return files.map(toStoredFileRecord);
 };
 
 export const markStoredFileReady = async (file: StoredFileRecord) => {

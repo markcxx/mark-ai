@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { isCloudMode } from "@/lib/env";
 
-const PUBLIC_PATHS = ["/api/auth", "/login", "/register", "/reset-password"];
+const PUBLIC_PATHS = [
+  "/api/auth",
+  "/api/public",
+  "/api/waitlist",
+  "/login",
+  "/register",
+  "/reset-password",
+];
 
 const isPublicPath = (pathname: string) => PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 

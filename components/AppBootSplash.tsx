@@ -7,7 +7,14 @@ import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/useUIStore";
 import { MarkAILoadingScreen } from "./MarkAILoadingScreen";
 
-const PUBLIC_AUTH_PATHS = ["/login", "/register", "/reset-password"];
+const ROUTES_WITHOUT_CHAT_INITIALIZATION = [
+  "/admin",
+  "/login",
+  "/onboarding",
+  "/plugins",
+  "/register",
+  "/reset-password",
+];
 
 export function AppBootSplash() {
   const pathname = usePathname();
@@ -16,7 +23,9 @@ export function AppBootSplash() {
   const bootProgress = useUIStore((s) => s.bootProgress);
   const [minimumDurationElapsed, setMinimumDurationElapsed] = useState(false);
   const [visible, setVisible] = useState(true);
-  const requiresChatInitialization = !PUBLIC_AUTH_PATHS.some((path) => pathname.startsWith(path));
+  const requiresChatInitialization = !ROUTES_WITHOUT_CHAT_INITIALIZATION.some((path) =>
+    pathname.startsWith(path),
+  );
   const routeReady = !requiresChatInitialization || isAppReady;
   const exiting = minimumDurationElapsed && routeReady;
 

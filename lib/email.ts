@@ -23,6 +23,18 @@ const getTransporter = () => {
 
 let _transporter: ReturnType<typeof getTransporter> | undefined;
 
+const escapeHtml = (value: string) =>
+  value.replace(/[&<>"']/g, (character) => {
+    const entities: Record<string, string> = {
+      '"': "&quot;",
+      "&": "&amp;",
+      "'": "&#39;",
+      "<": "&lt;",
+      ">": "&gt;",
+    };
+    return entities[character];
+  });
+
 const ensureTransporter = () => {
   if (_transporter === undefined) _transporter = getTransporter();
   return _transporter;
@@ -49,7 +61,7 @@ export const sendEmail = async ({
   if (!transporter) {
     console.warn("[Email] SMTP not configured, skipping email to:", to);
     console.warn("[Email] Subject:", subject);
-    return;
+    return false;
   }
 
   await transporter.sendMail({
@@ -58,6 +70,7 @@ export const sendEmail = async ({
     subject,
     html,
   });
+  return true;
 };
 
 export const sendVerificationCode = async (email: string, code: string) => {
@@ -111,3 +124,58 @@ export const sendResetPasswordEmail = async (email: string, url: string) => {
     `,
   });
 };
+
+export const sendWaitlistAdminNotification = async ({
+  applicantEmail,
+  applicantName,
+  message,
+  recipients,
+}: {
+  applicantEmail: string;
+  applicantName?: string;
+  message?: string;
+  recipients: string[];
+}) => {
+  if (!recipients.length) return false;
+  const safeEmail = escapeHtml(applicantEmail);
+  const safeName = applicantName ? escapeHtml(applicantName) : "";
+  const safeMessage = message ? escapeHtml(message) : "";
+  return sendEmail({
+    html: `
+      <div style="max-width:560px;margin:0 auto;font-family:system-ui,sans-serif;padding:24px;color:#111">
+        <h2 style="margin-bottom:8px">新的 MarkAI 等候名单申请</h2>
+        <p><strong>邮箱：</strong>${safeEmail}</p>
+        ${safeName ? `<p><strong>姓名：</strong>${safeName}</p>` : ""}
+        ${safeMessage ? `<p><strong>申请说明：</strong></p><div style="padding:12px 16px;background:#f5f5f5;border-radius:10px;white-space:pre-wrap">${safeMessage}</div>` : ""}
+        <p style="margin-top:24px;color:#666;font-size:14px">请登录 MarkAI 管理后台进行审批。</p>
+      </div>
+    `,
+    subject: `MarkAI — 新的等候名单申请：${applicantEmail.replace(/[\r\n]/g, "")}`,
+    to: recipients.join(","),
+  });
+};
+
+export const sendWaitlistInvitationEmail = async ({
+  email,
+  expiresInHours,
+  url,
+}: {
+  email: string;
+  expiresInHours: number;
+  url: string;
+}) =>
+  sendEmail({
+    html: `
+      <div style="max-width:520px;margin:0 auto;font-family:system-ui,sans-serif;padding:24px;color:#111">
+        <h2>你的 MarkAI 申请已通过</h2>
+        <p>管理员已经批准你的加入申请。点击下方按钮验证邮箱并创建账户：</p>
+        <a href="${url}" style="display:inline-block;padding:12px 24px;background:#111;color:#fff;text-decoration:none;border-radius:8px;margin:16px 0">
+          接受邀请并注册
+        </a>
+        <p style="color:#666;font-size:14px">如果按钮无法点击，请复制此链接到浏览器：<br/>${url}</p>
+        <p style="color:#999;font-size:12px">邀请链接将在 ${expiresInHours} 小时后失效，并且只能使用一次。</p>
+      </div>
+    `,
+    subject: "MarkAI — 你的加入申请已通过",
+    to: email,
+  });

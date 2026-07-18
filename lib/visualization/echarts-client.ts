@@ -16,6 +16,7 @@ import {
 } from "echarts/charts";
 import {
   AriaComponent,
+  CalendarComponent,
   DataZoomComponent,
   DatasetComponent,
   GridComponent,
@@ -40,6 +41,7 @@ echarts.use([
   BoxplotChart,
   CandlestickChart,
   CanvasRenderer,
+  CalendarComponent,
   DataZoomComponent,
   DatasetComponent,
   FunnelChart,

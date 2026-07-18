@@ -1,6 +1,13 @@
 "use client";
 
-import { ChevronUp, CircleUserRound, FolderOpen, LogOut, Settings } from "lucide-react";
+import {
+  ChevronUp,
+  CircleUserRound,
+  FolderOpen,
+  LogOut,
+  Settings,
+  ShieldCheck,
+} from "lucide-react";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
@@ -14,6 +21,7 @@ import type { UserProfile } from "./ProfileDialog";
 export function UserAccountMenu() {
   const { data } = useSession();
   const [fileManagerOpen, setFileManagerOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [open, setOpen] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -34,10 +42,14 @@ export function UserAccountMenu() {
 
   useEffect(() => {
     if (!user) return;
-    void fetch("/api/profile")
-      .then((response) => response.json())
-      .then((data) => setProfile(data.user || null))
-      .catch(() => undefined);
+    void Promise.all([
+      fetch("/api/profile")
+        .then((response) => response.json())
+        .then((data) => setProfile(data.user || null)),
+      fetch("/api/admin/me")
+        .then((response) => (response.ok ? response.json() : undefined))
+        .then((data) => setIsAdmin(!!data?.admin)),
+    ]).catch(() => undefined);
   }, [user]);
 
   if (!user) return null;
@@ -87,6 +99,19 @@ export function UserAccountMenu() {
                 <Settings className="text-gray-400" size={17} />
                 设置
               </button>
+              {isAdmin && (
+                <button
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-gray-700 transition-all hover:bg-gray-100 active:scale-[0.98] dark:text-gray-200 dark:hover:bg-white/[0.07]"
+                  onClick={() => {
+                    setOpen(false);
+                    window.location.href = "/admin";
+                  }}
+                  type="button"
+                >
+                  <ShieldCheck className="text-violet-500" size={17} />
+                  管理后台
+                </button>
+              )}
             </div>
             <div className="border-t border-gray-100 pt-1 dark:border-white/[0.07]">
               <button

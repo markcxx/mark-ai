@@ -8,8 +8,10 @@ import {
   ArrowRight,
   Check,
   ChevronDown,
+  Clock3,
   Github,
   LoaderCircle,
+  MailCheck,
   ShieldCheck,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
@@ -17,6 +19,7 @@ import toast, { Toaster } from "react-hot-toast";
 import { signIn, signUp } from "@/lib/auth-client";
 
 type Step = "email" | "code" | "account";
+type RegistrationMode = "closed" | "loading" | "open" | "waitlist";
 
 const EMAIL_DOMAINS = ["@qq.com", "@163.com", "@126.com", "@outlook.com", "@gmail.com"];
 const fieldClass =
@@ -57,10 +60,48 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [registrationToken, setRegistrationToken] = useState("");
+  const [registrationMode, setRegistrationMode] = useState<RegistrationMode>("loading");
+  const [invitationToken, setInvitationToken] = useState("");
+  const [invitedName, setInvitedName] = useState("");
+  const [waitlistName, setWaitlistName] = useState("");
+  const [waitlistMessage, setWaitlistMessage] = useState("");
+  const [waitlistSubmitted, setWaitlistSubmitted] = useState(false);
   const email = useMemo(() => {
     const value = emailInput.trim();
     return value.includes("@") ? value : `${value}${emailDomain}`;
   }, [emailDomain, emailInput]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadRegistration = async () => {
+      try {
+        const response = await fetch("/api/public/registration", { cache: "no-store" });
+        const data = await response.json();
+        if (!cancelled) setRegistrationMode(data.mode || "closed");
+
+        const token = new URLSearchParams(window.location.search).get("invite") || "";
+        if (!token || cancelled) return;
+        const invitationResponse = await fetch(
+          `/api/waitlist/invitations/${encodeURIComponent(token)}`,
+          { method: "POST" },
+        );
+        const invitation = await invitationResponse.json();
+        if (!invitationResponse.ok) throw new Error(invitation.error || "邀请链接无效");
+        if (cancelled) return;
+        setEmailInput(invitation.email);
+        setInvitedName(invitation.fullName || "");
+        setInvitationToken(token);
+        setRegistrationToken(invitation.registrationToken);
+        setStep("account");
+      } catch (error) {
+        if (!cancelled) toast.error(error instanceof Error ? error.message : "注册配置加载失败");
+      }
+    };
+    void loadRegistration();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -137,9 +178,12 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       const result = await signUp.email(
-        { email, name: email.split("@")[0], password },
+        { email, name: invitedName || email.split("@")[0], password },
         {
-          headers: { "x-markai-email-verification": registrationToken },
+          headers: {
+            "x-markai-email-verification": registrationToken,
+            ...(invitationToken ? { "x-markai-waitlist-invitation": invitationToken } : {}),
+          },
         },
       );
       if (result.error) throw new Error(result.error.message || "注册失败");
@@ -152,6 +196,51 @@ export default function RegisterPage() {
     }
   };
 
+  const handleWaitlistSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!emailInput.trim() || !email.includes("@")) return toast.error("请输入有效的邮箱地址");
+    setLoading(true);
+    try {
+      const response = await fetch("/api/waitlist", {
+        body: JSON.stringify({ email, fullName: waitlistName, message: waitlistMessage }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "申请提交失败");
+      setWaitlistSubmitted(true);
+      toast.success("申请已提交");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "申请提交失败");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const invited = !!invitationToken && step === "account";
+  const heading = invited
+    ? "欢迎加入 MarkAI"
+    : registrationMode === "waitlist"
+      ? "申请加入 MarkAI"
+      : registrationMode === "closed"
+        ? "注册暂未开放"
+        : step === "email"
+          ? "创建你的 MarkAI 账户"
+          : step === "code"
+            ? "输入邮箱验证码"
+            : "设置账户密码";
+  const description = invited
+    ? `邀请邮箱已验证：${email}`
+    : registrationMode === "waitlist"
+      ? "提交申请后，管理员会通过邮件通知你审批结果"
+      : registrationMode === "closed"
+        ? "管理员目前没有开放新账户注册"
+        : step === "email"
+          ? "开始构建属于你的智能工作空间"
+          : step === "code"
+            ? `我们已向 ${email} 发送 6 位验证码`
+            : "使用安全密码保护你的对话和文件";
+
   return (
     <div className="w-full">
       <Toaster
@@ -162,22 +251,78 @@ export default function RegisterPage() {
       <div className="flex min-h-[500px] flex-col">
         <div className="mb-8">
           <h2 className="text-[28px] font-bold leading-[1.4] text-gray-950 dark:text-gray-50">
-            {step === "email"
-              ? "创建你的 MarkAI 账户"
-              : step === "code"
-                ? "输入邮箱验证码"
-                : "设置账户密码"}
+            {heading}
           </h2>
-          <p className="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">
-            {step === "email"
-              ? "开始构建属于你的智能工作空间"
-              : step === "code"
-                ? `我们已向 ${email} 发送 6 位验证码`
-                : "使用安全密码保护你的对话和文件"}
-          </p>
+          <p className="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">{description}</p>
         </div>
 
-        {step === "email" && (
+        {registrationMode === "loading" && (
+          <div className="space-y-4">
+            <div className="h-11 animate-pulse rounded-lg bg-gray-100 dark:bg-white/[0.06]" />
+            <div className="h-11 animate-pulse rounded-lg bg-gray-100 dark:bg-white/[0.06]" />
+          </div>
+        )}
+
+        {registrationMode === "closed" && !invited && (
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-6 text-center dark:border-white/10 dark:bg-white/[0.03]">
+            <Clock3 className="mx-auto text-gray-400" size={28} />
+            <p className="mt-3 text-sm leading-6 text-gray-500 dark:text-gray-400">
+              请稍后再来，或联系管理员了解开放时间。
+            </p>
+          </div>
+        )}
+
+        {registrationMode === "waitlist" &&
+          !invited &&
+          (waitlistSubmitted ? (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-6 text-center dark:border-emerald-500/20 dark:bg-emerald-500/10">
+              <MailCheck className="mx-auto text-emerald-600 dark:text-emerald-400" size={30} />
+              <h3 className="mt-3 font-semibold text-gray-900 dark:text-gray-100">申请已收到</h3>
+              <p className="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">
+                如果该邮箱可以加入等候名单，我们会向你发送后续通知。
+              </p>
+            </div>
+          ) : (
+            <form className="space-y-4" onSubmit={handleWaitlistSubmit}>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                邮箱地址
+                <input
+                  autoFocus
+                  className={`${fieldClass} mt-2`}
+                  onChange={(event) => setEmailInput(event.target.value)}
+                  placeholder="name@example.com"
+                  type="email"
+                  value={emailInput}
+                />
+              </label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                你的称呼
+                <input
+                  className={`${fieldClass} mt-2`}
+                  maxLength={60}
+                  onChange={(event) => setWaitlistName(event.target.value)}
+                  placeholder="选填"
+                  value={waitlistName}
+                />
+              </label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                申请说明
+                <textarea
+                  className="mt-2 min-h-24 w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none transition-colors placeholder:text-gray-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10 dark:border-white/10 dark:bg-white/[0.04]"
+                  maxLength={1000}
+                  onChange={(event) => setWaitlistMessage(event.target.value)}
+                  placeholder="选填，简单介绍你希望如何使用 MarkAI"
+                  value={waitlistMessage}
+                />
+              </label>
+              <PrimaryButton loading={loading}>
+                提交申请
+                <ArrowRight size={16} />
+              </PrimaryButton>
+            </form>
+          ))}
+
+        {registrationMode === "open" && step === "email" && (
           <div className="relative">
             <div className="mb-5 grid grid-cols-2 gap-3">
               <button
@@ -264,7 +409,7 @@ export default function RegisterPage() {
           </div>
         )}
 
-        {step === "code" && (
+        {registrationMode === "open" && step === "code" && (
           <form className="relative space-y-5" onSubmit={handleVerifyCode}>
             <input
               autoFocus
@@ -310,7 +455,7 @@ export default function RegisterPage() {
           </form>
         )}
 
-        {step === "account" && (
+        {step === "account" && (registrationMode === "open" || invited) && (
           <form className="relative space-y-5" onSubmit={handleRegister}>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
               密码

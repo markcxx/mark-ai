@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/api/security";
 import { getDb } from "@/lib/db";
 import { verifications } from "@/lib/db/schema";
+import { getRegistrationMode } from "@/lib/registration";
 import { eq, and, gt } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +13,9 @@ export const runtime = "nodejs";
 const REGISTRATION_TOKEN_TTL_MS = 10 * 60 * 1000;
 
 export async function POST(req: NextRequest) {
+  if (getRegistrationMode() !== "open") {
+    return NextResponse.json({ error: "当前未开放直接注册" }, { status: 403 });
+  }
   const body = await req.json().catch(() => ({}));
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
   const code = typeof body.code === "string" ? body.code.trim() : "";

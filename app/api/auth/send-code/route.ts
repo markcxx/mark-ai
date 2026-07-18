@@ -5,6 +5,7 @@ import { enforceRateLimit } from "@/lib/api/security";
 import { getDb } from "@/lib/db";
 import { verifications } from "@/lib/db/schema";
 import { sendVerificationCode } from "@/lib/email";
+import { getRegistrationMode } from "@/lib/registration";
 import { eq, and, gt } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +16,9 @@ const CODE_TTL_MS = (Number(process.env.EMAIL_VERIFICATION_TTL_SECONDS) || 600) 
 const RATE_LIMIT_MS = 60_000;
 
 export async function POST(req: NextRequest) {
+  if (getRegistrationMode() !== "open") {
+    return NextResponse.json({ error: "当前未开放直接注册" }, { status: 403 });
+  }
   const body = await req.json().catch(() => ({}));
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
 

@@ -8,6 +8,13 @@ import { getDb } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { sendResetPasswordEmail, sendVerificationEmail } from "@/lib/email";
 import { isCloudMode } from "@/lib/env";
+import {
+  canCreateUser,
+  getValidWaitlistInvitation,
+  hashWaitlistToken,
+  isBootstrapAdminEmail,
+  normalizeEmail,
+} from "@/lib/registration";
 
 const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
 
@@ -63,10 +70,18 @@ export const auth = betterAuth({
     before: createAuthMiddleware(async (ctx) => {
       if (!isCloudMode() || ctx.path !== "/sign-up/email") return;
 
-      const email = typeof ctx.body?.email === "string" ? ctx.body.email.trim().toLowerCase() : "";
+      const email = typeof ctx.body?.email === "string" ? normalizeEmail(ctx.body.email) : "";
       const registrationToken = ctx.headers?.get("x-markai-email-verification")?.trim() || "";
+      const invitationToken = ctx.headers?.get("x-markai-waitlist-invitation")?.trim() || "";
       if (!email || !registrationToken) {
         throw new APIError("BAD_REQUEST", { message: "请先完成邮箱验证码验证" });
+      }
+
+      if (!(await canCreateUser({ email, invitationToken }))) {
+        throw new APIError("FORBIDDEN", {
+          code: "REGISTRATION_NOT_ALLOWED",
+          message: "当前注册需要有效的管理员邀请",
+        });
       }
 
       const db = getDb();
@@ -89,6 +104,68 @@ export const auth = betterAuth({
 
       await db.delete(schema.verifications).where(eq(schema.verifications.identifier, tokenId));
     }),
+    after: createAuthMiddleware(async (ctx) => {
+      if (!isCloudMode() || ctx.path !== "/sign-up/email") return;
+      const email = typeof ctx.body?.email === "string" ? normalizeEmail(ctx.body.email) : "";
+      if (!email) return;
+
+      const [user] = await getDb()
+        .select({ id: schema.users.id, role: schema.users.role })
+        .from(schema.users)
+        .where(eq(schema.users.email, email))
+        .limit(1);
+      if (!user) return;
+
+      if (isBootstrapAdminEmail(email) && user.role !== "admin") {
+        await getDb()
+          .update(schema.users)
+          .set({ role: "admin", updatedAt: new Date() })
+          .where(eq(schema.users.id, user.id));
+      }
+
+      const invitationToken = ctx.headers?.get("x-markai-waitlist-invitation")?.trim() || "";
+      if (!invitationToken) return;
+      const invitation = await getValidWaitlistInvitation({ email, token: invitationToken });
+      if (!invitation) return;
+      const now = new Date();
+      await getDb()
+        .update(schema.waitlistInvitations)
+        .set({ usedAt: now })
+        .where(eq(schema.waitlistInvitations.tokenHash, hashWaitlistToken(invitationToken)));
+      await getDb()
+        .update(schema.waitlistEntries)
+        .set({ registeredUserId: user.id, status: "registered", updatedAt: now })
+        .where(eq(schema.waitlistEntries.id, invitation.entry.id));
+    }),
+  },
+
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (user, context) => {
+          const email = normalizeEmail(user.email || "");
+          const invitationToken = context?.headers?.get("x-markai-waitlist-invitation")?.trim();
+          if (!email || !(await canCreateUser({ email, invitationToken }))) {
+            throw new APIError("FORBIDDEN", {
+              code: "REGISTRATION_NOT_ALLOWED",
+              message: "当前未开放注册，请先申请加入等候名单",
+            });
+          }
+
+          const invited = invitationToken
+            ? await getValidWaitlistInvitation({ email, token: invitationToken })
+            : undefined;
+          return {
+            data: {
+              ...user,
+              email,
+              emailVerified: invited ? true : user.emailVerified,
+              role: isBootstrapAdminEmail(email) ? "admin" : user.role,
+            },
+          };
+        },
+      },
+    },
   },
 
   emailAndPassword: {
