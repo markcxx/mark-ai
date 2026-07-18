@@ -2,11 +2,10 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import {
-  FileOutput,
+  ChartNoAxesCombined,
   FileText,
   Layers3,
   Loader2,
-  PanelsTopLeft,
   ShieldCheck,
   Table2,
   X,
@@ -22,9 +21,8 @@ import { cn } from "@/lib/utils";
 import { useToolStore } from "@/stores/useToolStore";
 
 const iconMap = {
-  artifacts: PanelsTopLeft,
+  "data-visualization": ChartNoAxesCombined,
   "excel-workbook": Table2,
-  "pdf-document": FileOutput,
   "word-document": FileText,
 };
 

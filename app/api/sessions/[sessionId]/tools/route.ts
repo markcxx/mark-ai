@@ -31,7 +31,14 @@ export async function GET(req: NextRequest, context: { params: Promise<{ session
   const requestContext = await getOwnedSession(req, sessionId);
   if ("response" in requestContext) return requestContext.response;
 
-  const toolIds = await listSessionEnabledToolIds(requestContext.storageUserId, sessionId);
+  const [sessionToolIds, installedToolIds] = await Promise.all([
+    listSessionEnabledToolIds(requestContext.storageUserId, sessionId),
+    listInstalledToolIds(requestContext.storageUserId),
+  ]);
+  const installed = new Set(installedToolIds);
+  const toolIds = sessionToolIds.filter(
+    (id) => installed.has(id) && Boolean(getAvailableBuiltinTool(id)),
+  );
   return NextResponse.json({ toolIds }, { headers: { "Cache-Control": "no-store" } });
 }
 

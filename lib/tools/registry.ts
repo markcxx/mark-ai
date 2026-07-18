@@ -103,44 +103,31 @@ const EXCEL_TOOL: BuiltinToolDefinition = {
   version: "1.0.0",
 };
 
-const PDF_TOOL: BuiltinToolDefinition = {
-  accent: "amber",
-  category: "documents",
-  description: "将内容转换为适合交付和打印的 PDF。渲染方案确认后接入执行能力。",
-  features: ["HTML/CSS 排版", "分页与打印样式", "中文字体嵌入"],
-  functions: [],
-  id: "pdf-document",
-  kind: "tool",
-  name: "PDF 文档生成",
-  shortName: "PDF",
-  status: "planned",
-  version: "0.1.0",
-};
-
-const ARTIFACTS_SKILL: BuiltinToolDefinition = {
+const DATA_VISUALIZATION_SKILL: BuiltinToolDefinition = {
   accent: "violet",
   category: "creation",
-  description: "创建可直接预览和下载的网页、组件、信息面板与交互式原型。",
-  features: ["HTML 实时预览", "响应式界面", "一键下载源文件"],
+  description: "把对话或附件中的数据转换为可交互图表，并直接在聊天消息中渲染。",
+  features: ["ECharts 交互图表", "多种可视化类型", "PNG 图片导出"],
   functions: [],
-  id: "artifacts",
+  id: "data-visualization",
   kind: "skill",
-  name: "Artifacts",
-  shortName: "Artifacts",
+  name: "数据可视化",
+  shortName: "可视化",
   status: "available",
-  systemPrompt: `Artifacts skill is enabled for this conversation.
-When the user asks to create a webpage, landing page, dashboard, interactive demo, visual component, poster-like web composition, or another browser-renderable artifact:
-- Produce a complete, self-contained HTML document in a fenced \`\`\`html code block.
-- Include a meaningful <title> element.
-- Put CSS and JavaScript inside the document; do not require a build step.
-- Prefer responsive, polished layouts with accessible contrast and sensible empty states.
-- Do not use external scripts, external stylesheets, remote fonts, or network requests unless the user explicitly requests them.
-- Keep explanatory prose brief so the HTML preview remains the primary result.
-The application will turn HTML code blocks into a safe preview panel and provide an HTML download action.`,
+  systemPrompt: `Data visualization skill is enabled for this conversation.
+When a chart materially improves the answer, analyze the data first and then output one or more Apache ECharts option objects inside fenced \`\`\`echarts code blocks.
+- The block content must be strict JSON: no JavaScript, functions, comments, trailing commas, Markdown, or HTML.
+- Output the ECharts option object directly, not wrapped in another property.
+- Always include a non-empty series array and a concise title.text.
+- Choose an appropriate built-in chart such as line, bar, pie, scatter, radar, heatmap, funnel, gauge, treemap, sunburst, sankey, graph, candlestick, or boxplot.
+- Use clear Chinese labels when the conversation is Chinese. Include tooltip and legend when helpful.
+- Prefer accurate, readable charts over decorative complexity. Aggregate excessive categories or data points before charting.
+- Never invent missing data. Briefly state important conclusions outside the chart block.
+The application renders these JSON blocks as interactive charts directly in the chat.`,
   version: "1.0.0",
 };
 
-export const BUILTIN_TOOLS = [WORD_TOOL, EXCEL_TOOL, PDF_TOOL, ARTIFACTS_SKILL] as const;
+export const BUILTIN_TOOLS = [WORD_TOOL, EXCEL_TOOL, DATA_VISUALIZATION_SKILL] as const;
 
 export const getBuiltinTool = (id: string) => BUILTIN_TOOLS.find((tool) => tool.id === id);
 

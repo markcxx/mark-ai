@@ -3,6 +3,7 @@
 import React from "react";
 import { rehypeStreamAnimated } from "@lobehub/ui";
 import { Check, Copy } from "lucide-react";
+import dynamic from "next/dynamic";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -13,6 +14,16 @@ import { cn } from "@/lib/utils";
 
 import { HtmlPreviewBlock } from "./HtmlPreviewBlock";
 import { CitationReference } from "./message/MessageSources";
+
+const EChartsPreviewBlock = dynamic(
+  () => import("./EChartsPreviewBlock").then((module) => module.EChartsPreviewBlock),
+  {
+    loading: () => (
+      <div className="my-5 h-[340px] animate-pulse rounded-xl border border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-white/[0.04]" />
+    ),
+    ssr: false,
+  },
+);
 
 type MarkdownNode = {
   children?: MarkdownNode[];
@@ -165,6 +176,9 @@ const markdownComponents = {
     }
     if (language === "html" || language === "htm") {
       return <HtmlPreviewBlock>{String(children)}</HtmlPreviewBlock>;
+    }
+    if (language === "echarts" || language === "echart" || language === "chart") {
+      return <EChartsPreviewBlock>{String(children)}</EChartsPreviewBlock>;
     }
     return <Pre language={language}>{String(children)}</Pre>;
   },
