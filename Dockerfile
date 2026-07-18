@@ -10,6 +10,12 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 
 ENV NEXT_TELEMETRY_DISABLED=1
+# Next.js evaluates the auth route while collecting build data. These inert
+# values only allow client construction; the runner receives production values
+# from /opt/markai/.env.production through Docker Compose.
+ENV AUTH_SECRET=build-only-secret-not-used-at-runtime-000000000000
+ENV DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build
+ENV NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
