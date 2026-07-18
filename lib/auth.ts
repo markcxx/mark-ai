@@ -17,6 +17,11 @@ import {
 } from "@/lib/registration";
 
 const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
+const emailVerificationSetting =
+  process.env.EMAIL_VERIFICATION_ENABLED ?? process.env.AUTH_EMAIL_VERIFICATION;
+const emailVerificationEnabled = ["1", "true", "yes", "on"].includes(
+  (emailVerificationSetting || "").trim().toLowerCase(),
+);
 
 const getSSOProviders = () => {
   const providers: ReturnType<typeof betterAuth>["options"]["socialProviders"] = {};
@@ -144,6 +149,7 @@ export const auth = betterAuth({
       create: {
         before: async (user, context) => {
           const email = normalizeEmail(user.email || "");
+          const registrationToken = context?.headers?.get("x-markai-email-verification")?.trim();
           const invitationToken = context?.headers?.get("x-markai-waitlist-invitation")?.trim();
           if (!email || !(await canCreateUser({ email, invitationToken }))) {
             throw new APIError("FORBIDDEN", {
@@ -155,11 +161,12 @@ export const auth = betterAuth({
           const invited = invitationToken
             ? await getValidWaitlistInvitation({ email, token: invitationToken })
             : undefined;
+          const verifiedByRegistrationCode = isCloudMode() && Boolean(registrationToken);
           return {
             data: {
               ...user,
               email,
-              emailVerified: invited ? true : user.emailVerified,
+              emailVerified: invited || verifiedByRegistrationCode ? true : user.emailVerified,
               role: isBootstrapAdminEmail(email) ? "admin" : user.role,
             },
           };
@@ -172,17 +179,23 @@ export const auth = betterAuth({
     enabled: true,
     minPasswordLength: 8,
     maxPasswordLength: 64,
-    requireEmailVerification: process.env.AUTH_EMAIL_VERIFICATION === "1",
+    requireEmailVerification: emailVerificationEnabled,
     sendResetPassword: async ({ user, url }) => {
       await sendResetPasswordEmail(user.email, url);
     },
   },
 
   emailVerification: {
-    sendVerificationEmail: async ({ user, url }) => {
+    sendVerificationEmail: async ({ user, url }, request) => {
+      if (
+        !emailVerificationEnabled ||
+        request?.headers.get("x-markai-waitlist-invitation")?.trim()
+      ) {
+        return;
+      }
       await sendVerificationEmail(user.email, url);
     },
-    sendOnSignUp: true,
+    sendOnSignUp: emailVerificationEnabled,
     autoSignInAfterVerification: true,
     expiresIn: 3600,
   },

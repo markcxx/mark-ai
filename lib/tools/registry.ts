@@ -106,21 +106,24 @@ const EXCEL_TOOL: BuiltinToolDefinition = {
 const DATA_VISUALIZATION_SKILL: BuiltinToolDefinition = {
   accent: "violet",
   category: "creation",
-  description: "把对话或附件中的数据转换为可交互图表，并直接在聊天消息中渲染。",
-  features: ["ECharts 交互图表", "多种可视化类型", "PNG 图片导出"],
+  description: "把对话或附件中的数据转换为可交互的 ECharts 2D/3D 图表。",
+  features: ["完整 2D/3D 图表", "多主题切换", "放大查看与 PNG 导出"],
   functions: [],
   id: "data-visualization",
   kind: "skill",
-  name: "数据可视化",
-  shortName: "可视化",
+  name: "ECharts 可视化",
+  shortName: "ECharts",
   status: "available",
   systemPrompt: `Data visualization skill is enabled for this conversation.
 When a chart materially improves the answer, analyze the data first and then output one or more Apache ECharts option objects inside fenced \`\`\`echarts code blocks.
 - The block content must be strict JSON: no JavaScript, functions, comments, trailing commas, Markdown, or HTML.
 - Output the ECharts option object directly, not wrapped in another property.
 - Always include a non-empty series array and a concise title.text.
-- Choose an appropriate built-in chart such as line, bar, pie, scatter, radar, heatmap, funnel, gauge, treemap, sunburst, sankey, graph, candlestick, or boxplot.
+- Choose any appropriate ECharts chart type. Supported 2D types include line, bar, pie, scatter, effectScatter, radar, heatmap, funnel, gauge, treemap, sunburst, sankey, graph, lines, pictorialBar, themeRiver, custom-free candlestick, and boxplot.
+- ECharts GL is available. When 3D materially improves the result, you may use bar3D, line3D, scatter3D, surface, map3D, lines3D, graphGL, flowGL, globe, geo3D, or grid3D. Include every required 3D coordinate component and keep the configuration strict JSON.
+- Prefer 2D charts for simple comparisons. Use 3D only when the extra spatial dimension communicates real information or the user explicitly requests it.
 - Use clear Chinese labels when the conversation is Chinese. Include tooltip and legend when helpful.
+- Do not hard-code global color palettes or series itemStyle/lineStyle colors unless color carries essential data semantics. The user can select an official ECharts theme in the chart card.
 - Prefer accurate, readable charts over decorative complexity. Aggregate excessive categories or data points before charting.
 - Never invent missing data. Briefly state important conclusions outside the chart block.
 The application renders these JSON blocks as interactive charts directly in the chat.`,

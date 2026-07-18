@@ -80,11 +80,11 @@ export function AdminConsole() {
       </aside>
 
       <main className="min-w-0 flex-1 overflow-y-auto border-0 bg-[var(--chat-panel-bg)] md:rounded-xl md:border md:border-[#e5e5e5] dark:md:border-gray-700">
-        <header className="sticky top-0 z-20 bg-[var(--chat-header-bg)] px-4 py-4 backdrop-blur-md md:px-6">
+        <header className="sticky top-0 z-20 border-b border-gray-200/70 bg-[var(--chat-header-bg)] px-3 py-3 backdrop-blur-md md:border-b-0 md:px-6 md:py-4 dark:border-white/[0.07]">
           <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-3">
             <div>
               <p className="text-xs font-medium text-gray-400 md:hidden">MarkAI 管理中心</p>
-              <h2 className="text-xl font-bold md:text-2xl">{current.label}</h2>
+              <h2 className="text-lg font-bold md:text-2xl">{current.label}</h2>
             </div>
             <button
               className="rounded-lg px-3 py-2 text-sm hover:bg-gray-100 md:hidden dark:hover:bg-white/[0.07]"
@@ -94,25 +94,29 @@ export function AdminConsole() {
               返回
             </button>
           </div>
-          <div className="mx-auto mt-3 flex max-w-[1440px] gap-2 overflow-x-auto pb-1 md:hidden">
-            {views.map((item) => (
-              <button
-                className={cn(
-                  "shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium",
-                  view === item.id
-                    ? "bg-primary text-white"
-                    : "bg-white text-gray-600 dark:bg-white/[0.06] dark:text-gray-300",
-                )}
-                key={item.id}
-                onClick={() => setView(item.id)}
-                type="button"
-              >
-                {item.label}
-              </button>
-            ))}
+          <div className="mx-auto mt-3 grid max-w-[1440px] grid-cols-4 gap-1 md:hidden">
+            {views.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  className={cn(
+                    "flex min-w-0 flex-col items-center gap-1 rounded-lg px-1 py-1.5 text-[10px] font-medium transition-colors",
+                    view === item.id
+                      ? "bg-primary/10 text-primary"
+                      : "text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/[0.06]",
+                  )}
+                  key={item.id}
+                  onClick={() => setView(item.id)}
+                  type="button"
+                >
+                  <Icon size={15} />
+                  <span className="w-full truncate text-center">{item.label}</span>
+                </button>
+              );
+            })}
           </div>
         </header>
-        <div className="mx-auto max-w-[1440px] p-4 md:p-8">
+        <div className="mx-auto max-w-[1440px] px-3 py-4 md:p-8">
           {view === "overview" && <OverviewPanel />}
           {view === "waitlist" && <WaitlistPanel />}
           {view === "users" && <UsersPanel />}

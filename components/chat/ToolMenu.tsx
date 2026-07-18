@@ -1,17 +1,30 @@
 "use client";
 
-import { ChevronRight, Loader2, Puzzle, Sparkles, Wrench } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import {
+  BarChart3,
+  Check,
+  ChevronRight,
+  FileSpreadsheet,
+  FileText,
+  Loader2,
+  Puzzle,
+  Store,
+  Wrench,
+} from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import toast from "react-hot-toast";
 
-import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
+import type { BuiltinToolCatalogItem } from "@/lib/tools/types";
 import { cn } from "@/lib/utils";
 import { useToolStore } from "@/stores/useToolStore";
 import { useUIStore } from "@/stores/useUIStore";
 
 export function ToolMenu({ disabled = false }: { disabled?: boolean }) {
   const [open, setOpen] = useState(false);
+  const [mobileBottom, setMobileBottom] = useState(92);
   const rootRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const catalog = useToolStore((state) => state.catalog);
   const enabledToolIds = useToolStore((state) => state.enabledToolIds);
   const isCatalogLoading = useToolStore((state) => state.isCatalogLoading);
@@ -19,6 +32,13 @@ export function ToolMenu({ disabled = false }: { disabled?: boolean }) {
   const loadCatalog = useToolStore((state) => state.loadCatalog);
   const toggleTool = useToolStore((state) => state.toggleTool);
   const installedTools = catalog.filter((tool) => tool.installed && tool.status === "available");
+
+  const getToolIcon = (tool: BuiltinToolCatalogItem) => {
+    if (tool.id === "word-document") return FileText;
+    if (tool.id === "excel-workbook") return FileSpreadsheet;
+    if (tool.id === "data-visualization") return BarChart3;
+    return Puzzle;
+  };
 
   useEffect(() => {
     void loadCatalog().catch(() => undefined);
@@ -33,9 +53,36 @@ export function ToolMenu({ disabled = false }: { disabled?: boolean }) {
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [open]);
 
+  useLayoutEffect(() => {
+    if (!open) return;
+    const updatePosition = () => {
+      const anchor = rootRef.current?.getBoundingClientRect();
+      if (!anchor) return;
+      const viewportHeight = window.visualViewport?.height || window.innerHeight;
+      const menuHeight = menuRef.current?.offsetHeight || 260;
+      const desiredBottom = viewportHeight - anchor.top + 8;
+      const maxBottom = Math.max(
+        12,
+        viewportHeight - Math.min(menuHeight, viewportHeight - 24) - 12,
+      );
+      setMobileBottom(Math.max(12, Math.min(desiredBottom, maxBottom)));
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.visualViewport?.addEventListener("resize", updatePosition);
+    window.visualViewport?.addEventListener("scroll", updatePosition);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.visualViewport?.removeEventListener("resize", updatePosition);
+      window.visualViewport?.removeEventListener("scroll", updatePosition);
+    };
+  }, [open]);
+
   return (
     <div className="relative" ref={rootRef}>
       <button
+        aria-expanded={open}
         className={cn(
           "relative flex h-9 items-center gap-1.5 rounded-lg px-2 text-sm text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-200",
           open && "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-100",
@@ -55,61 +102,70 @@ export function ToolMenu({ disabled = false }: { disabled?: boolean }) {
       </button>
 
       {open && (
-        <div className="absolute bottom-12 left-0 z-50 w-[min(360px,calc(100vw-32px))] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.18)] dark:border-white/10 dark:bg-[#171717] dark:shadow-[0_28px_90px_rgba(0,0,0,0.55)]">
-          <div className="border-b border-gray-100 px-4 py-3.5 dark:border-white/10">
-            <div className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
-              <Sparkles className="text-primary" size={16} />
-              当前会话工具
-            </div>
-            <p className="mt-1 text-xs leading-relaxed text-gray-400">
-              仅启用的工具会进入本次对话上下文
-            </p>
-          </div>
-
-          <div className="max-h-[340px] overflow-y-auto p-2">
+        <div
+          className="fixed inset-x-3 bottom-[var(--tool-menu-mobile-bottom)] z-50 origin-bottom-left animate-[menu-in_150ms_cubic-bezier(0.22,1,0.36,1)] overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-[0_18px_60px_rgba(15,23,42,0.2)] sm:absolute sm:inset-x-auto sm:bottom-12 sm:left-0 sm:w-80 dark:border-white/10 dark:bg-[#191919] dark:shadow-[0_24px_70px_rgba(0,0,0,0.55)]"
+          ref={menuRef}
+          style={{ "--tool-menu-mobile-bottom": `${mobileBottom}px` } as CSSProperties}
+        >
+          <div className="max-h-[min(52dvh,360px)] overflow-y-auto overscroll-contain">
             {isCatalogLoading || isSessionToolsLoading ? (
               <div className="flex h-24 items-center justify-center text-gray-400">
                 <Loader2 className="animate-spin" size={20} />
               </div>
             ) : installedTools.length > 0 ? (
-              installedTools.map((tool) => {
-                const checked = enabledToolIds.includes(tool.id);
-                return (
-                  <div
-                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.05]"
-                    key={tool.id}
-                  >
-                    <span
-                      className={cn(
-                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
-                        tool.accent === "blue" &&
-                          "bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300",
-                        tool.accent === "emerald" &&
-                          "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300",
-                        tool.accent === "violet" &&
-                          "bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300",
-                      )}
-                    >
-                      {tool.kind === "skill" ? <Sparkles size={19} /> : <Puzzle size={19} />}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-gray-900 dark:text-gray-100">
-                        {tool.name}
-                      </span>
-                      <span className="mt-0.5 block truncate text-xs text-gray-400">
-                        {tool.kind === "skill" ? "Skill" : "内置工具"} · v{tool.version}
-                      </span>
-                    </span>
-                    <ToggleSwitch
-                      checked={checked}
-                      disabled={isSessionToolsLoading}
-                      onChange={() => {
-                        void toggleTool(tool.id).catch(() => toast.error("更新工具状态失败"));
-                      }}
-                    />
-                  </div>
-                );
-              })
+              <>
+                <p className="px-2 pb-1 pt-1 text-xs text-gray-400">内置插件</p>
+                <div className="space-y-0.5">
+                  {installedTools.map((tool) => {
+                    const checked = enabledToolIds.includes(tool.id);
+                    const ToolIcon = getToolIcon(tool);
+                    return (
+                      <button
+                        aria-checked={checked}
+                        className={cn(
+                          "flex h-10 w-full items-center gap-2.5 rounded-lg px-2 text-left transition-colors hover:bg-gray-100 active:bg-gray-200/70 dark:hover:bg-white/[0.06] dark:active:bg-white/[0.1]",
+                          checked && "bg-gray-50 dark:bg-white/[0.035]",
+                        )}
+                        disabled={isSessionToolsLoading}
+                        key={tool.id}
+                        onClick={() => {
+                          void toggleTool(tool.id).catch(() => toast.error("更新工具状态失败"));
+                        }}
+                        role="switch"
+                        type="button"
+                      >
+                        <span
+                          className={cn(
+                            "flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
+                            tool.accent === "blue" &&
+                              "bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300",
+                            tool.accent === "emerald" &&
+                              "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300",
+                            tool.accent === "violet" &&
+                              "bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300",
+                          )}
+                        >
+                          <ToolIcon size={15} />
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-sm text-gray-800 dark:text-gray-200">
+                          {tool.name}
+                        </span>
+                        <span
+                          className={cn(
+                            "flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border transition-colors",
+                            checked
+                              ? "border-primary bg-primary text-white"
+                              : "border-gray-300 bg-white text-transparent dark:border-gray-600 dark:bg-transparent",
+                          )}
+                        >
+                          <Check size={12} strokeWidth={2.8} />
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="px-2 pb-1 pt-3 text-xs text-gray-400">第三方插件</p>
+              </>
             ) : (
               <div className="px-4 py-8 text-center">
                 <Puzzle className="mx-auto text-gray-300 dark:text-gray-600" size={28} />
@@ -122,15 +178,16 @@ export function ToolMenu({ disabled = false }: { disabled?: boolean }) {
           </div>
 
           <button
-            className="flex w-full items-center justify-between border-t border-gray-100 px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/[0.04]"
+            className="mt-1 flex h-10 w-full items-center gap-2 border-t border-gray-100 px-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/[0.04]"
             onClick={() => {
               setOpen(false);
               useUIStore.getState().setPluginCenterOpen(true);
             }}
             type="button"
           >
-            前往插件中心
-            <ChevronRight size={16} />
+            <Store className="text-gray-500" size={16} />
+            插件商店
+            <ChevronRight className="ml-auto text-gray-400" size={15} />
           </button>
         </div>
       )}

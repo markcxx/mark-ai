@@ -353,8 +353,8 @@ export function OverviewPanel() {
   }
 
   return (
-    <div className="space-y-9">
-      <div className="flex items-center justify-between gap-4">
+    <div className="space-y-7 md:space-y-9">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-sm font-semibold">运营数据</h3>
           <p className="mt-1 text-xs text-gray-400">点击图例可隐藏维度，滚轮可缩放趋势图</p>
@@ -371,11 +371,14 @@ export function OverviewPanel() {
           variant="borderless"
         />
       </div>
-      <div className="grid grid-cols-2 gap-x-7 gap-y-5 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-x-3 gap-y-4 sm:gap-x-7 sm:gap-y-5 lg:grid-cols-4">
         {items.map((item) => {
           const Icon = item.icon;
           return (
-            <div className="flex items-center gap-3 py-2" key={item.label}>
+            <div
+              className="flex min-w-0 items-center gap-2.5 py-1 sm:gap-3 sm:py-2"
+              key={item.label}
+            >
               <span
                 className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${item.tone}`}
               >
@@ -383,44 +386,48 @@ export function OverviewPanel() {
               </span>
               <div className="min-w-0">
                 <p className="text-xs text-gray-400">{item.label}</p>
-                <p className="mt-0.5 truncate text-lg font-semibold">{item.value}</p>
+                <p className="mt-0.5 truncate text-base font-semibold sm:text-lg">{item.value}</p>
               </div>
             </div>
           );
         })}
       </div>
-      <div className="grid gap-10 xl:grid-cols-[0.85fr_1.35fr]">
+      <div className="grid gap-7 md:gap-10 xl:grid-cols-[0.85fr_1.35fr]">
         <section className="min-w-0">
           <h3 className="text-sm font-semibold">用户增长趋势</h3>
-          <AdminChart height={330} option={userTrendOption} />
+          <AdminChart height={330} mobileHeight={260} option={userTrendOption} />
         </section>
         <section className="min-w-0">
           <h3 className="text-sm font-semibold">对话、消息与文件使用量</h3>
-          <AdminChart height={330} option={usageTrendOption} />
+          <AdminChart height={330} mobileHeight={280} option={usageTrendOption} />
         </section>
       </div>
-      <div className="grid gap-10 xl:grid-cols-3">
+      <div className="grid gap-7 md:gap-10 xl:grid-cols-3">
         <section className="min-w-0">
           <h3 className="text-sm font-semibold">模型服务商使用分布</h3>
-          <AdminChart height={300} option={providerOption} />
+          <AdminChart height={300} mobileHeight={260} option={providerOption} />
         </section>
         <section className="min-w-0">
           <h3 className="text-sm font-semibold">用户角色构成</h3>
-          <AdminChart height={300} option={roleOption} />
+          <AdminChart height={300} mobileHeight={250} option={roleOption} />
         </section>
         <section className="min-w-0">
           <h3 className="text-sm font-semibold">等候名单状态</h3>
-          <AdminChart height={300} option={waitlistOption} />
+          <AdminChart height={300} mobileHeight={260} option={waitlistOption} />
         </section>
       </div>
-      <div className="grid gap-10 xl:grid-cols-[1.6fr_1fr]">
+      <div className="grid gap-7 md:gap-10 xl:grid-cols-[1.6fr_1fr]">
         <section className="min-w-0">
           <h3 className="text-sm font-semibold">每日对话活跃日历</h3>
-          <AdminChart height={220} option={heatmapOption} />
+          <div className="overflow-x-auto">
+            <div className="min-w-[540px] sm:min-w-0">
+              <AdminChart height={220} mobileHeight={190} option={heatmapOption} />
+            </div>
+          </div>
         </section>
         <section className="min-w-0">
           <h3 className="text-sm font-semibold">文件存储分布</h3>
-          <AdminChart height={300} option={fileOption} />
+          <AdminChart height={300} mobileHeight={250} option={fileOption} />
         </section>
       </div>
     </div>

@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowLeft,
   Download,
+  Eye,
   FileText,
   Loader2,
   MessageSquareText,
@@ -291,7 +292,7 @@ export function UserManagementView({
 
   return (
     <>
-      <div className="min-h-[680px]">
+      <div className="min-h-[560px] sm:min-h-[680px]">
         {showHeader && (
           <div className="mb-5 flex min-h-14 items-center gap-3">
             <button
@@ -313,15 +314,19 @@ export function UserManagementView({
         ) : !detail ? (
           <AdminLoading rows={8} />
         ) : (
-          <div className="min-h-[620px]">
-            <Segmented
-              onChange={(value) => setTab(value as Tab)}
-              options={tabs}
-              padding={4}
-              value={tab}
-              variant="borderless"
-            />
-            <div className="mt-7 min-h-0">
+          <div className="min-h-[520px] sm:min-h-[620px]">
+            <div className="overflow-x-auto pb-1">
+              <div className="min-w-[430px] sm:min-w-0">
+                <Segmented
+                  onChange={(value) => setTab(value as Tab)}
+                  options={tabs}
+                  padding={4}
+                  value={tab}
+                  variant="borderless"
+                />
+              </div>
+            </div>
+            <div className="mt-5 min-h-0 sm:mt-7">
               {tab === "profile" && (
                 <ProfileEditor
                   detail={detail}
@@ -337,7 +342,7 @@ export function UserManagementView({
               )}
               {tab === "files" && (
                 <div>
-                  <div className="mb-4 flex min-h-9 items-center justify-between gap-3">
+                  <div className="mb-4 flex min-h-9 flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2 text-sm text-gray-500">
                       <AdminCheckbox
                         checked={files.length > 0 && selectedFileIds.length === files.length}
@@ -373,7 +378,7 @@ export function UserManagementView({
                       {files.map((file, index) => (
                         <div
                           className={cn(
-                            "grid grid-cols-[28px_minmax(0,1fr)_110px_170px_92px] items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-gray-100/80 dark:hover:bg-white/[0.06]",
+                            "grid grid-cols-[28px_minmax(0,1fr)_64px] items-center gap-2 rounded-lg px-2 py-2.5 transition-colors hover:bg-gray-100/80 sm:grid-cols-[28px_minmax(0,1fr)_110px_170px_92px] sm:gap-3 sm:px-3 dark:hover:bg-white/[0.06]",
                             index % 2 === 0 && "bg-gray-50/55 dark:bg-white/[0.018]",
                           )}
                           key={file.id}
@@ -399,8 +404,10 @@ export function UserManagementView({
                               {file.originalName}
                             </span>
                           </button>
-                          <span className="truncate text-xs text-gray-400">{file.contentType}</span>
-                          <span className="text-xs text-gray-400">
+                          <span className="hidden truncate text-xs text-gray-400 sm:block">
+                            {file.contentType}
+                          </span>
+                          <span className="hidden text-xs text-gray-400 sm:block">
                             {formatDateTime(file.createdAt)}
                           </span>
                           <div className="flex items-center justify-end gap-1">
@@ -440,7 +447,7 @@ export function UserManagementView({
               )}
               {tab === "conversations" && (
                 <div>
-                  <div className="mb-4 flex min-h-9 items-center justify-between gap-3">
+                  <div className="mb-4 flex min-h-9 flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2 text-sm text-gray-500">
                       <AdminCheckbox
                         checked={
@@ -482,7 +489,7 @@ export function UserManagementView({
                       {conversations.map((conversation, index) => (
                         <div
                           className={cn(
-                            "grid grid-cols-[28px_minmax(0,1fr)_140px_170px] items-center gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-gray-100/80 dark:hover:bg-white/[0.06]",
+                            "grid grid-cols-[28px_minmax(0,1fr)_42px] items-center gap-2 rounded-lg px-2 py-3 transition-colors hover:bg-gray-100/80 sm:grid-cols-[28px_minmax(0,1fr)_140px_170px] sm:gap-3 sm:px-3 dark:hover:bg-white/[0.06]",
                             index % 2 === 0 && "bg-gray-50/55 dark:bg-white/[0.018]",
                           )}
                           key={conversation.id}
@@ -509,13 +516,23 @@ export function UserManagementView({
                               {conversation.model || "未知模型"}
                             </p>
                           </button>
-                          <span className="text-xs text-gray-400">
+                          <span className="hidden text-xs text-gray-400 sm:block">
                             {formatDateTime(conversation.updatedAt)}
                           </span>
                           <div className="flex justify-end">
-                            <AdminButton onClick={() => void openConversation(conversation)}>
-                              查看对话
-                            </AdminButton>
+                            <button
+                              aria-label={`查看对话 ${conversation.title}`}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 sm:hidden dark:hover:bg-white/[0.07]"
+                              onClick={() => void openConversation(conversation)}
+                              type="button"
+                            >
+                              <Eye size={15} />
+                            </button>
+                            <span className="hidden sm:block">
+                              <AdminButton onClick={() => void openConversation(conversation)}>
+                                查看对话
+                              </AdminButton>
+                            </span>
                           </div>
                         </div>
                       ))}
@@ -566,14 +583,14 @@ export function UserManagementView({
         width="min(94vw, 1080px)"
         zIndex={95}
       >
-        <div className="min-h-full px-5 py-4 md:px-8 md:py-6">
+        <div className="min-h-full px-3 py-4 sm:px-5 md:px-8 md:py-6">
           {conversationDetailLoading ? (
             <div className="flex min-h-[520px] items-center justify-center text-gray-400">
               <Loader2 className="animate-spin" size={20} />
             </div>
           ) : activeConversation ? (
             <>
-              <div className="mb-6 flex items-start justify-between gap-3">
+              <div className="mb-4 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-xs text-gray-400">
                     {activeConversation.provider || "未知服务商"} ·{" "}
@@ -595,7 +612,10 @@ export function UserManagementView({
               </div>
               <div className="mx-auto max-w-4xl space-y-2">
                 {messages.map((message) => (
-                  <div className="flex items-start gap-3 py-3 text-sm leading-6" key={message.id}>
+                  <div
+                    className="flex items-start gap-2.5 py-3 text-sm leading-6 sm:gap-3"
+                    key={message.id}
+                  >
                     <span
                       className={cn(
                         "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
@@ -672,7 +692,7 @@ export function UserManagementDrawer({
             role="dialog"
             transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
           >
-            <header className="relative shrink-0 border-b border-gray-200/80 bg-white/90 px-4 backdrop-blur-xl dark:border-white/[0.08] dark:bg-[#111214]/90 sm:px-6">
+            <header className="relative shrink-0 border-b border-gray-200/80 bg-white/90 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-xl dark:border-white/[0.08] dark:bg-[#111214]/90 sm:px-6 sm:pt-0">
               <div className="mx-auto flex h-16 max-w-7xl items-center pr-11 sm:h-[72px]">
                 <div>
                   <h2 className="text-base font-semibold sm:text-lg">用户详情</h2>
@@ -691,7 +711,7 @@ export function UserManagementDrawer({
               </button>
             </header>
             <main className="min-h-0 flex-1 overflow-y-auto">
-              <div className="mx-auto min-h-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+              <div className="mx-auto min-h-full max-w-7xl px-3 py-4 sm:px-6 sm:py-8">
                 <UserManagementView
                   onBack={onClose}
                   onChanged={onChanged}
@@ -800,7 +820,7 @@ function ProfileEditor({
           />
         </label>
       )}
-      <div className="flex items-center justify-between pt-2">
+      <div className="grid grid-cols-2 gap-2 pt-2 sm:flex sm:items-center sm:justify-between">
         <AdminButton danger onClick={onDelete}>
           <Trash2 size={14} /> 删除用户
         </AdminButton>
@@ -850,7 +870,7 @@ function SecurityPanel({
           {detail.loginSessions.map((session, index) => (
             <div
               className={cn(
-                "flex items-center gap-3 rounded-lg px-2 py-3 transition-colors hover:bg-gray-100/80 dark:hover:bg-white/[0.06]",
+                "flex items-start gap-2.5 rounded-lg px-2 py-3 transition-colors hover:bg-gray-100/80 sm:items-center sm:gap-3 dark:hover:bg-white/[0.06]",
                 index % 2 === 0 && "bg-gray-50/55 dark:bg-white/[0.018]",
               )}
               key={session.id}
@@ -862,9 +882,11 @@ function SecurityPanel({
                   {session.ipAddress || "未知 IP"} · {formatDateTime(session.updatedAt)}
                 </p>
               </div>
-              <AdminButton danger onClick={() => void revoke(session.id)}>
-                撤销
-              </AdminButton>
+              <span className="shrink-0">
+                <AdminButton danger onClick={() => void revoke(session.id)}>
+                  撤销
+                </AdminButton>
+              </span>
             </div>
           ))}
           {!detail.loginSessions.length && (

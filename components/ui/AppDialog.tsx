@@ -41,14 +41,14 @@ export function AppDialog({
   return (
     <Modal
       className={cn(
-        "!border-gray-200 !bg-white !shadow-[0_24px_80px_rgba(15,23,42,0.22)] dark:!border-white/15 dark:!bg-[#191919] dark:!shadow-[0_28px_90px_rgba(0,0,0,0.58)]",
+        "!border-gray-200 !bg-white !shadow-[0_24px_80px_rgba(15,23,42,0.22)] max-sm:!max-h-[calc(100dvh-1.5rem)] max-sm:!w-[calc(100vw-1.5rem)] max-sm:!max-w-[calc(100vw-1.5rem)] dark:!border-white/15 dark:!bg-[#191919] dark:!shadow-[0_28px_90px_rgba(0,0,0,0.58)]",
         panelClassName,
       )}
       classNames={{
         body: cn("!p-0", bodyClassName),
         header: cn("border-b border-gray-100 dark:border-white/[0.08]", headerClassName),
         mask: cn("!bg-black/35 !backdrop-blur-sm", maskClassName),
-        wrapper: wrapperClassName,
+        wrapper: cn("max-sm:!p-3", wrapperClassName),
       }}
       closable={closable}
       draggable={false}

@@ -157,24 +157,28 @@ export function WaitlistPanel() {
               value={search}
             />
           </div>
-          <AppSelect
-            onChange={(value) => typeof value === "string" && setStatus(value)}
-            options={[
-              { label: "全部状态", value: "all" },
-              { label: "待审批", value: "pending" },
-              { label: "已批准", value: "approved" },
-              { label: "已邀请", value: "invited" },
-              { label: "已注册", value: "registered" },
-              { label: "已拒绝", value: "rejected" },
-            ]}
-            style={{ width: 160 }}
-            value={status}
-          />
-          <AdminButton onClick={() => void load()}>
-            <RefreshCw size={15} /> 刷新
-          </AdminButton>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 md:flex md:w-auto md:items-center">
+            <div className="min-w-0 md:w-40">
+              <AppSelect
+                onChange={(value) => typeof value === "string" && setStatus(value)}
+                options={[
+                  { label: "全部状态", value: "all" },
+                  { label: "待审批", value: "pending" },
+                  { label: "已批准", value: "approved" },
+                  { label: "已邀请", value: "invited" },
+                  { label: "已注册", value: "registered" },
+                  { label: "已拒绝", value: "rejected" },
+                ]}
+                style={{ width: "100%" }}
+                value={status}
+              />
+            </div>
+            <AdminButton onClick={() => void load()}>
+              <RefreshCw size={15} /> <span className="hidden sm:inline">刷新</span>
+            </AdminButton>
+          </div>
           {selectedIds.length > 0 && (
-            <div className="flex items-center gap-0.5">
+            <div className="flex w-full items-center gap-0.5 overflow-x-auto pb-1 md:w-auto md:pb-0">
               <AdminButton
                 success
                 onClick={() =>
@@ -220,136 +224,255 @@ export function WaitlistPanel() {
         ) : error ? (
           <AdminError message={error} onRetry={() => void load()} />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1040px] text-left text-sm">
-              <thead className="text-xs text-gray-400">
-                <tr>
-                  <th className="w-12 px-3 py-3">
-                    <AdminCheckbox
-                      checked={
-                        selectableEntries.length > 0 &&
-                        selectedIds.length === selectableEntries.length
-                      }
-                      disabled={!selectableEntries.length}
-                      indeterminate={
-                        selectedIds.length > 0 && selectedIds.length < selectableEntries.length
-                      }
-                      label="全选当前等候名单记录"
-                      onChange={(checked) =>
-                        setSelectedIds(checked ? selectableEntries.map((entry) => entry.id) : [])
-                      }
-                    />
-                  </th>
-                  <th className="px-5 py-3 font-medium">申请人</th>
-                  <th className="px-5 py-3 font-medium">状态</th>
-                  <th className="px-5 py-3 font-medium">申请时间</th>
-                  <th className="px-5 py-3 font-medium">申请说明</th>
-                  <th className="px-5 py-3 text-right font-medium">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {entries.map((entry, index) => (
-                  <tr
-                    className={cn(
-                      "transition-colors hover:bg-gray-100/80 dark:hover:bg-white/[0.06]",
-                      index % 2 === 0 && "bg-gray-50/55 dark:bg-white/[0.018]",
-                    )}
-                    key={entry.id}
-                  >
-                    <td className="px-3 py-3">
+          <>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[1040px] text-left text-sm">
+                <thead className="text-xs text-gray-400">
+                  <tr>
+                    <th className="w-12 px-3 py-3">
                       <AdminCheckbox
-                        checked={selectedIds.includes(entry.id)}
-                        label={`选择申请 ${entry.email}`}
+                        checked={
+                          selectableEntries.length > 0 &&
+                          selectedIds.length === selectableEntries.length
+                        }
+                        disabled={!selectableEntries.length}
+                        indeterminate={
+                          selectedIds.length > 0 && selectedIds.length < selectableEntries.length
+                        }
+                        label="全选当前等候名单记录"
                         onChange={(checked) =>
-                          setSelectedIds((current) =>
-                            checked
-                              ? [...current, entry.id]
-                              : current.filter((id) => id !== entry.id),
-                          )
+                          setSelectedIds(checked ? selectableEntries.map((entry) => entry.id) : [])
                         }
                       />
-                    </td>
-                    <td className="px-5 py-3">
-                      <p className="font-medium">{entry.fullName || entry.email.split("@")[0]}</p>
-                      <p className="mt-0.5 text-xs text-gray-400">{entry.email}</p>
-                    </td>
-                    <td className="px-5 py-3">
-                      <StatusBadge label={statusLabels[entry.status]} status={entry.status} />
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3 text-gray-500">
-                      {formatDateTime(entry.requestedAt)}
-                    </td>
-                    <td className="max-w-xs truncate px-5 py-3 text-gray-500">
-                      {entry.message || "—"}
-                    </td>
-                    <td className="px-5 py-3">
-                      <div className="flex items-center justify-end gap-0.5">
+                    </th>
+                    <th className="px-5 py-3 font-medium">申请人</th>
+                    <th className="px-5 py-3 font-medium">状态</th>
+                    <th className="px-5 py-3 font-medium">申请时间</th>
+                    <th className="px-5 py-3 font-medium">申请说明</th>
+                    <th className="px-5 py-3 text-right font-medium">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {entries.map((entry, index) => (
+                    <tr
+                      className={cn(
+                        "transition-colors hover:bg-gray-100/80 dark:hover:bg-white/[0.06]",
+                        index % 2 === 0 && "bg-gray-50/55 dark:bg-white/[0.018]",
+                      )}
+                      key={entry.id}
+                    >
+                      <td className="px-3 py-3">
+                        <AdminCheckbox
+                          checked={selectedIds.includes(entry.id)}
+                          label={`选择申请 ${entry.email}`}
+                          onChange={(checked) =>
+                            setSelectedIds((current) =>
+                              checked
+                                ? [...current, entry.id]
+                                : current.filter((id) => id !== entry.id),
+                            )
+                          }
+                        />
+                      </td>
+                      <td className="px-5 py-3">
+                        <p className="font-medium">{entry.fullName || entry.email.split("@")[0]}</p>
+                        <p className="mt-0.5 text-xs text-gray-400">{entry.email}</p>
+                      </td>
+                      <td className="px-5 py-3">
+                        <StatusBadge label={statusLabels[entry.status]} status={entry.status} />
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-3 text-gray-500">
+                        {formatDateTime(entry.requestedAt)}
+                      </td>
+                      <td className="max-w-xs truncate px-5 py-3 text-gray-500">
+                        {entry.message || "—"}
+                      </td>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center justify-end gap-0.5">
+                          <AdminButton
+                            compact
+                            onClick={() => {
+                              setReviewNote(entry.reviewNote || "");
+                              setSelected(entry);
+                            }}
+                          >
+                            <Eye size={14} /> 详情
+                          </AdminButton>
+                          {entry.status === "pending" && (
+                            <>
+                              <AdminButton
+                                compact
+                                success
+                                onClick={() =>
+                                  setQuickAction({
+                                    action: "approve",
+                                    ids: [entry.id],
+                                    label: entry.email,
+                                  })
+                                }
+                              >
+                                <Check size={14} /> 批准
+                              </AdminButton>
+                              <AdminButton
+                                compact
+                                danger
+                                onClick={() =>
+                                  setQuickAction({
+                                    action: "reject",
+                                    ids: [entry.id],
+                                    label: entry.email,
+                                  })
+                                }
+                              >
+                                <X size={14} /> 拒绝
+                              </AdminButton>
+                            </>
+                          )}
+                          <AdminButton
+                            compact
+                            danger
+                            onClick={() =>
+                              setQuickAction({
+                                action: "delete",
+                                ids: [entry.id],
+                                label: entry.email,
+                              })
+                            }
+                          >
+                            <Trash2 size={14} /> 删除
+                          </AdminButton>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {!loading && !entries.length && (
+                    <tr>
+                      <td className="px-5 py-14 text-center text-gray-400" colSpan={6}>
+                        暂无等候名单申请
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="space-y-2 md:hidden">
+              <div className="flex items-center gap-2 px-1 pb-1 text-xs text-gray-500">
+                <AdminCheckbox
+                  checked={
+                    selectableEntries.length > 0 && selectedIds.length === selectableEntries.length
+                  }
+                  disabled={!selectableEntries.length}
+                  indeterminate={
+                    selectedIds.length > 0 && selectedIds.length < selectableEntries.length
+                  }
+                  label="全选当前等候名单记录"
+                  onChange={(checked) =>
+                    setSelectedIds(checked ? selectableEntries.map((entry) => entry.id) : [])
+                  }
+                />
+                全选当前列表
+              </div>
+              {entries.map((entry) => (
+                <article
+                  className="rounded-xl bg-gray-50/80 p-3.5 dark:bg-white/[0.035]"
+                  key={entry.id}
+                >
+                  <div className="flex items-start gap-3">
+                    <AdminCheckbox
+                      checked={selectedIds.includes(entry.id)}
+                      label={`选择申请 ${entry.email}`}
+                      onChange={(checked) =>
+                        setSelectedIds((current) =>
+                          checked
+                            ? [...current, entry.id]
+                            : current.filter((id) => id !== entry.id),
+                        )
+                      }
+                    />
+                    <button
+                      className="min-w-0 flex-1 text-left"
+                      onClick={() => {
+                        setReviewNote(entry.reviewNote || "");
+                        setSelected(entry);
+                      }}
+                      type="button"
+                    >
+                      <p className="truncate text-sm font-semibold">
+                        {entry.fullName || entry.email.split("@")[0]}
+                      </p>
+                      <p className="mt-0.5 truncate text-xs text-gray-400">{entry.email}</p>
+                    </button>
+                    <StatusBadge label={statusLabels[entry.status]} status={entry.status} />
+                  </div>
+                  {entry.message && (
+                    <p className="mt-3 line-clamp-2 text-xs leading-5 text-gray-500 dark:text-gray-400">
+                      {entry.message}
+                    </p>
+                  )}
+                  <p className="mt-2 text-[11px] text-gray-400">
+                    申请于 {formatDateTime(entry.requestedAt)}
+                  </p>
+                  <div className="mt-2 flex items-center gap-0.5 border-t border-gray-200/70 pt-2 dark:border-white/[0.07]">
+                    <AdminButton
+                      compact
+                      onClick={() => {
+                        setReviewNote(entry.reviewNote || "");
+                        setSelected(entry);
+                      }}
+                    >
+                      <Eye size={14} /> 详情
+                    </AdminButton>
+                    {entry.status === "pending" && (
+                      <>
                         <AdminButton
                           compact
-                          onClick={() => {
-                            setReviewNote(entry.reviewNote || "");
-                            setSelected(entry);
-                          }}
-                        >
-                          <Eye size={14} /> 详情
-                        </AdminButton>
-                        {entry.status === "pending" && (
-                          <>
-                            <AdminButton
-                              compact
-                              success
-                              onClick={() =>
-                                setQuickAction({
-                                  action: "approve",
-                                  ids: [entry.id],
-                                  label: entry.email,
-                                })
-                              }
-                            >
-                              <Check size={14} /> 批准
-                            </AdminButton>
-                            <AdminButton
-                              compact
-                              danger
-                              onClick={() =>
-                                setQuickAction({
-                                  action: "reject",
-                                  ids: [entry.id],
-                                  label: entry.email,
-                                })
-                              }
-                            >
-                              <X size={14} /> 拒绝
-                            </AdminButton>
-                          </>
-                        )}
-                        <AdminButton
-                          compact
-                          danger
+                          success
                           onClick={() =>
                             setQuickAction({
-                              action: "delete",
+                              action: "approve",
                               ids: [entry.id],
                               label: entry.email,
                             })
                           }
                         >
-                          <Trash2 size={14} /> 删除
+                          <Check size={14} /> 批准
                         </AdminButton>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {!loading && !entries.length && (
-                  <tr>
-                    <td className="px-5 py-14 text-center text-gray-400" colSpan={6}>
-                      暂无等候名单申请
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                        <AdminButton
+                          compact
+                          danger
+                          onClick={() =>
+                            setQuickAction({
+                              action: "reject",
+                              ids: [entry.id],
+                              label: entry.email,
+                            })
+                          }
+                        >
+                          <X size={14} /> 拒绝
+                        </AdminButton>
+                      </>
+                    )}
+                    <AdminButton
+                      compact
+                      danger
+                      onClick={() =>
+                        setQuickAction({
+                          action: "delete",
+                          ids: [entry.id],
+                          label: entry.email,
+                        })
+                      }
+                    >
+                      <Trash2 size={14} /> 删除
+                    </AdminButton>
+                  </div>
+                </article>
+              ))}
+              {!entries.length && (
+                <p className="py-12 text-center text-sm text-gray-400">暂无等候名单申请</p>
+              )}
+            </div>
+          </>
         )}
       </div>
 
@@ -361,7 +484,7 @@ export function WaitlistPanel() {
         width={560}
       >
         {selected && (
-          <div className="space-y-5 p-5">
+          <div className="space-y-5 p-4 sm:p-5">
             <div>
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -386,7 +509,7 @@ export function WaitlistPanel() {
                 value={reviewNote}
               />
             </label>
-            <div className="flex flex-wrap justify-end gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
               {selected.status === "pending" && (
                 <>
                   <AdminButton

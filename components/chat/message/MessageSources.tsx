@@ -1,7 +1,7 @@
 "use client";
 
 import { Popover } from "@lobehub/ui";
-import { ChevronDown, ExternalLink, Globe } from "lucide-react";
+import { ChevronRight, ExternalLink, Globe } from "lucide-react";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
@@ -154,39 +154,48 @@ export function MessageSources({ citations }: { citations: WebCitation[] }) {
             </span>
           ))}
         </span>
-        <ChevronDown
+        <ChevronRight
           className={cn(
-            "shrink-0 text-gray-400 transition-transform duration-200",
-            expanded && "rotate-180",
+            "shrink-0 text-gray-400 transition-transform duration-200 ease-out",
+            expanded && "-rotate-90",
           )}
           size={15}
         />
       </button>
 
-      {expanded && (
-        <div className="grid gap-2 border-t border-gray-200/70 p-2 dark:border-white/[0.07] sm:grid-cols-2">
-          {citations.map((citation) => (
-            <SourcePopover citation={citation} key={citation.url}>
-              <a
-                className="group/source flex min-w-0 items-start gap-2.5 rounded-lg border border-transparent bg-white px-2.5 py-2.5 transition-all hover:border-gray-200 hover:shadow-sm dark:bg-white/[0.035] dark:hover:border-white/10"
-                href={citation.url}
-                rel="noreferrer"
-                target="_blank"
-              >
-                <SourceFavicon citation={citation} size={20} />
-                <span className="min-w-0 flex-1">
-                  <span className="line-clamp-2 text-xs font-medium leading-4 text-gray-800 group-hover/source:text-primary dark:text-gray-200">
-                    {citation.title || citation.url}
+      <div
+        aria-hidden={!expanded}
+        className={cn(
+          "grid transition-[grid-template-rows,opacity] duration-200 ease-out",
+          expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+        )}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className="grid gap-2 border-t border-gray-200/70 p-2 dark:border-white/[0.07] sm:grid-cols-2">
+            {citations.map((citation) => (
+              <SourcePopover citation={citation} key={citation.url}>
+                <a
+                  className="group/source flex min-w-0 items-start gap-2.5 rounded-lg border border-transparent bg-white px-2.5 py-2.5 transition-all hover:border-gray-200 hover:shadow-sm dark:bg-white/[0.035] dark:hover:border-white/10"
+                  href={citation.url}
+                  rel="noreferrer"
+                  tabIndex={expanded ? 0 : -1}
+                  target="_blank"
+                >
+                  <SourceFavicon citation={citation} size={20} />
+                  <span className="min-w-0 flex-1">
+                    <span className="line-clamp-2 text-xs font-medium leading-4 text-gray-800 group-hover/source:text-primary dark:text-gray-200">
+                      {citation.title || citation.url}
+                    </span>
+                    <span className="mt-1 block truncate text-[10px] text-gray-400">
+                      {citation.citationId} · {getDomain(citation.url)}
+                    </span>
                   </span>
-                  <span className="mt-1 block truncate text-[10px] text-gray-400">
-                    {citation.citationId} · {getDomain(citation.url)}
-                  </span>
-                </span>
-              </a>
-            </SourcePopover>
-          ))}
+                </a>
+              </SourcePopover>
+            ))}
+          </div>
         </div>
-      )}
+      </div>
     </section>
   );
 }
