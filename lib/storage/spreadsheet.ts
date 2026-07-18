@@ -2,6 +2,10 @@ import * as XLSX from "xlsx";
 
 const DEFAULT_MAX_CHARS = 120_000;
 const TRUNCATION_MARKER = "\n\n[表格内容过长，已截断]";
+const PREVIEW_MAX_CELLS = 20_000;
+const PREVIEW_MAX_COLUMNS = 50;
+const PREVIEW_MAX_ROWS = 200;
+const PREVIEW_MAX_CELL_CHARS = 500;
 
 const normalizeCell = (value: unknown) =>
   String(value ?? "")
@@ -12,6 +16,17 @@ const normalizeCell = (value: unknown) =>
 
 const normalizeSheetName = (value: string) =>
   value.replaceAll("\0", "").replace(/\r?\n/g, " ").trim();
+
+const escapeHtml = (value: unknown) =>
+  String(value ?? "")
+    .replaceAll("\0", "")
+    .slice(0, PREVIEW_MAX_CELL_CHARS)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;")
+    .replaceAll(/\r?\n/g, "<br />");
 
 const hasContent = (row: unknown[]) => row.some((cell) => normalizeCell(cell).length > 0);
 
@@ -89,4 +104,103 @@ export const extractSpreadsheetContent = (bytes: Uint8Array, maxChars = DEFAULT_
   const content = parts.join("");
   if (!content.trim()) throw new Error("Excel 文件中没有提取到可读数据");
   return truncated ? `${content}${TRUNCATION_MARKER}` : content;
+};
+
+export const renderSpreadsheetPreview = (bytes: Uint8Array, fileName: string) => {
+  const workbook = XLSX.read(Buffer.from(bytes), {
+    cellDates: true,
+    type: "buffer",
+  });
+  if (workbook.SheetNames.length === 0) throw new Error("Excel 文件中没有工作表");
+
+  let remainingCells = PREVIEW_MAX_CELLS;
+  let truncated = false;
+  const sheets: string[] = [];
+  const navigation: string[] = [];
+
+  for (const [sheetIndex, sheetName] of workbook.SheetNames.entries()) {
+    const worksheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(worksheet, {
+      blankrows: true,
+      defval: "",
+      header: 1,
+      raw: false,
+    });
+    const columnCount = Math.min(
+      PREVIEW_MAX_COLUMNS,
+      Math.max(0, ...rows.map((row) => row.length)),
+    );
+    const affordableRows = columnCount > 0 ? Math.floor(remainingCells / columnCount) : 0;
+    const visibleRows = rows.slice(0, Math.min(PREVIEW_MAX_ROWS, affordableRows));
+    remainingCells -= visibleRows.length * columnCount;
+
+    if (
+      rows.length > visibleRows.length ||
+      rows.some((row) => row.length > PREVIEW_MAX_COLUMNS) ||
+      remainingCells <= 0
+    ) {
+      truncated = true;
+    }
+
+    const id = `sheet-${sheetIndex + 1}`;
+    navigation.push(`<a href="#${id}">${escapeHtml(sheetName)}</a>`);
+    const tableRows = visibleRows
+      .map((row, rowIndex) => {
+        const tag = rowIndex === 0 ? "th" : "td";
+        const cells = Array.from({ length: columnCount }, (_, columnIndex) => {
+          const value = escapeHtml(row[columnIndex]);
+          return `<${tag}>${value || "&nbsp;"}</${tag}>`;
+        }).join("");
+        return `<tr><th class="row-number">${rowIndex + 1}</th>${cells}</tr>`;
+      })
+      .join("");
+
+    sheets.push(`<section id="${id}">
+      <h2>${escapeHtml(sheetName)}</h2>
+      ${
+        columnCount > 0 && visibleRows.length > 0
+          ? `<div class="table-wrap"><table><tbody>${tableRows}</tbody></table></div>`
+          : '<div class="empty">此工作表为空</div>'
+      }
+    </section>`);
+
+    if (remainingCells <= 0) break;
+  }
+
+  if (sheets.length < workbook.SheetNames.length) truncated = true;
+
+  return `<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${escapeHtml(fileName)}</title>
+    <style>
+      :root { color-scheme: light; }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { margin: 0; background: #f3f4f6; color: #27272a; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 13px; }
+      header { position: sticky; z-index: 10; top: 0; display: flex; overflow-x: auto; gap: 4px; padding: 10px 14px; border-bottom: 1px solid #e5e7eb; background: rgba(255,255,255,.94); backdrop-filter: blur(12px); }
+      header a { flex: none; padding: 6px 10px; border-radius: 6px; color: #52525b; text-decoration: none; }
+      header a:hover { background: #f3f4f6; color: #18181b; }
+      main { padding: 18px; }
+      section { margin: 0 auto 22px; scroll-margin-top: 64px; }
+      h2 { margin: 0 0 10px; color: #18181b; font-size: 14px; font-weight: 600; }
+      .table-wrap { overflow: auto; max-height: calc(100vh - 120px); border: 1px solid #dfe2e7; border-radius: 8px; background: white; }
+      table { min-width: 100%; border-spacing: 0; border-collapse: separate; white-space: nowrap; }
+      th, td { max-width: 420px; padding: 7px 10px; overflow: hidden; border-right: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; text-align: left; text-overflow: ellipsis; vertical-align: top; }
+      tr:first-child > th:not(.row-number) { position: sticky; z-index: 2; top: 0; background: #f5f7f9; color: #27272a; font-weight: 600; }
+      .row-number { position: sticky; z-index: 3; left: 0; width: 44px; min-width: 44px; background: #f7f8fa; color: #a1a1aa; font-weight: 400; text-align: center; }
+      .empty, .notice { padding: 18px; border: 1px solid #e5e7eb; border-radius: 8px; background: white; color: #71717a; }
+      .notice { margin: 0 auto 18px; border-color: #fde68a; background: #fffbeb; color: #a16207; }
+    </style>
+  </head>
+  <body>
+    <header>${navigation.join("")}</header>
+    <main>
+      ${truncated ? '<div class="notice">表格较大，在线预览仅展示部分工作表、行或列；下载文件可查看完整内容。</div>' : ""}
+      ${sheets.join("")}
+    </main>
+  </body>
+</html>`;
 };

@@ -14,6 +14,7 @@ import {
 } from "@/lib/chat/server/openai-helpers";
 import { READ_WEBPAGE_TOOL, WEB_SEARCH_TOOL } from "@/lib/chat/server/runtime-prompt";
 import {
+  encodeGeneratedFileEvent,
   encodeStreamEvent,
   encodeToolEvent,
   encodeUsageEvent,
@@ -30,6 +31,8 @@ import {
 import type { WebSearchState } from "@/lib/chat/types";
 import { searchTavily } from "@/lib/search/tavily";
 import { readWebpage } from "@/lib/search/webpage";
+import { executeBuiltinTool } from "@/lib/tools/executors";
+import { getBuiltinToolByFunction, getToolFunctions } from "@/lib/tools/registry";
 
 const unsupportedStreamUsage = new Set<string>();
 
@@ -42,6 +45,12 @@ export const createOpenAICompatibleStream = async (
   timezone?: unknown,
   signal?: AbortSignal,
   contextPreparation?: ContextPreparation<ChatMessage>,
+  toolRuntime?: {
+    enabledToolIds: string[];
+    sessionId: string;
+    skillPrompt?: string;
+    userId: string;
+  },
 ) => {
   const endpoint = toOpenAIChatEndpoint(baseUrl);
   if (!endpoint) {
@@ -54,9 +63,16 @@ export const createOpenAICompatibleStream = async (
     : 18_000;
   const openAIMessages = toOpenAIMessages({
     messages,
+    skillPrompt: toolRuntime?.skillPrompt,
     timezone,
     webSearchEnabled,
   });
+  const builtinFunctions = getToolFunctions(toolRuntime?.enabledToolIds || []);
+  const availableTools = [
+    ...(webSearchEnabled ? [WEB_SEARCH_TOOL, READ_WEBPAGE_TOOL] : []),
+    ...builtinFunctions.map((toolFunction) => ({ function: toolFunction, type: "function" })),
+  ];
+  const allowedToolNames = new Set(availableTools.map((tool) => tool.function.name));
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -85,7 +101,7 @@ export const createOpenAICompatibleStream = async (
           ...(allowTools
             ? {
                 tool_choice: "auto",
-                tools: [WEB_SEARCH_TOOL, READ_WEBPAGE_TOOL],
+                tools: availableTools,
               }
             : {}),
         });
@@ -135,7 +151,7 @@ export const createOpenAICompatibleStream = async (
             ...(allowTools
               ? {
                   tool_choice: "auto",
-                  tools: [WEB_SEARCH_TOOL, READ_WEBPAGE_TOOL],
+                  tools: availableTools,
                 }
               : {}),
           }),
@@ -286,10 +302,10 @@ export const createOpenAICompatibleStream = async (
         let cumulativeUsage: ResolvedTokenUsage | undefined;
 
         for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-          const pass = await streamModelResponse(currentMessages, webSearchEnabled);
+          const pass = await streamModelResponse(currentMessages, availableTools.length > 0);
           cumulativeUsage = addTokenUsage(cumulativeUsage, pass.usage);
           const executableToolCalls = pass.toolCalls.filter((toolCall) =>
-            ["web_search", "read_webpage"].includes(toolCall.function.name),
+            allowedToolNames.has(toolCall.function.name),
           );
 
           if (executableToolCalls.length === 0) break;
@@ -302,6 +318,56 @@ export const createOpenAICompatibleStream = async (
           const toolResultMessages: OpenAIChatMessage[] = [];
 
           for (const toolCall of executableToolCalls) {
+            const builtinTool = getBuiltinToolByFunction(toolCall.function.name);
+            if (builtinTool && toolRuntime) {
+              const runningState = {
+                callId: toolCall.id,
+                status: "running" as const,
+                toolId: builtinTool.id,
+                toolName: toolCall.function.name,
+              };
+              controller.enqueue(encodeGeneratedFileEvent(encoder, runningState));
+
+              try {
+                const parsedArgs = JSON.parse(toolCall.function.arguments || "{}");
+                const args =
+                  parsedArgs && typeof parsedArgs === "object"
+                    ? (parsedArgs as Record<string, unknown>)
+                    : {};
+                const result = await executeBuiltinTool(toolCall.function.name, args, {
+                  sessionId: toolRuntime.sessionId,
+                  userId: toolRuntime.userId,
+                });
+                controller.enqueue(
+                  encodeGeneratedFileEvent(encoder, {
+                    ...runningState,
+                    file: result.file,
+                    status: "done",
+                  }),
+                );
+                toolResultMessages.push({
+                  content: JSON.stringify(result.content),
+                  role: "tool",
+                  tool_call_id: toolCall.id,
+                });
+              } catch (error) {
+                const message = error instanceof Error ? error.message : "File generation failed";
+                controller.enqueue(
+                  encodeGeneratedFileEvent(encoder, {
+                    ...runningState,
+                    error: message,
+                    status: "error",
+                  }),
+                );
+                toolResultMessages.push({
+                  content: JSON.stringify({ error: message, success: false }),
+                  role: "tool",
+                  tool_call_id: toolCall.id,
+                });
+              }
+              continue;
+            }
+
             if (toolCall.function.name === "read_webpage") {
               const url = getToolWebpageUrl(toolCall);
               const readingState: WebSearchState = {

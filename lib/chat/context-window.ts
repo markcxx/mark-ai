@@ -115,11 +115,13 @@ export const estimateDraftContextTokens = ({
   attachments,
   draft,
   messages,
+  toolContextTokens = 0,
   webSearchEnabled,
 }: {
   attachments: FileAttachment[];
   draft: string;
   messages: Message[];
+  toolContextTokens?: number;
   webSearchEnabled: boolean;
 }) => {
   const draftContent = draft.trim();
@@ -139,5 +141,5 @@ export const estimateDraftContextTokens = ({
     0,
   );
 
-  return messageTokens + attachmentTokens + 512 + (webSearchEnabled ? 1200 : 0);
+  return messageTokens + attachmentTokens + 512 + toolContextTokens + (webSearchEnabled ? 1200 : 0);
 };

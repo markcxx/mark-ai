@@ -1,6 +1,6 @@
 import type { ContextPreparation } from "@/lib/chat/context-window";
 import type { TokenUsage } from "@/lib/chat/token-usage";
-import type { WebSearchState } from "@/lib/chat/types";
+import type { GeneratedFileState, WebSearchState } from "@/lib/chat/types";
 
 import type { ChatMessage } from "./types";
 
@@ -14,6 +14,9 @@ export const encodeUsageEvent = (encoder: TextEncoder, usage: TokenUsage) =>
 
 export const encodeToolEvent = (encoder: TextEncoder, webSearch: WebSearchState) =>
   encoder.encode(`${JSON.stringify({ type: "tool", webSearch })}\n`);
+
+export const encodeGeneratedFileEvent = (encoder: TextEncoder, generatedFile: GeneratedFileState) =>
+  encoder.encode(`${JSON.stringify({ generatedFile, type: "file" })}\n`);
 
 export const getContextHeaders = (
   context?: ContextPreparation<ChatMessage>,

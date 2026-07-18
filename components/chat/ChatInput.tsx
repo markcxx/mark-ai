@@ -23,6 +23,7 @@ import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
 import { ContextWindowIndicator } from "./ContextWindowIndicator";
 import { FilePreviewDialog } from "./FilePreviewDialog";
 import { ModelSelectorDialog } from "./ModelSelectorDialog";
+import { ToolMenu } from "./ToolMenu";
 
 export function ChatInput({
   availableModels,
@@ -168,6 +169,7 @@ export function ChatInput({
                 >
                   <Mic size={20} />
                 </button>
+                <ToolMenu disabled={isLoading} />
                 <button
                   className={cn(
                     "flex h-9 items-center gap-1.5 rounded-lg px-2 text-sm transition-colors",

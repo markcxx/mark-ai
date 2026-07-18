@@ -41,6 +41,7 @@ import { MessageActionButton } from "./MessageActionButton";
 import { MessageSelectionWrapper } from "./MessageSelectionWrapper";
 import { ModelAvatar } from "./ModelAvatar";
 import { ThinkingPanel } from "./ThinkingPanel";
+import { GeneratedFileToolBlock } from "./message/GeneratedFileToolBlock";
 import { WebSearchToolBlock, WebSearchToolBlockItem } from "./message/WebSearchToolBlock";
 import { MessageSources } from "./message/MessageSources";
 
@@ -466,6 +467,15 @@ export function MessageItem({
                     }
                     if (seg.type === "tool") {
                       return <WebSearchToolBlockItem key={`seg-${i}`} webSearch={seg.webSearch} />;
+                    }
+                    if (seg.type === "generated-file") {
+                      return (
+                        <GeneratedFileToolBlock
+                          generatedFile={seg.generatedFile}
+                          key={`seg-${i}`}
+                          onPreview={setPreviewFile}
+                        />
+                      );
                     }
                     return seg.content ? (
                       <div key={`seg-${i}`}>

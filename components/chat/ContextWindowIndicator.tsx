@@ -3,9 +3,12 @@
 import { useId, useMemo } from "react";
 
 import { estimateDraftContextTokens } from "@/lib/chat/context-window";
+import { estimateTextTokens } from "@/lib/chat/metrics";
 import type { FileAttachment, Message } from "@/lib/chat/types";
 import { formatTokenCount, getModelMetadata } from "@/lib/model-metadata";
 import { cn } from "@/lib/utils";
+import { getToolFunctions, getToolSystemPrompt } from "@/lib/tools/registry";
+import { useToolStore } from "@/stores/useToolStore";
 
 export function ContextWindowIndicator({
   attachments,
@@ -21,10 +24,28 @@ export function ContextWindowIndicator({
   webSearchEnabled: boolean;
 }) {
   const tooltipId = useId();
+  const enabledToolIds = useToolStore((state) => state.enabledToolIds);
   const metadata = getModelMetadata(modelId);
+  const toolContextTokens = useMemo(
+    () =>
+      estimateTextTokens(
+        JSON.stringify({
+          prompt: getToolSystemPrompt(enabledToolIds),
+          tools: getToolFunctions(enabledToolIds),
+        }),
+      ),
+    [enabledToolIds],
+  );
   const estimatedTokens = useMemo(
-    () => estimateDraftContextTokens({ attachments, draft, messages, webSearchEnabled }),
-    [attachments, draft, messages, webSearchEnabled],
+    () =>
+      estimateDraftContextTokens({
+        attachments,
+        draft,
+        messages,
+        toolContextTokens,
+        webSearchEnabled,
+      }),
+    [attachments, draft, messages, toolContextTokens, webSearchEnabled],
   );
 
   if (!metadata) return null;

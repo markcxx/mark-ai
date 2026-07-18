@@ -73,12 +73,14 @@ const getCurrentDatePrompt = (timezone?: unknown) => {
 };
 
 export const getRuntimeSystemPrompt = ({
+  skillPrompt,
   timezone,
   webSearchEnabled,
 }: {
+  skillPrompt?: string;
   timezone?: unknown;
   webSearchEnabled: boolean;
 }) =>
-  [getCurrentDatePrompt(timezone), webSearchEnabled ? WEB_SEARCH_SYSTEM_PROMPT : ""]
+  [getCurrentDatePrompt(timezone), webSearchEnabled ? WEB_SEARCH_SYSTEM_PROMPT : "", skillPrompt]
     .filter(Boolean)
     .join("\n\n");

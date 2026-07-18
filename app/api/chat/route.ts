@@ -5,6 +5,7 @@ import { LOCAL_STORAGE_OWNER_ID } from "@/lib/auth-helpers";
 import { findAvailableModel } from "@/lib/available-models";
 import { prepareMessagesForContext } from "@/lib/chat/context-window";
 import { estimateTextTokens } from "@/lib/chat/metrics";
+import { getChatSession } from "@/lib/chat/storage";
 import { createGeminiStream } from "@/lib/chat/server/gemini-runtime";
 import { createOpenAICompatibleStream } from "@/lib/chat/server/openai-runtime";
 import {
@@ -17,6 +18,12 @@ import type { FileAttachment } from "@/lib/chat/types";
 import { isLocalMode } from "@/lib/env";
 import { getModelMetadata } from "@/lib/model-metadata";
 import { injectFileContexts } from "@/lib/storage/file-context";
+import {
+  getAvailableBuiltinTool,
+  getToolFunctions,
+  getToolSystemPrompt,
+} from "@/lib/tools/registry";
+import { listInstalledToolIds, listSessionEnabledToolIds } from "@/lib/tools/storage";
 
 const MAX_CHAT_MESSAGES = 200;
 const MAX_CHAT_MESSAGE_CHARS = 200_000;
@@ -39,7 +46,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid request payload" }, { status: 400 });
     }
 
-    const { messages, model, provider, timezone, webSearchEnabled } = body;
+    const { messages, model, provider, sessionId, timezone, webSearchEnabled } = body;
     const selectedModel = await findAvailableModel(model, provider, authorization.userId);
 
     if (!selectedModel) {
@@ -72,11 +79,36 @@ export async function POST(req: NextRequest) {
     }
 
     const storageOwnerId = authorization.userId || (isLocalMode() ? LOCAL_STORAGE_OWNER_ID : null);
+    if (!storageOwnerId) {
+      return NextResponse.json({ error: "Storage owner is unavailable" }, { status: 401 });
+    }
+
+    let enabledToolIds: string[] = [];
+    if (typeof sessionId === "string" && sessionId) {
+      const session = await getChatSession(sessionId, authorization.userId);
+      if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
+
+      const [sessionToolIds, installedToolIds] = await Promise.all([
+        listSessionEnabledToolIds(storageOwnerId, sessionId),
+        listInstalledToolIds(storageOwnerId),
+      ]);
+      const installed = new Set(installedToolIds);
+      enabledToolIds = sessionToolIds.filter(
+        (toolId) => installed.has(toolId) && Boolean(getAvailableBuiltinTool(toolId)),
+      );
+    }
+
+    const skillPrompt = getToolSystemPrompt(enabledToolIds);
+    const builtinToolSchemas = getToolFunctions(enabledToolIds).map((toolFunction) => ({
+      function: toolFunction,
+      type: "function",
+    }));
     const resolvedMessages = storageOwnerId
       ? await injectFileContexts(messages as ChatMessage[], storageOwnerId)
       : (messages as ChatMessage[]);
     const modelMetadata = getModelMetadata(selectedModel.id);
     const runtimeSystemPrompt = getRuntimeSystemPrompt({
+      skillPrompt,
       timezone,
       webSearchEnabled: selectedModel.runtime === "openai-compatible" && Boolean(webSearchEnabled),
     });
@@ -85,16 +117,31 @@ export async function POST(req: NextRequest) {
         ? estimateTextTokens(
             JSON.stringify({
               messages: [{ content: runtimeSystemPrompt, role: "system" }],
-              ...(webSearchEnabled
-                ? { tool_choice: "auto", tools: [WEB_SEARCH_TOOL, READ_WEBPAGE_TOOL] }
+              ...(webSearchEnabled || builtinToolSchemas.length > 0
+                ? {
+                    tool_choice: "auto",
+                    tools: [
+                      ...(webSearchEnabled ? [WEB_SEARCH_TOOL, READ_WEBPAGE_TOOL] : []),
+                      ...builtinToolSchemas,
+                    ],
+                  }
                 : {}),
             }),
           )
         : estimateTextTokens(
-            JSON.stringify([
-              { role: "user", parts: [{ text: runtimeSystemPrompt }] },
-              { role: "model", parts: [{ text: "了解。" }] },
-            ]),
+            JSON.stringify({
+              contents: [
+                { role: "user", parts: [{ text: runtimeSystemPrompt }] },
+                { role: "model", parts: [{ text: "了解。" }] },
+              ],
+              ...(builtinToolSchemas.length > 0
+                ? {
+                    tools: [
+                      { functionDeclarations: builtinToolSchemas.map((tool) => tool.function) },
+                    ],
+                  }
+                : {}),
+            }),
           );
     const contextPreparation = modelMetadata
       ? prepareMessagesForContext(resolvedMessages, modelMetadata, contextOverheadTokens)
@@ -111,6 +158,14 @@ export async function POST(req: NextRequest) {
         timezone,
         req.signal,
         contextPreparation,
+        typeof sessionId === "string" && sessionId
+          ? {
+              enabledToolIds,
+              sessionId,
+              skillPrompt,
+              userId: storageOwnerId,
+            }
+          : undefined,
       );
     }
 
@@ -120,7 +175,12 @@ export async function POST(req: NextRequest) {
       contextPreparation,
       messages: preparedMessages,
       model: selectedModel.id,
+      signal: req.signal,
       systemPrompt: runtimeSystemPrompt,
+      toolRuntime:
+        typeof sessionId === "string" && sessionId
+          ? { enabledToolIds, sessionId, userId: storageOwnerId }
+          : undefined,
     });
   } catch (error) {
     console.error("Chat error:", error);

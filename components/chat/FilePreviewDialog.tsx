@@ -12,6 +12,19 @@ export type PreviewFile = {
 };
 
 const getPreviewKind = (file: PreviewFile) => {
+  if (
+    file.contentType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+    file.name.toLowerCase().endsWith(".xlsx")
+  ) {
+    return "spreadsheet";
+  }
+  if (
+    file.contentType ===
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    file.name.toLowerCase().endsWith(".docx")
+  ) {
+    return "docx";
+  }
   if (file.contentType === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
     return "pdf";
   }
@@ -89,9 +102,11 @@ export function FilePreviewDialog({
             src={previewUrl}
           />
         )}
-        {(kind === "pdf" || kind === "text") && (
+        {(kind === "docx" || kind === "pdf" || kind === "spreadsheet" || kind === "text") && (
           <iframe
             className="h-full w-full border-0 bg-white"
+            referrerPolicy="no-referrer"
+            sandbox={kind === "docx" || kind === "spreadsheet" ? "" : undefined}
             src={previewUrl}
             title={`${file.name} 预览`}
           />

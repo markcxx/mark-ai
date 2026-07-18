@@ -4,11 +4,11 @@ import { PanelLeftClose, Plus, Puzzle } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
-import { NOT_IMPLEMENTED_TOAST } from "@/lib/chat/constants";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { IconButton } from "@/components/ui/IconButton";
 import type { ChatSession } from "@/lib/chat/types";
 import { cn } from "@/lib/utils";
+import { useUIStore } from "@/stores/useUIStore";
 
 import { SessionGroupHeader } from "./SessionGroupHeader";
 import { SidebarNavItem } from "./SidebarNavItem";
@@ -61,7 +61,6 @@ export function Sidebar({
   onSelectSession,
   onToggleFavorite,
   onUpdateSessionTitle,
-  onUnavailable,
   sessions,
   width,
 }: {
@@ -77,7 +76,6 @@ export function Sidebar({
   onSelectSession: (sessionId: string) => void;
   onToggleFavorite: (sessionId: string, favorite: boolean) => void;
   onUpdateSessionTitle: (sessionId: string, title: string) => void;
-  onUnavailable: (message?: string) => void;
   sessions: ChatSession[];
   width: number;
 }) {
@@ -159,10 +157,9 @@ export function Sidebar({
             </div>
             <nav className="flex flex-col gap-1">
               <SidebarNavItem
-                active
                 icon={Puzzle}
                 label="插件中心"
-                onClick={() => onUnavailable(NOT_IMPLEMENTED_TOAST)}
+                onClick={() => useUIStore.getState().setPluginCenterOpen(true)}
               />
             </nav>
           </div>

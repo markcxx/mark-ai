@@ -9,6 +9,7 @@ import { estimateMessageTokens } from "@/lib/chat/metrics";
 import type { ConfiguredModel, FileAttachment, Message, RegenerateMode } from "@/lib/chat/types";
 import { createStreamAssistantMessage } from "./chat/stream-assistant-message";
 import { useSessionStore } from "./useSessionStore";
+import { useToolStore } from "./useToolStore";
 import { useUIStore } from "./useUIStore";
 
 type StreamedMessageResult = Pick<
@@ -28,6 +29,7 @@ type StreamedMessageResult = Pick<
 
 type StreamOptions = {
   initialContent?: string;
+  sessionId?: string;
   webSearchEnabled?: boolean;
 };
 
@@ -185,6 +187,16 @@ export const useChatStore = create<ChatStore>()(
             targetSessionId = session.id;
             createdSession = true;
             sessionStore.setSessionLoading(session.id, true);
+            try {
+              await useToolStore.getState().persistDraftToSession(session.id);
+            } catch (error) {
+              console.error("Session tools persist error:", error);
+              toast.error("保存当前会话工具失败，本次将不启用工具");
+              await useToolStore
+                .getState()
+                .setActiveSession(session.id)
+                .catch(() => undefined);
+            }
           } catch (error) {
             console.error("Session create error:", error);
             set((state) => ({
@@ -208,7 +220,7 @@ export const useChatStore = create<ChatStore>()(
           [...messages, userMessage],
           modelMessageId,
           selectedModel,
-          { webSearchEnabled },
+          { sessionId: targetSessionId, webSearchEnabled },
         );
         const latestModelMessage = get().messages.find((m) => m.id === modelMessageId);
         const savedMessages = [
@@ -303,7 +315,7 @@ export const useChatStore = create<ChatStore>()(
         historyMessages,
         message.id,
         modelConfig,
-        { initialContent },
+        { initialContent, sessionId: targetSessionId },
       );
       const savedMessages = nextMessages.map((item) => {
         if (item.id !== message.id) return item;
@@ -403,7 +415,7 @@ export const useChatStore = create<ChatStore>()(
           historyMessages,
           targetId,
           modelConfig,
-          { webSearchEnabled },
+          { sessionId: targetSessionId, webSearchEnabled },
         );
         const latestUserRetryMessage = get().messages.find((item) => item.id === targetId);
         const savedMessages = [
@@ -483,7 +495,7 @@ export const useChatStore = create<ChatStore>()(
         regenerateHistoryMessages,
         nextModelMessage.id,
         modelConfig,
-        { webSearchEnabled },
+        { sessionId: targetSessionId, webSearchEnabled },
       );
       const latestRetryMessage = get().messages.find((item) => item.id === nextModelMessage.id);
       let completedMessage: Message = {

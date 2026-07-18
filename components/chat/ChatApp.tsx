@@ -20,7 +20,9 @@ import { cn } from "@/lib/utils";
 import { useChatStore } from "@/stores/useChatStore";
 import { useSessionStore } from "@/stores/useSessionStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
+import { useToolStore } from "@/stores/useToolStore";
 import { useUIStore } from "@/stores/useUIStore";
+import { PluginCenterDrawer } from "@/components/tools/PluginCenterDrawer";
 
 import { ChatInput } from "./ChatInput";
 import { ChatMiniMap } from "./ChatMiniMap";
@@ -93,6 +95,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   const modelSearchKeyword = useUIStore((s) => s.modelSearchKeyword);
   const wideChatMode = useUIStore((s) => s.wideChatMode);
   const webSearchEnabled = useUIStore((s) => s.webSearchEnabled);
+  const pluginCenterOpen = useUIStore((s) => s.pluginCenterOpen);
 
   // Session Store
   const sessions = useSessionStore((s) => s.sessions);
@@ -141,7 +144,15 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
       setActiveHtmlPreview(null);
       setHtmlPreviewFullscreen(false);
       resetScrollIntent();
-      await loadChatSession(sessionId, options);
+      const loaded = await loadChatSession(sessionId, options);
+      if (loaded) {
+        await useToolStore
+          .getState()
+          .setActiveSession(sessionId)
+          .catch(() => {
+            toast.error("加载会话工具失败");
+          });
+      }
     },
     [resetScrollIntent],
   );
@@ -151,6 +162,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
       setActiveHtmlPreview(null);
       setHtmlPreviewFullscreen(false);
       resetScrollIntent();
+      useToolStore.getState().resetForNewChat();
       startNewChat(history);
     },
     [resetScrollIntent],
@@ -440,7 +452,6 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
         onUpdateSessionTitle={(id, title) =>
           useSessionStore.getState().updateSessionTitle(id, title)
         }
-        onUnavailable={() => toast(NOT_IMPLEMENTED_TOAST)}
         sessions={sessions}
         width={sidebarWidth}
       />
@@ -743,6 +754,10 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
           session={activeSession}
         />
       )}
+      <PluginCenterDrawer
+        onClose={() => useUIStore.getState().setPluginCenterOpen(false)}
+        open={pluginCenterOpen}
+      />
     </div>
   );
 }

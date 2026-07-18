@@ -23,6 +23,7 @@ interface UIState {
   isLoadingModels: boolean;
   selectedModelKey: string;
   webSearchEnabled: boolean;
+  pluginCenterOpen: boolean;
 }
 
 interface UIActions {
@@ -46,6 +47,7 @@ interface UIActions {
   setModelSearchKeyword: (keyword: string) => void;
   setWebSearchEnabled: (enabled: boolean) => void;
   toggleWebSearch: () => void;
+  setPluginCenterOpen: (open: boolean) => void;
 }
 
 export type UIStore = UIState & UIActions;
@@ -77,6 +79,7 @@ export const useUIStore = create<UIStore>()(
     isLoadingModels: true,
     selectedModelKey: "",
     webSearchEnabled: false,
+    pluginCenterOpen: false,
 
     setAppReady: (ready) => set({ isAppReady: ready }),
     setBootProgress: (progress, message) =>
@@ -235,5 +238,6 @@ export const useUIStore = create<UIStore>()(
     setModelSearchKeyword: (keyword) => set({ modelSearchKeyword: keyword }),
     setWebSearchEnabled: (enabled) => set({ webSearchEnabled: enabled }),
     toggleWebSearch: () => set((s) => ({ webSearchEnabled: !s.webSearchEnabled })),
+    setPluginCenterOpen: (open) => set({ pluginCenterOpen: open }),
   })),
 );

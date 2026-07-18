@@ -48,10 +48,12 @@ export const isUnsupportedStreamUsageError = (status: number, detail: string) =>
 
 export const toOpenAIMessages = ({
   messages,
+  skillPrompt,
   timezone,
   webSearchEnabled,
 }: {
   messages: ChatMessage[];
+  skillPrompt?: string;
   timezone?: unknown;
   webSearchEnabled: boolean;
 }): OpenAIChatMessage[] => {
@@ -62,7 +64,7 @@ export const toOpenAIMessages = ({
 
   return [
     {
-      content: getRuntimeSystemPrompt({ timezone, webSearchEnabled }),
+      content: getRuntimeSystemPrompt({ skillPrompt, timezone, webSearchEnabled }),
       role: "system",
     },
     ...openAIMessages,

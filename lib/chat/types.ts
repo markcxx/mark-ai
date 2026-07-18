@@ -17,7 +17,21 @@ export type ContentSegment = {
   content: string;
 };
 
-export type MessageSegment = ThinkingSegment | ToolSegment | ContentSegment;
+export type GeneratedFileState = {
+  callId: string;
+  error?: string;
+  file?: FileAttachment & { url: string };
+  status: "running" | "done" | "error";
+  toolId: string;
+  toolName: string;
+};
+
+export type GeneratedFileSegment = {
+  type: "generated-file";
+  generatedFile: GeneratedFileState;
+};
+
+export type MessageSegment = ThinkingSegment | ToolSegment | ContentSegment | GeneratedFileSegment;
 
 export type FileAttachment = {
   id: string;
@@ -97,12 +111,13 @@ export type ChatSession = {
 };
 
 export type ChatStreamEvent = {
+  generatedFile?: GeneratedFileState;
   inputTokens?: number;
   outputTokens?: number;
   text?: string;
   totalTokens?: number;
   tokenUsageSource?: TokenUsageSource;
-  type?: "content" | "reasoning" | "tool" | "usage";
+  type?: "content" | "file" | "reasoning" | "tool" | "usage";
   webSearch?: WebSearchState;
 };
 

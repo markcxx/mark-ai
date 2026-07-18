@@ -79,6 +79,17 @@ export const createPreviewUrl = async (
 export const headR2Object = (bucket: string, key: string) =>
   getR2Client().send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
 
+export const putR2Object = (bucket: string, key: string, contentType: string, bytes: Uint8Array) =>
+  getR2Client().send(
+    new PutObjectCommand({
+      Body: bytes,
+      Bucket: bucket,
+      ContentLength: bytes.byteLength,
+      ContentType: contentType,
+      Key: key,
+    }),
+  );
+
 export const getR2ObjectBytes = async (bucket: string, key: string) => {
   const response = await getR2Client().send(new GetObjectCommand({ Bucket: bucket, Key: key }));
   if (!response.Body) throw new Error("R2 object has no body");

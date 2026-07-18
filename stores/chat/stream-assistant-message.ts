@@ -92,6 +92,7 @@ export const createStreamAssistantMessage =
           })),
           model: modelConfig.id,
           provider: modelConfig.provider,
+          sessionId: options.sessionId,
           timezone: getClientTimezone(),
           webSearchEnabled: Boolean(options.webSearchEnabled),
         }),
@@ -243,6 +244,25 @@ export const createStreamAssistantMessage =
             (segments[existingIdx] as Extract<MessageSegment, { type: "tool" }>).webSearch = ws;
           } else {
             segments.push({ type: "tool", webSearch: ws });
+          }
+          updateStreamingMessage();
+          return;
+        }
+        if (event.type === "file" && event.generatedFile) {
+          contentController?.flush();
+          reasoningController?.flush();
+          finishCurrentReasoning();
+          currentThinkingSegment = undefined;
+          const generatedFile = event.generatedFile;
+          const existingIdx = segments.findIndex(
+            (segment) =>
+              segment.type === "generated-file" &&
+              segment.generatedFile.callId === generatedFile.callId,
+          );
+          if (existingIdx >= 0) {
+            segments[existingIdx] = { generatedFile, type: "generated-file" };
+          } else {
+            segments.push({ generatedFile, type: "generated-file" });
           }
           updateStreamingMessage();
           return;
