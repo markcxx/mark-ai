@@ -1,0 +1,27 @@
+services:
+  app:
+    image: ${MARKAI_IMAGE:-ghcr.io/markcxx/mark-ai:latest}
+    container_name: markai
+    restart: unless-stopped
+    init: true
+    env_file:
+      - /opt/markai/.env.production
+    ports:
+      - "127.0.0.1:3001:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/').then((response) => process.exit(response.status < 500 ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
