@@ -1,11 +1,13 @@
 import { headers } from "next/headers";
 
-import { auth } from "@/lib/auth";
-import { isCloudMode } from "@/lib/env";
+import { isCloudMode, isLocalMode } from "@/lib/env";
+
+export const LOCAL_STORAGE_OWNER_ID = "local";
 
 export const getCurrentUserId = async (): Promise<string | undefined> => {
   if (!isCloudMode()) return undefined;
 
+  const { auth } = await import("@/lib/auth");
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -19,4 +21,9 @@ export const requireUserId = async (): Promise<string> => {
     throw new Error("Unauthorized");
   }
   return userId;
+};
+
+export const getCurrentStorageOwnerId = async (): Promise<string | undefined> => {
+  if (isLocalMode()) return LOCAL_STORAGE_OWNER_ID;
+  return getCurrentUserId();
 };

@@ -26,7 +26,12 @@ export async function GET(_req: Request, context: { params: Promise<{ sessionId:
       messages: await getChatMessages(sessionId, userId),
       session,
     },
-    { headers: { "Cache-Control": "no-store" } },
+    {
+      headers: {
+        "Cache-Control": "no-store",
+        ETag: `"${session.revision}"`,
+      },
+    },
   );
 }
 

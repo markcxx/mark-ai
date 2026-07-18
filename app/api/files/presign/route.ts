@@ -1,13 +1,16 @@
 import { randomUUID } from "node:crypto";
 
-import { and, count, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
-import { getCurrentUserId } from "@/lib/auth-helpers";
-import { getDb } from "@/lib/db";
-import { storageFiles, users } from "@/lib/db/schema";
+import { getCurrentStorageOwnerId } from "@/lib/auth-helpers";
+import {
+  createStoredFileRecord,
+  createStoredFileUploadUrl,
+  getStoredFileBucket,
+  getStoredFileUsage,
+  isStoredFileQuotaUnlimited,
+} from "@/lib/storage/file-storage";
 import { isAllowedUploadType, storageLimits } from "@/lib/storage/limits";
-import { createUploadUrl, getR2Bucket } from "@/lib/storage/r2";
 
 export const runtime = "nodejs";
 
@@ -17,7 +20,7 @@ const safeExtension = (name: string) => {
 };
 
 export async function POST(request: Request) {
-  const userId = await getCurrentUserId();
+  const userId = await getCurrentStorageOwnerId();
   if (!userId) return NextResponse.json({ error: "请先登录" }, { status: 401 });
 
   const body = await request.json().catch(() => null);
@@ -42,44 +45,34 @@ export async function POST(request: Request) {
     );
   }
 
-  const db = getDb();
-  const [user] = await db
-    .select({ role: users.role })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
-  if (!user) return NextResponse.json({ error: "用户不存在" }, { status: 404 });
+  let unlimited: boolean;
+  try {
+    unlimited = await isStoredFileQuotaUnlimited(userId);
+  } catch (error) {
+    if (error instanceof Error && error.message === "用户不存在") {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
+    throw error;
+  }
 
-  if (user.role !== "admin" && kind !== "avatar") {
-    const [usage] = await db
-      .select({
-        total: sql<number>`coalesce(sum(${storageFiles.size}), 0)`,
-        files: count(storageFiles.id),
-      })
-      .from(storageFiles)
-      .where(
-        and(
-          eq(storageFiles.userId, userId),
-          eq(storageFiles.kind, "attachment"),
-          eq(storageFiles.status, "ready"),
-        ),
-      );
-    if (Number(usage?.files || 0) >= storageLimits.maxFileCount) {
+  if (!unlimited && kind !== "avatar") {
+    const usage = await getStoredFileUsage(userId);
+    if (usage.count >= storageLimits.maxFileCount) {
       return NextResponse.json({ error: "文件数量已达到上限" }, { status: 413 });
     }
-    if (Number(usage?.total || 0) + size > storageLimits.maxStorageBytes) {
+    if (usage.size + size > storageLimits.maxStorageBytes) {
       return NextResponse.json({ error: "存储空间不足，请删除旧文件后重试" }, { status: 413 });
     }
   }
 
   const id = randomUUID();
-  const bucket = getR2Bucket(kind);
+  const bucket = getStoredFileBucket(kind);
   const objectKey =
     kind === "avatar"
       ? `avatars/${userId}/${id}${safeExtension(name)}`
       : `users/${userId}/attachments/${id}${safeExtension(name)}`;
 
-  await db.insert(storageFiles).values({
+  const file = await createStoredFileRecord({
     bucket,
     contentType,
     id,
@@ -93,6 +86,6 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     file: { contentType, id, kind, name, size },
-    uploadUrl: await createUploadUrl({ bucket, contentType, key: objectKey }),
+    uploadUrl: await createStoredFileUploadUrl(file),
   });
 }

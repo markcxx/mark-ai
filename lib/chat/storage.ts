@@ -1,6 +1,7 @@
 import { isCloudMode } from "@/lib/env";
 
-import type { StorageAdapter } from "./storage-adapter";
+import type { MessageWriteOptions, StorageAdapter } from "./storage-adapter";
+import type { Message } from "./types";
 
 let _storage: StorageAdapter | undefined;
 
@@ -43,7 +44,23 @@ export const updateChatSessionFavorite = (sessionId: string, favorite: boolean, 
 export const deleteChatSession = (sessionId: string, userId?: string) =>
   getStorage().deleteChatSession(sessionId, userId);
 
-export const replaceChatMessages = (sessionId: string, messages: Message[], userId?: string) =>
-  getStorage().replaceChatMessages(sessionId, messages, userId);
+export const replaceChatMessages = (
+  sessionId: string,
+  messages: Message[],
+  userId?: string,
+  options?: Pick<MessageWriteOptions, "expectedRevision">,
+) => getStorage().replaceChatMessages(sessionId, messages, userId, options);
 
-import type { Message } from "./types";
+export const upsertChatMessage = (
+  sessionId: string,
+  message: Message,
+  userId?: string,
+  options?: MessageWriteOptions,
+) => getStorage().upsertChatMessage(sessionId, message, userId, options);
+
+export const deleteChatMessage = (
+  sessionId: string,
+  messageId: string,
+  userId?: string,
+  options?: Pick<MessageWriteOptions, "expectedRevision">,
+) => getStorage().deleteChatMessage(sessionId, messageId, userId, options);

@@ -1,67 +1,48 @@
-import { and, count, desc, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
-import { getCurrentUserId } from "@/lib/auth-helpers";
-import { getDb } from "@/lib/db";
-import { storageFiles, users } from "@/lib/db/schema";
+import { getCurrentStorageOwnerId } from "@/lib/auth-helpers";
+import {
+  getStoredFileUsage,
+  isStoredFileQuotaUnlimited,
+  listStoredAttachmentFiles,
+} from "@/lib/storage/file-storage";
 import { storageLimits } from "@/lib/storage/limits";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-  const userId = await getCurrentUserId();
+  const userId = await getCurrentStorageOwnerId();
   if (!userId) return NextResponse.json({ error: "请先登录" }, { status: 401 });
 
-  const db = getDb();
-  const [user] = await db
-    .select({ role: users.role })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
-  if (!user) return NextResponse.json({ error: "用户不存在" }, { status: 404 });
-
-  const fileFilter = and(
-    eq(storageFiles.userId, userId),
-    eq(storageFiles.kind, "attachment"),
-    eq(storageFiles.status, "ready"),
-  );
-  const [files, usageRows] = await Promise.all([
-    db
-      .select({
-        contentType: storageFiles.contentType,
-        createdAt: storageFiles.createdAt,
-        id: storageFiles.id,
-        name: storageFiles.originalName,
-        size: storageFiles.size,
-      })
-      .from(storageFiles)
-      .where(fileFilter)
-      .orderBy(desc(storageFiles.createdAt)),
-    db
-      .select({
-        count: count(storageFiles.id),
-        size: sql<number>`coalesce(sum(${storageFiles.size}), 0)`,
-      })
-      .from(storageFiles)
-      .where(fileFilter),
-  ]);
-
-  const [usage] = usageRows;
-  const limited = user.role !== "admin";
+  let files: Awaited<ReturnType<typeof listStoredAttachmentFiles>>;
+  let usage: Awaited<ReturnType<typeof getStoredFileUsage>>;
+  let unlimited: boolean;
+  try {
+    [files, usage, unlimited] = await Promise.all([
+      listStoredAttachmentFiles(userId),
+      getStoredFileUsage(userId),
+      isStoredFileQuotaUnlimited(userId),
+    ]);
+  } catch (error) {
+    if (error instanceof Error && error.message === "用户不存在") {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
+    throw error;
+  }
 
   return NextResponse.json({
     files: files.map((file) => ({
-      ...file,
+      contentType: file.contentType,
       createdAt: file.createdAt.toISOString(),
+      id: file.id,
+      name: file.originalName,
+      size: file.size,
     })),
     limits: {
       maxFileBytes: storageLimits.maxFileBytes,
-      maxFileCount: limited ? storageLimits.maxFileCount : null,
-      maxStorageBytes: limited ? storageLimits.maxStorageBytes : null,
+      maxFileCount: unlimited ? null : storageLimits.maxFileCount,
+      maxStorageBytes: unlimited ? null : storageLimits.maxStorageBytes,
     },
-    usage: {
-      count: Number(usage?.count || 0),
-      size: Number(usage?.size || 0),
-    },
+    usage,
   });
 }

@@ -1,30 +1,31 @@
-import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
-import { getCurrentUserId } from "@/lib/auth-helpers";
-import { getDb } from "@/lib/db";
-import { storageFiles } from "@/lib/db/schema";
-import { createDownloadUrl } from "@/lib/storage/r2";
+import { getCurrentStorageOwnerId } from "@/lib/auth-helpers";
+import {
+  getStoredFile,
+  getStoredFileBytes,
+  getStoredFileDownloadUrl,
+} from "@/lib/storage/file-storage";
 
 export const runtime = "nodejs";
 
 export async function GET(_request: Request, context: { params: Promise<{ fileId: string }> }) {
-  const userId = await getCurrentUserId();
+  const userId = await getCurrentStorageOwnerId();
   if (!userId) return NextResponse.json({ error: "请先登录" }, { status: 401 });
   const { fileId } = await context.params;
-  const [file] = await getDb()
-    .select()
-    .from(storageFiles)
-    .where(
-      and(
-        eq(storageFiles.id, fileId),
-        eq(storageFiles.userId, userId),
-        eq(storageFiles.status, "ready"),
-      ),
-    )
-    .limit(1);
+  const file = await getStoredFile(fileId, userId, true);
   if (!file) return NextResponse.json({ error: "文件不存在" }, { status: 404 });
-  return NextResponse.redirect(
-    await createDownloadUrl(file.bucket, file.objectKey, file.originalName),
-  );
+  const remoteUrl = await getStoredFileDownloadUrl(file);
+  if (remoteUrl) return NextResponse.redirect(remoteUrl);
+
+  const bytes = await getStoredFileBytes(file);
+  const body = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(body).set(bytes);
+  return new Response(body, {
+    headers: {
+      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(file.originalName)}`,
+      "Content-Length": String(file.size),
+      "Content-Type": file.contentType,
+    },
+  });
 }

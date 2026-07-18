@@ -92,6 +92,7 @@ export type ChatSession = {
   favorite?: boolean;
   model?: string;
   provider?: string;
+  revision: number;
   messageCount: number;
 };
 

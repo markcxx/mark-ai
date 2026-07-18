@@ -14,6 +14,7 @@ export const chatSessions = pgTable(
     favorite: boolean("favorite").default(false),
     model: text("model"),
     provider: text("provider"),
+    revision: integer("revision").default(0).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },

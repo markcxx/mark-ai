@@ -1,17 +1,13 @@
 import mammoth from "mammoth";
-import { and, eq, inArray } from "drizzle-orm";
 
-import { getDb } from "@/lib/db";
-import { storageFiles } from "@/lib/db/schema";
 import type { FileAttachment } from "@/lib/chat/types";
-import { getR2ObjectBytes } from "./r2";
+import { getStoredFileBytes, getStoredFilesByIds, type StoredFileRecord } from "./file-storage";
 import { extractPdfContent } from "./pdf";
 import { extractSpreadsheetContent } from "./spreadsheet";
 
 const MAX_FILE_CONTEXT_CHARS = 120_000;
 const MAX_TOTAL_CONTEXT_CHARS = 180_000;
 
-type FileRecord = typeof storageFiles.$inferSelect;
 type CachedContent = { content: string; updatedAt: number };
 
 const globalFileCache = globalThis as typeof globalThis & {
@@ -36,12 +32,12 @@ const decodeText = (bytes: Uint8Array) => {
   return new TextDecoder("utf-8").decode(bytes);
 };
 
-const extractFileContent = async (file: FileRecord) => {
+const extractFileContent = async (file: StoredFileRecord) => {
   const updatedAt = file.updatedAt.getTime();
   const cached = fileContentCache.get(file.id);
   if (cached?.updatedAt === updatedAt) return cached.content;
 
-  const bytes = await getR2ObjectBytes(file.bucket, file.objectKey);
+  const bytes = await getStoredFileBytes(file);
   const extension = extensionOf(file.originalName);
   let content = "";
 
@@ -97,16 +93,7 @@ export const injectFileContexts = async <
   );
   if (fileIds.length === 0) return messages;
 
-  const records = await getDb()
-    .select()
-    .from(storageFiles)
-    .where(
-      and(
-        eq(storageFiles.userId, userId),
-        eq(storageFiles.status, "ready"),
-        inArray(storageFiles.id, fileIds),
-      ),
-    );
+  const records = await getStoredFilesByIds(fileIds, userId);
   const byId = new Map(records.map((file) => [file.id, file]));
   let usedChars = 0;
 
