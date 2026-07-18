@@ -9,6 +9,8 @@ import * as schema from "@/lib/db/schema";
 import { sendResetPasswordEmail, sendVerificationEmail } from "@/lib/email";
 import { isCloudMode } from "@/lib/env";
 
+const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
+
 const getSSOProviders = () => {
   const providers: ReturnType<typeof betterAuth>["options"]["socialProviders"] = {};
   const enabledProviders = (process.env.AUTH_SSO_PROVIDERS || "")
@@ -53,8 +55,9 @@ export const auth = betterAuth({
     },
   }),
 
-  baseURL: process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL,
+  baseURL: appUrl,
   secret: process.env.AUTH_SECRET,
+  trustedOrigins: appUrl ? [appUrl] : [],
 
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
