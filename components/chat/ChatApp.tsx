@@ -133,6 +133,13 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exportDialogMode, setExportDialogMode] = useState<ExportMode>("image");
 
+  useEffect(() => {
+    const guestDraft = window.localStorage.getItem("markai:guest-draft")?.trim();
+    if (!guestDraft || useChatStore.getState().input) return;
+    useChatStore.getState().setInput(guestDraft);
+    window.localStorage.removeItem("markai:guest-draft");
+  }, []);
+
   // Derived
   const selectedModel = availableModels.find((m) => getModelKey(m) === selectedModelKey);
   const activeSession = sessions.find((session) => session.id === activeSessionId);
@@ -173,11 +180,17 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   useEffect(() => {
     if (!settingsLoaded) return;
     const root = document.documentElement;
-    root.style.setProperty("--color-primary", PRIMARY_COLOR_VALUES[generalSettings.primaryColor]);
-    root.style.setProperty(
-      "--color-primary-container",
-      PRIMARY_COLOR_VALUES[generalSettings.primaryColor],
-    );
+    root.dataset.primaryColor = generalSettings.primaryColor;
+    if (generalSettings.primaryColor === "black") {
+      root.style.removeProperty("--color-primary");
+      root.style.removeProperty("--color-primary-container");
+    } else {
+      root.style.setProperty("--color-primary", PRIMARY_COLOR_VALUES[generalSettings.primaryColor]);
+      root.style.setProperty(
+        "--color-primary-container",
+        PRIMARY_COLOR_VALUES[generalSettings.primaryColor],
+      );
+    }
     root.style.setProperty("--chat-font-size", `${generalSettings.chatFontSize}px`);
     root.dataset.density = generalSettings.density;
     root.dataset.reduceMotion = generalSettings.reduceMotion ? "true" : "false";
@@ -614,11 +627,11 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
               ) : (
                 <div
                   className={cn(
-                    "flex w-full flex-col transition-[max-width,gap] duration-200 ease-out",
+                    "flex w-full flex-col transition-[max-width,gap,padding] duration-300 ease-out",
                     selectionLayoutMode
                       ? "max-w-none"
                       : wideChatMode
-                        ? "max-w-[1120px]"
+                        ? "max-w-full px-1 md:px-3"
                         : "max-w-[840px]",
                     selectionLayoutMode
                       ? "gap-0"
@@ -672,6 +685,9 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                       }
                       toggleSelectedMessage={(id, shift) =>
                         useUIStore.getState().toggleSelectedMessage(id, !!shift, messages)
+                      }
+                      translateMessage={(message, language) =>
+                        useChatStore.getState().translateMessage(message, language)
                       }
                     />
                   ))}
@@ -730,6 +746,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                 setSelectedModelKey={(key) => useUIStore.getState().setSelectedModelKey(key)}
                 textareaRef={textareaRef}
                 webSearchEnabled={webSearchEnabled}
+                wide={wideChatMode}
               />
             )}
           </main>

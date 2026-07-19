@@ -1,6 +1,14 @@
 export type ThemeMode = "light" | "dark" | "system";
 export type PrimaryColor =
-  "blue" | "cyan" | "green" | "indigo" | "magenta" | "orange" | "red" | "violet";
+  | "black"
+  | "blue"
+  | "cyan"
+  | "green"
+  | "indigo"
+  | "magenta"
+  | "orange"
+  | "red"
+  | "violet";
 export type CodeTheme =
   | "dracula"
   | "duotone"
@@ -35,6 +43,7 @@ export type GeneralSettings = {
   sidebarWidth: number;
   themeMode: ThemeMode;
   thinkingDisplay: ThinkingDisplay;
+  translationModelKey: string;
   wideChatMode: boolean;
 };
 
@@ -55,6 +64,7 @@ export type MarkAISettings = {
 };
 
 export const PRIMARY_COLOR_VALUES: Record<PrimaryColor, string> = {
+  black: "#111827",
   blue: "#2563eb",
   cyan: "#0891b2",
   green: "#16a34a",
@@ -76,7 +86,7 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
   defaultWebSearch: false,
   density: "comfortable",
   overwriteRegeneratedResponse: true,
-  primaryColor: "blue",
+  primaryColor: "black",
   reduceMotion: false,
   responseAnimation: "fade",
   sendShortcut: "enter",
@@ -84,6 +94,7 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
   sidebarWidth: 260,
   themeMode: "system",
   thinkingDisplay: "auto",
+  translationModelKey: "__system__",
   wideChatMode: false,
 };
 
@@ -154,7 +165,7 @@ export const sanitizeGeneralSettings = (
     ),
     primaryColor: stringOption(
       input.primaryColor,
-      ["blue", "indigo", "violet", "magenta", "red", "orange", "green", "cyan"],
+      ["black", "blue", "indigo", "violet", "magenta", "red", "orange", "green", "cyan"],
       fallback.primaryColor,
     ),
     reduceMotion: booleanValue(input.reduceMotion, fallback.reduceMotion),
@@ -172,6 +183,7 @@ export const sanitizeGeneralSettings = (
       ["auto", "collapsed", "expanded"],
       fallback.thinkingDisplay,
     ),
+    translationModelKey: shortText(input.translationModelKey, 256),
     wideChatMode: booleanValue(input.wideChatMode, fallback.wideChatMode),
   };
 };

@@ -7,8 +7,10 @@ import { createMessageId, getModelKey } from "@/lib/chat/helpers";
 import { applyMessageVariant, toMessageVariant } from "@/lib/chat/message-variants";
 import { estimateMessageTokens } from "@/lib/chat/metrics";
 import type { ConfiguredModel, FileAttachment, Message, RegenerateMode } from "@/lib/chat/types";
+import type { TranslationLanguage } from "@/lib/chat/translation-languages";
 import { createStreamAssistantMessage } from "./chat/stream-assistant-message";
 import { useSessionStore } from "./useSessionStore";
+import { useSettingsStore } from "./useSettingsStore";
 import { useToolStore } from "./useToolStore";
 import { useUIStore } from "./useUIStore";
 
@@ -60,6 +62,7 @@ interface ChatActions {
   continueMessage: (message: Message) => Promise<void>;
   regenerateMessage: (message: Message, mode?: RegenerateMode) => Promise<void>;
   selectMessageVariant: (messageId: string, variantId: string) => Promise<void>;
+  translateMessage: (message: Message, targetLanguage: TranslationLanguage) => Promise<void>;
   startEditing: (message: Message) => void;
   saveEditing: () => void;
   cancelEditing: () => void;
@@ -542,6 +545,56 @@ export const useChatStore = create<ChatStore>()(
       if (sessionId) {
         await useSessionStore.getState().persistSessionMessages(sessionId, nextMessages);
       }
+    },
+
+    translateMessage: async (message, targetLanguage) => {
+      if (!message.content.trim() || message.isStreaming) return;
+
+      const { availableModels, selectedModelKey } = useUIStore.getState();
+      const translationModelKey = useSettingsStore.getState().general.translationModelKey;
+      const useSystemTranslationModel = translationModelKey === "__system__";
+      const configuredTranslationModel =
+        translationModelKey && !useSystemTranslationModel
+        ? availableModels.find((model) => getModelKey(model) === translationModelKey)
+        : undefined;
+      const selectedModel = availableModels.find((model) => getModelKey(model) === selectedModelKey);
+      const messageModel = availableModels.find(
+        (model) => model.id === message.model && model.provider === message.provider,
+      );
+      const model = configuredTranslationModel || messageModel || selectedModel;
+      if (!model) throw new Error("请先配置可用模型");
+
+      const response = await fetch("/api/translate", {
+        body: JSON.stringify({
+          content: message.content,
+          fallbackModel: model.id,
+          fallbackProvider: model.provider,
+          model: useSystemTranslationModel ? undefined : model.id,
+          provider: useSystemTranslationModel ? undefined : model.provider,
+          targetLanguage,
+          useSystemModel: useSystemTranslationModel,
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "翻译失败，请稍后重试");
+
+      const latestMessages = get().messages;
+      const nextMessages = latestMessages.map((item) => {
+        if (item.id !== message.id) return item;
+        return {
+          ...item,
+          segments: [
+            ...(item.segments || []).filter((segment) => segment.type !== "translation"),
+            { content: data.translation, language: data.language, type: "translation" as const },
+          ],
+        };
+      });
+      set({ messages: nextMessages });
+
+      const sessionId = useSessionStore.getState().activeSessionId;
+      if (sessionId) await useSessionStore.getState().persistSessionMessages(sessionId, nextMessages);
     },
 
     startEditing: (message) => {

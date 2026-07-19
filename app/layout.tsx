@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AppBootSplash } from "@/components/AppBootSplash";
+import { GlobalTooltip } from "@/components/GlobalTooltip";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import "@fontsource-variable/noto-sans-sc";
 import "@fontsource-variable/plus-jakarta-sans";
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <AppBootSplash />
           {children}
+          <GlobalTooltip />
         </ThemeProvider>
       </body>
     </html>

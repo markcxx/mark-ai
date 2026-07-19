@@ -120,9 +120,17 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
         general: sanitizeGeneralSettings({ ...state.general, ...patch }, state.general),
       }));
       if (patch.primaryColor && typeof document !== "undefined") {
-        const color = PRIMARY_COLOR_VALUES[get().general.primaryColor];
-        document.documentElement.style.setProperty("--color-primary", color);
-        document.documentElement.style.setProperty("--color-primary-container", color);
+        const primaryColor = get().general.primaryColor;
+        const root = document.documentElement;
+        root.dataset.primaryColor = primaryColor;
+        if (primaryColor === "black") {
+          root.style.removeProperty("--color-primary");
+          root.style.removeProperty("--color-primary-container");
+        } else {
+          const color = PRIMARY_COLOR_VALUES[primaryColor];
+          root.style.setProperty("--color-primary", color);
+          root.style.setProperty("--color-primary-container", color);
+        }
       }
       persist();
     },

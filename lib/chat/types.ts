@@ -31,7 +31,18 @@ export type GeneratedFileSegment = {
   generatedFile: GeneratedFileState;
 };
 
-export type MessageSegment = ThinkingSegment | ToolSegment | ContentSegment | GeneratedFileSegment;
+export type TranslationSegment = {
+  type: "translation";
+  content: string;
+  language: string;
+};
+
+export type MessageSegment =
+  | ThinkingSegment
+  | ToolSegment
+  | ContentSegment
+  | GeneratedFileSegment
+  | TranslationSegment;
 
 export type FileAttachment = {
   id: string;
@@ -130,5 +141,9 @@ export type MenuItem = {
   danger?: boolean;
   icon: ComponentType<{ size?: number; className?: string }>;
   label: string;
-  onClick: () => void;
+  onClick?: () => void;
+  submenu?: Array<{
+    label: string;
+    onClick: () => void;
+  }>;
 };

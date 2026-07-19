@@ -1,9 +1,10 @@
 "use client";
 
-import { RefObject, useMemo, useRef, useState } from "react";
+import { RefObject, useCallback, useMemo, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   CheckSquare,
   Copy,
   FileText,
@@ -19,6 +20,7 @@ import {
   Trash2,
   Volume2,
 } from "lucide-react";
+import toast from "react-hot-toast";
 
 import type {
   ConfiguredModel,
@@ -31,6 +33,10 @@ import type {
 import { collectMessageCitations } from "@/lib/chat/citations";
 import { formatDuration, formatRelativeTime } from "@/lib/chat/metrics";
 import { cn } from "@/lib/utils";
+import {
+  TRANSLATION_LANGUAGES,
+  type TranslationLanguage,
+} from "@/lib/chat/translation-languages";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 
 import { CollapsibleContent } from "./CollapsibleContent";
@@ -95,7 +101,7 @@ function MessageStats({ message }: { message: Message }) {
   if (items.length === 0) return null;
 
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-400 opacity-0 transition-opacity duration-200 group-hover/message:opacity-100 dark:text-gray-500">
+    <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-400 opacity-100 transition-opacity duration-200 md:opacity-0 md:group-hover/message:opacity-100 dark:text-gray-500">
       {items.map((item, index) => (
         <span className="inline-flex items-center gap-2" key={item}>
           {index > 0 && <span className="h-1 w-1 rounded-full bg-gray-300 dark:bg-gray-600" />}
@@ -103,6 +109,42 @@ function MessageStats({ message }: { message: Message }) {
         </span>
       ))}
     </div>
+  );
+}
+
+function MessageTranslation({ message }: { message: Message }) {
+  const [expanded, setExpanded] = useState(false);
+  const translation = message.segments?.find((segment) => segment.type === "translation");
+  if (!translation || translation.type !== "translation") return null;
+
+  return (
+    <section className="mt-4 border-t border-gray-200/80 pt-4 dark:border-white/[0.09]">
+      <button
+        aria-expanded={expanded}
+        className="flex min-h-9 items-center gap-1.5 rounded-md pr-2 text-xs font-medium text-gray-500 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+        onClick={() => setExpanded((value) => !value)}
+        type="button"
+      >
+        <Languages size={13} />
+        译文 · {translation.language}
+        <ChevronDown
+          className={cn("transition-transform duration-200", expanded && "rotate-180")}
+          size={13}
+        />
+      </button>
+      <div
+        className={cn(
+          "grid transition-[grid-template-rows] duration-200 ease-out",
+          expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+        )}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50/90 px-3 py-3 text-gray-700 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-300">
+            <MarkdownContent>{translation.content}</MarkdownContent>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -208,6 +250,7 @@ export function MessageItem({
   startEditingMessage,
   toggleCollapseMessage,
   toggleSelectedMessage,
+  translateMessage,
 }: {
   cancelEditingMessage: () => void;
   collapsed: boolean;
@@ -234,12 +277,31 @@ export function MessageItem({
   startEditingMessage: (message: Message) => void;
   toggleCollapseMessage: (id: string) => void;
   toggleSelectedMessage: (id: string, shiftKey?: boolean) => void;
+  translateMessage: (message: Message, language: TranslationLanguage) => Promise<void>;
 }) {
   const generalSettings = useSettingsStore((state) => state.general);
   const [previewFile, setPreviewFile] = useState<FileAttachment | null>(null);
+  const [translating, setTranslating] = useState(false);
   const regenerateMode: RegenerateMode = generalSettings.overwriteRegeneratedResponse
     ? "replace"
     : "preserve";
+  const handleTranslate = useCallback(
+    async (language: TranslationLanguage) => {
+      setTranslating(true);
+      const toastId = toast.loading("正在生成译文…", { duration: Infinity });
+      try {
+        await translateMessage(message, language);
+        toast.success("译文已生成", { id: toastId });
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "翻译失败，请稍后重试", {
+          id: toastId,
+        });
+      } finally {
+        setTranslating(false);
+      }
+    },
+    [message, translateMessage],
+  );
   const moreItems = useMemo<MenuItem[]>(
     () => [
       { icon: Pencil, label: "编辑", onClick: () => startEditingMessage(message) },
@@ -251,7 +313,16 @@ export function MessageItem({
         onClick: () => toggleCollapseMessage(message.id),
       },
       { icon: Volume2, label: "语音朗读", onClick: menuUnavailable },
-      { icon: Languages, label: "翻译", onClick: menuUnavailable },
+      {
+        icon: Languages,
+        label: translating ? "翻译中…" : "翻译",
+        submenu: TRANSLATION_LANGUAGES.map((language) => ({
+          label: language.label,
+          onClick: () => {
+            if (!translating) void handleTranslate(language.value);
+          },
+        })),
+      },
       { icon: Share2, label: "分享", onClick: menuUnavailable },
       { icon: CheckSquare, label: "多选", onClick: () => enableMultiSelect(message.id) },
       {
@@ -266,12 +337,14 @@ export function MessageItem({
       copyMessage,
       deleteMessage,
       enableMultiSelect,
+      handleTranslate,
       menuUnavailable,
       message,
       regenerateMode,
       regenerateMessage,
       startEditingMessage,
       toggleCollapseMessage,
+      translating,
     ],
   );
 
@@ -292,7 +365,7 @@ export function MessageItem({
       <div className="group group/message relative flex w-full flex-col items-end">
         {relativeTime && (
           <time
-            className="mb-2 mr-1 text-xs text-gray-400 opacity-0 transition-opacity duration-200 group-hover/message:opacity-100 dark:text-gray-500"
+            className="mb-2 mr-1 text-xs text-gray-400 opacity-100 transition-opacity duration-200 md:opacity-0 md:group-hover/message:opacity-100 dark:text-gray-500"
             dateTime={message.createdAt ? new Date(message.createdAt).toISOString() : undefined}
             title={absoluteTime}
           >
@@ -358,6 +431,7 @@ export function MessageItem({
             <div className="whitespace-pre-wrap">
               <CollapsibleContent>{collapsed ? "消息已收起" : message.content}</CollapsibleContent>
             </div>
+            {!collapsed && <MessageTranslation message={message} />}
           </div>
         )}
         {!multiSelectMode && (
@@ -395,7 +469,7 @@ export function MessageItem({
               </span>
               {relativeTime && (
                 <time
-                  className="shrink-0 text-xs text-gray-400 opacity-0 transition-opacity duration-200 group-hover/message:opacity-100 dark:text-gray-500"
+                  className="shrink-0 text-xs text-gray-400 opacity-100 transition-opacity duration-200 md:opacity-0 md:group-hover/message:opacity-100 dark:text-gray-500"
                   dateTime={
                     message.createdAt ? new Date(message.createdAt).toISOString() : undefined
                   }
@@ -445,7 +519,8 @@ export function MessageItem({
             </div>
           ) : (
             <>
-              {message.segments && message.segments.length > 0 ? (
+              {message.segments &&
+              message.segments.some((segment) => segment.type !== "translation") ? (
                 <>
                   {!message.segments.some((segment) => segment.type === "thinking") && (
                     <ThinkingPanel
@@ -455,6 +530,7 @@ export function MessageItem({
                     />
                   )}
                   {message.segments.map((seg, i) => {
+                    if (seg.type === "translation") return null;
                     if (seg.type === "thinking") {
                       return (
                         <ThinkingPanel
@@ -515,6 +591,7 @@ export function MessageItem({
                   )}
                 </>
               )}
+              {!message.isStreaming && <MessageTranslation message={message} />}
               {!message.isStreaming && <MessageSources citations={citations} />}
               {message.interrupted && (
                 <InterruptedHint

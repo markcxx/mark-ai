@@ -84,7 +84,7 @@ export function ToolMenu({ disabled = false }: { disabled?: boolean }) {
       <button
         aria-expanded={open}
         className={cn(
-          "relative flex h-9 items-center gap-1.5 rounded-lg px-2 text-sm text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-200",
+          "relative flex h-11 items-center gap-1.5 rounded-lg px-2 text-sm text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-200 md:h-9",
           open && "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-100",
         )}
         disabled={disabled}

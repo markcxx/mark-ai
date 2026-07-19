@@ -361,13 +361,15 @@ export const createStreamAssistantMessage =
       contentController?.flush();
       reasoningController?.flush();
       console.error("Chat error:", error);
-      toast.error("生成失败，请稍后重试");
+      const failureMessage = "生成失败，请稍后重试。";
+      toast.error(failureMessage);
       set((s) => ({
         messages: s.messages.map((m) =>
           m.id === modelMessageId
             ? {
                 ...m,
-                content: "Sorry, I encountered an error. Please try again.",
+                content: failureMessage,
+                interrupted: true,
                 isReasoning: false,
               }
             : m,
@@ -375,17 +377,18 @@ export const createStreamAssistantMessage =
       }));
       const errReasoning = getAllReasoning();
       return {
-        content: "Sorry, I encountered an error. Please try again.",
+        content: failureMessage,
         generationDuration: Date.now() - startedAt,
         inputTokens,
         isReasoning: false,
+        interrupted: true,
         isStreaming: false,
-        outputTokens: estimateTextTokens("Sorry, I encountered an error. Please try again."),
+        outputTokens: estimateTextTokens(failureMessage),
         reasoning: errReasoning || undefined,
         segments: segments.length > 0 ? [...segments] : undefined,
         tokenUsageSource: "estimated",
         totalTokens:
-          inputTokens + estimateTextTokens("Sorry, I encountered an error. Please try again."),
+          inputTokens + estimateTextTokens(failureMessage),
       };
     } finally {
       set((s) => ({

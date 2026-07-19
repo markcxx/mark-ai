@@ -18,7 +18,12 @@ export async function middleware(req: NextRequest) {
 
   const { pathname } = req.nextUrl;
 
-  if (isPublicPath(pathname) || pathname.startsWith("/_next") || pathname.startsWith("/images")) {
+  if (
+    pathname === "/" ||
+    isPublicPath(pathname) ||
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/images")
+  ) {
     return NextResponse.next();
   }
 

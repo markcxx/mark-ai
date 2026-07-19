@@ -108,7 +108,7 @@ export function UserAccountMenu() {
                   }}
                   type="button"
                 >
-                  <ShieldCheck className="text-violet-500" size={17} />
+                  <ShieldCheck className="text-gray-400" size={17} />
                   管理后台
                 </button>
               )}

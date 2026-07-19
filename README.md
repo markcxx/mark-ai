@@ -130,6 +130,7 @@ FIRECRAWL_API_KEY=fc-xxxxx       # 网页阅读（可选，缺省回退到 Tavil
 | --------------------------------- | --------------------- | ------------------------------------------------ |
 | `MARKAI_SQLITE_PATH`              | `.data/markai.sqlite` | SQLite 数据库路径                                |
 | `MARKAI_CONVERSATION_TITLE_MODEL` | —                     | 自动生成会话标题的模型（格式：`provider/model`） |
+| `MARKAI_TRANSLATION_MODEL`        | —                     | 默认消息翻译模型（格式：`provider/model`）       |
 
 ---
 

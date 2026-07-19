@@ -23,21 +23,21 @@ export function AppBootSplash() {
   const bootProgress = useUIStore((s) => s.bootProgress);
   const [minimumDurationElapsed, setMinimumDurationElapsed] = useState(false);
   const [visible, setVisible] = useState(true);
-  const requiresChatInitialization = !ROUTES_WITHOUT_CHAT_INITIALIZATION.some((path) =>
-    pathname.startsWith(path),
-  );
+  const requiresChatInitialization =
+    pathname !== "/" &&
+    !ROUTES_WITHOUT_CHAT_INITIALIZATION.some((path) => pathname.startsWith(path));
   const routeReady = !requiresChatInitialization || isAppReady;
   const exiting = minimumDurationElapsed && routeReady;
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setMinimumDurationElapsed(true), 850);
+    const timer = window.setTimeout(() => setMinimumDurationElapsed(true), 120);
     return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
     if (!exiting) return;
 
-    const timer = window.setTimeout(() => setVisible(false), 300);
+    const timer = window.setTimeout(() => setVisible(false), 180);
     return () => window.clearTimeout(timer);
   }, [exiting]);
 
@@ -46,7 +46,7 @@ export function AppBootSplash() {
   return (
     <MarkAILoadingScreen
       className={cn(
-        "fixed inset-0 z-[9999] transition-opacity duration-300",
+        "fixed inset-0 z-[9999] transition-opacity duration-200",
         exiting && "opacity-0",
       )}
       progress={requiresChatInitialization ? bootProgress : 100}

@@ -51,7 +51,7 @@ export function SessionRow({
     <div className="relative" ref={menuOpen ? menuRef : undefined}>
       <div
         className={cn(
-          "group flex h-9 min-w-0 items-center gap-2 overflow-hidden rounded-lg px-1 text-sm transition-colors",
+          "group flex min-h-11 min-w-0 items-center gap-2 overflow-hidden rounded-lg px-1 text-sm transition-colors md:min-h-9",
           active
             ? "bg-[#eceef0] text-gray-900 dark:bg-gray-800 dark:text-gray-100"
             : "text-gray-700 hover:bg-[#f0f1f2] dark:text-gray-300 dark:hover:bg-gray-800/60",
@@ -105,7 +105,7 @@ export function SessionRow({
         ) : (
           <IconButton
             className={cn(
-              "opacity-0 transition-opacity group-hover:opacity-100",
+              "opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100",
               menuOpen && "opacity-100",
             )}
             onClick={(event) => {

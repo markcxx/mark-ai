@@ -40,8 +40,14 @@ export function AdminConsole() {
   useEffect(() => {
     if (!settingsLoaded) return;
     const root = document.documentElement;
-    root.style.setProperty("--color-primary", PRIMARY_COLOR_VALUES[general.primaryColor]);
-    root.style.setProperty("--color-primary-container", PRIMARY_COLOR_VALUES[general.primaryColor]);
+    root.dataset.primaryColor = general.primaryColor;
+    if (general.primaryColor === "black") {
+      root.style.removeProperty("--color-primary");
+      root.style.removeProperty("--color-primary-container");
+    } else {
+      root.style.setProperty("--color-primary", PRIMARY_COLOR_VALUES[general.primaryColor]);
+      root.style.setProperty("--color-primary-container", PRIMARY_COLOR_VALUES[general.primaryColor]);
+    }
     root.dataset.density = general.density;
     root.dataset.reduceMotion = general.reduceMotion ? "true" : "false";
     setTheme(general.themeMode);

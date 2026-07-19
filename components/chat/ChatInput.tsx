@@ -49,6 +49,7 @@ export function ChatInput({
   textareaRef,
   webSearchEnabled,
   onToggleWebSearch,
+  wide = false,
 }: {
   availableModels: ConfiguredModel[];
   attachments: FileAttachment[];
@@ -73,6 +74,7 @@ export function ChatInput({
   textareaRef: RefObject<HTMLTextAreaElement | null>;
   webSearchEnabled: boolean;
   onToggleWebSearch: () => void;
+  wide?: boolean;
 }) {
   const [isModelDialogOpen, setIsModelDialogOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<FileAttachment | null>(null);
@@ -88,8 +90,10 @@ export function ChatInput({
       >
         <div
           className={cn(
-            "w-full",
-            placement === "bottom" ? "pointer-events-auto max-w-[840px]" : "max-w-[760px]",
+            "w-full transition-[max-width] duration-300 ease-out",
+            placement === "bottom"
+              ? cn("pointer-events-auto", wide ? "max-w-full" : "max-w-[840px]")
+              : "max-w-[760px]",
           )}
         >
           <div className="relative flex flex-col rounded-xl border border-gray-200 bg-[var(--chat-input-bg)] shadow-[0_12px_32px_rgba(0,0,0,0.06)] transition-all duration-300 focus-within:border-primary/30 focus-within:ring-2 focus-within:ring-primary/20 dark:border-white/10 dark:shadow-[0_14px_40px_rgba(0,0,0,0.35)] dark:focus-within:border-white/20 dark:focus-within:ring-white/[0.06]">
@@ -153,7 +157,7 @@ export function ChatInput({
             <div className="flex items-center justify-between px-2.5 pb-2.5 pt-1 md:px-3 md:pb-3">
               <div className="flex items-center gap-1">
                 <button
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-200"
+                  className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-200 md:h-9 md:w-9"
                   onClick={onAttachment}
                   disabled={isLoading || attachmentUploading || attachments.length >= 4}
                   title="添加附件"
@@ -162,7 +166,7 @@ export function ChatInput({
                   <Paperclip size={20} />
                 </button>
                 <button
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-200"
+                  className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-200 md:h-9 md:w-9"
                   onClick={onMic}
                   title="语音输入"
                   type="button"
@@ -172,7 +176,7 @@ export function ChatInput({
                 <ToolMenu disabled={isLoading} />
                 <button
                   className={cn(
-                    "flex h-9 items-center gap-1.5 rounded-lg px-2 text-sm transition-colors",
+                    "flex h-11 items-center gap-1.5 rounded-lg px-2 text-sm transition-colors md:h-9",
                     webSearchEnabled
                       ? "text-primary hover:bg-primary/5 dark:text-primary dark:hover:bg-primary/10"
                       : "text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-200",
@@ -197,7 +201,7 @@ export function ChatInput({
                   webSearchEnabled={webSearchEnabled}
                 />
                 <button
-                  className="flex h-9 max-w-[240px] items-center gap-2 rounded-lg px-2.5 text-sm text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex h-11 max-w-[240px] items-center gap-2 rounded-lg px-2.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:text-gray-300 dark:hover:bg-gray-700 md:h-9"
                   disabled={isLoadingModels || availableModels.length === 0}
                   onClick={() => {
                     if (availableModels.length > 0) setIsModelDialogOpen(true);
@@ -222,7 +226,7 @@ export function ChatInput({
                 <button
                   aria-label={isLoading ? "停止生成" : "发送消息"}
                   className={cn(
-                    "relative flex h-9 w-9 min-w-9 items-center justify-center overflow-hidden rounded-full bg-gray-950 text-white shadow-sm transition-transform duration-150 ease-out hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 disabled:hover:scale-100 dark:bg-white dark:text-gray-950 dark:disabled:bg-gray-700 dark:disabled:text-gray-400",
+                    "relative flex h-11 w-11 min-w-11 items-center justify-center overflow-hidden rounded-full bg-gray-950 text-white shadow-sm transition-transform duration-150 ease-out hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 disabled:hover:scale-100 dark:bg-white dark:text-gray-950 dark:disabled:bg-gray-700 dark:disabled:text-gray-400 md:h-9 md:w-9 md:min-w-9",
                     isLoading &&
                       "bg-red-500 text-white hover:bg-red-600 dark:bg-red-500 dark:text-white dark:hover:bg-red-600",
                   )}

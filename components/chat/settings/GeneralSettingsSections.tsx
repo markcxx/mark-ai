@@ -7,11 +7,14 @@ import type { ReactNode } from "react";
 
 import { AppSelect } from "@/components/ui/AppSelect";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
+import { getModelDisplayName, getModelKey } from "@/lib/chat/helpers";
 import type { CodeTheme, PrimaryColor } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/useSettingsStore";
+import { useUIStore } from "@/stores/useUIStore";
 
 const primaryColors: Array<{ color: string; id: PrimaryColor; label: string }> = [
+  { id: "black", color: "#111827", label: "黑色" },
   { id: "blue", color: "#2563eb", label: "蓝色" },
   { id: "indigo", color: "#4f46e5", label: "靛青" },
   { id: "violet", color: "#7c3aed", label: "紫色" },
@@ -177,6 +180,8 @@ export function AppearanceSettings() {
 export function ChatSettings() {
   const general = useSettingsStore((state) => state.general);
   const update = useSettingsStore((state) => state.updateGeneral);
+  const availableModels = useUIStore((state) => state.availableModels);
+  const providerNames = useUIStore((state) => state.providerNames);
 
   return (
     <div>
@@ -226,6 +231,25 @@ export function ChatSettings() {
         <ToggleSwitch
           checked={general.showMessageStats}
           onChange={(showMessageStats) => update({ showMessageStats })}
+        />
+      </SettingRow>
+      <SettingRow
+        description="系统默认由服务端配置；也可以跟随消息或固定到指定模型"
+        title="翻译模型"
+      >
+        <AppSelect
+          onChange={(value) => {
+            if (typeof value === "string") update({ translationModelKey: value });
+          }}
+          options={[
+            { label: "系统默认", value: "__system__" },
+            { label: "跟随消息模型", value: "" },
+            ...availableModels.map((model) => ({
+              label: `${getModelDisplayName(model.id)} · ${providerNames[model.provider] || model.provider}`,
+              value: getModelKey(model),
+            })),
+          ]}
+          value={general.translationModelKey}
         />
       </SettingRow>
       <SettingRow title="默认启用联网搜索">

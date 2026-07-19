@@ -3,8 +3,8 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --color-primary: #0056c3;
-  --color-primary-container: #2a70e4;
+  --color-primary: #111827;
+  --color-primary-container: #111827;
   --color-on-primary-container: #fefcff;
   --color-surface-container-low: #f3f4f5;
   --color-surface-container-high: #e7e8e9;
@@ -56,8 +56,8 @@ body {
 
 /* Dark mode overrides */
 .dark {
-  --color-primary: #5b9aff;
-  --color-primary-container: #3a7cdb;
+  --color-primary: #f5f5f5;
+  --color-primary-container: #f5f5f5;
   --color-on-primary-container: #e8f1ff;
   --color-surface-container-low: #1a1b1e;
   --color-surface-container-high: #2a2b2e;
@@ -76,6 +76,11 @@ body {
   --chat-input-overlay-via: rgba(17, 18, 20, 0.9);
   --chat-popover-bg: #191919;
   --chat-user-bubble-bg: #1f2023;
+}
+
+html.dark[data-primary-color="black"] {
+  --color-primary: #f5f5f5;
+  --color-primary-container: #f5f5f5;
 }
 
 /* Custom scrollbar */
@@ -219,6 +224,40 @@ button:disabled {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+@keyframes auth-emoji-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(2deg);
+  }
+}
+
+@keyframes auth-emoji-swap {
+  0% {
+    opacity: 0;
+    transform: scale(0.72) rotate(-8deg);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.06) rotate(2deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
+.auth-emoji-float {
+  animation: auth-emoji-float 4.2s ease-in-out infinite;
+}
+
+.auth-emoji-swap {
+  display: inline-flex;
+  animation: auth-emoji-swap 420ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes menu-in {

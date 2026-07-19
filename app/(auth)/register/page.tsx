@@ -23,7 +23,7 @@ type RegistrationMode = "closed" | "loading" | "open" | "waitlist";
 
 const EMAIL_DOMAINS = ["@qq.com", "@163.com", "@126.com", "@outlook.com", "@gmail.com"];
 const fieldClass =
-  "h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-blue-400/50";
+  "h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-primary/45 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-white/30";
 
 function GoogleIcon() {
   return (
@@ -308,7 +308,7 @@ export default function RegisterPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
                 申请说明
                 <textarea
-                  className="mt-2 min-h-24 w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none transition-colors placeholder:text-gray-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10 dark:border-white/10 dark:bg-white/[0.04]"
+                  className="mt-2 min-h-24 w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none transition-colors placeholder:text-gray-400 focus:border-primary/45 focus:ring-2 focus:ring-primary/10 dark:border-white/10 dark:bg-white/[0.04]"
                   maxLength={1000}
                   onChange={(event) => setWaitlistMessage(event.target.value)}
                   placeholder="选填，简单介绍你希望如何使用 MarkAI"
@@ -354,7 +354,7 @@ export default function RegisterPage() {
             <form className="space-y-5" onSubmit={handleSendCode}>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
                 邮箱地址
-                <div className="mt-2 flex rounded-lg border border-gray-200 bg-white transition-colors focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/10 dark:border-white/10 dark:bg-white/[0.04]">
+                <div className="mt-2 flex rounded-lg border border-gray-200 bg-white transition-colors focus-within:border-primary/45 focus-within:ring-2 focus-within:ring-primary/10 dark:border-white/10 dark:bg-white/[0.04]">
                   <input
                     autoFocus
                     className="h-11 min-w-0 flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-gray-400"
@@ -380,7 +380,7 @@ export default function RegisterPage() {
                         <div className="absolute right-0 top-[calc(100%+6px)] z-20 w-40 origin-top-right animate-[menu-in_160ms_cubic-bezier(0.22,1,0.36,1)] rounded-lg border border-gray-200 bg-white p-1 shadow-[0_10px_32px_rgba(0,0,0,0.12)] dark:border-white/10 dark:bg-[#1c1c1c]">
                           {EMAIL_DOMAINS.map((domain) => (
                             <button
-                              className={`flex h-9 w-full items-center justify-between rounded-md px-3 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/[0.07] ${emailDomain === domain ? "text-blue-600 dark:text-blue-400" : "text-gray-700 dark:text-gray-200"}`}
+                              className={`flex h-11 w-full items-center justify-between rounded-md px-3 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/[0.07] ${emailDomain === domain ? "font-medium text-gray-950 dark:text-white" : "text-gray-700 dark:text-gray-200"}`}
                               key={domain}
                               onClick={() => {
                                 setEmailDomain(domain);
@@ -434,7 +434,7 @@ export default function RegisterPage() {
                 修改邮箱
               </button>
               <button
-                className="text-blue-600 disabled:text-gray-400 dark:text-blue-400"
+                className="min-h-11 text-gray-950 disabled:text-gray-400 dark:text-white"
                 disabled={countdown > 0 || loading}
                 onClick={async () => {
                   setLoading(true);
@@ -484,7 +484,7 @@ export default function RegisterPage() {
         <p className="mt-auto pt-8 text-sm text-gray-500 dark:text-gray-400">
           已有账户？{" "}
           <Link
-            className="font-medium text-blue-600 hover:underline dark:text-blue-400"
+            className="font-medium text-gray-950 hover:underline dark:text-white"
             href="/login"
           >
             直接登录

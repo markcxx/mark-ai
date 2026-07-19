@@ -10,8 +10,8 @@ type IconButtonShape = "circle" | "rounded";
 
 const sizeClass: Record<IconButtonSize, string> = {
   md: "h-10 w-10",
-  sm: "h-8 w-8",
-  xs: "h-7 w-7",
+  sm: "h-10 w-10 md:h-8 md:w-8",
+  xs: "h-9 w-9 md:h-7 md:w-7",
 };
 
 const shapeClass: Record<IconButtonShape, string> = {
