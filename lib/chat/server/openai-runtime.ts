@@ -14,6 +14,10 @@ import {
 } from "@/lib/chat/server/openai-helpers";
 import { READ_WEBPAGE_TOOL, WEB_SEARCH_TOOL } from "@/lib/chat/server/runtime-prompt";
 import {
+  ThinkingTagStreamParser,
+  type ThinkingTagStreamEvent,
+} from "@/lib/chat/server/thinking-tag-stream";
+import {
   encodeGeneratedFileEvent,
   encodeStreamEvent,
   encodeToolEvent,
@@ -168,6 +172,21 @@ export const createOpenAICompatibleStream = async (
         let assistantReasoning = "";
         let buffer = "";
         let providerUsage: TokenUsage | undefined;
+        let thinkingParsersFinished = false;
+        const thinkingParsers = new Map<number, ThinkingTagStreamParser>();
+
+        const emitTextEvent = (event: ThinkingTagStreamEvent) => {
+          if (!event.text) return;
+          if (event.type === "reasoning") assistantReasoning += event.text;
+          else assistantContent += event.text;
+          controller.enqueue(encodeStreamEvent(encoder, event.type, event.text));
+        };
+
+        const finishThinkingParsers = () => {
+          if (thinkingParsersFinished) return;
+          thinkingParsersFinished = true;
+          thinkingParsers.forEach((parser) => parser.finish().forEach(emitTextEvent));
+        };
 
         const appendToolCall = (toolCall: any, fallbackIndex: number) => {
           const index = Number.isFinite(toolCall?.index) ? Number(toolCall.index) : fallbackIndex;
@@ -208,7 +227,7 @@ export const createOpenAICompatibleStream = async (
             };
           }
 
-          for (const choice of choices) {
+          for (const [fallbackIndex, choice] of choices.entries()) {
             const reasoning = getChoiceText(choice, [
               "reasoning_content",
               "reasoningContent",
@@ -223,12 +242,15 @@ export const createOpenAICompatibleStream = async (
             const deltaToolCalls = choice?.delta?.tool_calls || choice?.message?.tool_calls;
 
             if (reasoning) {
-              assistantReasoning += reasoning;
-              controller.enqueue(encodeStreamEvent(encoder, "reasoning", reasoning));
+              emitTextEvent({ text: reasoning, type: "reasoning" });
             }
             if (content) {
-              assistantContent += content;
-              controller.enqueue(encodeStreamEvent(encoder, "content", content));
+              const choiceIndex = Number.isFinite(choice?.index)
+                ? Number(choice.index)
+                : fallbackIndex;
+              const parser = thinkingParsers.get(choiceIndex) || new ThinkingTagStreamParser();
+              thinkingParsers.set(choiceIndex, parser);
+              parser.push(content).forEach(emitTextEvent);
             }
             if (Array.isArray(deltaToolCalls)) {
               deltaToolCalls.forEach(appendToolCall);
@@ -237,6 +259,7 @@ export const createOpenAICompatibleStream = async (
         };
 
         const getPassResult = () => {
+          finishThinkingParsers();
           const toolCalls = normalizeToolCalls([...toolCallsByIndex.values()]);
           return {
             assistantContent,
