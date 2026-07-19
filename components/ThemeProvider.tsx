@@ -1,7 +1,5 @@
 "use client";
 
-import { ConfigProvider } from "@lobehub/ui";
-import { motion } from "motion/react";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
@@ -12,7 +10,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       enableSystem
       disableTransitionOnChange
     >
-      <ConfigProvider motion={motion}>{children}</ConfigProvider>
+      {children}
     </NextThemesProvider>
   );
 }

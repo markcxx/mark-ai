@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { rehypeStreamAnimated } from "@lobehub/ui";
 import { Check, Copy } from "lucide-react";
 import dynamic from "next/dynamic";
 import ReactMarkdown from "react-markdown";
@@ -11,6 +10,7 @@ import { Pre, PreSingleLine } from "@/components/CodeBlock";
 import type { WebCitation } from "@/lib/chat/citations";
 import type { GeneralSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
+import { rehypeStreamAnimated } from "@/lib/markdown/rehype-stream-animated";
 
 import { HtmlPreviewBlock } from "./HtmlPreviewBlock";
 import { CitationReference } from "./message/MessageSources";

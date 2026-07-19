@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { AppDialog } from "@/components/ui/AppDialog";
+import { useUIStore } from "@/stores/useUIStore";
 
 const GUEST_EMOJIS = ["🙂", "😊", "😄", "😁", "🤗", "🤩", "😎", "🫡", "😉"];
 
@@ -16,6 +17,12 @@ export function GuestChatApp() {
   const [promptOpen, setPromptOpen] = useState(false);
   const [emoji, setEmoji] = useState("🙂");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const uiStore = useUIStore.getState();
+    uiStore.setBootProgress(100, "加载完成");
+    uiStore.setAppReady(true);
+  }, []);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {

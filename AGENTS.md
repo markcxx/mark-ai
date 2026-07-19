@@ -108,7 +108,7 @@ Dark mode is not a simple inversion. Use the existing near-black surfaces (`#0e0
 
 - Use `lucide-react` for general interface icons. Use `@lobehub/icons` only for model/provider brand identities.
 - Icon-only buttons require an accessible name and a tooltip.
-- Prefer local primitives: `IconButton`, `MenuAction`, `DropdownSurface`, `AppDialog`, `AppSelect`, `ToggleSwitch`, and `ConfirmDialog`.
+- Prefer local primitives: `IconButton`, `MenuAction`, `DropdownSurface`, `AppDialog`, `AppSelect`, `AppInput`, `AppPasswordInput`, `AppTextArea`, `AppNumberInput`, `AppSliderWithInput`, `SegmentedControl`, `ToggleSwitch`, and `ConfirmDialog`.
 - Use a familiar icon instead of a rounded text button when the command is universally recognizable.
 - Destructive actions use red only in the action itself and its confirmation flow.
 - Global tooltips are owned by `components/GlobalTooltip.tsx`. Prefer `aria-label` plus `data-markai-tooltip` for new icon controls. Existing `title` attributes are migrated automatically, but new code should avoid relying on the browser-native tooltip.
@@ -118,6 +118,7 @@ Dark mode is not a simple inversion. Use the existing near-black surfaces (`#0e0
 
 - Use skeletons when the final layout is known. Avoid generic centered spinners that replace a stable work surface.
 - Do not force a long splash delay. `AppBootSplash` should leave as soon as the route is ready, subject only to its short anti-flash minimum.
+- On authenticated chat routes, `AppBootSplash` must remain visible until the initial model list and session history requests have both settled. The root `/` route is not an exception. `GuestChatApp` explicitly releases the splash because it must not call those protected APIs.
 - User-facing errors must be Chinese and actionable. A failed assistant generation is an interrupted message with continue/regenerate options, not a normal English assistant reply.
 - Toasts should be brief except for operations whose completion time is unknown. A translation loading toast must use infinite duration and be replaced by the success/error toast with the same toast ID.
 - Never expose an enabled control that silently does nothing. Existing placeholder controls intentionally show `NOT_IMPLEMENTED_TOAST`; do not remove them without explicit product direction.
@@ -156,6 +157,7 @@ Use the existing ownership boundaries before adding abstractions.
 ### Dialogs And Overlays
 
 - Use `AppDialog` for modal workflows and `ConfirmDialog` for destructive confirmation.
+- `AppDialog`, `AppSelect`, and source previews are styled MarkAI components built on targeted `@base-ui/react` subpath imports. Preserve their current public props and accessibility behavior instead of bypassing them with raw Base UI primitives in feature components.
 - Use `FloatingMenu` for message menus. It supports nested submenu items for compact option sets.
 - Use `GlobalTooltip` for small contextual labels.
 - Preview surfaces such as HTML and ECharts should remain framed artifacts, not generic page cards.
@@ -214,6 +216,8 @@ The Next.js development server warning `Server is approaching the used memory th
 Development-memory rules:
 
 - Avoid new imports from the `@lobehub/ui` top-level barrel. Prefer existing local wrappers or a documented targeted subpath export.
+- Application code must not import LobeHub UI components. The currently required controls have local MarkAI equivalents under `components/ui/`, and streaming Markdown uses `lib/markdown/rehype-stream-animated.ts`.
+- `@lobehub/ui` remains installed because `@lobehub/icons` declares it as a required peer dependency and generic icon fallbacks reference it. Its presence in `package.json` does not authorize new UI-component imports.
 - Do not import an entire model-icon package when a provider-specific export exists.
 - Dynamically import heavy preview/editor/export code that is not needed on the initial chat route.
 - Keep server-only Office parsers and generators out of client dependency graphs.

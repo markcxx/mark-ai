@@ -3,7 +3,6 @@
 import type { RefObject } from "react";
 import { useState } from "react";
 import { ModelIcon } from "@lobehub/icons";
-import { GlobeOffIcon } from "@lobehub/ui/icons";
 import {
   ChevronRight,
   FileText,
@@ -20,6 +19,7 @@ import type { ConfiguredModel, FileAttachment, Message } from "@/lib/chat/types"
 import { getModelDisplayName } from "@/lib/chat/helpers";
 import { cn } from "@/lib/utils";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
+import { GlobeOffIcon } from "@/components/icons/GlobeOffIcon";
 import { ContextWindowIndicator } from "./ContextWindowIndicator";
 import { FilePreviewDialog } from "./FilePreviewDialog";
 import { ModelSelectorDialog } from "./ModelSelectorDialog";

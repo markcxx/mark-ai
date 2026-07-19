@@ -236,7 +236,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
         };
 
         uiStore.setBootProgress(12, "正在加载模型与会话…");
-        await Promise.all([
+        await Promise.allSettled([
           useSettingsStore
             .getState()
             .loadSettings()

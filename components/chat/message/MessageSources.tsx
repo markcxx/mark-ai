@@ -1,6 +1,6 @@
 "use client";
 
-import { Popover } from "@lobehub/ui";
+import { Popover } from "@base-ui/react/popover";
 import { ChevronRight, ExternalLink, Globe } from "lucide-react";
 import { useState } from "react";
 import type { ReactElement } from "react";
@@ -101,19 +101,20 @@ export function SourcePopover({
   citation: WebCitation;
 }) {
   return (
-    <Popover
-      arrow
-      className="!rounded-xl !border-gray-200 !bg-white !p-2 !shadow-[0_16px_48px_rgba(15,23,42,0.18)] dark:!border-white/15 dark:!bg-[#202020]"
-      closeDelay={120}
-      content={<SourcePreviewCard citation={citation} />}
-      openDelay={120}
-      placement="top"
-      standalone
-      trigger="both"
-      zIndex={120}
-    >
-      {children}
-    </Popover>
+    <Popover.Root>
+      <Popover.Trigger closeDelay={120} delay={120} openOnHover render={children} />
+      <Popover.Portal>
+        <Popover.Positioner align="center" className="z-[120]" side="top" sideOffset={8}>
+          <Popover.Popup
+            className="origin-[var(--transform-origin)] rounded-xl border border-gray-200 bg-white p-2 shadow-[0_16px_48px_rgba(15,23,42,0.18)] outline-none transition-[opacity,transform] duration-150 data-[ending-style]:scale-[0.96] data-[ending-style]:opacity-0 data-[starting-style]:scale-[0.96] data-[starting-style]:opacity-0 dark:border-white/15 dark:bg-[#202020]"
+            initialFocus={false}
+          >
+            <Popover.Arrow className="h-2 w-2 rotate-45 border-b border-r border-gray-200 bg-white dark:border-white/15 dark:bg-[#202020]" />
+            <SourcePreviewCard citation={citation} />
+          </Popover.Popup>
+        </Popover.Positioner>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 

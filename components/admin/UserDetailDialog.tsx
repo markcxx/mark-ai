@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Segmented } from "@lobehub/ui";
 import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowLeft,
@@ -33,6 +32,7 @@ import { FilePreviewDialog } from "@/components/chat/FilePreviewDialog";
 import { AppDialog } from "@/components/ui/AppDialog";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { AppSelect } from "@/components/ui/AppSelect";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { cn } from "@/lib/utils";
 
 type UserDetail = {
@@ -317,12 +317,11 @@ export function UserManagementView({
           <div className="min-h-[520px] sm:min-h-[620px]">
             <div className="overflow-x-auto pb-1">
               <div className="min-w-[430px] sm:min-w-0">
-                <Segmented
+                <SegmentedControl
                   onChange={(value) => setTab(value as Tab)}
                   options={tabs}
                   padding={4}
                   value={tab}
-                  variant="borderless"
                 />
               </div>
             </div>

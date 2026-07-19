@@ -26,12 +26,12 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { Input, InputPassword, TextArea } from "@lobehub/ui";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 
 import { AppDialog } from "@/components/ui/AppDialog";
+import { AppInput, AppPasswordInput, AppTextArea } from "@/components/ui/AppInput";
 import { MODEL_PROVIDER_TEMPLATES } from "@/lib/model-provider-registry";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -320,7 +320,7 @@ function ProviderSettings() {
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="text-sm">
               显示名称
-              <Input
+              <AppInput
                 className="mt-2"
                 onChange={(event) => setForm({ ...form, name: event.target.value })}
                 value={form.name}
@@ -328,7 +328,7 @@ function ProviderSettings() {
             </label>
             <label className="text-sm">
               提供商 ID
-              <Input
+              <AppInput
                 className="mt-2"
                 disabled={exists || Boolean(templates.find((item) => item.id === form.provider))}
                 onChange={(event) =>
@@ -343,7 +343,7 @@ function ProviderSettings() {
           </div>
           <label className="block text-sm">
             Base URL
-            <Input
+            <AppInput
               className="mt-2"
               onChange={(event) => setForm({ ...form, baseUrl: event.target.value })}
               value={form.baseUrl}
@@ -351,7 +351,7 @@ function ProviderSettings() {
           </label>
           <label className="block text-sm">
             API Key
-            <InputPassword
+            <AppPasswordInput
               autoComplete="off"
               className="mt-2"
               onChange={(event) => setForm({ ...form, apiKey: event.target.value })}
@@ -363,7 +363,7 @@ function ProviderSettings() {
           </label>
           <label className="block text-sm">
             模型 ID（每行一个，也支持逗号分隔）
-            <TextArea
+            <AppTextArea
               className="mt-2 font-mono"
               onChange={(event) => setForm({ ...form, models: event.target.value })}
               rows={7}

@@ -1,7 +1,6 @@
 "use client";
 
 import type { EChartsOption } from "echarts";
-import { Segmented } from "@lobehub/ui";
 import {
   BadgeCheck,
   ClipboardClock,
@@ -16,6 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AdminChart } from "@/components/admin/AdminChart";
 import { AdminError, formatBytes } from "@/components/admin/AdminPrimitives";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 
 type OverviewData = {
   fileTypes: Array<{ name: string; value: number }>;
@@ -359,7 +359,7 @@ export function OverviewPanel() {
           <h3 className="text-sm font-semibold">运营数据</h3>
           <p className="mt-1 text-xs text-gray-400">点击图例可隐藏维度，滚轮可缩放趋势图</p>
         </div>
-        <Segmented
+        <SegmentedControl
           onChange={(value) => setRangeDays(Number(value))}
           options={[
             { label: "7 天", value: 7 },
@@ -368,7 +368,6 @@ export function OverviewPanel() {
           ]}
           padding={4}
           value={rangeDays}
-          variant="borderless"
         />
       </div>
       <div className="grid grid-cols-2 gap-x-3 gap-y-4 sm:gap-x-7 sm:gap-y-5 lg:grid-cols-4">

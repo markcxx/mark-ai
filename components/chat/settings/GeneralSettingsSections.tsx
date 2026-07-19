@@ -1,11 +1,12 @@
 "use client";
 
-import { InputNumber, SliderWithInput } from "@lobehub/ui";
 import { Check } from "lucide-react";
 import { useTheme } from "next-themes";
 import type { ReactNode } from "react";
 
 import { AppSelect } from "@/components/ui/AppSelect";
+import { AppNumberInput } from "@/components/ui/AppNumberInput";
+import { AppSliderWithInput } from "@/components/ui/AppSliderWithInput";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
 import { getModelDisplayName, getModelKey } from "@/lib/chat/helpers";
 import type { CodeTheme, PrimaryColor } from "@/lib/settings";
@@ -104,7 +105,7 @@ export function AppearanceSettings() {
         </div>
       </SettingRow>
       <SettingRow description="影响 AI 回复正文，不影响导航栏" title="对话字号">
-        <SliderWithInput
+        <AppSliderWithInput
           max={20}
           min={12}
           onChange={(value) => update({ chatFontSize: Number(value) })}
@@ -165,7 +166,7 @@ export function AppearanceSettings() {
         <ToggleSwitch checked={general.codeWrap} onChange={(codeWrap) => update({ codeWrap })} />
       </SettingRow>
       <SettingRow description="设为 0 表示永不自动折叠" title="长代码折叠阈值">
-        <InputNumber
+        <AppNumberInput
           max={100}
           min={0}
           onChange={(value) => update({ codeCollapseLines: Number(value) })}

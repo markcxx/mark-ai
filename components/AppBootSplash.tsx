@@ -23,16 +23,20 @@ export function AppBootSplash() {
   const bootProgress = useUIStore((s) => s.bootProgress);
   const [minimumDurationElapsed, setMinimumDurationElapsed] = useState(false);
   const [visible, setVisible] = useState(true);
-  const requiresChatInitialization =
-    pathname !== "/" &&
-    !ROUTES_WITHOUT_CHAT_INITIALIZATION.some((path) => pathname.startsWith(path));
+  const requiresChatInitialization = !ROUTES_WITHOUT_CHAT_INITIALIZATION.some((path) =>
+    pathname.startsWith(path),
+  );
   const routeReady = !requiresChatInitialization || isAppReady;
   const exiting = minimumDurationElapsed && routeReady;
 
   useEffect(() => {
+    if (requiresChatInitialization && !useUIStore.getState().isAppReady) {
+      setVisible(true);
+    }
+    setMinimumDurationElapsed(false);
     const timer = window.setTimeout(() => setMinimumDurationElapsed(true), 120);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [pathname, requiresChatInitialization]);
 
   useEffect(() => {
     if (!exiting) return;
