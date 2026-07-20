@@ -25,6 +25,26 @@ const EChartsPreviewBlock = dynamic(
   },
 );
 
+const MermaidPreviewBlock = dynamic(
+  () => import("./MermaidPreviewBlock").then((module) => module.MermaidPreviewBlock),
+  {
+    loading: () => (
+      <div className="my-5 h-[340px] animate-pulse rounded-xl border border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-white/[0.04]" />
+    ),
+    ssr: false,
+  },
+);
+
+const MarkmapPreviewBlock = dynamic(
+  () => import("./MarkmapPreviewBlock").then((module) => module.MarkmapPreviewBlock),
+  {
+    loading: () => (
+      <div className="my-5 h-[340px] animate-pulse rounded-xl border border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-white/[0.04]" />
+    ),
+    ssr: false,
+  },
+);
+
 type MarkdownNode = {
   children?: MarkdownNode[];
   type: string;
@@ -179,6 +199,12 @@ const markdownComponents = {
     }
     if (language === "echarts" || language === "echart" || language === "chart") {
       return <EChartsPreviewBlock>{String(children)}</EChartsPreviewBlock>;
+    }
+    if (language === "mermaid") {
+      return <MermaidPreviewBlock>{String(children)}</MermaidPreviewBlock>;
+    }
+    if (language === "markmap" || language === "mindmap") {
+      return <MarkmapPreviewBlock>{String(children)}</MarkmapPreviewBlock>;
     }
     return <Pre language={language}>{String(children)}</Pre>;
   },

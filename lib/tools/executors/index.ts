@@ -1,3 +1,8 @@
+import {
+  executeCalculateExpression,
+  executeConvertUnits,
+  executeSummarizeNumbers,
+} from "./calculator";
 import { executeCreateExcel } from "./excel";
 import { executeCreateWord } from "./word";
 
@@ -13,6 +18,12 @@ export const executeBuiltinTool = async (
       return executeCreateWord(args, context);
     case "create_excel_workbook":
       return executeCreateExcel(args, context);
+    case "calculate_expression":
+      return executeCalculateExpression(args);
+    case "summarize_numbers":
+      return executeSummarizeNumbers(args);
+    case "convert_units":
+      return executeConvertUnits(args);
     default:
       throw new Error(`Unsupported built-in tool: ${name}`);
   }

@@ -2,10 +2,13 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import {
+  Calculator,
   ChartNoAxesCombined,
   FileText,
+  GitBranch,
   Layers3,
   Loader2,
+  Network,
   ShieldCheck,
   Table2,
   X,
@@ -21,8 +24,11 @@ import { cn } from "@/lib/utils";
 import { useToolStore } from "@/stores/useToolStore";
 
 const iconMap = {
+  calculator: Calculator,
   "data-visualization": ChartNoAxesCombined,
   "excel-workbook": Table2,
+  "markmap-mindmap": Network,
+  "mermaid-diagram": GitBranch,
   "word-document": FileText,
 };
 
@@ -122,7 +128,7 @@ export function PluginCenterDrawer({ onClose, open }: { onClose: () => void; ope
   const catalog = useToolStore((state) => state.catalog);
   const isLoading = useToolStore((state) => state.isCatalogLoading);
   const loadCatalog = useToolStore((state) => state.loadCatalog);
-  const [category, setCategory] = useState<"all" | "creation" | "documents">("all");
+  const [category, setCategory] = useState<"all" | "creation" | "documents" | "utilities">("all");
 
   useEffect(() => {
     if (!open) return;
@@ -196,6 +202,7 @@ export function PluginCenterDrawer({ onClose, open }: { onClose: () => void; ope
                       { id: "all" as const, label: "全部" },
                       { id: "documents" as const, label: "文件与文档" },
                       { id: "creation" as const, label: "创作与原型" },
+                      { id: "utilities" as const, label: "效率工具" },
                     ].map((item) => (
                       <button
                         className={cn(

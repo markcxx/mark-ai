@@ -16,9 +16,9 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@base-ui/react": "1.5.0",
     "@aws-sdk/client-s3": "^3.1086.0",
     "@aws-sdk/s3-request-presigner": "^3.1086.0",
+    "@base-ui/react": "1.5.0",
     "@fontsource-variable/noto-sans-sc": "^5.2.10",
     "@fontsource-variable/plus-jakarta-sans": "^5.2.8",
     "@google/genai": "^2.4.0",
@@ -35,6 +35,9 @@
     "echarts-gl": "^2.1.0",
     "lucide-react": "^0.553.0",
     "mammoth": "^1.12.0",
+    "markmap-lib": "^0.18.12",
+    "markmap-view": "^0.18.12",
+    "mermaid": "^11.16.0",
     "motion": "^12.23.24",
     "next": "^15.4.9",
     "next-themes": "^0.4.6",

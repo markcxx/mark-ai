@@ -4,9 +4,12 @@ export type BuiltinToolKind = "tool" | "skill";
 export type ToolJsonSchema = {
   additionalProperties?: boolean;
   description?: string;
+  enum?: string[];
   items?: ToolJsonSchema;
   maxItems?: number;
   maxLength?: number;
+  maximum?: number;
+  minimum?: number;
   properties?: Record<string, ToolJsonSchema>;
   required?: string[];
   type: "array" | "boolean" | "integer" | "number" | "object" | "string";
@@ -20,7 +23,7 @@ export type BuiltinToolFunction = {
 
 export type BuiltinToolDefinition = {
   accent: "amber" | "blue" | "emerald" | "violet";
-  category: "creation" | "documents";
+  category: "creation" | "documents" | "utilities";
   description: string;
   features: string[];
   functions: BuiltinToolFunction[];
