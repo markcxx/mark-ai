@@ -14,7 +14,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
 import { AppDialog } from "@/components/ui/AppDialog";
@@ -35,7 +35,23 @@ const validateSource = (source: string) => {
 const actionClass =
   "flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40 dark:hover:bg-white/[0.07] dark:hover:text-gray-200";
 
-const clampScale = (value: number) => Math.min(5, Math.max(0.25, value));
+type DiagramViewBox = { height: number; width: number; x: number; y: number };
+type DiagramView = { base: DiagramViewBox; current: DiagramViewBox; zoom: number };
+
+const clampZoom = (value: number) => Math.min(8, Math.max(0.25, value));
+
+const parseViewBox = (value: string | null): DiagramViewBox | null => {
+  const values = value
+    ?.trim()
+    .split(/[\s,]+/)
+    .map(Number);
+  if (!values || values.length !== 4 || values.some((item) => !Number.isFinite(item))) return null;
+  const [x, y, width, height] = values;
+  if (width <= 0 || height <= 0) return null;
+  return { height, width, x, y };
+};
+
+const formatViewBox = ({ height, width, x, y }: DiagramViewBox) => `${x} ${y} ${width} ${height}`;
 
 const DiagramSurface = ({
   className,
@@ -48,24 +64,63 @@ const DiagramSurface = ({
 }) => {
   const { resolvedTheme } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
   const renderId = useRef(`markai-mermaid-${Math.random().toString(36).slice(2)}`);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [scale, setScale] = useState(1);
+  const [view, setView] = useState<DiagramView | null>(null);
   const dragRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
   const validationError = useMemo(() => validateSource(source), [source]);
 
-  const resetView = () => {
-    setOffset({ x: 0, y: 0 });
-    setScale(1);
-  };
+  const resetView = useCallback(() => {
+    setView((current) =>
+      current ? { base: current.base, current: current.base, zoom: 1 } : current,
+    );
+  }, []);
+
+  const zoomBy = useCallback((factor: number) => {
+    setView((viewState) => {
+      if (!viewState) return viewState;
+      const nextZoom = clampZoom(viewState.zoom * factor);
+      const appliedFactor = nextZoom / viewState.zoom;
+      if (appliedFactor === 1) return viewState;
+      const width = viewState.current.width / appliedFactor;
+      const height = viewState.current.height / appliedFactor;
+      return {
+        ...viewState,
+        current: {
+          height,
+          width,
+          x: viewState.current.x + (viewState.current.width - width) / 2,
+          y: viewState.current.y + (viewState.current.height - height) / 2,
+        },
+        zoom: nextZoom,
+      };
+    });
+  }, []);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      zoomBy(event.deltaY > 0 ? 1 / 1.12 : 1.12);
+    };
+    viewport.addEventListener("wheel", handleWheel, { capture: true, passive: false });
+    return () => viewport.removeEventListener("wheel", handleWheel, { capture: true });
+  }, [zoomBy]);
+
+  useEffect(() => {
+    const svg = containerRef.current?.querySelector("svg");
+    if (svg && view) svg.setAttribute("viewBox", formatViewBox(view.current));
+  }, [view]);
 
   useEffect(() => {
     let active = true;
     setError(validationError);
     setLoading(!validationError);
-    resetView();
+    setView(null);
     onReady?.(null);
     if (validationError) return () => undefined;
 
@@ -84,12 +139,17 @@ const DiagramSurface = ({
         containerRef.current.innerHTML = result.svg;
         const svg = containerRef.current.querySelector("svg");
         if (svg) {
+          const baseViewBox = parseViewBox(svg.getAttribute("viewBox"));
+          if (!baseViewBox) throw new Error("流程图缺少有效的矢量视图范围");
+          const exportViewBox = formatViewBox(baseViewBox);
+          svg.dataset.markaiExportViewBox = exportViewBox;
           svg.setAttribute("height", "100%");
           svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
           svg.setAttribute("width", "100%");
           svg.style.height = "100%";
           svg.style.maxWidth = "none";
           svg.style.width = "100%";
+          setView({ base: baseViewBox, current: baseViewBox, zoom: 1 });
           onReady?.(svg);
         }
         setLoading(false);
@@ -109,6 +169,7 @@ const DiagramSurface = ({
   return (
     <div
       className={`relative overflow-hidden bg-white touch-none dark:bg-[#171717] ${className}`}
+      ref={viewportRef}
       onPointerCancel={() => {
         dragRef.current = null;
       }}
@@ -120,24 +181,29 @@ const DiagramSurface = ({
       onPointerMove={(event) => {
         const drag = dragRef.current;
         if (!drag || drag.pointerId !== event.pointerId) return;
-        setOffset((current) => ({
-          x: current.x + event.clientX - drag.x,
-          y: current.y + event.clientY - drag.y,
-        }));
+        const bounds = containerRef.current?.getBoundingClientRect();
+        if (!bounds?.width || !bounds.height) return;
+        const deltaX = event.clientX - drag.x;
+        const deltaY = event.clientY - drag.y;
+        setView((viewState) =>
+          viewState
+            ? {
+                ...viewState,
+                current: {
+                  ...viewState.current,
+                  x: viewState.current.x - (deltaX * viewState.current.width) / bounds.width,
+                  y: viewState.current.y - (deltaY * viewState.current.height) / bounds.height,
+                },
+              }
+            : viewState,
+        );
         dragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
       }}
       onPointerUp={(event) => {
         if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null;
       }}
-      onWheel={(event) => {
-        event.preventDefault();
-        setScale((current) => clampScale(current * (event.deltaY > 0 ? 0.9 : 1.1)));
-      }}
     >
-      <div
-        className="absolute inset-5 flex items-center justify-center will-change-transform"
-        style={{ transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale})` }}
-      >
+      <div className="absolute inset-5 flex items-center justify-center">
         <div className="h-full w-full" ref={containerRef} />
       </div>
       {!error && !loading && (
@@ -149,7 +215,7 @@ const DiagramSurface = ({
             aria-label="缩小流程图"
             className={actionClass}
             data-markai-tooltip="缩小"
-            onClick={() => setScale((current) => clampScale(current / 1.2))}
+            onClick={() => zoomBy(1 / 1.2)}
             type="button"
           >
             <ZoomOut size={15} />
@@ -167,7 +233,7 @@ const DiagramSurface = ({
             aria-label="放大流程图"
             className={actionClass}
             data-markai-tooltip="放大"
-            onClick={() => setScale((current) => clampScale(current * 1.2))}
+            onClick={() => zoomBy(1.2)}
             type="button"
           >
             <ZoomIn size={15} />

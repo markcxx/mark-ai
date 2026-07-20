@@ -6,7 +6,14 @@ const safeFileName = (value: string) =>
     .slice(0, 80) || "MarkAI 图形";
 
 const getSvgSize = (svg: SVGSVGElement) => {
-  const viewBox = svg.viewBox.baseVal;
+  const exportViewBox = svg.dataset.markaiExportViewBox
+    ?.trim()
+    .split(/[\s,]+/)
+    .map(Number);
+  const viewBox =
+    exportViewBox?.length === 4 && exportViewBox.every((value) => Number.isFinite(value))
+      ? { height: exportViewBox[3], width: exportViewBox[2] }
+      : svg.viewBox.baseVal;
   const bounds = svg.getBoundingClientRect();
   const width = Math.max(1, viewBox.width || bounds.width || 1200);
   const height = Math.max(1, viewBox.height || bounds.height || 800);
@@ -16,10 +23,13 @@ const getSvgSize = (svg: SVGSVGElement) => {
 const serializeSvg = (svg: SVGSVGElement) => {
   const clone = svg.cloneNode(true) as SVGSVGElement;
   const { height, width } = getSvgSize(svg);
+  const exportViewBox = svg.dataset.markaiExportViewBox;
   clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
   clone.setAttribute("width", String(width));
   clone.setAttribute("height", String(height));
-  if (!clone.getAttribute("viewBox")) clone.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  if (exportViewBox) clone.setAttribute("viewBox", exportViewBox);
+  else if (!clone.getAttribute("viewBox")) clone.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  clone.removeAttribute("data-markai-export-view-box");
   return { height, source: new XMLSerializer().serializeToString(clone), width };
 };
 
