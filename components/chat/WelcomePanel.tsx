@@ -1,7 +1,8 @@
 "use client";
 
-import { FluentEmoji } from "@lobehub/fluent-emoji";
 import { useEffect, useState, type ReactNode } from "react";
+
+import { FluentEmoji } from "@/components/FluentEmoji";
 
 const WELCOME_EMOJIS = ["🙂", "😊", "😄", "😁", "🤗", "🤩", "😎", "🫡", "😉"];
 const WELCOME_TEXT = "你好，我是 MarkAI。今天想聊点什么？";
@@ -18,7 +19,7 @@ function AnimatedEmojiLogo() {
 
   return (
     <div className="markai-logo-face flex h-16 w-16 shrink-0 items-center justify-center md:h-20 md:w-20">
-      <FluentEmoji cdn="aliyun" emoji={emoji} size={64} type="3d" />
+      <FluentEmoji emoji={emoji} size={64} />
       <style>{`
         @keyframes markai-logo-float {
           0%, 100% { transform: translateY(0) rotate(-2deg); }

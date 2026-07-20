@@ -2,7 +2,6 @@
 
 import type { RefObject } from "react";
 import { useState } from "react";
-import { ModelIcon } from "@lobehub/icons";
 import {
   ChevronRight,
   FileText,
@@ -23,6 +22,7 @@ import { GlobeOffIcon } from "@/components/icons/GlobeOffIcon";
 import { ContextWindowIndicator } from "./ContextWindowIndicator";
 import { FilePreviewDialog } from "./FilePreviewDialog";
 import { ModelSelectorDialog } from "./ModelSelectorDialog";
+import { ModelBrandIcon } from "./ModelBrandIcon";
 import { ToolMenu } from "./ToolMenu";
 
 export function ChatInput({
@@ -211,7 +211,11 @@ export function ChatInput({
                 >
                   {selectedModel ? (
                     <>
-                      <ModelIcon model={selectedModel.id} size={20} type="avatar" />
+                      <ModelBrandIcon
+                        model={selectedModel.id}
+                        provider={selectedModel.provider}
+                        size={20}
+                      />
                       <span className="hidden max-w-[160px] truncate text-[13px] sm:inline">
                         {getModelDisplayName(selectedModel.id)}
                       </span>

@@ -38,7 +38,7 @@ function ExportPreviewMessage({ message }: { message: Message }) {
 
   return (
     <div className="flex gap-3">
-      <ModelAvatar model={message.model} size={32} />
+      <ModelAvatar model={message.model} provider={message.provider} size={32} />
       <div className="min-w-0 flex-1">
         <div className="mb-2 flex items-center gap-2">
           <span className="truncate font-jakarta text-[15px] font-bold text-gray-900 dark:text-gray-100">

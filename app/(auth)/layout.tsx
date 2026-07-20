@@ -1,9 +1,9 @@
 "use client";
 
-import { FluentEmoji } from "@lobehub/fluent-emoji";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
+import { FluentEmoji } from "@/components/FluentEmoji";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 const AUTH_EMOJIS = ["🙂", "😊", "😄", "😁", "🤗", "🤩", "😎", "🫡", "😉"];
@@ -28,13 +28,11 @@ function AuthGuide({ compact = false }: { compact?: boolean }) {
         }
       >
         <span className="auth-emoji-swap" key={emoji}>
-          <FluentEmoji cdn="aliyun" emoji={emoji} size={compact ? 52 : 96} type="3d" />
+          <FluentEmoji emoji={emoji} size={compact ? 52 : 96} />
         </span>
       </div>
       <div>
-        <p className={compact ? "text-sm font-semibold" : "text-2xl font-semibold"}>
-          很高兴见到你
-        </p>
+        <p className={compact ? "text-sm font-semibold" : "text-2xl font-semibold"}>很高兴见到你</p>
         <p className="mt-1 text-sm leading-6 text-gray-500 dark:text-gray-400">
           登录后继续你的对话、文件与工具。
         </p>

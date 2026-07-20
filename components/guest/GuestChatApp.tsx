@@ -1,11 +1,11 @@
 "use client";
 
-import { FluentEmoji } from "@lobehub/fluent-emoji";
 import { Globe, LogIn, Paperclip, SendHorizontal, SlidersHorizontal } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
+import { FluentEmoji } from "@/components/FluentEmoji";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { AppDialog } from "@/components/ui/AppDialog";
 import { useUIStore } from "@/stores/useUIStore";
@@ -90,7 +90,7 @@ export function GuestChatApp() {
             <div className="mb-6 flex items-center gap-3 md:mb-8 md:gap-4">
               <div className="auth-emoji-float flex h-16 w-16 shrink-0 items-center justify-center md:h-20 md:w-20">
                 <span className="auth-emoji-swap" key={emoji}>
-                  <FluentEmoji cdn="aliyun" emoji={emoji} size={64} type="3d" />
+                  <FluentEmoji emoji={emoji} size={64} />
                 </span>
               </div>
               <div className="min-w-0">

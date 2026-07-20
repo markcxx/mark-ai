@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import { ModelIcon } from "@lobehub/icons";
 import { Check, Search } from "lucide-react";
 
 import { AppDialog } from "@/components/ui/AppDialog";
@@ -9,6 +8,8 @@ import type { ConfiguredModel } from "@/lib/chat/types";
 import { getModelDisplayName, getModelKey } from "@/lib/chat/helpers";
 import { formatTokenCount, getModelMetadata } from "@/lib/model-metadata";
 import { cn } from "@/lib/utils";
+
+import { ModelBrandIcon } from "./ModelBrandIcon";
 
 type ModelGroup = {
   displayName: string;
@@ -139,7 +140,7 @@ export function ModelSelectorDialog({
                       ref={isSelected ? selectedItemRef : undefined}
                       type="button"
                     >
-                      <ModelIcon model={model.id} size={20} type="avatar" />
+                      <ModelBrandIcon model={model.id} provider={model.provider} size={20} />
                       <span className="min-w-0 flex-1 truncate">
                         {getModelDisplayName(model.id)}
                       </span>

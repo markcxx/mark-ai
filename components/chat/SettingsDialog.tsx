@@ -1,21 +1,5 @@
 "use client";
 
-import DeepSeek from "@lobehub/icons/es/DeepSeek";
-import Gemini from "@lobehub/icons/es/Gemini";
-import Groq from "@lobehub/icons/es/Groq";
-import HuggingFace from "@lobehub/icons/es/HuggingFace";
-import Infinigence from "@lobehub/icons/es/Infinigence";
-import Minimax from "@lobehub/icons/es/Minimax";
-import Mistral from "@lobehub/icons/es/Mistral";
-import Moonshot from "@lobehub/icons/es/Moonshot";
-import OpenAI from "@lobehub/icons/es/OpenAI";
-import OpenRouter from "@lobehub/icons/es/OpenRouter";
-import Qwen from "@lobehub/icons/es/Qwen";
-import SiliconCloud from "@lobehub/icons/es/SiliconCloud";
-import Together from "@lobehub/icons/es/Together";
-import Volcengine from "@lobehub/icons/es/Volcengine";
-import XAI from "@lobehub/icons/es/XAI";
-import Zhipu from "@lobehub/icons/es/Zhipu";
 import {
   ChevronRight,
   KeyRound,
@@ -39,6 +23,7 @@ import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useUIStore } from "@/stores/useUIStore";
 
+import { ProviderBrandIcon } from "./ModelBrandIcon";
 import { SidebarNavItem } from "./SidebarNavItem";
 import { AppearanceSettings, ChatSettings } from "./settings/GeneralSettingsSections";
 
@@ -83,25 +68,6 @@ const sections: Array<{ id: SettingsSection; icon: typeof Palette; label: string
   { id: "providers", icon: KeyRound, label: "AI 提供商" },
 ];
 
-const providerIcons = {
-  bailian: Qwen,
-  deepseek: DeepSeek,
-  gemini: Gemini,
-  groq: Groq,
-  huggingface: HuggingFace,
-  infiniai: Infinigence,
-  minimax: Minimax,
-  mistral: Mistral,
-  moonshot: Moonshot,
-  openai: OpenAI,
-  openrouter: OpenRouter,
-  siliconflow: SiliconCloud,
-  together: Together,
-  volcengine: Volcengine,
-  xai: XAI,
-  zhipu: Zhipu,
-};
-
 function ProviderLogo({
   disabled = false,
   name,
@@ -124,7 +90,6 @@ function ProviderLogo({
     );
   }
 
-  const Icon = providerIcons[provider as keyof typeof providerIcons];
   return (
     <div
       className={cn(
@@ -132,7 +97,7 @@ function ProviderLogo({
         disabled && "opacity-45",
       )}
     >
-      {Icon ? <Icon size={23} /> : <span className="text-sm font-bold">{name.slice(0, 1)}</span>}
+      <ProviderBrandIcon className="text-sm" name={name} provider={provider} size={23} />
     </div>
   );
 }

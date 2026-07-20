@@ -1,12 +1,11 @@
 "use client";
 
-import { ModelIcon } from "@lobehub/icons";
-
-import { cn } from "@/lib/utils";
+import { ModelBrandIcon } from "./ModelBrandIcon";
 
 export function ModelAvatar({
   className,
   model,
+  provider,
   size = 32,
 }: {
   className?: string;
@@ -14,15 +13,5 @@ export function ModelAvatar({
   provider?: string;
   size?: number;
 }) {
-  return (
-    <div
-      className={cn(
-        "shrink-0 overflow-hidden rounded-full bg-white shadow-sm ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700",
-        className,
-      )}
-      style={{ height: size, width: size }}
-    >
-      <ModelIcon model={model} size={size} type="avatar" />
-    </div>
-  );
+  return <ModelBrandIcon className={className} model={model} provider={provider} size={size} />;
 }

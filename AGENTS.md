@@ -106,7 +106,7 @@ Dark mode is not a simple inversion. Use the existing near-black surfaces (`#0e0
 
 ### Icons, Buttons, Menus, And Tooltips
 
-- Use `lucide-react` for general interface icons. Use `@lobehub/icons` only for model/provider brand identities.
+- Use `lucide-react` for general interface icons. Model/provider brand identities use the selected local SVG assets under `public/images/model-icons/`.
 - Icon-only buttons require an accessible name and a tooltip.
 - Prefer local primitives: `IconButton`, `MenuAction`, `DropdownSurface`, `AppDialog`, `AppSelect`, `AppInput`, `AppPasswordInput`, `AppTextArea`, `AppNumberInput`, `AppSliderWithInput`, `SegmentedControl`, `ToggleSwitch`, and `ConfirmDialog`.
 - Use a familiar icon instead of a rounded text button when the command is universally recognizable.
@@ -217,15 +217,15 @@ The Next.js development server warning `Server is approaching the used memory th
 - `NODE_OPTIONS` is unset.
 - V8 heap limit is approximately 4192 MB, so Next restarts near 3354 MB used heap.
 - The repository has about 202 TS/TSX files and 27k source lines.
-- `@lobehub/ui`, `@lobehub/icons`, and `@lobehub/fluent-emoji` contain roughly 6.4k, 7.8k, and 3.9k files respectively.
+- The friendly 3D emoji treatment uses the local `FluentEmoji` wrapper and static CDN assets; do not add its former React package or broad UI icon barrels.
 - Additional heavy graphs include ECharts/ECharts GL, XLSX, Mammoth, DOCX, syntax highlighting, and auth/database dependencies.
 
 Development-memory rules:
 
-- Avoid new imports from the `@lobehub/ui` top-level barrel. Prefer existing local wrappers or a documented targeted subpath export.
+- Do not add `@lobehub/ui` or `@lobehub/icons` imports. Prefer existing local wrappers, Lucide, or selected local brand SVG assets.
 - Application code must not import LobeHub UI components. The currently required controls have local MarkAI equivalents under `components/ui/`, and streaming Markdown uses `lib/markdown/rehype-stream-animated.ts`.
-- `@lobehub/ui` remains installed because `@lobehub/icons` declares it as a required peer dependency and generic icon fallbacks reference it. Its presence in `package.json` does not authorize new UI-component imports.
-- Do not import an entire model-icon package when a provider-specific export exists.
+- Model/provider icons are vendored SVG assets so the application does not install the LobeHub UI/icon peer-dependency graph.
+- Do not add a model-icon package for coverage gaps; add a selected optimized SVG to the local asset map.
 - Dynamically import heavy preview/editor/export code that is not needed on the initial chat route.
 - Keep server-only Office parsers and generators out of client dependency graphs.
 - Split very large components when the split creates a real lazy-load or ownership boundary; splitting files alone does not reduce the module graph.

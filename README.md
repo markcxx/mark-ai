@@ -184,7 +184,7 @@ docker run -p 3000:3000 --env-file .env.local markai
 | 动画     | [Motion](https://motion.dev/)（Framer Motion）                                                            |
 | Markdown | [react-markdown](https://github.com/remarkjs/react-markdown) + remark-gfm                                 |
 | 代码高亮 | [react-syntax-highlighter](https://github.com/react-syntax-highlighter/react-syntax-highlighter)（Prism） |
-| 图标     | [Lucide](https://lucide.dev/) + [@lobehub/icons](https://github.com/lobehub/lobe-icons)                   |
+| 图标     | [Lucide](https://lucide.dev/) + 本地模型品牌 SVG                                                          |
 | 数据库   | SQLite（Node.js 内置 `node:sqlite`）                                                                      |
 | 联网搜索 | [Tavily](https://tavily.com/) + [Firecrawl](https://firecrawl.dev/)                                       |
 | 图片导出 | [@zumer/snapdom](https://github.com/nicepkg/snapdom)                                                      |
