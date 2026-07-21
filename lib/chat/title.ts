@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
 import { findConfiguredModel, getConfiguredModels } from "@/lib/models";
+import { fetchWithDevelopmentProxy } from "@/lib/server/development-proxy";
 
 import type { Message } from "./types";
 
@@ -119,7 +120,7 @@ ${transcript}
       if (!endpoint)
         return { title: fallback, titleModel: { ...titleModel, reason: "No endpoint configured" } };
 
-      const response = await fetch(endpoint, {
+      const response = await fetchWithDevelopmentProxy(endpoint, {
         body: JSON.stringify({
           max_tokens: 64,
           messages: [

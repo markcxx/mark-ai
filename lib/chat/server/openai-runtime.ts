@@ -34,6 +34,7 @@ import {
 } from "@/lib/chat/token-usage";
 import type { WebSearchState } from "@/lib/chat/types";
 import { searchTavily } from "@/lib/search/tavily";
+import { fetchWithDevelopmentProxy } from "@/lib/server/development-proxy";
 import { readWebpage } from "@/lib/search/webpage";
 import { executeBuiltinTool } from "@/lib/tools/executors";
 import { getBuiltinToolByFunction, getToolFunctions } from "@/lib/tools/registry";
@@ -110,7 +111,7 @@ export const createOpenAICompatibleStream = async (
             : {}),
         });
         const sendRequest = (includeUsage: boolean) =>
-          fetch(endpoint, {
+          fetchWithDevelopmentProxy(endpoint, {
             body: JSON.stringify(createRequestBody(includeUsage)),
             headers: {
               Authorization: `Bearer ${apiKey}`,

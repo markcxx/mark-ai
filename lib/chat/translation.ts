@@ -3,6 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import type { ConfiguredModel } from "@/lib/models";
 import { toOpenAIChatEndpoint } from "@/lib/chat/server/openai-helpers";
 import { extractTranslation } from "@/lib/chat/translation-output";
+import { fetchWithDevelopmentProxy } from "@/lib/server/development-proxy";
 
 const TRANSLATION_PROMPT = `You are a professional translator.
 Translate the provided text into the requested target language.
@@ -26,7 +27,7 @@ export const generateTranslation = async ({
   if (model.runtime === "openai-compatible") {
     const endpoint = toOpenAIChatEndpoint(model.baseUrl);
     if (!endpoint) throw new Error("模型接口地址未配置");
-    const response = await fetch(endpoint, {
+    const response = await fetchWithDevelopmentProxy(endpoint, {
       body: JSON.stringify({
         messages: [
           { content: TRANSLATION_PROMPT, role: "system" },
