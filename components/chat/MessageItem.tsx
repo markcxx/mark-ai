@@ -33,15 +33,13 @@ import type {
 import { collectMessageCitations } from "@/lib/chat/citations";
 import { formatDuration, formatRelativeTime } from "@/lib/chat/metrics";
 import { cn } from "@/lib/utils";
-import {
-  TRANSLATION_LANGUAGES,
-  type TranslationLanguage,
-} from "@/lib/chat/translation-languages";
+import { TRANSLATION_LANGUAGES, type TranslationLanguage } from "@/lib/chat/translation-languages";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 
 import { CollapsibleContent } from "./CollapsibleContent";
 import { FloatingMenu } from "./FloatingMenu";
 import { FilePreviewDialog } from "./FilePreviewDialog";
+import { FirstTokenLoader } from "./FirstTokenLoader";
 import { MarkdownContent } from "./MarkdownContent";
 import { MessageActionButton } from "./MessageActionButton";
 import { MessageSelectionWrapper } from "./MessageSelectionWrapper";
@@ -282,6 +280,18 @@ export function MessageItem({
   const generalSettings = useSettingsStore((state) => state.general);
   const [previewFile, setPreviewFile] = useState<FileAttachment | null>(null);
   const [translating, setTranslating] = useState(false);
+  const hasStreamingOutput = Boolean(
+    message.content?.trim() ||
+    message.reasoning?.trim() ||
+    message.webSearch?.length ||
+    message.segments?.some((segment) => {
+      if (segment.type === "content" || segment.type === "thinking") {
+        return Boolean(segment.content.trim());
+      }
+      return segment.type !== "translation";
+    }),
+  );
+  const waitingForFirstOutput = Boolean(message.isStreaming && !hasStreamingOutput);
   const regenerateMode: RegenerateMode = generalSettings.overwriteRegeneratedResponse
     ? "replace"
     : "preserve";
@@ -479,7 +489,7 @@ export function MessageItem({
                 </time>
               )}
             </div>
-            {message.isStreaming && (
+            {waitingForFirstOutput && (
               <span className="mt-0.5 animate-pulse text-xs font-medium text-gray-400">
                 {loadingText}
               </span>
@@ -519,6 +529,7 @@ export function MessageItem({
             </div>
           ) : (
             <>
+              {waitingForFirstOutput && <FirstTokenLoader />}
               {message.segments &&
               message.segments.some((segment) => segment.type !== "translation") ? (
                 <>

@@ -738,8 +738,17 @@ function ProfileEditor({
   onDelete: () => void;
   onSave: (updates: Record<string, unknown>) => Promise<void>;
 }) {
+  const banExpires = detail.user.banExpires
+    ? new Date(
+        new Date(detail.user.banExpires).getTime() -
+          new Date(detail.user.banExpires).getTimezoneOffset() * 60_000,
+      )
+        .toISOString()
+        .slice(0, 16)
+    : "";
   const [form, setForm] = useState({
     age: detail.user.age?.toString() || "",
+    banExpires,
     banReason: detail.user.banReason || "",
     banned: !!detail.user.banned,
     email: detail.user.email,
@@ -752,7 +761,11 @@ function ProfileEditor({
       className="max-w-4xl space-y-8"
       onSubmit={(event) => {
         event.preventDefault();
-        void onSave({ ...form, age: form.age ? Number(form.age) : null });
+        void onSave({
+          ...form,
+          age: form.age ? Number(form.age) : null,
+          banExpires: form.banExpires ? new Date(form.banExpires).toISOString() : null,
+        });
       }}
     >
       <div>
@@ -808,16 +821,30 @@ function ProfileEditor({
         </label>
       </div>
       {form.banned && (
-        <label className="block text-sm font-medium">
-          封禁原因
-          <textarea
-            className="mt-2 min-h-20 w-full rounded-lg border border-gray-200 bg-white p-3 text-sm outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/15 dark:border-white/10 dark:bg-[var(--chat-input-bg)]"
-            onChange={(event) =>
-              setForm((current) => ({ ...current, banReason: event.target.value }))
-            }
-            value={form.banReason}
-          />
-        </label>
+        <div className="grid gap-5 md:grid-cols-2">
+          <label className="block text-sm font-medium">
+            封禁原因
+            <textarea
+              className="mt-2 min-h-20 w-full rounded-lg border border-gray-200 bg-white p-3 text-sm outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/15 dark:border-white/10 dark:bg-[var(--chat-input-bg)]"
+              onChange={(event) =>
+                setForm((current) => ({ ...current, banReason: event.target.value }))
+              }
+              value={form.banReason}
+            />
+          </label>
+          <label className="block text-sm font-medium">
+            封禁到期时间
+            <input
+              className={`${adminInputClass} mt-2`}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, banExpires: event.target.value }))
+              }
+              type="datetime-local"
+              value={form.banExpires}
+            />
+            <span className="mt-2 block text-xs font-normal text-gray-400">留空表示永久封禁</span>
+          </label>
+        </div>
       )}
       <div className="grid grid-cols-2 gap-2 pt-2 sm:flex sm:items-center sm:justify-between">
         <AdminButton danger onClick={onDelete}>

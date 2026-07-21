@@ -1,4 +1,4 @@
-import { and, count, eq, ne } from "drizzle-orm";
+import { and, count, eq, gt, ne } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { authorizeAdminApi } from "@/lib/admin/api";
@@ -35,7 +35,7 @@ export async function GET(request: Request, context: { params: Promise<{ userId:
         userAgent: authSessions.userAgent,
       })
       .from(authSessions)
-      .where(eq(authSessions.userId, userId)),
+      .where(and(eq(authSessions.userId, userId), gt(authSessions.expiresAt, new Date()))),
   ]);
   await writeAdminAudit({
     action: "user.view",
@@ -99,19 +99,30 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
     if (userId === admin.id && body.banned) {
       return NextResponse.json({ error: "不能封禁自己的账户" }, { status: 400 });
     }
+    if (isBootstrapAdminEmail(current.email) && body.banned) {
+      return NextResponse.json({ error: "不能封禁环境变量指定的管理员" }, { status: 400 });
+    }
     updates.banned = body.banned;
     updates.banReason = body.banned
       ? typeof body.banReason === "string"
         ? body.banReason.trim().slice(0, 300)
         : null
       : null;
-    updates.banExpires =
-      body.banned && typeof body.banExpires === "string" && body.banExpires
-        ? new Date(body.banExpires)
-        : null;
+    if (body.banned && typeof body.banExpires === "string" && body.banExpires) {
+      const banExpires = new Date(body.banExpires);
+      if (!Number.isFinite(banExpires.getTime()) || banExpires <= new Date()) {
+        return NextResponse.json({ error: "封禁到期时间必须晚于当前时间" }, { status: 400 });
+      }
+      updates.banExpires = banExpires;
+    } else {
+      updates.banExpires = null;
+    }
   }
 
   await getDb().update(users).set(updates).where(eq(users.id, userId));
+  if (body.banned === true) {
+    await getDb().delete(authSessions).where(eq(authSessions.userId, userId));
+  }
   await writeAdminAudit({
     action: "user.update",
     actorUserId: admin.id,

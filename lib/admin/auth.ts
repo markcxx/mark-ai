@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { headers as getNextHeaders } from "next/headers";
 
+import { isActiveBan } from "@/lib/auth-access";
 import { getDb } from "@/lib/db";
 import { adminAuditLogs, users } from "@/lib/db/schema";
 import { isBootstrapAdminEmail } from "@/lib/registration";
@@ -19,12 +20,14 @@ export const getCurrentAdmin = async (
   const { auth } = await import("@/lib/auth");
   const session = await auth.api.getSession({
     headers: requestHeaders || (await getNextHeaders()),
+    query: { disableCookieCache: true },
   });
   if (!session?.user?.id) return undefined;
 
   const [user] = await getDb()
     .select({
       banned: users.banned,
+      banExpires: users.banExpires,
       email: users.email,
       emailVerified: users.emailVerified,
       id: users.id,
@@ -33,7 +36,16 @@ export const getCurrentAdmin = async (
     .from(users)
     .where(eq(users.id, session.user.id))
     .limit(1);
-  if (!user || user.banned) return undefined;
+  if (!user) return undefined;
+  const activeBan = isActiveBan(user);
+  const banExpired = Boolean(user.banned && !activeBan);
+  if (activeBan) return undefined;
+  if (banExpired) {
+    await getDb()
+      .update(users)
+      .set({ banned: false, banExpires: null, banReason: null, updatedAt: new Date() })
+      .where(eq(users.id, user.id));
+  }
 
   const bootstrapAdmin = isBootstrapAdminEmail(user.email);
   if (!bootstrapAdmin && (user.role !== "admin" || !user.emailVerified)) return undefined;

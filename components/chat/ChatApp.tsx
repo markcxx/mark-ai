@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import toast, { Toaster } from "react-hot-toast";
 
-import { NOT_IMPLEMENTED_TOAST, THINKING_TEXTS } from "@/lib/chat/constants";
+import { getNextThinkingText, NOT_IMPLEMENTED_TOAST } from "@/lib/chat/constants";
 import {
   deleteChatSession,
   loadChatSession,
@@ -298,10 +298,9 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   // Loading text rotation
   useEffect(() => {
     if (!isLoading) return;
-    let i = 0;
     const interval = setInterval(() => {
-      i = (i + 1) % THINKING_TEXTS.length;
-      useChatStore.getState().setLoadingText(THINKING_TEXTS[i]);
+      const current = useChatStore.getState().loadingText;
+      useChatStore.getState().setLoadingText(getNextThinkingText(current));
     }, 4200);
     return () => clearInterval(interval);
   }, [isLoading]);

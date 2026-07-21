@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, ilike, inArray, or, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { authorizeAdminApi, getPagination } from "@/lib/admin/api";
@@ -83,7 +83,7 @@ export async function GET(request: Request) {
         userId: authSessions.userId,
       })
       .from(authSessions)
-      .where(inArray(authSessions.userId, userIds))
+      .where(and(inArray(authSessions.userId, userIds), gt(authSessions.expiresAt, new Date())))
       .groupBy(authSessions.userId),
   ]);
 
@@ -138,6 +138,9 @@ export async function PATCH(request: Request) {
         updatedAt: new Date(),
       })
       .where(inArray(users.id, editableIds));
+    if (action === "ban") {
+      await getDb().delete(authSessions).where(inArray(authSessions.userId, editableIds));
+    }
   }
   await writeAdminAudit({
     action: action === "ban" ? "user.batch_ban" : "user.batch_unban",

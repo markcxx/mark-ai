@@ -453,6 +453,164 @@ button:disabled {
   }
 }
 
+@keyframes first-token-loader-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes first-token-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes first-token-orbit-one {
+  0% {
+    transform: translate(11px, 0);
+  }
+  10% {
+    transform: translate(11px, 0);
+    animation-timing-function: cubic-bezier(0.62, 0, 0.22, 1);
+  }
+  33.333% {
+    transform: translate(20px, 15px);
+  }
+  43.333% {
+    transform: translate(20px, 15px);
+    animation-timing-function: cubic-bezier(0.62, 0, 0.22, 1);
+  }
+  66.666% {
+    transform: translate(2px, 15px);
+  }
+  76.666% {
+    transform: translate(2px, 15px);
+    animation-timing-function: cubic-bezier(0.62, 0, 0.22, 1);
+  }
+  100% {
+    transform: translate(11px, 0);
+  }
+}
+
+@keyframes first-token-orbit-two {
+  0% {
+    transform: translate(20px, 15px);
+  }
+  10% {
+    transform: translate(20px, 15px);
+    animation-timing-function: cubic-bezier(0.62, 0, 0.22, 1);
+  }
+  33.333% {
+    transform: translate(2px, 15px);
+  }
+  43.333% {
+    transform: translate(2px, 15px);
+    animation-timing-function: cubic-bezier(0.62, 0, 0.22, 1);
+  }
+  66.666% {
+    transform: translate(11px, 0);
+  }
+  76.666% {
+    transform: translate(11px, 0);
+    animation-timing-function: cubic-bezier(0.62, 0, 0.22, 1);
+  }
+  100% {
+    transform: translate(20px, 15px);
+  }
+}
+
+@keyframes first-token-orbit-three {
+  0% {
+    transform: translate(2px, 15px);
+  }
+  10% {
+    transform: translate(2px, 15px);
+    animation-timing-function: cubic-bezier(0.62, 0, 0.22, 1);
+  }
+  33.333% {
+    transform: translate(11px, 0);
+  }
+  43.333% {
+    transform: translate(11px, 0);
+    animation-timing-function: cubic-bezier(0.62, 0, 0.22, 1);
+  }
+  66.666% {
+    transform: translate(20px, 15px);
+  }
+  76.666% {
+    transform: translate(20px, 15px);
+    animation-timing-function: cubic-bezier(0.62, 0, 0.22, 1);
+  }
+  100% {
+    transform: translate(2px, 15px);
+  }
+}
+
+.first-token-loader {
+  position: relative;
+  display: inline-flex;
+  width: 28px;
+  height: 22px;
+  animation: first-token-loader-enter 180ms ease-out both;
+}
+
+.first-token-loader > span {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--color-primary) 72%, transparent);
+}
+
+.first-token-loader-bounce {
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.first-token-loader-bounce > span {
+  animation: first-token-bounce 900ms ease-in-out infinite;
+}
+
+.first-token-loader-bounce > span:nth-child(2) {
+  animation-delay: 120ms;
+}
+
+.first-token-loader-bounce > span:nth-child(3) {
+  animation-delay: 240ms;
+}
+
+.first-token-loader-orbit > span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  animation-duration: 2.2s;
+  animation-iteration-count: infinite;
+  animation-timing-function: linear;
+}
+
+.first-token-loader-orbit > span:nth-child(1) {
+  animation-name: first-token-orbit-one;
+}
+
+.first-token-loader-orbit > span:nth-child(2) {
+  animation-name: first-token-orbit-two;
+}
+
+.first-token-loader-orbit > span:nth-child(3) {
+  animation-name: first-token-orbit-three;
+}
+
 .streaming-markdown .stream-char {
   opacity: 0;
   animation: stream-word-in 180ms cubic-bezier(0.33, 0, 0.67, 1) forwards;

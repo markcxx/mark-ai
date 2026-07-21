@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { isActiveBan } from "@/lib/auth-access";
 import { isCloudMode } from "@/lib/env";
 
 type AuthorizedRequest = {
@@ -38,11 +39,21 @@ export const authorizeApiRequest = async (
   }
 
   const { auth } = await import("@/lib/auth");
-  const session = await auth.api.getSession({ headers: req.headers });
+  const session = await auth.api.getSession({
+    headers: req.headers,
+    query: { disableCookieCache: true },
+  });
   if (!session?.user?.id) {
     return {
       authorized: false,
       response: NextResponse.json({ error: "请先登录" }, { status: 401 }),
+    };
+  }
+
+  if (isActiveBan(session.user)) {
+    return {
+      authorized: false,
+      response: NextResponse.json({ error: "账户已被封禁" }, { status: 403 }),
     };
   }
 

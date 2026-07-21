@@ -41,6 +41,7 @@ const getTooltipTarget = (target: EventTarget | null) =>
 export function GlobalTooltip() {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const activeTargetRef = useRef<HTMLElement | null>(null);
+  const keyboardNavigationRef = useRef(false);
   const showTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -64,7 +65,15 @@ export function GlobalTooltip() {
       clearShowTimer();
       activeTargetRef.current = target;
       showTimerRef.current = window.setTimeout(() => {
-        if (activeTargetRef.current !== target) return;
+        if (
+          activeTargetRef.current !== target ||
+          !target.isConnected ||
+          target.hasAttribute("disabled")
+        ) {
+          if (activeTargetRef.current === target) activeTargetRef.current = null;
+          showTimerRef.current = null;
+          return;
+        }
         const rect = target.getBoundingClientRect();
         const placement = rect.top >= 56 ? "top" : "bottom";
         const left = Math.min(Math.max(rect.left + rect.width / 2, 88), window.innerWidth - 88);
@@ -90,6 +99,7 @@ export function GlobalTooltip() {
           if (node instanceof Element) migrateTitlesWithin(node);
         });
       });
+      if (activeTargetRef.current && !activeTargetRef.current.isConnected) hide();
     });
     observer.observe(document.body, {
       attributeFilter: ["title"],
@@ -99,6 +109,7 @@ export function GlobalTooltip() {
     });
 
     const handlePointerOver = (event: PointerEvent) => {
+      if (event.pointerType === "touch") return;
       const target = getTooltipTarget(event.target);
       if (target) show(target);
     };
@@ -107,21 +118,33 @@ export function GlobalTooltip() {
       if (!target) return;
       const relatedTarget = event.relatedTarget;
       if (relatedTarget instanceof Node && target.contains(relatedTarget)) return;
+      if (activeTargetRef.current === target) hide();
+    };
+    const handlePointerDown = () => {
+      keyboardNavigationRef.current = false;
       hide();
     };
     const handleFocusIn = (event: FocusEvent) => {
       const target = getTooltipTarget(event.target);
-      if (target) show(target);
+      if (target && keyboardNavigationRef.current) show(target);
     };
     const handleFocusOut = (event: FocusEvent) => {
       const target = getTooltipTarget(event.target);
-      if (target) hide();
+      if (target && activeTargetRef.current === target) hide();
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Tab") keyboardNavigationRef.current = true;
+      if (event.key === "Escape") hide();
     };
 
     document.addEventListener("pointerover", handlePointerOver, true);
     document.addEventListener("pointerout", handlePointerOut, true);
+    document.addEventListener("pointerdown", handlePointerDown, true);
     document.addEventListener("focusin", handleFocusIn, true);
     document.addEventListener("focusout", handleFocusOut, true);
+    document.addEventListener("keydown", handleKeyDown, true);
+    document.addEventListener("visibilitychange", hide);
+    window.addEventListener("blur", hide);
     window.addEventListener("resize", hide);
     window.addEventListener("scroll", hide, true);
 
@@ -130,8 +153,12 @@ export function GlobalTooltip() {
       observer.disconnect();
       document.removeEventListener("pointerover", handlePointerOver, true);
       document.removeEventListener("pointerout", handlePointerOut, true);
+      document.removeEventListener("pointerdown", handlePointerDown, true);
       document.removeEventListener("focusin", handleFocusIn, true);
       document.removeEventListener("focusout", handleFocusOut, true);
+      document.removeEventListener("keydown", handleKeyDown, true);
+      document.removeEventListener("visibilitychange", hide);
+      window.removeEventListener("blur", hide);
       window.removeEventListener("resize", hide);
       window.removeEventListener("scroll", hide, true);
     };

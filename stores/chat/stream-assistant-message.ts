@@ -1,7 +1,7 @@
 import toast from "react-hot-toast";
 import type { StoreApi } from "zustand";
 
-import { THINKING_TEXTS } from "@/lib/chat/constants";
+import { getNextThinkingText } from "@/lib/chat/constants";
 import { createSmoothTextController, parseChatStreamLine } from "@/lib/chat/client/streaming";
 import { extractThinkingFromText } from "@/lib/chat/helpers";
 import {
@@ -76,10 +76,9 @@ export const createStreamAssistantMessage =
 
     try {
       set((s) => {
-        const index = THINKING_TEXTS.indexOf(s.loadingText);
         return {
           isLoading: true,
-          loadingText: THINKING_TEXTS[(index + 1) % THINKING_TEXTS.length],
+          loadingText: getNextThinkingText(s.loadingText),
         };
       });
 
