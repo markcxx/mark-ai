@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  AlertCircle,
   Check,
   Copy,
   Download,
@@ -20,6 +19,8 @@ import toast from "react-hot-toast";
 import { AppDialog } from "@/components/ui/AppDialog";
 import { downloadSvg, downloadSvgAsPng } from "@/lib/visualization/svg-export";
 
+import { ToolPreviewCard, ToolPreviewError, toolPreviewActionClass } from "./ToolPreviewCard";
+
 const MAX_SOURCE_LENGTH = 50_000;
 const BLOCKED_SOURCE =
   /%%\s*\{\s*init|^\s*click\s|<\/?(?:script|iframe|object|embed|img|foreignObject)\b|javascript:/im;
@@ -31,9 +32,6 @@ const validateSource = (source: string) => {
   if (BLOCKED_SOURCE.test(trimmed)) return "图表包含不允许的指令或嵌入内容";
   return null;
 };
-
-const actionClass =
-  "flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40 dark:hover:bg-white/[0.07] dark:hover:text-gray-200";
 
 type DiagramViewBox = { height: number; width: number; x: number; y: number };
 type DiagramView = { base: DiagramViewBox; current: DiagramViewBox; zoom: number };
@@ -55,10 +53,12 @@ const formatViewBox = ({ height, width, x, y }: DiagramViewBox) => `${x} ${y} ${
 
 const DiagramSurface = ({
   className,
+  onError,
   source,
   onReady,
 }: {
   className: string;
+  onError?: () => void;
   source: string;
   onReady?: (svg: SVGSVGElement | null) => void;
 }) => {
@@ -156,15 +156,17 @@ const DiagramSurface = ({
       })
       .catch((reason) => {
         if (!active) return;
+        console.error("Mermaid preview render error:", reason);
         setError(reason instanceof Error ? reason.message : "Mermaid 渲染失败");
         setLoading(false);
+        onError?.();
       });
 
     return () => {
       active = false;
       onReady?.(null);
     };
-  }, [onReady, resolvedTheme, source, validationError]);
+  }, [onError, onReady, resolvedTheme, source, validationError]);
 
   return (
     <div
@@ -213,7 +215,7 @@ const DiagramSurface = ({
         >
           <button
             aria-label="缩小流程图"
-            className={actionClass}
+            className={toolPreviewActionClass}
             data-markai-tooltip="缩小"
             onClick={() => zoomBy(1 / 1.2)}
             type="button"
@@ -222,7 +224,7 @@ const DiagramSurface = ({
           </button>
           <button
             aria-label="适应流程图视口"
-            className={actionClass}
+            className={toolPreviewActionClass}
             data-markai-tooltip="适应视口"
             onClick={resetView}
             type="button"
@@ -231,7 +233,7 @@ const DiagramSurface = ({
           </button>
           <button
             aria-label="放大流程图"
-            className={actionClass}
+            className={toolPreviewActionClass}
             data-markai-tooltip="放大"
             onClick={() => zoomBy(1.2)}
             type="button"
@@ -246,12 +248,8 @@ const DiagramSurface = ({
         </div>
       )}
       {error && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-white px-6 text-center dark:bg-[#171717]">
-          <AlertCircle className="text-amber-500" size={24} />
-          <p className="mt-3 text-sm font-medium text-gray-700 dark:text-gray-200">
-            流程图暂时无法渲染
-          </p>
-          <p className="mt-1 max-w-lg text-xs text-gray-400">{error}</p>
+        <div className="absolute inset-0 bg-white dark:bg-[#171717]">
+          <ToolPreviewError label="流程图" />
         </div>
       )}
     </div>
@@ -262,10 +260,19 @@ export function MermaidPreviewBlock({ children }: { children: string }) {
   const { resolvedTheme } = useTheme();
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [runtimeError, setRuntimeError] = useState(false);
   const [svg, setSvg] = useState<SVGSVGElement | null>(null);
   const [expandedSvg, setExpandedSvg] = useState<SVGSVGElement | null>(null);
   const title = "Mermaid 流程图";
   const background = resolvedTheme === "dark" ? "#171717" : "#ffffff";
+  const validationError = useMemo(() => validateSource(children), [children]);
+  const previewError = Boolean(validationError || runtimeError);
+  const handleRenderError = useCallback(() => setRuntimeError(true), []);
+
+  useEffect(() => {
+    setRuntimeError(false);
+    if (validationError) console.warn("Mermaid preview validation error:", validationError);
+  }, [children, resolvedTheme, validationError]);
 
   const copySource = async () => {
     await navigator.clipboard.writeText(children.trim());
@@ -284,61 +291,69 @@ export function MermaidPreviewBlock({ children }: { children: string }) {
 
   return (
     <>
-      <section className="my-5 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#171717]">
-        <header className="flex min-h-12 items-center justify-between gap-2 border-b border-gray-100 px-3 py-1.5 dark:border-white/[0.08]">
-          <div className="flex min-w-0 items-center gap-2">
-            <GitBranch className="shrink-0 text-primary" size={17} />
-            <span className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
-              {title}
-            </span>
-            <span className="hidden rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-400 sm:inline dark:bg-white/[0.06]">
-              Mermaid
-            </span>
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <button
-              aria-label="放大查看流程图"
-              className={actionClass}
-              data-markai-tooltip="放大查看"
-              disabled={!svg}
-              onClick={() => setExpanded(true)}
-              type="button"
-            >
-              <Maximize2 size={15} />
-            </button>
-            <button
-              aria-label="下载流程图 SVG"
-              className={actionClass}
-              data-markai-tooltip="下载 SVG"
-              disabled={!svg}
-              onClick={() => svg && downloadSvg(svg, title)}
-              type="button"
-            >
-              <Download size={15} />
-            </button>
-            <button
-              aria-label="下载流程图 PNG"
-              className={actionClass}
-              data-markai-tooltip="下载 PNG"
-              disabled={!svg}
-              onClick={() => void exportPng(svg)}
-              type="button"
-            >
-              <ImageDown size={15} />
-            </button>
+      <ToolPreviewCard
+        actions={
+          <>
+            {!previewError && (
+              <>
+                <button
+                  aria-label="放大查看流程图"
+                  className={toolPreviewActionClass}
+                  data-markai-tooltip="放大查看"
+                  disabled={!svg}
+                  onClick={() => setExpanded(true)}
+                  type="button"
+                >
+                  <Maximize2 size={15} />
+                </button>
+                <button
+                  aria-label="下载流程图 SVG"
+                  className={toolPreviewActionClass}
+                  data-markai-tooltip="下载 SVG"
+                  disabled={!svg}
+                  onClick={() => svg && downloadSvg(svg, title)}
+                  type="button"
+                >
+                  <Download size={15} />
+                </button>
+                <button
+                  aria-label="下载流程图 PNG"
+                  className={toolPreviewActionClass}
+                  data-markai-tooltip="下载 PNG"
+                  disabled={!svg}
+                  onClick={() => void exportPng(svg)}
+                  type="button"
+                >
+                  <ImageDown size={15} />
+                </button>
+              </>
+            )}
             <button
               aria-label={copied ? "源码已复制" : "复制流程图源码"}
-              className={actionClass}
+              className={toolPreviewActionClass}
               data-markai-tooltip={copied ? "已复制" : "复制源码"}
               onClick={() => void copySource()}
               type="button"
             >
               {copied ? <Check className="text-emerald-500" size={15} /> : <Copy size={15} />}
             </button>
-          </div>
-        </header>
-        <DiagramSurface className="h-[340px] sm:h-[380px]" onReady={setSvg} source={children} />
-      </section>
+          </>
+        }
+        badge="Mermaid"
+        icon={GitBranch}
+        title={title}
+      >
+        {previewError ? (
+          <ToolPreviewError label="流程图" />
+        ) : (
+          <DiagramSurface
+            className="h-[340px] sm:h-[380px]"
+            onError={handleRenderError}
+            onReady={setSvg}
+            source={children}
+          />
+        )}
+      </ToolPreviewCard>
 
       <AppDialog
         bodyClassName="min-h-0 flex-1 overflow-hidden"
@@ -354,7 +369,7 @@ export function MermaidPreviewBlock({ children }: { children: string }) {
           <div className="absolute right-3 top-3 z-10 flex gap-1 rounded-lg border border-gray-200 bg-white/90 p-1 shadow-sm backdrop-blur dark:border-white/10 dark:bg-[#191919]/90">
             <button
               aria-label="下载流程图 SVG"
-              className={actionClass}
+              className={toolPreviewActionClass}
               data-markai-tooltip="下载 SVG"
               disabled={!expandedSvg}
               onClick={() => expandedSvg && downloadSvg(expandedSvg, title)}
@@ -364,7 +379,7 @@ export function MermaidPreviewBlock({ children }: { children: string }) {
             </button>
             <button
               aria-label="下载流程图 PNG"
-              className={actionClass}
+              className={toolPreviewActionClass}
               data-markai-tooltip="下载 PNG"
               disabled={!expandedSvg}
               onClick={() => void exportPng(expandedSvg)}

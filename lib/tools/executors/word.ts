@@ -95,8 +95,8 @@ export const executeCreateWord = async (
   const title = typeof args.title === "string" ? args.title.trim().slice(0, 160) : "";
   const content = typeof args.content === "string" ? args.content.trim() : "";
   const filename = typeof args.filename === "string" ? args.filename : undefined;
-  if (!title || !content) throw new Error("Word document title and content are required");
-  if (content.length > MAX_CONTENT_CHARS) throw new Error("Word document content is too long");
+  if (!title || !content) throw new Error("Word 文档标题和内容不能为空");
+  if (content.length > MAX_CONTENT_CHARS) throw new Error("Word 文档内容过长");
 
   const document = new Document({
     numbering: {

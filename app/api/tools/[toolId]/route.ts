@@ -20,7 +20,7 @@ const getRequestContext = async (req: NextRequest, toolId: string) => {
 
   const tool = getBuiltinTool(toolId);
   if (!tool) {
-    return { response: NextResponse.json({ error: "Tool not found" }, { status: 404 }) };
+    return { response: NextResponse.json({ error: "工具不存在" }, { status: 404 }) };
   }
 
   return {
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ toolId
 
   const tool = getAvailableBuiltinTool(toolId);
   if (!tool) {
-    return NextResponse.json({ error: "This tool is not ready to install yet" }, { status: 409 });
+    return NextResponse.json({ error: "该工具暂未开放安装" }, { status: 409 });
   }
 
   await installTool(requestContext.userId, tool.id, tool.version);

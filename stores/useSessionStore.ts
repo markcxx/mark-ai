@@ -106,9 +106,9 @@ export const useSessionStore = create<SessionStore>()(
           if (response.status === 401) {
             const callbackUrl = `${window.location.pathname}${window.location.search}`;
             window.location.replace(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
-            throw new Error("Unauthorized");
+            throw new Error("请先登录");
           }
-          if (!response.ok) throw new Error("Failed to load sessions");
+          if (!response.ok) throw new Error("加载历史会话失败");
 
           const data = await response.json();
           const nextSessions: ChatSession[] = Array.isArray(data.sessions) ? data.sessions : [];
@@ -137,7 +137,7 @@ export const useSessionStore = create<SessionStore>()(
           cache: "no-store",
           signal: controller.signal,
         });
-        if (!response.ok) throw new Error("Failed to load session");
+        if (!response.ok) throw new Error("加载会话失败");
 
         const data = await response.json();
         if (requestId !== activeSessionLoadRequest) return undefined;
@@ -175,7 +175,7 @@ export const useSessionStore = create<SessionStore>()(
         signal: options.signal,
       });
 
-      if (!response.ok) throw new Error("Failed to create session");
+      if (!response.ok) throw new Error("创建会话失败");
 
       const data = await response.json();
       const session = data.session as ChatSession;
@@ -189,7 +189,7 @@ export const useSessionStore = create<SessionStore>()(
       try {
         const deletingActiveSession = get().activeSessionId === sessionId;
         const response = await fetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
-        if (!response.ok) throw new Error("Failed to delete session");
+        if (!response.ok) throw new Error("删除会话失败");
 
         get().setSessionLoading(sessionId, false);
         set((s) => ({
@@ -221,7 +221,7 @@ export const useSessionStore = create<SessionStore>()(
 
         if (!sourceMessages) {
           const response = await fetch(`/api/sessions/${sessionId}`, { cache: "no-store" });
-          if (!response.ok) throw new Error("Failed to load session for title");
+          if (!response.ok) throw new Error("加载会话内容失败");
           const data = await response.json();
           sourceMessages = Array.isArray(data.messages) ? data.messages : [];
         }
@@ -250,7 +250,7 @@ export const useSessionStore = create<SessionStore>()(
           headers: { "Content-Type": "application/json" },
           method: "PATCH",
         });
-        if (!response.ok) throw new Error("Failed to update session title");
+        if (!response.ok) throw new Error("更新会话标题失败");
 
         const data = await response.json();
         if (data.session) get().upsertSession(data.session);
@@ -271,7 +271,7 @@ export const useSessionStore = create<SessionStore>()(
           headers: { "Content-Type": "application/json" },
           method: "PATCH",
         });
-        if (!response.ok) throw new Error("Failed to update session favorite");
+        if (!response.ok) throw new Error("更新会话收藏状态失败");
 
         const data = await response.json();
         if (data.session) get().upsertSession(data.session);
@@ -294,7 +294,7 @@ export const useSessionStore = create<SessionStore>()(
 
         if (!response.ok) {
           const errorPayload = await response.text();
-          let message = errorPayload || "Failed to save messages";
+          let message = errorPayload || "保存消息失败";
           try {
             const parsed = JSON.parse(errorPayload);
             message = parsed.detail || parsed.error || message;
@@ -322,7 +322,7 @@ export const useSessionStore = create<SessionStore>()(
           method: "POST",
         });
 
-        if (!response.ok) throw new Error("Failed to generate title");
+        if (!response.ok) throw new Error("生成会话标题失败");
 
         const data = await response.json();
         if (data.session) get().upsertSession(data.session);

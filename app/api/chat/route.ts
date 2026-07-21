@@ -38,19 +38,19 @@ export async function POST(req: NextRequest) {
 
     const contentLength = Number(req.headers.get("content-length"));
     if (Number.isFinite(contentLength) && contentLength > MAX_CHAT_PAYLOAD_BYTES) {
-      return NextResponse.json({ error: "Chat payload is too large" }, { status: 413 });
+      return NextResponse.json({ error: "对话内容过大，请缩短消息后重试" }, { status: 413 });
     }
 
     const body = await req.json().catch(() => null);
     if (!body || typeof body !== "object") {
-      return NextResponse.json({ error: "Invalid request payload" }, { status: 400 });
+      return NextResponse.json({ error: "请求内容格式无效" }, { status: 400 });
     }
 
     const { messages, model, provider, sessionId, timezone, webSearchEnabled } = body;
     const selectedModel = await findAvailableModel(model, provider, authorization.userId);
 
     if (!selectedModel) {
-      return NextResponse.json({ error: "Model is not configured" }, { status: 400 });
+      return NextResponse.json({ error: "所选模型尚未配置或不可用" }, { status: 400 });
     }
 
     if (
@@ -75,18 +75,18 @@ export async function POST(req: NextRequest) {
               ))),
       )
     ) {
-      return NextResponse.json({ error: "Messages are required" }, { status: 400 });
+      return NextResponse.json({ error: "消息内容为空、过长或格式无效" }, { status: 400 });
     }
 
     const storageOwnerId = authorization.userId || (isLocalMode() ? LOCAL_STORAGE_OWNER_ID : null);
     if (!storageOwnerId) {
-      return NextResponse.json({ error: "Storage owner is unavailable" }, { status: 401 });
+      return NextResponse.json({ error: "无法确认当前存储用户，请重新登录" }, { status: 401 });
     }
 
     let enabledToolIds: string[] = [];
     if (typeof sessionId === "string" && sessionId) {
       const session = await getChatSession(sessionId, authorization.userId);
-      if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      if (!session) return NextResponse.json({ error: "会话不存在或无权访问" }, { status: 404 });
 
       const [sessionToolIds, installedToolIds] = await Promise.all([
         listSessionEnabledToolIds(storageOwnerId, sessionId),
@@ -184,6 +184,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("Chat error:", error);
-    return NextResponse.json({ error: "Failed to generate response" }, { status: 500 });
+    return NextResponse.json({ error: "生成回复失败，请稍后重试" }, { status: 500 });
   }
 }

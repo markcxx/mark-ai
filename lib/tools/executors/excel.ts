@@ -24,21 +24,21 @@ export const executeCreateExcel = async (
   context: ToolExecutionContext,
 ): Promise<ToolExecutionResult> => {
   if (!Array.isArray(args.sheets) || args.sheets.length === 0) {
-    throw new Error("At least one worksheet is required");
+    throw new Error("Excel 工作簿至少需要一个工作表");
   }
-  if (args.sheets.length > MAX_SHEETS) throw new Error("Too many worksheets");
+  if (args.sheets.length > MAX_SHEETS) throw new Error("Excel 工作表数量过多");
 
   const workbook = XLSX.utils.book_new();
   const usedNames = new Set<string>();
   for (const [sheetIndex, rawSheet] of args.sheets.entries()) {
     const sheet =
       rawSheet && typeof rawSheet === "object" ? (rawSheet as Record<string, unknown>) : {};
-    if (!Array.isArray(sheet.rows)) throw new Error("Worksheet rows must be an array");
-    if (sheet.rows.length > MAX_ROWS) throw new Error("Worksheet has too many rows");
+    if (!Array.isArray(sheet.rows)) throw new Error("Excel 工作表行数据格式无效");
+    if (sheet.rows.length > MAX_ROWS) throw new Error("Excel 工作表行数过多");
 
     const rows = sheet.rows.map((rawRow) => {
       if (!Array.isArray(rawRow)) return [cellValue(rawRow)];
-      if (rawRow.length > MAX_COLUMNS) throw new Error("Worksheet has too many columns");
+      if (rawRow.length > MAX_COLUMNS) throw new Error("Excel 工作表列数过多");
       return rawRow.map(cellValue);
     });
     const worksheet = XLSX.utils.aoa_to_sheet(rows);

@@ -58,7 +58,7 @@ export const createOpenAICompatibleStream = async (
 ) => {
   const endpoint = toOpenAIChatEndpoint(baseUrl);
   if (!endpoint) {
-    return NextResponse.json({ error: "Model base URL is not configured" }, { status: 400 });
+    return NextResponse.json({ error: "模型接口地址尚未配置" }, { status: 400 });
   }
 
   const encoder = new TextEncoder();
@@ -139,7 +139,7 @@ export const createOpenAICompatibleStream = async (
         }
 
         if (!upstream.body) {
-          throw new Error("No upstream response body");
+          throw new Error("模型服务未返回可读取的响应");
         }
 
         return upstream.body.getReader();

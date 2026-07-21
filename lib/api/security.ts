@@ -42,7 +42,7 @@ export const authorizeApiRequest = async (
   if (!session?.user?.id) {
     return {
       authorized: false,
-      response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+      response: NextResponse.json({ error: "请先登录" }, { status: 401 }),
     };
   }
 
@@ -72,7 +72,7 @@ export const enforceRateLimit = ({
   if (current.count >= limit) {
     const retryAfter = Math.max(1, Math.ceil((current.resetAt - now) / 1000));
     return NextResponse.json(
-      { error: "Too many requests", retryAfter },
+      { error: "请求过于频繁，请稍后重试", retryAfter },
       { headers: { "Retry-After": String(retryAfter) }, status: 429 },
     );
   }

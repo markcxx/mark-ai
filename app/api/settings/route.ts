@@ -31,7 +31,7 @@ export async function PATCH(req: NextRequest) {
 
   const body = await req.json().catch(() => null);
   if (!body || typeof body !== "object") {
-    return NextResponse.json({ error: "Invalid settings payload" }, { status: 400 });
+    return NextResponse.json({ error: "设置内容格式无效" }, { status: 400 });
   }
 
   const current = await getSettingsOrDefaults(authorization.userId);

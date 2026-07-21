@@ -7,7 +7,7 @@ import { getStoredFile, writeStoredFileObject } from "@/lib/storage/file-storage
 export const runtime = "nodejs";
 
 export async function PUT(request: Request, context: { params: Promise<{ fileId: string }> }) {
-  if (!isLocalMode()) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!isLocalMode()) return NextResponse.json({ error: "上传接口不存在" }, { status: 404 });
 
   const userId = await getCurrentStorageOwnerId();
   if (!userId) return NextResponse.json({ error: "无权上传文件" }, { status: 401 });

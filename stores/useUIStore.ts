@@ -171,9 +171,9 @@ export const useUIStore = create<UIStore>()(
         if (response.status === 401) {
           const callbackUrl = `${window.location.pathname}${window.location.search}`;
           window.location.replace(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
-          throw new Error("Unauthorized");
+          throw new Error("请先登录");
         }
-        if (!response.ok) throw new Error("Failed to load models");
+        if (!response.ok) throw new Error("加载模型列表失败");
         const data = await response.json();
         const models: ConfiguredModel[] = Array.isArray(data.models) ? data.models : [];
         const providerNames: Record<string, string> =
@@ -228,7 +228,7 @@ export const useUIStore = create<UIStore>()(
         method: "PATCH",
       })
         .then((response) => {
-          if (!response.ok) throw new Error("Failed to save selected model");
+          if (!response.ok) throw new Error("保存默认模型失败");
         })
         .catch((error) => {
           console.error("Model preference save error:", error);

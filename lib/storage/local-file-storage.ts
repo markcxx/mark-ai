@@ -106,7 +106,7 @@ const getObjectPath = (objectKey: string) => {
   const root = getFilesRoot();
   const objectPath = path.resolve(root, objectKey);
   if (objectPath !== root && !objectPath.startsWith(`${root}${path.sep}`)) {
-    throw new Error("Invalid local file path");
+    throw new Error("本地文件路径无效");
   }
   return objectPath;
 };
@@ -176,7 +176,7 @@ export const deleteLocalFileRecord = (id: string, userId = LOCAL_STORAGE_OWNER_I
 };
 
 export const writeLocalObject = async (file: StoredFileRecord, bytes: Uint8Array) => {
-  if (bytes.byteLength !== file.size) throw new Error("Uploaded file size does not match");
+  if (bytes.byteLength !== file.size) throw new Error("上传文件大小与预期不一致");
   const objectPath = getObjectPath(file.objectKey);
   const temporaryPath = `${objectPath}.uploading`;
   await fsPromises.mkdir(path.dirname(objectPath), { recursive: true });

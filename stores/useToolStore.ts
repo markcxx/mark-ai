@@ -27,7 +27,7 @@ const putSessionTools = async (sessionId: string, toolIds: string[]) => {
     headers: { "Content-Type": "application/json" },
     method: "PUT",
   });
-  if (!response.ok) throw new Error("Failed to update session tools");
+  if (!response.ok) throw new Error("更新会话工具失败");
   const data = await response.json();
   return Array.isArray(data.toolIds) ? (data.toolIds as string[]) : toolIds;
 };
@@ -46,7 +46,7 @@ export const useToolStore = create<ToolStore>((set, get) => ({
     catalogPromise = (async () => {
       try {
         const response = await fetch("/api/tools", { cache: "no-store" });
-        if (!response.ok) throw new Error("Failed to load tools");
+        if (!response.ok) throw new Error("加载工具失败");
         const data = await response.json();
         set({ catalog: Array.isArray(data.tools) ? data.tools : [] });
       } finally {
@@ -59,7 +59,7 @@ export const useToolStore = create<ToolStore>((set, get) => ({
 
   installTool: async (toolId) => {
     const response = await fetch(`/api/tools/${encodeURIComponent(toolId)}`, { method: "POST" });
-    if (!response.ok) throw new Error("Failed to install tool");
+    if (!response.ok) throw new Error("安装工具失败");
     set((state) => ({
       catalog: state.catalog.map((tool) =>
         tool.id === toolId ? { ...tool, installed: true } : tool,
@@ -69,7 +69,7 @@ export const useToolStore = create<ToolStore>((set, get) => ({
 
   uninstallTool: async (toolId) => {
     const response = await fetch(`/api/tools/${encodeURIComponent(toolId)}`, { method: "DELETE" });
-    if (!response.ok) throw new Error("Failed to uninstall tool");
+    if (!response.ok) throw new Error("卸载工具失败");
     set((state) => ({
       catalog: state.catalog.map((tool) =>
         tool.id === toolId ? { ...tool, installed: false } : tool,
@@ -95,7 +95,7 @@ export const useToolStore = create<ToolStore>((set, get) => ({
       const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/tools`, {
         cache: "no-store",
       });
-      if (!response.ok) throw new Error("Failed to load session tools");
+      if (!response.ok) throw new Error("加载会话工具失败");
       const data = await response.json();
       if (requestId !== sessionRequestId) return;
       set({ enabledToolIds: Array.isArray(data.toolIds) ? data.toolIds : [] });

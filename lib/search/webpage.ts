@@ -287,7 +287,7 @@ const withTimeoutSignal = (signal: AbortSignal | undefined, timeoutMs: number) =
 const readViaFirecrawl = async (url: URL, startedAt: number, signal?: AbortSignal) => {
   const apiKeys = getEnvKeys("FIRECRAWL_API_KEY");
   if (apiKeys.length === 0) {
-    throw new Error("FIRECRAWL_API_KEY is not configured");
+    throw new Error("网页读取服务尚未配置 FIRECRAWL_API_KEY");
   }
 
   let lastError = "Firecrawl scrape failed";
@@ -362,7 +362,7 @@ const readViaFirecrawl = async (url: URL, startedAt: number, signal?: AbortSigna
 const readViaTavilyExtract = async (url: URL, startedAt: number, signal?: AbortSignal) => {
   const apiKeys = getEnvKeys("TAVILY_API_KEY");
   if (apiKeys.length === 0) {
-    throw new Error("TAVILY_API_KEY is not configured");
+    throw new Error("网页读取服务尚未配置 TAVILY_API_KEY");
   }
 
   let lastError = "Tavily extract failed";

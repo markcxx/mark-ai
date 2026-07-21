@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     const query = typeof body.query === "string" ? body.query.trim() : "";
 
     if (!query || query.length > 500) {
-      return NextResponse.json({ error: "Query is required" }, { status: 400 });
+      return NextResponse.json({ error: "请输入不超过 500 个字符的搜索内容" }, { status: 400 });
     }
 
     const data = await searchTavily({
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
-      return NextResponse.json({ error: "Search aborted" }, { status: 499 });
+      return NextResponse.json({ error: "搜索已取消" }, { status: 499 });
     }
 
     const status =
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       error instanceof Error && "detail" in error
         ? (error as Error & { detail?: string }).detail
         : undefined;
-    const message = error instanceof Error ? error.message : "Failed to search with Tavily";
+    const message = error instanceof Error ? error.message : "联网搜索失败，请稍后重试";
 
     if (status >= 500) console.error("Tavily search error:", error);
 

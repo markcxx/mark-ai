@@ -112,7 +112,7 @@ export const createStreamAssistantMessage =
         }
         throw new Error(typeof detail === "string" && detail.trim() ? detail : "模型请求失败");
       }
-      if (!response.body) throw new Error("No response body");
+      if (!response.body) throw new Error("模型服务未返回可读取的响应");
 
       const removedContextMessages = Number(response.headers.get("X-MarkAI-Context-Removed"));
       const contextContentTruncated = response.headers.get("X-MarkAI-Context-Truncated") === "1";
@@ -387,8 +387,7 @@ export const createStreamAssistantMessage =
         reasoning: errReasoning || undefined,
         segments: segments.length > 0 ? [...segments] : undefined,
         tokenUsageSource: "estimated",
-        totalTokens:
-          inputTokens + estimateTextTokens(failureMessage),
+        totalTokens: inputTokens + estimateTextTokens(failureMessage),
       };
     } finally {
       set((s) => ({

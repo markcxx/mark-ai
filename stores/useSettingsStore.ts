@@ -63,7 +63,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
         method: "PATCH",
       })
         .then((response) => {
-          if (!response.ok) throw new Error("Failed to save settings");
+          if (!response.ok) throw new Error("保存设置失败");
           if (version === saveVersion) set({ saveState: "saved" });
         })
         .catch((error) => {
@@ -83,7 +83,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       if (local) set({ ...local });
       try {
         const response = await fetch("/api/settings", { cache: "no-store" });
-        if (!response.ok) throw new Error("Failed to load settings");
+        if (!response.ok) throw new Error("加载设置失败");
         const data = await response.json();
         const resolved =
           data.cloudPersistence === false && local
@@ -107,7 +107,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
           headers: { "Content-Type": "application/json" },
           method: "PATCH",
         });
-        if (!response.ok) throw new Error("Failed to reset settings");
+        if (!response.ok) throw new Error("恢复默认设置失败");
         set({ saveState: "saved" });
       } catch (error) {
         console.error("Settings reset error:", error);

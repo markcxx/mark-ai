@@ -23,7 +23,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ sessio
   const userId = await getCurrentUserId();
   const currentSession = await getChatSession(sessionId, userId);
   if (!currentSession) {
-    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    return NextResponse.json({ error: "会话不存在或无权访问" }, { status: 404 });
   }
 
   const body = await req.json().catch(() => ({}));

@@ -20,7 +20,7 @@ const getOwnedSession = async (req: NextRequest, sessionId: string) => {
   const storageUserId = authorization.userId || LOCAL_STORAGE_OWNER_ID;
   const session = await getChatSession(sessionId, authorization.userId);
   if (!session) {
-    return { response: NextResponse.json({ error: "Session not found" }, { status: 404 }) };
+    return { response: NextResponse.json({ error: "会话不存在或无权访问" }, { status: 404 }) };
   }
 
   return { authorization, storageUserId };
@@ -56,7 +56,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ session
 
   const body = await req.json().catch(() => null);
   if (!body || !Array.isArray(body.toolIds) || body.toolIds.length > 20) {
-    return NextResponse.json({ error: "Invalid tool list" }, { status: 400 });
+    return NextResponse.json({ error: "工具列表格式无效" }, { status: 400 });
   }
 
   const requestedIds: string[] = [

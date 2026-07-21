@@ -323,7 +323,7 @@ export async function DELETE(req: NextRequest) {
 
   const provider = req.nextUrl.searchParams.get("provider")?.trim().toLowerCase() || "";
   if (!PROVIDER_ID_RE.test(provider)) {
-    return NextResponse.json({ error: "Invalid provider" }, { status: 400 });
+    return NextResponse.json({ error: "提供商标识无效" }, { status: 400 });
   }
 
   const db = getDb();

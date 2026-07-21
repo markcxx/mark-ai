@@ -163,7 +163,7 @@ export const createStoredFileUploadUrl = async (file: StoredFileRecord) => {
 };
 
 export const writeStoredFileObject = async (file: StoredFileRecord, bytes: Uint8Array) => {
-  if (!isLocalMode()) throw new Error("Direct uploads are only available in local mode");
+  if (!isLocalMode()) throw new Error("直接上传仅支持本地模式");
   await writeLocalObject(file, bytes);
 };
 

@@ -18,7 +18,7 @@ const MAX_MESSAGES_JSON_CHARS = 4_000_000;
 
 const revisionConflictResponse = (error: ChatRevisionConflictError) =>
   NextResponse.json(
-    { currentRevision: error.currentRevision, error: "Session revision conflict" },
+    { currentRevision: error.currentRevision, error: "会话已在其他位置更新，请刷新后重试" },
     { status: 409 },
   );
 
@@ -27,29 +27,29 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ session
     const { sessionId } = await context.params;
     const userId = await getCurrentUserId();
     if (!(await getChatSession(sessionId, userId))) {
-      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      return NextResponse.json({ error: "会话不存在或无权访问" }, { status: 404 });
     }
 
     const contentLength = Number(req.headers.get("content-length"));
     if (Number.isFinite(contentLength) && contentLength > MAX_MESSAGES_JSON_CHARS) {
-      return NextResponse.json({ error: "Message payload is too large" }, { status: 413 });
+      return NextResponse.json({ error: "消息内容过大，请缩短后重试" }, { status: 413 });
     }
 
     const body = await req.json().catch(() => null);
     if (!body || !Array.isArray(body.messages)) {
-      return NextResponse.json({ error: "Messages must be an array" }, { status: 400 });
+      return NextResponse.json({ error: "消息列表格式无效" }, { status: 400 });
     }
     if (hasInvalidExpectedRevision(body.revision)) {
-      return NextResponse.json({ error: "Invalid session revision" }, { status: 400 });
+      return NextResponse.json({ error: "会话版本号无效" }, { status: 400 });
     }
     if (body.messages.length > MAX_MESSAGE_COUNT) {
-      return NextResponse.json({ error: "Too many messages" }, { status: 413 });
+      return NextResponse.json({ error: "单个会话的消息数量过多" }, { status: 413 });
     }
     if (!body.messages.every(isMessage)) {
-      return NextResponse.json({ error: "Invalid message payload" }, { status: 400 });
+      return NextResponse.json({ error: "消息内容格式无效" }, { status: 400 });
     }
     if (JSON.stringify(body.messages).length > MAX_MESSAGES_JSON_CHARS) {
-      return NextResponse.json({ error: "Message payload is too large" }, { status: 413 });
+      return NextResponse.json({ error: "消息内容过大，请缩短后重试" }, { status: 413 });
     }
 
     const messages: Message[] = body.messages;
@@ -63,8 +63,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ session
     console.error("Session messages save error:", error);
     return NextResponse.json(
       {
-        error: "Failed to save session messages",
-        detail: error instanceof Error ? error.message : String(error),
+        error: "保存会话消息失败，请稍后重试",
       },
       { status: 500 },
     );
@@ -76,15 +75,15 @@ export async function POST(req: NextRequest, context: { params: Promise<{ sessio
     const { sessionId } = await context.params;
     const userId = await getCurrentUserId();
     if (!(await getChatSession(sessionId, userId))) {
-      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      return NextResponse.json({ error: "会话不存在或无权访问" }, { status: 404 });
     }
 
     const body = await req.json().catch(() => null);
     if (!body || !isMessage(body.message)) {
-      return NextResponse.json({ error: "Invalid message payload" }, { status: 400 });
+      return NextResponse.json({ error: "消息内容格式无效" }, { status: 400 });
     }
     if (hasInvalidExpectedRevision(body.revision)) {
-      return NextResponse.json({ error: "Invalid session revision" }, { status: 400 });
+      return NextResponse.json({ error: "会话版本号无效" }, { status: 400 });
     }
     const position =
       Number.isSafeInteger(body.position) && body.position >= 0 ? Number(body.position) : undefined;
@@ -96,6 +95,6 @@ export async function POST(req: NextRequest, context: { params: Promise<{ sessio
   } catch (error) {
     if (error instanceof ChatRevisionConflictError) return revisionConflictResponse(error);
     console.error("Session message create error:", error);
-    return NextResponse.json({ error: "Failed to create message" }, { status: 500 });
+    return NextResponse.json({ error: "保存新消息失败，请稍后重试" }, { status: 500 });
   }
 }

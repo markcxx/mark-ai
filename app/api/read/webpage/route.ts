@@ -16,17 +16,17 @@ export async function POST(req: NextRequest) {
     const url = typeof body.url === "string" ? body.url.trim() : "";
 
     if (!url || url.length > 2_048) {
-      return NextResponse.json({ error: "URL is required" }, { status: 400 });
+      return NextResponse.json({ error: "请输入有效的网页地址" }, { status: 400 });
     }
 
     const data = await readWebpage({ signal: req.signal, url });
     return NextResponse.json(data);
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
-      return NextResponse.json({ error: "Read aborted" }, { status: 499 });
+      return NextResponse.json({ error: "网页读取已取消" }, { status: 499 });
     }
 
-    const message = error instanceof Error ? error.message : "Failed to read webpage";
+    const message = error instanceof Error ? error.message : "网页读取失败，请稍后重试";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

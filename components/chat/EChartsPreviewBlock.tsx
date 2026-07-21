@@ -2,22 +2,16 @@
 
 import type { EChartsOption } from "echarts";
 import type { EChartsType } from "echarts/core";
-import {
-  AlertCircle,
-  ChartNoAxesCombined,
-  Check,
-  Copy,
-  Download,
-  Loader2,
-  Maximize2,
-} from "lucide-react";
+import { ChartNoAxesCombined, Check, Copy, Download, Loader2, Maximize2 } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AppDialog } from "@/components/ui/AppDialog";
 import { AppSelect } from "@/components/ui/AppSelect";
 import { cn } from "@/lib/utils";
 import { ECHARTS_THEME_PALETTES } from "@/lib/visualization/echarts-theme-palettes";
+
+import { ToolPreviewCard, ToolPreviewError, toolPreviewActionClass } from "./ToolPreviewCard";
 
 const MAX_CONFIG_CHARS = 160_000;
 const MAX_NODES = 60_000;
@@ -246,6 +240,7 @@ function ChartCanvas({
   backgroundColor,
   chartRef,
   className,
+  onError,
   onReady,
   option,
   theme,
@@ -253,6 +248,7 @@ function ChartCanvas({
   backgroundColor: string;
   chartRef: { current: EChartsType | null };
   className?: string;
+  onError?: (error: unknown) => void;
   onReady: (ready: boolean) => void;
   option: EChartsOption;
   theme?: string;
@@ -283,8 +279,10 @@ function ChartCanvas({
       })
       .catch((error) => {
         if (!active) return;
+        console.error("ECharts preview render error:", error);
         setLoading(false);
         setRuntimeError(error instanceof Error ? error.message : "图表组件加载失败");
+        onError?.(error);
         onReady(false);
       });
 
@@ -295,7 +293,7 @@ function ChartCanvas({
       chartRef.current = null;
       onReady(false);
     };
-  }, [chartRef, onReady, option, theme]);
+  }, [chartRef, onError, onReady, option, theme]);
 
   return (
     <div className={cn("relative", className)} style={{ backgroundColor }}>
@@ -307,9 +305,7 @@ function ChartCanvas({
       )}
       {runtimeError && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 px-6 text-center dark:bg-[#171717]/90">
-          <AlertCircle className="text-amber-500" size={24} />
-          <p className="mt-3 text-sm font-medium text-gray-700 dark:text-gray-200">图表渲染失败</p>
-          <p className="mt-1 max-w-lg text-xs text-gray-400">{runtimeError}</p>
+          <ToolPreviewError label="图表" />
         </div>
       )}
     </div>
@@ -324,6 +320,7 @@ export function EChartsPreviewBlock({ children }: { children: string }) {
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [expandedChartReady, setExpandedChartReady] = useState(false);
+  const [runtimeError, setRuntimeError] = useState(false);
   const [chartTheme, setChartTheme] = useState<ChartThemeId>("auto");
   const parsed = useMemo(() => parseOption(children), [children]);
   const dark = resolvedTheme === "dark";
@@ -336,6 +333,12 @@ export function EChartsPreviewBlock({ children }: { children: string }) {
         : undefined,
     [chartTheme, parsed],
   );
+  const handleRenderError = useCallback(() => setRuntimeError(true), []);
+
+  useEffect(() => {
+    setRuntimeError(false);
+    if (!parsed.ok) console.warn("ECharts preview parse error:", parsed.error);
+  }, [children, parsed]);
 
   const copyConfig = async () => {
     await navigator.clipboard.writeText(children.trim());
@@ -360,43 +363,38 @@ export function EChartsPreviewBlock({ children }: { children: string }) {
 
   return (
     <>
-      <section className="my-5 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#171717]">
-        <header className="flex min-h-12 flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-3 py-1.5 dark:border-white/[0.08]">
-          <div className="flex min-w-[140px] flex-1 items-center gap-2">
-            <ChartNoAxesCombined className="shrink-0 text-primary" size={17} />
-            <span className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
-              {parsed.ok ? parsed.title : "数据图表"}
-            </span>
-            <span className="hidden shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-400 sm:inline dark:bg-white/[0.06]">
-              ECharts
-            </span>
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <AppSelect
-              onChange={(value) =>
-                typeof value === "string" && setChartTheme(value as ChartThemeId)
-              }
-              options={chartThemeOptions}
-              size="small"
-              style={{ width: 112 }}
-              value={chartTheme}
-            />
-            {parsed.ok && (
+      <ToolPreviewCard
+        actions={
+          <>
+            {parsed.ok && !runtimeError && (
+              <AppSelect
+                onChange={(value) =>
+                  typeof value === "string" && setChartTheme(value as ChartThemeId)
+                }
+                options={chartThemeOptions}
+                size="small"
+                style={{ width: 112 }}
+                value={chartTheme}
+              />
+            )}
+            {parsed.ok && !runtimeError && (
               <>
                 <button
-                  className="flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40 dark:hover:bg-white/[0.07] dark:hover:text-gray-200"
+                  aria-label="放大查看图表"
+                  className={toolPreviewActionClass}
+                  data-markai-tooltip="放大查看"
                   disabled={!chartReady}
                   onClick={() => setExpanded(true)}
-                  title="放大查看"
                   type="button"
                 >
                   <Maximize2 size={15} />
                 </button>
                 <button
-                  className="flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40 dark:hover:bg-white/[0.07] dark:hover:text-gray-200"
+                  aria-label="下载图表 PNG"
+                  className={toolPreviewActionClass}
+                  data-markai-tooltip="下载 PNG"
                   disabled={!chartReady}
                   onClick={() => downloadImage(chartRef.current)}
-                  title="下载图表 PNG"
                   type="button"
                 >
                   <Download size={15} />
@@ -404,35 +402,34 @@ export function EChartsPreviewBlock({ children }: { children: string }) {
               </>
             )}
             <button
-              className="flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/[0.07] dark:hover:text-gray-200"
+              aria-label={copied ? "配置已复制" : "复制图表配置"}
+              className={toolPreviewActionClass}
+              data-markai-tooltip={copied ? "已复制" : "复制配置"}
               onClick={() => void copyConfig()}
-              title={copied ? "配置已复制" : "复制图表配置"}
               type="button"
             >
               {copied ? <Check className="text-emerald-500" size={15} /> : <Copy size={15} />}
             </button>
-          </div>
-        </header>
-
-        {parsed.ok ? (
+          </>
+        }
+        badge="ECharts"
+        icon={ChartNoAxesCombined}
+        title={parsed.ok ? parsed.title : "数据图表"}
+      >
+        {parsed.ok && !runtimeError ? (
           <ChartCanvas
             backgroundColor={chartBackground}
             chartRef={chartRef}
             className="h-[340px] w-full sm:h-[380px]"
+            onError={handleRenderError}
             onReady={setChartReady}
             option={chartOption || parsed.option}
             theme={runtimeTheme}
           />
         ) : (
-          <div className="flex h-[340px] flex-col items-center justify-center px-6 text-center sm:h-[380px]">
-            <AlertCircle className="text-amber-500" size={24} />
-            <p className="mt-3 text-sm font-medium text-gray-700 dark:text-gray-200">
-              图表配置尚未完成或格式不正确
-            </p>
-            <p className="mt-1 max-w-lg text-xs text-gray-400">{parsed.error}</p>
-          </div>
+          <ToolPreviewError label="图表" />
         )}
-      </section>
+      </ToolPreviewCard>
 
       <AppDialog
         bodyClassName="min-h-0 !h-[calc(100%-55px)] overflow-hidden"

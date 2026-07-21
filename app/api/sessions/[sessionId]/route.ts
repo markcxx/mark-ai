@@ -18,7 +18,7 @@ export async function GET(_req: Request, context: { params: Promise<{ sessionId:
   const session = await getChatSession(sessionId, userId);
 
   if (!session) {
-    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    return NextResponse.json({ error: "会话不存在或无权访问" }, { status: 404 });
   }
 
   return NextResponse.json(
@@ -39,7 +39,7 @@ export async function DELETE(_req: Request, context: { params: Promise<{ session
   const { sessionId } = await context.params;
   const userId = await getCurrentUserId();
   if (!(await getChatSession(sessionId, userId))) {
-    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    return NextResponse.json({ error: "会话不存在或无权访问" }, { status: 404 });
   }
 
   await deleteChatSession(sessionId, userId);
@@ -50,7 +50,7 @@ export async function PATCH(req: Request, context: { params: Promise<{ sessionId
   const { sessionId } = await context.params;
   const userId = await getCurrentUserId();
   if (!(await getChatSession(sessionId, userId))) {
-    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    return NextResponse.json({ error: "会话不存在或无权访问" }, { status: 404 });
   }
 
   const body = await req.json().catch(() => ({}));

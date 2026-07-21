@@ -46,17 +46,17 @@ export const saveGeneratedFile = async ({
   filename?: string;
   userId: string;
 }): Promise<GeneratedFile> => {
-  if (bytes.byteLength === 0) throw new Error("Generated file is empty");
+  if (bytes.byteLength === 0) throw new Error("生成的文件为空");
   if (bytes.byteLength > storageLimits.maxFileBytes) {
-    throw new Error("Generated file exceeds the current file size limit");
+    throw new Error("生成的文件超过当前大小限制");
   }
 
   const unlimited = await isStoredFileQuotaUnlimited(userId);
   if (!unlimited) {
     const usage = await getStoredFileUsage(userId);
-    if (usage.count >= storageLimits.maxFileCount) throw new Error("File count quota exceeded");
+    if (usage.count >= storageLimits.maxFileCount) throw new Error("文件数量已达到上限");
     if (usage.size + bytes.byteLength > storageLimits.maxStorageBytes) {
-      throw new Error("Storage quota exceeded");
+      throw new Error("存储空间不足，请删除旧文件后重试");
     }
   }
 

@@ -69,7 +69,7 @@ export async function PATCH(req: NextRequest) {
   );
 
   if (!id || !provider || !modelExists) {
-    return NextResponse.json({ error: "Model is not configured" }, { status: 400 });
+    return NextResponse.json({ error: "所选模型尚未配置或不可用" }, { status: 400 });
   }
 
   if (authorization.userId) {

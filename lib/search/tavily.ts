@@ -59,12 +59,12 @@ export async function searchTavily({
 }): Promise<TavilySearchResponse> {
   const apiKeys = getApiKeys();
   if (apiKeys.length === 0) {
-    throw new Error("TAVILY_API_KEY is not configured");
+    throw new Error("联网搜索服务尚未配置 TAVILY_API_KEY");
   }
 
   const cleanQuery = query.trim();
   if (!cleanQuery) {
-    throw new Error("Query is required");
+    throw new Error("请输入搜索内容");
   }
 
   const startedAt = Date.now();

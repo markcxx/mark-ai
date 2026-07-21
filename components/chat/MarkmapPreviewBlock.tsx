@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  AlertCircle,
   Check,
   Copy,
   Download,
@@ -16,11 +15,13 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
 import { AppDialog } from "@/components/ui/AppDialog";
 import { downloadSvg, downloadSvgAsPng } from "@/lib/visualization/svg-export";
+
+import { ToolPreviewCard, ToolPreviewError, toolPreviewActionClass } from "./ToolPreviewCard";
 
 const MAX_SOURCE_LENGTH = 50_000;
 const MAX_NODES = 1_000;
@@ -59,9 +60,6 @@ const getTitle = (source: string) =>
     ?.replaceAll(/[*_`]/g, "")
     .trim()
     .slice(0, 80) || "Markmap 脑图";
-
-const actionClass =
-  "flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40 dark:hover:bg-white/[0.07] dark:hover:text-gray-200";
 
 const getMarkmapOptions = (dark: boolean) => ({
   autoFit: false,
@@ -205,10 +203,12 @@ const renderMindMapForExport = async ({
 
 const MindMapSurface = ({
   className,
+  onError,
   onReady,
   source,
 }: {
   className: string;
+  onError?: () => void;
   onReady?: (ready: boolean) => void;
   source: string;
 }) => {
@@ -257,8 +257,10 @@ const MindMapSurface = ({
       })
       .catch((reason) => {
         if (!active) return;
+        console.error("Markmap preview render error:", reason);
         setError(reason instanceof Error ? reason.message : "Markmap 渲染失败");
         setLoading(false);
+        onError?.();
       });
 
     return () => {
@@ -267,7 +269,7 @@ const MindMapSurface = ({
       markmapRef.current = null;
       onReady?.(false);
     };
-  }, [onReady, resolvedTheme, source, validationError]);
+  }, [onError, onReady, resolvedTheme, source, validationError]);
 
   return (
     <div className={`relative overflow-hidden bg-white dark:bg-[#171717] ${className}`}>
@@ -276,7 +278,7 @@ const MindMapSurface = ({
         <div className="absolute bottom-3 right-3 z-10 flex gap-1 rounded-lg border border-gray-200 bg-white/90 p-1 shadow-sm backdrop-blur dark:border-white/10 dark:bg-[#191919]/90">
           <button
             aria-label="折叠脑图节点"
-            className={actionClass}
+            className={toolPreviewActionClass}
             data-markai-tooltip="折叠全部"
             onClick={() => markmapRef.current && void setAllFolded(markmapRef.current, true)}
             type="button"
@@ -285,7 +287,7 @@ const MindMapSurface = ({
           </button>
           <button
             aria-label="展开脑图节点"
-            className={actionClass}
+            className={toolPreviewActionClass}
             data-markai-tooltip="展开全部"
             onClick={() => markmapRef.current && void setAllFolded(markmapRef.current, false)}
             type="button"
@@ -295,7 +297,7 @@ const MindMapSurface = ({
           <span className="mx-0.5 w-px bg-gray-200 dark:bg-white/10" />
           <button
             aria-label="缩小脑图"
-            className={actionClass}
+            className={toolPreviewActionClass}
             data-markai-tooltip="缩小"
             onClick={() => markmapRef.current && void markmapRef.current.rescale(0.8)}
             type="button"
@@ -304,7 +306,7 @@ const MindMapSurface = ({
           </button>
           <button
             aria-label="适应脑图视口"
-            className={actionClass}
+            className={toolPreviewActionClass}
             data-markai-tooltip="适应视口"
             onClick={() => markmapRef.current && void markmapRef.current.fit()}
             type="button"
@@ -313,7 +315,7 @@ const MindMapSurface = ({
           </button>
           <button
             aria-label="放大脑图"
-            className={actionClass}
+            className={toolPreviewActionClass}
             data-markai-tooltip="放大"
             onClick={() => markmapRef.current && void markmapRef.current.rescale(1.2)}
             type="button"
@@ -328,12 +330,8 @@ const MindMapSurface = ({
         </div>
       )}
       {error && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-white px-6 text-center dark:bg-[#171717]">
-          <AlertCircle className="text-amber-500" size={24} />
-          <p className="mt-3 text-sm font-medium text-gray-700 dark:text-gray-200">
-            脑图暂时无法渲染
-          </p>
-          <p className="mt-1 max-w-lg text-xs text-gray-400">{error}</p>
+        <div className="absolute inset-0 bg-white dark:bg-[#171717]">
+          <ToolPreviewError label="脑图" />
         </div>
       )}
     </div>
@@ -344,11 +342,20 @@ export function MarkmapPreviewBlock({ children }: { children: string }) {
   const { resolvedTheme } = useTheme();
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [runtimeError, setRuntimeError] = useState(false);
   const [ready, setReady] = useState(false);
   const [expandedReady, setExpandedReady] = useState(false);
   const [exporting, setExporting] = useState(false);
   const title = useMemo(() => getTitle(children), [children]);
   const background = resolvedTheme === "dark" ? "#171717" : "#ffffff";
+  const validationError = useMemo(() => validateSource(children), [children]);
+  const previewError = Boolean(validationError || runtimeError);
+  const handleRenderError = useCallback(() => setRuntimeError(true), []);
+
+  useEffect(() => {
+    setRuntimeError(false);
+    if (validationError) console.warn("Markmap preview validation error:", validationError);
+  }, [children, resolvedTheme, validationError]);
 
   const copySource = async () => {
     await navigator.clipboard.writeText(children.trim());
@@ -376,61 +383,69 @@ export function MarkmapPreviewBlock({ children }: { children: string }) {
 
   return (
     <>
-      <section className="my-5 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#171717]">
-        <header className="flex min-h-12 items-center justify-between gap-2 border-b border-gray-100 px-3 py-1.5 dark:border-white/[0.08]">
-          <div className="flex min-w-0 items-center gap-2">
-            <Network className="shrink-0 text-primary" size={17} />
-            <span className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
-              {title}
-            </span>
-            <span className="hidden rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-400 sm:inline dark:bg-white/[0.06]">
-              Markmap
-            </span>
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <button
-              aria-label="放大查看脑图"
-              className={actionClass}
-              data-markai-tooltip="放大查看"
-              disabled={!ready}
-              onClick={() => setExpanded(true)}
-              type="button"
-            >
-              <Maximize2 size={15} />
-            </button>
-            <button
-              aria-label="下载脑图 SVG"
-              className={actionClass}
-              data-markai-tooltip="下载 SVG"
-              disabled={!ready || exporting}
-              onClick={() => void exportMindMap("svg")}
-              type="button"
-            >
-              <Download size={15} />
-            </button>
-            <button
-              aria-label="下载脑图 PNG"
-              className={actionClass}
-              data-markai-tooltip="下载 PNG"
-              disabled={!ready || exporting}
-              onClick={() => void exportMindMap("png")}
-              type="button"
-            >
-              <ImageDown size={15} />
-            </button>
+      <ToolPreviewCard
+        actions={
+          <>
+            {!previewError && (
+              <>
+                <button
+                  aria-label="放大查看脑图"
+                  className={toolPreviewActionClass}
+                  data-markai-tooltip="放大查看"
+                  disabled={!ready}
+                  onClick={() => setExpanded(true)}
+                  type="button"
+                >
+                  <Maximize2 size={15} />
+                </button>
+                <button
+                  aria-label="下载脑图 SVG"
+                  className={toolPreviewActionClass}
+                  data-markai-tooltip="下载 SVG"
+                  disabled={!ready || exporting}
+                  onClick={() => void exportMindMap("svg")}
+                  type="button"
+                >
+                  <Download size={15} />
+                </button>
+                <button
+                  aria-label="下载脑图 PNG"
+                  className={toolPreviewActionClass}
+                  data-markai-tooltip="下载 PNG"
+                  disabled={!ready || exporting}
+                  onClick={() => void exportMindMap("png")}
+                  type="button"
+                >
+                  <ImageDown size={15} />
+                </button>
+              </>
+            )}
             <button
               aria-label={copied ? "源码已复制" : "复制脑图源码"}
-              className={actionClass}
+              className={toolPreviewActionClass}
               data-markai-tooltip={copied ? "已复制" : "复制源码"}
               onClick={() => void copySource()}
               type="button"
             >
               {copied ? <Check className="text-emerald-500" size={15} /> : <Copy size={15} />}
             </button>
-          </div>
-        </header>
-        <MindMapSurface className="h-[340px] sm:h-[380px]" onReady={setReady} source={children} />
-      </section>
+          </>
+        }
+        badge="Markmap"
+        icon={Network}
+        title={title}
+      >
+        {previewError ? (
+          <ToolPreviewError label="脑图" />
+        ) : (
+          <MindMapSurface
+            className="h-[340px] sm:h-[380px]"
+            onError={handleRenderError}
+            onReady={setReady}
+            source={children}
+          />
+        )}
+      </ToolPreviewCard>
 
       <AppDialog
         bodyClassName="min-h-0 flex-1 overflow-hidden"
@@ -446,7 +461,7 @@ export function MarkmapPreviewBlock({ children }: { children: string }) {
           <div className="absolute right-3 top-3 z-10 flex gap-1 rounded-lg border border-gray-200 bg-white/90 p-1 shadow-sm backdrop-blur dark:border-white/10 dark:bg-[#191919]/90">
             <button
               aria-label="下载脑图 SVG"
-              className={actionClass}
+              className={toolPreviewActionClass}
               data-markai-tooltip="下载 SVG"
               disabled={!expandedReady || exporting}
               onClick={() => void exportMindMap("svg")}
@@ -456,7 +471,7 @@ export function MarkmapPreviewBlock({ children }: { children: string }) {
             </button>
             <button
               aria-label="下载脑图 PNG"
-              className={actionClass}
+              className={toolPreviewActionClass}
               data-markai-tooltip="下载 PNG"
               disabled={!expandedReady || exporting}
               onClick={() => void exportMindMap("png")}

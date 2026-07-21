@@ -25,6 +25,6 @@ export const executeBuiltinTool = async (
     case "convert_units":
       return executeConvertUnits(args);
     default:
-      throw new Error(`Unsupported built-in tool: ${name}`);
+      throw new Error(`不支持的内置工具：${name}`);
   }
 };
