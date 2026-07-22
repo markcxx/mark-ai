@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { ModelMetadata } from "@/lib/model-metadata";
+import type { ModelMetadataWithContext } from "@/lib/model-metadata";
 import { getOutputReserveTokens, prepareMessagesForContext } from "./context-window";
 
-const metadata: ModelMetadata = {
+const metadata: ModelMetadataWithContext = {
   contextWindowTokens: 4096,
   description: "测试模型",
   displayName: "Test",

@@ -35,6 +35,7 @@ import { formatDuration, formatRelativeTime } from "@/lib/chat/metrics";
 import { cn } from "@/lib/utils";
 import { TRANSLATION_LANGUAGES, type TranslationLanguage } from "@/lib/chat/translation-languages";
 import { useSettingsStore } from "@/stores/useSettingsStore";
+import { AppTextArea } from "@/components/ui/AppInput";
 
 import { CollapsibleContent } from "./CollapsibleContent";
 import { FloatingMenu } from "./FloatingMenu";
@@ -81,6 +82,64 @@ function MoreMenuButton({
         open={open}
       />
     </>
+  );
+}
+
+function MessageEditor({
+  className,
+  content,
+  onCancel,
+  onChange,
+  onSave,
+}: {
+  className?: string;
+  content: string;
+  onCancel: () => void;
+  onChange: (content: string) => void;
+  onSave: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "w-full rounded-xl border border-gray-200 bg-[var(--chat-input-bg)] p-3 shadow-[0_8px_24px_rgba(0,0,0,0.06)] dark:border-white/10 dark:shadow-[0_12px_30px_rgba(0,0,0,0.24)]",
+        className,
+      )}
+    >
+      <AppTextArea
+        aria-label="编辑消息内容"
+        autoFocus
+        className="max-h-[55dvh] min-h-[180px] resize-y px-3 py-3 text-[length:var(--chat-font-size)] leading-relaxed md:min-h-[220px]"
+        onChange={(event) => onChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            onCancel();
+            return;
+          }
+          if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+            event.preventDefault();
+            onSave();
+          }
+        }}
+        value={content}
+      />
+      <div className="mt-3 flex justify-end gap-2">
+        <button
+          className="h-9 rounded-md px-3 text-sm text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/[0.07]"
+          onClick={onCancel}
+          type="button"
+        >
+          取消
+        </button>
+        <button
+          className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-white transition-opacity hover:opacity-85 dark:text-gray-900"
+          onClick={onSave}
+          type="button"
+        >
+          保存
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -301,9 +360,10 @@ export function MessageItem({
       const toastId = toast.loading("正在生成译文…", { duration: Infinity });
       try {
         await translateMessage(message, language);
-        toast.success("译文已生成", { id: toastId });
+        toast.success("译文已生成", { duration: 2200, id: toastId });
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "翻译失败，请稍后重试", {
+          duration: 3500,
           id: toastId,
         });
       } finally {
@@ -383,30 +443,13 @@ export function MessageItem({
           </time>
         )}
         {editing ? (
-          <div className="w-full max-w-[92%] rounded-2xl rounded-tr-sm bg-[var(--chat-user-bubble-bg)] p-3 shadow-sm md:max-w-[85%]">
-            <textarea
-              autoFocus
-              className="min-h-[96px] w-full resize-y rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-[15px] text-gray-900 dark:text-gray-100 outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
-              onChange={(event) => setEditingContent(event.target.value)}
-              value={editingContent}
-            />
-            <div className="mt-2 flex justify-end gap-2">
-              <button
-                className="rounded-lg px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700"
-                onClick={cancelEditingMessage}
-                type="button"
-              >
-                取消
-              </button>
-              <button
-                className="rounded-lg bg-gray-900 dark:bg-gray-100 px-3 py-1.5 text-sm text-white dark:text-gray-900 transition-opacity hover:opacity-85"
-                onClick={saveEditingMessage}
-                type="button"
-              >
-                保存
-              </button>
-            </div>
-          </div>
+          <MessageEditor
+            className="max-w-[720px]"
+            content={editingContent}
+            onCancel={cancelEditingMessage}
+            onChange={setEditingContent}
+            onSave={saveEditingMessage}
+          />
         ) : (
           <div className="flex w-fit max-w-[92%] flex-col gap-3 break-words rounded-2xl rounded-tr-sm bg-[var(--chat-user-bubble-bg)] px-4 py-3 text-left text-[length:var(--chat-font-size)] text-gray-900 shadow-sm dark:text-gray-100 md:max-w-[85%] md:px-5">
             {message.attachments && message.attachments.length > 0 && !collapsed && (
@@ -499,30 +542,12 @@ export function MessageItem({
 
         <div className="markdown-body ml-10 text-[length:var(--chat-font-size)] leading-relaxed text-gray-900 dark:text-gray-100">
           {editing ? (
-            <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-3">
-              <textarea
-                autoFocus
-                className="min-h-[180px] w-full resize-y rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-[15px] text-gray-900 dark:text-gray-100 outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
-                onChange={(event) => setEditingContent(event.target.value)}
-                value={editingContent}
-              />
-              <div className="mt-2 flex justify-end gap-2">
-                <button
-                  className="rounded-lg px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700"
-                  onClick={cancelEditingMessage}
-                  type="button"
-                >
-                  取消
-                </button>
-                <button
-                  className="rounded-lg bg-gray-900 dark:bg-gray-100 px-3 py-1.5 text-sm text-white dark:text-gray-900 transition-opacity hover:opacity-85"
-                  onClick={saveEditingMessage}
-                  type="button"
-                >
-                  保存
-                </button>
-              </div>
-            </div>
+            <MessageEditor
+              content={editingContent}
+              onCancel={cancelEditingMessage}
+              onChange={setEditingContent}
+              onSave={saveEditingMessage}
+            />
           ) : collapsed ? (
             <div className="rounded-xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
               消息已收起

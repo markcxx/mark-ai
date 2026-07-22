@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import { Check, Search } from "lucide-react";
+import { Check, Image, Search } from "lucide-react";
 
 import { AppDialog } from "@/components/ui/AppDialog";
 import type { ConfiguredModel } from "@/lib/chat/types";
 import { getModelDisplayName, getModelKey } from "@/lib/chat/helpers";
-import { formatTokenCount, getModelMetadata } from "@/lib/model-metadata";
+import {
+  formatTokenCount,
+  getModelMetadata,
+  hasKnownContextWindow,
+} from "@/lib/model-metadata";
 import { cn } from "@/lib/utils";
 
 import { ModelBrandIcon } from "./ModelBrandIcon";
@@ -144,7 +148,15 @@ export function ModelSelectorDialog({
                       <span className="min-w-0 flex-1 truncate">
                         {getModelDisplayName(model.id)}
                       </span>
-                      {metadata && (
+                      {metadata?.supportsVision && (
+                        <Image
+                          aria-label="支持图片理解"
+                          className="shrink-0 text-gray-400 dark:text-gray-500"
+                          data-markai-tooltip="支持图片理解"
+                          size={14}
+                        />
+                      )}
+                      {hasKnownContextWindow(metadata) && (
                         <span
                           className="shrink-0 text-[11px] tabular-nums text-gray-400 dark:text-gray-500"
                           title={[

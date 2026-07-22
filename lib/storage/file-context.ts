@@ -1,6 +1,6 @@
 import mammoth from "mammoth";
 
-import type { FileAttachment } from "@/lib/chat/types";
+import type { ChatMessage, ModelImageInput } from "@/lib/chat/server/types";
 import { getStoredFileBytes, getStoredFilesByIds, type StoredFileRecord } from "./file-storage";
 import { extractPdfContent } from "./pdf";
 import { extractSpreadsheetContent } from "./spreadsheet";
@@ -74,16 +74,16 @@ const escapeAttribute = (value: string) =>
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
 
-export const injectFileContexts = async <
-  T extends {
-    attachments?: FileAttachment[];
-    content: string;
-    role: string;
-  },
->(
-  messages: T[],
-  userId: string,
-) => {
+const prepareImageInput = async (file: StoredFileRecord): Promise<ModelImageInput> => {
+  const bytes = await getStoredFileBytes(file);
+  return {
+    data: Buffer.from(bytes).toString("base64"),
+    mediaType: file.contentType,
+    name: file.originalName,
+  };
+};
+
+export const injectFileContexts = async (messages: ChatMessage[], userId: string) => {
   const fileIds = Array.from(
     new Set(
       messages.flatMap((message) =>
@@ -106,9 +106,22 @@ export const injectFileContexts = async <
     if (message.role !== "user" || !message.attachments?.length) continue;
 
     const fileNodes: string[] = [];
+    const imageInputs: ModelImageInput[] = [];
     for (const attachment of message.attachments) {
       const file = byId.get(attachment.id);
-      if (!file || usedChars >= MAX_TOTAL_CONTEXT_CHARS) continue;
+      if (!file) continue;
+      if (file.contentType.startsWith("image/")) {
+        try {
+          imageInputs.push(await prepareImageInput(file));
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : "图片读取失败";
+          fileNodes.push(
+            `<file id="${escapeAttribute(file.id)}" name="${escapeAttribute(file.originalName)}" type="${escapeAttribute(file.contentType)}" size="${file.size}">[${detail}]</file>`,
+          );
+        }
+        continue;
+      }
+      if (usedChars >= MAX_TOTAL_CONTEXT_CHARS) continue;
       try {
         let content = await extractFileContent(file);
         const remaining = MAX_TOTAL_CONTEXT_CHARS - usedChars;
@@ -127,8 +140,8 @@ export const injectFileContexts = async <
       }
     }
 
-    if (fileNodes.length === 0) continue;
-    const context = `<!-- SYSTEM CONTEXT (NOT PART OF USER QUERY) -->
+    const context = fileNodes.length
+      ? `<!-- SYSTEM CONTEXT (NOT PART OF USER QUERY) -->
 <context.instruction>以下内容是系统从用户上传文件中提取的正文。回答依赖附件的问题时，请直接阅读并使用这些内容，不要声称无法访问附件。</context.instruction>
 <files_info>
 <files>
@@ -136,8 +149,13 @@ export const injectFileContexts = async <
 ${fileNodes.join("\n")}
 </files>
 </files_info>
-<!-- END SYSTEM CONTEXT -->`;
-    prepared[index] = { ...message, content: `${message.content}\n\n${context}`.trim() };
+<!-- END SYSTEM CONTEXT -->`
+      : "";
+    prepared[index] = {
+      ...message,
+      content: context ? `${message.content}\n\n${context}`.trim() : message.content,
+      ...(imageInputs.length ? { imageInputs } : {}),
+    };
   }
 
   return prepared;

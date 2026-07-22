@@ -57,10 +57,24 @@ export const toOpenAIMessages = ({
   timezone?: unknown;
   webSearchEnabled: boolean;
 }): OpenAIChatMessage[] => {
-  const openAIMessages = messages.map((message) => ({
-    content: message.content,
-    role: message.role === "model" ? "assistant" : message.role,
-  })) as OpenAIChatMessage[];
+  const openAIMessages = messages.map((message): OpenAIChatMessage => {
+    const imageInputs = message.role === "user" ? message.imageInputs || [] : [];
+    return {
+      content:
+        imageInputs.length > 0
+          ? [
+              { text: message.content || "请识别并说明图片内容。", type: "text" },
+              ...imageInputs.map((image) => ({
+                image_url: {
+                  url: `data:${image.mediaType};base64,${image.data}`,
+                },
+                type: "image_url" as const,
+              })),
+            ]
+          : message.content,
+      role: message.role === "model" ? "assistant" : message.role,
+    };
+  });
 
   return [
     {

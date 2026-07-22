@@ -5,7 +5,11 @@ import { useId, useMemo } from "react";
 import { estimateDraftContextTokens } from "@/lib/chat/context-window";
 import { estimateTextTokens } from "@/lib/chat/metrics";
 import type { FileAttachment, Message } from "@/lib/chat/types";
-import { formatTokenCount, getModelMetadata } from "@/lib/model-metadata";
+import {
+  formatTokenCount,
+  getModelMetadata,
+  hasKnownContextWindow,
+} from "@/lib/model-metadata";
 import { cn } from "@/lib/utils";
 import { getToolFunctions, getToolSystemPrompt } from "@/lib/tools/registry";
 import { useToolStore } from "@/stores/useToolStore";
@@ -48,7 +52,7 @@ export function ContextWindowIndicator({
     [attachments, draft, messages, toolContextTokens, webSearchEnabled],
   );
 
-  if (!metadata) return null;
+  if (!hasKnownContextWindow(metadata)) return null;
 
   const percentage = Math.min(100, (estimatedTokens / metadata.contextWindowTokens) * 100);
   const tone = percentage >= 90 ? "danger" : percentage >= 70 ? "warning" : "normal";

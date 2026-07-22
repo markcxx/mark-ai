@@ -41,9 +41,15 @@ export const createGeminiStream = async ({
     ...(baseUrl ? { httpOptions: { baseUrl } } : {}),
   });
 
-  const prompt = messages[messages.length - 1].content;
+  const toGeminiParts = (message: ChatMessage) => [
+    { text: message.content || "请识别并说明图片内容。" },
+    ...(message.imageInputs || []).map((image) => ({
+      inlineData: { data: image.data, mimeType: image.mediaType },
+    })),
+  ];
+  const prompt = messages[messages.length - 1];
   const history = messages.slice(0, -1).map((message) => ({
-    parts: [{ text: message.content }],
+    parts: toGeminiParts(message),
     role: message.role === "model" ? "model" : "user",
   }));
 
@@ -51,7 +57,7 @@ export const createGeminiStream = async ({
     { role: "user", parts: [{ text: systemPrompt }] },
     { role: "model", parts: [{ text: "了解。" }] },
     ...history,
-    { role: "user", parts: [{ text: prompt }] },
+    { role: "user", parts: toGeminiParts(prompt) },
   ];
   const builtinFunctions = getToolFunctions(toolRuntime?.enabledToolIds || []);
 

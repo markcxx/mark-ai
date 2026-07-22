@@ -49,7 +49,6 @@ export function ChatInput({
   textareaRef,
   webSearchEnabled,
   onToggleWebSearch,
-  wide = false,
 }: {
   availableModels: ConfiguredModel[];
   attachments: FileAttachment[];
@@ -74,7 +73,6 @@ export function ChatInput({
   textareaRef: RefObject<HTMLTextAreaElement | null>;
   webSearchEnabled: boolean;
   onToggleWebSearch: () => void;
-  wide?: boolean;
 }) {
   const [isModelDialogOpen, setIsModelDialogOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<FileAttachment | null>(null);
@@ -92,7 +90,7 @@ export function ChatInput({
           className={cn(
             "w-full transition-[max-width] duration-300 ease-out",
             placement === "bottom"
-              ? cn("pointer-events-auto", wide ? "max-w-full" : "max-w-[840px]")
+              ? "pointer-events-auto max-w-[840px]"
               : "max-w-[760px]",
           )}
         >

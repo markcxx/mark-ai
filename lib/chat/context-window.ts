@@ -1,5 +1,5 @@
 import type { FileAttachment, Message } from "@/lib/chat/types";
-import type { ModelMetadata } from "@/lib/model-metadata";
+import type { ModelMetadataWithContext } from "@/lib/model-metadata";
 import { estimateTextTokens } from "./metrics";
 
 const MIN_OUTPUT_RESERVE_TOKENS = 2048;
@@ -26,7 +26,7 @@ export const estimateContextMessagesTokens = (messages: ContextMessage[]) =>
     JSON.stringify(messages.map((message) => ({ content: message.content, role: message.role }))),
   );
 
-export const getOutputReserveTokens = (metadata: ModelMetadata) => {
+export const getOutputReserveTokens = (metadata: ModelMetadataWithContext) => {
   const proportionalReserve = Math.round(metadata.contextWindowTokens * 0.12);
   const preferredReserve = Math.min(
     Math.max(proportionalReserve, MIN_OUTPUT_RESERVE_TOKENS),
@@ -64,7 +64,7 @@ const truncateLastMessageToBudget = <T extends ContextMessage>(messages: T[], bu
 
 export const prepareMessagesForContext = <T extends ContextMessage>(
   messages: T[],
-  metadata: ModelMetadata,
+  metadata: ModelMetadataWithContext,
   overheadTokens: number,
 ): ContextPreparation<T> => {
   const outputReserveTokens = getOutputReserveTokens(metadata);

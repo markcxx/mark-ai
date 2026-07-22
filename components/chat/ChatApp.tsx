@@ -745,7 +745,6 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                 setSelectedModelKey={(key) => useUIStore.getState().setSelectedModelKey(key)}
                 textareaRef={textareaRef}
                 webSearchEnabled={webSearchEnabled}
-                wide={wideChatMode}
               />
             )}
           </main>

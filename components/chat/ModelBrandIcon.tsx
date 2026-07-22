@@ -63,6 +63,12 @@ const BRAND_ASSETS: Record<string, BrandAsset> = {
   },
   mistral: { background: "#fa520f", foreground: "#fff", slug: "mistral" },
   moonshot: { background: "#16191e", foreground: "#fff", slug: "moonshot" },
+  xiaomimimo: {
+    background: "#050505",
+    foreground: "#fff",
+    scale: 0.82,
+    slug: "xiaomimimo",
+  },
   openai: { background: "#050505", foreground: "#fff", slug: "openai" },
   openrouter: { background: "#050505", foreground: "#c8ff00", slug: "openrouter" },
   qwen: {
@@ -95,6 +101,9 @@ const PROVIDER_ASSET_KEYS: Record<string, string> = {
   mistral: "mistral",
   moonshot: "moonshot",
   moonshotai: "moonshot",
+  mimo: "xiaomimimo",
+  xiaomi: "xiaomimimo",
+  xiaomimimo: "xiaomimimo",
   openai: "openai",
   openrouter: "openrouter",
   qwen: "qwen",
@@ -128,6 +137,7 @@ const MODEL_ASSET_RULES: Array<{ key: string; pattern: RegExp }> = [
   { key: "minimax", pattern: /(?:minimax|abab)/ },
   { key: "mistral", pattern: /(?:mistral|mixtral|codestral|pixtral)/ },
   { key: "moonshot", pattern: /(?:kimi|moonshot)/ },
+  { key: "xiaomimimo", pattern: /(?:xiaomi[^/]*mimo|(?:^|[/_.-])mimo(?:$|[/_.-]))/ },
   { key: "openai", pattern: /(?:gpt|chatgpt|(?:^|[/_.-])o[1345](?:$|[/_.-])|dall-e|sora)/ },
 ];
 

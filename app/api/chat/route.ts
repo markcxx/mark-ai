@@ -16,7 +16,7 @@ import {
 import type { ChatMessage } from "@/lib/chat/server/types";
 import type { FileAttachment } from "@/lib/chat/types";
 import { isLocalMode } from "@/lib/env";
-import { getModelMetadata } from "@/lib/model-metadata";
+import { getModelMetadata, hasKnownContextWindow } from "@/lib/model-metadata";
 import { injectFileContexts } from "@/lib/storage/file-context";
 import {
   getAvailableBuiltinTool,
@@ -143,7 +143,7 @@ export async function POST(req: NextRequest) {
                 : {}),
             }),
           );
-    const contextPreparation = modelMetadata
+    const contextPreparation = hasKnownContextWindow(modelMetadata)
       ? prepareMessagesForContext(resolvedMessages, modelMetadata, contextOverheadTokens)
       : undefined;
     const preparedMessages = contextPreparation?.messages || resolvedMessages;
