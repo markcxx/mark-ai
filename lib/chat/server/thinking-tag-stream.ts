@@ -5,7 +5,6 @@ export type ThinkingTagStreamEvent = {
 
 const THINKING_TAGS = [
   { close: "</think>", open: "<think>" },
-  { close: "</lobeThinking>", open: "<lobeThinking>" },
 ] as const;
 
 const appendEvent = (

@@ -688,7 +688,7 @@ button:disabled {
 .markdown-body a {
   @apply text-primary hover:underline;
 }
-.markdown-body .lobe-markdown-table-wrapper {
+.markdown-body .markdown-table-wrapper {
   position: relative;
   display: block;
   width: max-content;
@@ -696,7 +696,7 @@ button:disabled {
   margin-block: 0.5em;
 }
 
-.markdown-body .lobe-markdown-table {
+.markdown-body .markdown-table {
   unicode-bidi: isolate;
   overflow: auto hidden;
   display: block;
@@ -717,16 +717,16 @@ button:disabled {
   box-shadow: 0 0 0 1px #eeeeee;
 }
 
-.markdown-body .lobe-markdown-table thead {
+.markdown-body .markdown-table thead {
   background: rgba(0, 0, 0, 0.015);
 }
 
-.markdown-body .lobe-markdown-table tr {
+.markdown-body .markdown-table tr {
   box-shadow: 0 1px 0 #eeeeee;
 }
 
-.markdown-body .lobe-markdown-table th,
-.markdown-body .lobe-markdown-table td {
+.markdown-body .markdown-table th,
+.markdown-body .markdown-table td {
   min-width: 120px;
   padding-block: 0.75em;
   padding-inline: 1em;
@@ -734,11 +734,11 @@ button:disabled {
   text-align: start;
 }
 
-.markdown-body .lobe-markdown-table thead th:last-child {
+.markdown-body .markdown-table thead th:last-child {
   padding-inline-end: calc(1em + 32px);
 }
 
-.markdown-body .lobe-markdown-table-copy {
+.markdown-body .markdown-table-copy {
   position: absolute;
   z-index: 1;
   inset-block-start: 1.55em;
@@ -762,43 +762,43 @@ button:disabled {
     background-color 0.1s;
 }
 
-.markdown-body .lobe-markdown-table-wrapper:hover .lobe-markdown-table-copy,
-.markdown-body .lobe-markdown-table-wrapper:focus-within .lobe-markdown-table-copy {
+.markdown-body .markdown-table-wrapper:hover .markdown-table-copy,
+.markdown-body .markdown-table-wrapper:focus-within .markdown-table-copy {
   opacity: 1;
 }
 
-.markdown-body .lobe-markdown-table-copy:hover {
+.markdown-body .markdown-table-copy:hover {
   color: #666666;
   background: rgba(0, 0, 0, 0.06);
 }
 
-.markdown-body .lobe-markdown-table-copy:active {
+.markdown-body .markdown-table-copy:active {
   color: #080808;
 }
 
-.dark .markdown-body .lobe-markdown-table {
+.dark .markdown-body .markdown-table {
   box-shadow: 0 0 0 1px #1a1a1a;
 }
 
-.dark .markdown-body .lobe-markdown-table thead {
+.dark .markdown-body .markdown-table thead {
   background: rgba(255, 255, 255, 0.02);
 }
 
-.dark .markdown-body .lobe-markdown-table tr {
+.dark .markdown-body .markdown-table tr {
   box-shadow: 0 1px 0 #1a1a1a;
 }
 
-.dark .markdown-body .lobe-markdown-table-copy {
+.dark .markdown-body .markdown-table-copy {
   color: #6f6f6f;
   background: #0d0d0d;
   box-shadow: 0 0 0 1px #1a1a1a;
 }
 
-.dark .markdown-body .lobe-markdown-table-copy:hover {
+.dark .markdown-body .markdown-table-copy:hover {
   color: #aaaaaa;
   background: rgba(255, 255, 255, 0.1);
 }
 
-.dark .markdown-body .lobe-markdown-table-copy:active {
+.dark .markdown-body .markdown-table-copy:active {
   color: #ffffff;
 }

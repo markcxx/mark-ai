@@ -25,8 +25,8 @@ describe("ThinkingTagStreamParser", () => {
     });
   });
 
-  it("supports lobeThinking tags and unfinished reasoning", () => {
-    expect(parseChunks(["<lobeThinking>", "仍在思考"])).toEqual({
+  it("supports unfinished reasoning", () => {
+    expect(parseChunks(["<think>", "仍在思考"])).toEqual({
       content: "",
       reasoning: "仍在思考",
     });

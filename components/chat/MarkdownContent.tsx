@@ -157,17 +157,17 @@ function MarkdownTable({
   };
 
   return (
-    <div className="lobe-markdown-table-wrapper">
+    <div className="markdown-table-wrapper">
       <button
         aria-label={copied ? "表格已复制" : "复制表格"}
-        className="lobe-markdown-table-copy"
+        className="markdown-table-copy"
         onClick={() => void copyTable()}
         title={copied ? "已复制" : "复制表格"}
         type="button"
       >
         {copied ? <Check size={14} /> : <Copy size={14} />}
       </button>
-      <table className="lobe-markdown-table" ref={tableRef} {...props}>
+      <table className="markdown-table" ref={tableRef} {...props}>
         {children}
       </table>
     </div>

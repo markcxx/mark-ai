@@ -17,7 +17,6 @@ export const getModelDisplayName = (modelId: string) => {
 
 const THINKING_TAGS = [
   { close: "</think>", open: "<think>" },
-  { close: "</lobeThinking>", open: "<lobeThinking>" },
 ];
 
 export const extractThinkingFromText = (text: string) => {

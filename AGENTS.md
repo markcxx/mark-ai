@@ -196,7 +196,7 @@ Do not duplicate store state in component state unless the value is strictly loc
 
 ### Reasoning Stream Normalization
 
-- OpenAI-compatible providers may return reasoning either in structured fields such as `reasoning_content` or embedded inside content with `<think>...</think>` / `<lobeThinking>...</lobeThinking>` tags.
+- OpenAI-compatible providers may return reasoning either in structured fields such as `reasoning_content` or embedded inside content with `<think>...</think>` tags.
 - Embedded reasoning tags must be normalized by `lib/chat/server/thinking-tag-stream.ts` before events reach the client or smooth-text controller.
 - The parser must retain partial opening and closing tag prefixes across arbitrary SSE chunk boundaries. Never emit a possible partial thinking tag as visible content.
 - Provider content accumulated for tool-call continuation must contain only visible assistant content; embedded reasoning belongs in the reasoning accumulator.
