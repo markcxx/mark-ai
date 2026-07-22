@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 
-import { signIn, signUp } from "@/lib/auth-client";
+import { getSocialErrorCallbackURL, signIn, signUp } from "@/lib/auth-client";
 
 type Step = "email" | "code" | "account";
 type RegistrationMode = "closed" | "loading" | "open" | "waitlist";
@@ -66,6 +66,9 @@ export default function RegisterPage() {
   const [waitlistName, setWaitlistName] = useState("");
   const [waitlistMessage, setWaitlistMessage] = useState("");
   const [waitlistSubmitted, setWaitlistSubmitted] = useState(false);
+  const [socialWaitlistProvider, setSocialWaitlistProvider] = useState<"GitHub" | "Google" | "">(
+    "",
+  );
   const email = useMemo(() => {
     const value = emailInput.trim();
     return value.includes("@") ? value : `${value}${emailDomain}`;
@@ -79,7 +82,14 @@ export default function RegisterPage() {
         const data = await response.json();
         if (!cancelled) setRegistrationMode(data.mode || "closed");
 
-        const token = new URLSearchParams(window.location.search).get("invite") || "";
+        const searchParams = new URLSearchParams(window.location.search);
+        const token = searchParams.get("invite") || "";
+        if (searchParams.get("source") === "oauth") {
+          const provider = searchParams.get("provider");
+          setSocialWaitlistProvider(
+            provider === "github" ? "GitHub" : provider === "google" ? "Google" : "",
+          );
+        }
         if (!token || cancelled) return;
         const invitationResponse = await fetch(
           `/api/waitlist/invitations/${encodeURIComponent(token)}`,
@@ -232,7 +242,9 @@ export default function RegisterPage() {
   const description = invited
     ? `邀请邮箱已验证：${email}`
     : registrationMode === "waitlist"
-      ? "提交申请后，管理员会通过邮件通知你审批结果"
+      ? socialWaitlistProvider
+        ? `${socialWaitlistProvider} 账号尚未加入 MarkAI，请使用该账号对应邮箱提交申请`
+        : "提交申请后，管理员会通过邮件通知你审批结果"
       : registrationMode === "closed"
         ? "管理员目前没有开放新账户注册"
         : step === "email"
@@ -328,7 +340,11 @@ export default function RegisterPage() {
               <button
                 className="flex h-11 items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white text-sm font-medium transition-colors hover:bg-gray-50 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.07]"
                 onClick={() =>
-                  signIn.social({ provider: "google", callbackURL: "/onboarding/avatar" })
+                  signIn.social({
+                    provider: "google",
+                    callbackURL: "/onboarding/avatar",
+                    errorCallbackURL: getSocialErrorCallbackURL("google", "/onboarding/avatar"),
+                  })
                 }
                 type="button"
               >
@@ -338,7 +354,11 @@ export default function RegisterPage() {
               <button
                 className="flex h-11 items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white text-sm font-medium transition-colors hover:bg-gray-50 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.07]"
                 onClick={() =>
-                  signIn.social({ provider: "github", callbackURL: "/onboarding/avatar" })
+                  signIn.social({
+                    provider: "github",
+                    callbackURL: "/onboarding/avatar",
+                    errorCallbackURL: getSocialErrorCallbackURL("github", "/onboarding/avatar"),
+                  })
                 }
                 type="button"
               >
@@ -483,10 +503,7 @@ export default function RegisterPage() {
 
         <p className="mt-auto pt-8 text-sm text-gray-500 dark:text-gray-400">
           已有账户？{" "}
-          <Link
-            className="font-medium text-gray-950 hover:underline dark:text-white"
-            href="/login"
-          >
+          <Link className="font-medium text-gray-950 hover:underline dark:text-white" href="/login">
             直接登录
           </Link>
         </p>

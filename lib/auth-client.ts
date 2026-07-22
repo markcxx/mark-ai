@@ -6,4 +6,11 @@ export const authClient = createAuthClient({
   plugins: [adminClient()],
 });
 
+export type SocialProvider = "github" | "google";
+
+export const getSocialErrorCallbackURL = (provider: SocialProvider, callbackUrl: string) => {
+  const params = new URLSearchParams({ callbackUrl, provider });
+  return `/api/public/oauth-error?${params.toString()}`;
+};
+
 export const { signIn, signUp, signOut, useSession, getSession } = authClient;
