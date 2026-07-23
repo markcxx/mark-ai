@@ -4,6 +4,8 @@ import { NextRequest } from "next/server";
 import { GET } from "./route";
 
 const originalRegistrationMode = process.env.AUTH_REGISTRATION_MODE;
+const originalAppUrl = process.env.APP_URL;
+const originalNextPublicAppUrl = process.env.NEXT_PUBLIC_APP_URL;
 
 afterEach(() => {
   if (originalRegistrationMode === undefined) {
@@ -11,10 +13,23 @@ afterEach(() => {
   } else {
     process.env.AUTH_REGISTRATION_MODE = originalRegistrationMode;
   }
+  if (originalAppUrl === undefined) {
+    delete process.env.APP_URL;
+  } else {
+    process.env.APP_URL = originalAppUrl;
+  }
+  if (originalNextPublicAppUrl === undefined) {
+    delete process.env.NEXT_PUBLIC_APP_URL;
+  } else {
+    process.env.NEXT_PUBLIC_APP_URL = originalNextPublicAppUrl;
+  }
 });
 
-const requestOAuthError = (params: Record<string, string>) => {
-  const url = new URL("http://localhost:3000/api/public/oauth-error");
+const requestOAuthError = (
+  params: Record<string, string>,
+  origin = "http://localhost:3000",
+) => {
+  const url = new URL("/api/public/oauth-error", origin);
   Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
   return GET(new NextRequest(url));
 };
@@ -29,6 +44,25 @@ describe("OAuth error redirect", () => {
     });
     const location = new URL(response.headers.get("location") || "");
 
+    expect(location.pathname).toBe("/register");
+    expect(location.searchParams.get("source")).toBe("oauth");
+    expect(location.searchParams.get("provider")).toBe("google");
+  });
+
+  it("uses APP_URL instead of the internal request origin", () => {
+    process.env.APP_URL = "https://ai.example.com";
+    process.env.AUTH_REGISTRATION_MODE = "waitlist";
+
+    const response = requestOAuthError(
+      {
+        error: "REGISTRATION_NOT_ALLOWED",
+        provider: "google",
+      },
+      "https://0.0.0.0:3000",
+    );
+    const location = new URL(response.headers.get("location") || "");
+
+    expect(location.origin).toBe("https://ai.example.com");
     expect(location.pathname).toBe("/register");
     expect(location.searchParams.get("source")).toBe("oauth");
     expect(location.searchParams.get("provider")).toBe("google");
