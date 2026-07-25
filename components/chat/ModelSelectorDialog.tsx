@@ -6,11 +6,8 @@ import { Check, Image, Search } from "lucide-react";
 import { AppDialog } from "@/components/ui/AppDialog";
 import type { ConfiguredModel } from "@/lib/chat/types";
 import { getModelDisplayName, getModelKey } from "@/lib/chat/helpers";
-import {
-  formatTokenCount,
-  getModelMetadata,
-  hasKnownContextWindow,
-} from "@/lib/model-metadata";
+import { formatTokenCount, getModelMetadata, hasKnownContextWindow } from "@/lib/model-metadata";
+import { compareModelProviders, sortModelsByFamily } from "@/lib/model-sorting";
 import { cn } from "@/lib/utils";
 
 import { ModelBrandIcon } from "./ModelBrandIcon";
@@ -75,9 +72,9 @@ export function ModelSelectorDialog({
       providerMap.get(p)!.push(model);
     }
 
-    return providerOrder.map((p): ModelGroup => ({
+    return providerOrder.sort(compareModelProviders).map((p): ModelGroup => ({
       displayName: providerNames[p] || p,
-      models: providerMap.get(p)!,
+      models: sortModelsByFamily(providerMap.get(p)!),
       provider: p,
     }));
   }, [availableModels, providerNames, keyword]);
@@ -165,7 +162,6 @@ export function ModelSelectorDialog({
                               ? `最大输出 ${metadata.maxOutputTokens.toLocaleString()} tokens`
                               : "",
                             metadata.knowledgeCutoff ? `知识截止 ${metadata.knowledgeCutoff}` : "",
-                            `资料核对 ${metadata.verifiedAt}`,
                           ]
                             .filter(Boolean)
                             .join("\n")}

@@ -12,7 +12,6 @@ export type ModelMetadata = {
   supportsToolCalling?: boolean;
   supportsVideo?: boolean;
   supportsVision?: boolean;
-  verifiedAt: string;
 };
 
 export type ModelMetadataWithContext = ModelMetadata & { contextWindowTokens: number };
@@ -22,8 +21,6 @@ export const hasKnownContextWindow = (
 ): metadata is ModelMetadataWithContext =>
   typeof metadata?.contextWindowTokens === "number" && metadata.contextWindowTokens > 0;
 
-const VERIFIED_AT = "2026-07-18";
-const ENV_MODELS_VERIFIED_AT = "2026-07-22";
 const DOUBAO_SOURCE_URL = "https://www.volcengine.com/docs/82379/1330310";
 
 // Keep this list deliberately conservative. Unknown/custom models remain unknown instead of
@@ -42,7 +39,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     supportsReasoning: true,
     supportsToolCalling: true,
     supportsVision: true,
-    verifiedAt: ENV_MODELS_VERIFIED_AT,
   },
   {
     aliases: ["gpt-5-3"],
@@ -56,7 +52,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     sourceUrl: "https://developers.openai.com/api/docs/models/gpt-5.3-chat-latest",
     supportsToolCalling: true,
     supportsVision: true,
-    verifiedAt: ENV_MODELS_VERIFIED_AT,
   },
   {
     description:
@@ -66,7 +61,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "gpt-5-3-mini",
     sourceUrl:
       "https://community.openai.com/t/gpt-5-5-go-redirects-to-gpt-5-3-mini-for-more-than-24-hours/1385556",
-    verifiedAt: ENV_MODELS_VERIFIED_AT,
   },
   {
     aliases: ["gpt-5.4-pro"],
@@ -78,7 +72,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     knowledgeCutoff: "2025-08",
     maxOutputTokens: 128_000,
     sourceUrl: "https://developers.openai.com/api/docs/models/gpt-5.4",
-    verifiedAt: VERIFIED_AT,
   },
   {
     contextWindowTokens: 400_000,
@@ -89,7 +82,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     knowledgeCutoff: "2025-08",
     maxOutputTokens: 128_000,
     sourceUrl: "https://developers.openai.com/api/docs/models",
-    verifiedAt: VERIFIED_AT,
   },
   {
     contextWindowTokens: 400_000,
@@ -100,7 +92,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     knowledgeCutoff: "2025-08",
     maxOutputTokens: 128_000,
     sourceUrl: "https://developers.openai.com/api/docs/models",
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["gpt-5.2-codex"],
@@ -112,7 +103,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     knowledgeCutoff: "2025-08",
     maxOutputTokens: 128_000,
     sourceUrl: "https://developers.openai.com/api/docs/models/gpt-5.2",
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["gpt-5-mini", "gpt-5-nano"],
@@ -124,7 +114,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     knowledgeCutoff: "2024-09",
     maxOutputTokens: 128_000,
     sourceUrl: "https://developers.openai.com/api/docs/models/gpt-5",
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["gpt-4.1-mini", "gpt-4.1-nano"],
@@ -136,7 +125,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     knowledgeCutoff: "2024-06",
     maxOutputTokens: 32_768,
     sourceUrl: "https://developers.openai.com/api/docs/models/gpt-4.1",
-    verifiedAt: VERIFIED_AT,
   },
   {
     contextWindowTokens: 200_000,
@@ -146,7 +134,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "o4-mini",
     maxOutputTokens: 100_000,
     sourceUrl: "https://developers.openai.com/api/docs/models/o4-mini",
-    verifiedAt: VERIFIED_AT,
   },
   {
     contextWindowTokens: 1_114_112,
@@ -161,7 +148,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     supportsToolCalling: true,
     supportsVideo: true,
     supportsVision: true,
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["gemini-3.1-pro-preview", "gemini-pro-latest"],
@@ -178,7 +164,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     supportsToolCalling: true,
     supportsVideo: true,
     supportsVision: true,
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["gemini-3.1-flash-lite-preview", "gemini-flash-lite-latest"],
@@ -190,7 +175,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     knowledgeCutoff: "2025-01",
     maxOutputTokens: 65_536,
     sourceUrl: "https://ai.google.dev/gemini-api/docs/models",
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["gemini-3-flash", "gemini-flash-latest"],
@@ -202,7 +186,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     knowledgeCutoff: "2025-01",
     maxOutputTokens: 65_536,
     sourceUrl: "https://ai.google.dev/gemini-api/docs/models",
-    verifiedAt: VERIFIED_AT,
   },
   {
     contextWindowTokens: 1_048_576,
@@ -213,7 +196,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     knowledgeCutoff: "2025-01",
     maxOutputTokens: 65_536,
     sourceUrl: "https://ai.google.dev/gemini-api/docs/models",
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["gemini-2.5-flash-lite"],
@@ -225,7 +207,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     knowledgeCutoff: "2025-01",
     maxOutputTokens: 65_536,
     sourceUrl: "https://ai.google.dev/gemini-api/docs/models",
-    verifiedAt: VERIFIED_AT,
   },
   {
     contextWindowTokens: 1_048_576,
@@ -237,7 +218,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     sourceUrl: "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro",
     supportsReasoning: true,
     supportsToolCalling: true,
-    verifiedAt: ENV_MODELS_VERIFIED_AT,
   },
   {
     contextWindowTokens: 1_048_576,
@@ -249,7 +229,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     sourceUrl: "https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash",
     supportsReasoning: true,
     supportsToolCalling: true,
-    verifiedAt: ENV_MODELS_VERIFIED_AT,
   },
   {
     aliases: ["deepseek-reasoner"],
@@ -262,7 +241,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     sourceUrl: "https://api-docs.deepseek.com/quick_start/pricing",
     supportsReasoning: true,
     supportsToolCalling: true,
-    verifiedAt: VERIFIED_AT,
   },
   {
     contextWindowTokens: 163_840,
@@ -274,7 +252,14 @@ export const MODEL_METADATA: ModelMetadata[] = [
     sourceUrl: "https://huggingface.co/deepseek-ai/DeepSeek-V3.2",
     supportsReasoning: true,
     supportsToolCalling: true,
-    verifiedAt: ENV_MODELS_VERIFIED_AT,
+  },
+  {
+    contextWindowTokens: 131_072,
+    description: "DeepSeek V3 开源 MoE 对话模型，适合通用问答、代码和长文本任务。",
+    displayName: "DeepSeek V3",
+    family: "DeepSeek V3",
+    id: "deepseek-v3",
+    sourceUrl: "https://huggingface.co/deepseek-ai/DeepSeek-V3",
   },
   {
     contextWindowTokens: 131_072,
@@ -285,7 +270,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     maxOutputTokens: 65_536,
     sourceUrl: "https://huggingface.co/deepseek-ai/DeepSeek-R1",
     supportsReasoning: true,
-    verifiedAt: ENV_MODELS_VERIFIED_AT,
   },
   {
     aliases: ["qwen3.7-max-preview"],
@@ -300,7 +284,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     supportsToolCalling: true,
     supportsVideo: true,
     supportsVision: true,
-    verifiedAt: ENV_MODELS_VERIFIED_AT,
   },
   {
     contextWindowTokens: 1_000_000,
@@ -314,7 +297,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     supportsToolCalling: true,
     supportsVideo: true,
     supportsVision: true,
-    verifiedAt: ENV_MODELS_VERIFIED_AT,
   },
   {
     contextWindowTokens: 262_144,
@@ -326,7 +308,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     sourceUrl: "https://help.aliyun.com/zh/model-studio/models",
     supportsReasoning: true,
     supportsToolCalling: true,
-    verifiedAt: ENV_MODELS_VERIFIED_AT,
   },
   {
     contextWindowTokens: 1_000_000,
@@ -340,7 +321,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     supportsToolCalling: true,
     supportsVideo: true,
     supportsVision: true,
-    verifiedAt: ENV_MODELS_VERIFIED_AT,
   },
   {
     contextWindowTokens: 1_000_000,
@@ -354,7 +334,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     supportsToolCalling: true,
     supportsVideo: true,
     supportsVision: true,
-    verifiedAt: ENV_MODELS_VERIFIED_AT,
   },
   {
     contextWindowTokens: 262_144,
@@ -368,7 +347,32 @@ export const MODEL_METADATA: ModelMetadata[] = [
     supportsToolCalling: true,
     supportsVideo: true,
     supportsVision: true,
-    verifiedAt: VERIFIED_AT,
+  },
+  {
+    contextWindowTokens: 262_144,
+    description: "Qwen 3.6 稠密多模态模型，支持长上下文、视觉理解、推理和工具调用。",
+    displayName: "Qwen 3.6 27B",
+    family: "Qwen 3.6",
+    id: "qwen3.6-27b",
+    maxOutputTokens: 81_920,
+    sourceUrl: "https://huggingface.co/Qwen/Qwen3.6-27B",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVideo: true,
+    supportsVision: true,
+  },
+  {
+    contextWindowTokens: 1_000_000,
+    description: "通义千问高性价比多模态模型，支持图像、视频、推理和函数调用。",
+    displayName: "Qwen 3.5 Flash",
+    family: "Qwen 3.5",
+    id: "qwen3.5-flash",
+    maxOutputTokens: 65_536,
+    sourceUrl: "https://help.aliyun.com/zh/model-studio/text-generation-model/",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVideo: true,
+    supportsVision: true,
   },
   {
     contextWindowTokens: 262_144,
@@ -382,7 +386,19 @@ export const MODEL_METADATA: ModelMetadata[] = [
     supportsToolCalling: true,
     supportsVideo: true,
     supportsVision: true,
-    verifiedAt: VERIFIED_AT,
+  },
+  {
+    contextWindowTokens: 262_144,
+    description: "Qwen3-VL 轻量视觉模型，支持长视频、视觉推理和函数调用。",
+    displayName: "Qwen 3 VL Flash",
+    family: "Qwen 3 VL",
+    id: "qwen3-vl-flash",
+    maxOutputTokens: 32_768,
+    sourceUrl: "https://help.aliyun.com/zh/model-studio/vision-model/",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVideo: true,
+    supportsVision: true,
   },
   {
     contextWindowTokens: 131_072,
@@ -393,7 +409,28 @@ export const MODEL_METADATA: ModelMetadata[] = [
     maxOutputTokens: 32_768,
     sourceUrl: "https://huggingface.co/Qwen/Qwen3-235B-A22B-Instruct-2507",
     supportsToolCalling: true,
-    verifiedAt: ENV_MODELS_VERIFIED_AT,
+  },
+  {
+    contextWindowTokens: 131_072,
+    description: "Qwen 3 稠密参数模型，支持思考与非思考模式、函数调用和结构化输出。",
+    displayName: "Qwen 3 32B",
+    family: "Qwen 3",
+    id: "qwen3-32b",
+    maxOutputTokens: 32_768,
+    sourceUrl: "https://help.aliyun.com/zh/model-studio/text-generation-model/",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+  },
+  {
+    contextWindowTokens: 1_000_000,
+    description: "通义千问长上下文代码模型，面向代码生成、工程任务和 Agent 工作流。",
+    displayName: "Qwen 3 Coder Plus",
+    family: "Qwen 3 Coder",
+    id: "qwen3-coder-plus",
+    maxOutputTokens: 65_536,
+    sourceUrl: "https://help.aliyun.com/zh/model-studio/text-generation-model/",
+    supportsReasoning: true,
+    supportsToolCalling: true,
   },
   {
     contextWindowTokens: 262_144,
@@ -404,7 +441,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     maxOutputTokens: 65_536,
     sourceUrl: "https://huggingface.co/Qwen/Qwen3-Coder-Next",
     supportsToolCalling: true,
-    verifiedAt: ENV_MODELS_VERIFIED_AT,
   },
   {
     contextWindowTokens: 262_144,
@@ -415,7 +451,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     maxOutputTokens: 65_536,
     sourceUrl: "https://huggingface.co/Qwen/Qwen3-Coder-480B-A35B-Instruct",
     supportsToolCalling: true,
-    verifiedAt: ENV_MODELS_VERIFIED_AT,
   },
   {
     contextWindowTokens: 1_000_000,
@@ -425,7 +460,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "qwen-plus",
     maxOutputTokens: 32_768,
     sourceUrl: "https://help.aliyun.com/zh/model-studio/models",
-    verifiedAt: VERIFIED_AT,
   },
   {
     contextWindowTokens: 131_072,
@@ -435,20 +469,44 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "qwen-max",
     maxOutputTokens: 8192,
     sourceUrl: "https://help.aliyun.com/zh/model-studio/models",
-    verifiedAt: VERIFIED_AT,
   },
   {
+    contextWindowTokens: 131_072,
+    description: "通义千问低成本通用模型，支持思考模式、函数调用、内置工具和结构化输出。",
+    displayName: "Qwen Turbo",
+    family: "Qwen",
+    id: "qwen-turbo",
+    maxOutputTokens: 8192,
+    sourceUrl: "https://help.aliyun.com/zh/model-studio/text-generation-model/",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+  },
+  {
+    contextWindowTokens: 1_000_000,
+    description: "Kimi 原生多模态旗舰模型，面向长程编程、知识工作、推理和 Agent 任务。",
+    displayName: "Kimi K3",
+    family: "Kimi K3",
+    id: "kimi-k3",
+    maxOutputTokens: 1_048_576,
+    sourceUrl: "https://platform.kimi.com/docs/guide/kimi-k3-quickstart",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVideo: true,
+    supportsVision: true,
+  },
+  {
+    aliases: ["kimi-k2.7-code-highspeed"],
     contextWindowTokens: 262_144,
     description: "Moonshot 面向长程软件工程任务的多模态代码 Agent 模型。",
     displayName: "Kimi K2.7 Code",
     family: "Kimi K2",
     id: "kimi-k2.7-code",
     maxOutputTokens: 65_536,
-    sourceUrl: "https://huggingface.co/moonshotai/Kimi-K2.7-Code",
+    sourceUrl: "https://platform.kimi.com/docs/models",
     supportsReasoning: true,
     supportsToolCalling: true,
+    supportsVideo: true,
     supportsVision: true,
-    verifiedAt: ENV_MODELS_VERIFIED_AT,
   },
   {
     contextWindowTokens: 262_144,
@@ -460,7 +518,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     sourceUrl: "https://platform.kimi.com/docs/pricing/chat",
     supportsReasoning: true,
     supportsToolCalling: true,
-    verifiedAt: VERIFIED_AT,
   },
   {
     contextWindowTokens: 262_144,
@@ -473,7 +530,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     supportsReasoning: true,
     supportsToolCalling: true,
     supportsVision: true,
-    verifiedAt: VERIFIED_AT,
   },
   {
     contextWindowTokens: 262_144,
@@ -487,7 +543,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     supportsToolCalling: true,
     supportsVideo: true,
     supportsVision: true,
-    verifiedAt: VERIFIED_AT,
   },
   {
     contextWindowTokens: 8192,
@@ -497,7 +552,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "moonshot-v1-8k",
     maxOutputTokens: 4096,
     sourceUrl: "https://platform.moonshot.cn/docs/guide/start-using-kimi-api",
-    verifiedAt: VERIFIED_AT,
   },
   {
     contextWindowTokens: 32_768,
@@ -507,7 +561,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "moonshot-v1-32k",
     maxOutputTokens: 8192,
     sourceUrl: "https://platform.moonshot.cn/docs/guide/start-using-kimi-api",
-    verifiedAt: VERIFIED_AT,
   },
   {
     contextWindowTokens: 131_072,
@@ -517,7 +570,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "moonshot-v1-128k",
     maxOutputTokens: 8192,
     sourceUrl: "https://platform.moonshot.cn/docs/guide/start-using-kimi-api",
-    verifiedAt: VERIFIED_AT,
   },
   {
     contextWindowTokens: 1_000_000,
@@ -531,7 +583,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     sourceUrl: "https://platform.xiaomimimo.com/",
     supportsReasoning: true,
     supportsToolCalling: true,
-    verifiedAt: VERIFIED_AT,
   },
   {
     contextWindowTokens: 131_072,
@@ -544,7 +595,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     sourceUrl: "https://developers.openai.com/api/docs/models/gpt-oss-120b",
     supportsReasoning: true,
     supportsToolCalling: true,
-    verifiedAt: ENV_MODELS_VERIFIED_AT,
   },
   {
     contextWindowTokens: 131_072,
@@ -557,7 +607,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     sourceUrl: "https://developers.openai.com/api/docs/models/gpt-oss-20b",
     supportsReasoning: true,
     supportsToolCalling: true,
-    verifiedAt: ENV_MODELS_VERIFIED_AT,
   },
   {
     contextWindowTokens: 1_000_000,
@@ -571,7 +620,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     supportsToolCalling: true,
     supportsVideo: true,
     supportsVision: true,
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["minimax-m2.7-highspeed"],
@@ -584,7 +632,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     sourceUrl: "https://platform.minimaxi.com/docs/guides/models-intro",
     supportsReasoning: true,
     supportsToolCalling: true,
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["minimax-m2.5-highspeed", "minimax-m2.5-free"],
@@ -597,7 +644,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     sourceUrl: "https://platform.minimaxi.com/docs/guides/models-intro",
     supportsReasoning: true,
     supportsToolCalling: true,
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["minimax-m2.1-highspeed"],
@@ -608,7 +654,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "minimax-m2.1",
     maxOutputTokens: 131_072,
     sourceUrl: "https://platform.minimaxi.com/docs/guides/models-intro",
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["doubao-seed-2-1-pro", "doubao-seed-2-1-pro-260628"],
@@ -620,7 +665,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "doubao-seed-2.1-pro",
     maxOutputTokens: 128_000,
     sourceUrl: DOUBAO_SOURCE_URL,
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["doubao-seed-2-1-turbo", "doubao-seed-2-1-turbo-260628"],
@@ -631,7 +675,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "doubao-seed-2.1-turbo",
     maxOutputTokens: 128_000,
     sourceUrl: DOUBAO_SOURCE_URL,
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["doubao-seed-2-0-pro", "doubao-seed-2-0-pro-260215"],
@@ -642,7 +685,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "doubao-seed-2.0-pro",
     maxOutputTokens: 128_000,
     sourceUrl: DOUBAO_SOURCE_URL,
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["doubao-seed-2-0-lite", "doubao-seed-2-0-lite-260428"],
@@ -653,7 +695,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "doubao-seed-2.0-lite",
     maxOutputTokens: 128_000,
     sourceUrl: DOUBAO_SOURCE_URL,
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["doubao-seed-2-0-mini", "doubao-seed-2-0-mini-260428"],
@@ -664,7 +705,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "doubao-seed-2.0-mini",
     maxOutputTokens: 128_000,
     sourceUrl: DOUBAO_SOURCE_URL,
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["doubao-seed-2-0-code", "doubao-seed-2-0-code-preview-260215"],
@@ -675,7 +715,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "doubao-seed-2.0-code",
     maxOutputTokens: 128_000,
     sourceUrl: DOUBAO_SOURCE_URL,
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["doubao-seed-1-8", "doubao-seed-1-8-251228"],
@@ -686,7 +725,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "doubao-seed-1.8",
     maxOutputTokens: 64_000,
     sourceUrl: DOUBAO_SOURCE_URL,
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["doubao-seed-code-preview", "doubao-seed-code-preview-251028"],
@@ -701,7 +739,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     supportsToolCalling: true,
     supportsVideo: true,
     supportsVision: true,
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["doubao-seed-1-6", "doubao-seed-1-6-251015"],
@@ -716,7 +753,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     supportsToolCalling: true,
     supportsVideo: true,
     supportsVision: true,
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["doubao-seed-1-6-flash", "doubao-seed-1-6-flash-250828"],
@@ -727,7 +763,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "doubao-seed-1.6-flash",
     maxOutputTokens: 32_000,
     sourceUrl: DOUBAO_SOURCE_URL,
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["doubao-seed-1-6-vision", "doubao-seed-1-6-vision-250815"],
@@ -738,7 +773,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "doubao-seed-1.6-vision",
     maxOutputTokens: 32_000,
     sourceUrl: DOUBAO_SOURCE_URL,
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["doubao-1-5-pro-32k", "doubao-1-5-pro-32k-250115"],
@@ -749,7 +783,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "doubao-1.5-pro-32k",
     maxOutputTokens: 16_384,
     sourceUrl: DOUBAO_SOURCE_URL,
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["doubao-1-5-pro-256k", "doubao-1-5-pro-256k-250115"],
@@ -760,7 +793,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "doubao-1.5-pro-256k",
     maxOutputTokens: 12_288,
     sourceUrl: DOUBAO_SOURCE_URL,
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["doubao-1-5-lite-32k", "doubao-1-5-lite-32k-250115"],
@@ -771,10 +803,13 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "doubao-1.5-lite-32k",
     maxOutputTokens: 12_288,
     sourceUrl: DOUBAO_SOURCE_URL,
-    verifiedAt: VERIFIED_AT,
   },
   {
-    aliases: ["doubao-1-5-vision-pro-32k", "doubao-1-5-vision-pro-32k-250115"],
+    aliases: [
+      "doubao-1.5-vision-pro",
+      "doubao-1-5-vision-pro-32k",
+      "doubao-1-5-vision-pro-32k-250115",
+    ],
     contextWindowTokens: 32_768,
     description: "豆包 1.5 多模态旗舰模型，强化视觉推理、文档识别、细节理解和指令遵循。",
     displayName: "Doubao 1.5 Vision Pro 32K",
@@ -782,7 +817,7 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "doubao-1.5-vision-pro-32k",
     maxOutputTokens: 12_288,
     sourceUrl: DOUBAO_SOURCE_URL,
-    verifiedAt: VERIFIED_AT,
+    supportsVision: true,
   },
   {
     contextWindowTokens: 1_000_000,
@@ -795,7 +830,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     sourceUrl: "https://docs.bigmodel.cn/cn/guide/start/model-overview",
     supportsReasoning: true,
     supportsToolCalling: true,
-    verifiedAt: VERIFIED_AT,
   },
   {
     contextWindowTokens: 200_000,
@@ -807,7 +841,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     sourceUrl: "https://docs.bigmodel.cn/cn/guide/start/model-overview",
     supportsReasoning: true,
     supportsToolCalling: true,
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["glm-5-turbo"],
@@ -820,7 +853,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     sourceUrl: "https://docs.bigmodel.cn/cn/guide/start/model-overview",
     supportsReasoning: true,
     supportsToolCalling: true,
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["glm-4-7", "zai-glm-4.7"],
@@ -833,7 +865,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     sourceUrl: "https://docs.bigmodel.cn/cn/guide/start/model-overview",
     supportsReasoning: true,
     supportsToolCalling: true,
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["glm-4.7-flashx"],
@@ -846,7 +877,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     sourceUrl: "https://docs.bigmodel.cn/cn/guide/start/model-overview",
     supportsReasoning: true,
     supportsToolCalling: true,
-    verifiedAt: ENV_MODELS_VERIFIED_AT,
   },
   {
     contextWindowTokens: 200_000,
@@ -856,7 +886,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "glm-4.6",
     maxOutputTokens: 131_072,
     sourceUrl: "https://docs.bigmodel.cn/cn/guide/start/model-overview",
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["glm-4.5-air", "glm-4.5-airx", "glm-4.5-x"],
@@ -867,7 +896,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "glm-4.5",
     maxOutputTokens: 98_304,
     sourceUrl: "https://docs.bigmodel.cn/cn/guide/start/model-overview",
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["glm-4-flash"],
@@ -878,7 +906,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "glm-4-plus",
     maxOutputTokens: 4096,
     sourceUrl: "https://docs.bigmodel.cn/cn/guide/models/text/glm-4",
-    verifiedAt: VERIFIED_AT,
   },
   {
     contextWindowTokens: 1_000_000,
@@ -889,7 +916,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     knowledgeCutoff: "2025-05",
     maxOutputTokens: 128_000,
     sourceUrl: "https://docs.anthropic.com/en/docs/about-claude/models/overview",
-    verifiedAt: VERIFIED_AT,
   },
   {
     contextWindowTokens: 1_000_000,
@@ -900,7 +926,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     knowledgeCutoff: "2025-08",
     maxOutputTokens: 64_000,
     sourceUrl: "https://docs.anthropic.com/en/docs/about-claude/models/overview",
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["claude-opus-4-5", "claude-haiku-4-5"],
@@ -911,7 +936,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "claude-sonnet-4-5",
     maxOutputTokens: 64_000,
     sourceUrl: "https://docs.anthropic.com/en/docs/about-claude/models/overview",
-    verifiedAt: VERIFIED_AT,
   },
   {
     aliases: ["grok-4.20", "grok-4.20-0309-non-reasoning"],
@@ -921,7 +945,6 @@ export const MODEL_METADATA: ModelMetadata[] = [
     family: "Grok",
     id: "grok-4.3",
     sourceUrl: "https://docs.x.ai/docs/models",
-    verifiedAt: VERIFIED_AT,
   },
 ];
 

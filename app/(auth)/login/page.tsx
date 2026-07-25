@@ -71,8 +71,8 @@ export default function LoginPage() {
       const result = await signIn.email({ email, password });
       if (result.error) throw new Error(result.error.message || "邮箱或密码不正确");
       toast.success("登录成功");
-      router.push(callbackUrl);
-      router.refresh();
+      // Authentication changes the server-rendered root and invalidates guest-owned stores.
+      window.location.replace(callbackUrl);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "登录失败，请稍后重试");
     } finally {

@@ -125,7 +125,7 @@ const MODEL_ASSET_RULES: Array<{ key: string; pattern: RegExp }> = [
   { key: "gemini", pattern: /gemini/ },
   { key: "gemma", pattern: /gemma/ },
   { key: "deepseek", pattern: /deepseek/ },
-  { key: "qwen", pattern: /(?:^|[/_.-])(qwen|qwq)(?:$|[/_.-])/ },
+  { key: "qwen", pattern: /(?:^|[/_.-])(?:qwen|qwq)/ },
   { key: "grok", pattern: /(?:^|[/_.-])grok(?:$|[/_.-])/ },
   { key: "meta", pattern: /(?:llama|meta-llama)/ },
   { key: "glmv", pattern: /(?:^|\/)glm-[^/]*v(?:$|[/_.-])/ },
@@ -147,10 +147,15 @@ const getProviderAsset = (provider?: string) => {
   return BRAND_ASSETS[PROVIDER_ASSET_KEYS[normalized] || normalized];
 };
 
+export const getModelAssetKey = (model?: string) => {
+  const normalizedModel = model?.trim().toLowerCase() || "";
+  return MODEL_ASSET_RULES.find((rule) => rule.pattern.test(normalizedModel))?.key;
+};
+
 const getModelAsset = (model?: string, provider?: string) => {
   const normalizedModel = model?.trim().toLowerCase() || "";
-  const match = MODEL_ASSET_RULES.find((rule) => rule.pattern.test(normalizedModel));
-  const asset = match ? BRAND_ASSETS[match.key] : getProviderAsset(provider);
+  const assetKey = getModelAssetKey(model);
+  const asset = assetKey ? BRAND_ASSETS[assetKey] : getProviderAsset(provider);
   if (!asset || asset.slug !== "openai") return asset;
 
   if (/gpt[-_.]?5/.test(normalizedModel)) return { ...asset, background: "#f86aa4" };

@@ -10,12 +10,22 @@ const configuredModelExpectations = [
   ["qwen3.6-max-preview", "qwen3.6-max-preview", 262_144, false],
   ["qwen3.6-plus", "qwen3.6-plus", 1_000_000, true],
   ["qwen3.6-flash", "qwen3.6-flash", 1_000_000, true],
+  ["qwen3.6-27b", "qwen3.6-27b", 262_144, true],
+  ["qwen3.5-flash", "qwen3.5-flash", 1_000_000, true],
+  ["qwen3-vl-flash", "qwen3-vl-flash", 262_144, true],
+  ["qwen3-coder-plus", "qwen3-coder-plus", 1_000_000, false],
+  ["qwen3-32b", "qwen3-32b", 131_072, false],
+  ["qwen-turbo", "qwen-turbo", 131_072, false],
   ["deepseek-ai/DeepSeek-V4-Pro", "deepseek-v4-pro", 1_048_576, false],
   ["deepseek-ai/DeepSeek-V4-Flash", "deepseek-v4-flash", 1_048_576, false],
   ["deepseek-ai/DeepSeek-V3.2", "deepseek-v3.2", 163_840, false],
+  ["deepseek-v3", "deepseek-v3", 131_072, false],
   ["deepseek-ai/DeepSeek-R1", "deepseek-r1", 131_072, false],
   ["Qwen/Qwen3-Coder-Next", "qwen3-coder-next", 262_144, false],
   ["moonshotai/Kimi-K2.7-Code", "kimi-k2.7-code", 262_144, true],
+  ["kimi-k2.7-code-highspeed", "kimi-k2.7-code", 262_144, true],
+  ["kimi-k3", "kimi-k3", 1_000_000, true],
+  ["doubao-1.5-vision-pro", "doubao-1.5-vision-pro-32k", 32_768, true],
   ["openai/gpt-oss-120b", "gpt-oss-120b", 131_072, false],
 ] as const;
 
@@ -43,9 +53,7 @@ describe("model metadata", () => {
   });
 
   it("does not merge distinct model variants through aliases", () => {
-    expect(getModelMetadata("deepseek-ai/DeepSeek-V4-Pro")?.displayName).toBe(
-      "DeepSeek V4 Pro",
-    );
+    expect(getModelMetadata("deepseek-ai/DeepSeek-V4-Pro")?.displayName).toBe("DeepSeek V4 Pro");
     expect(getModelMetadata("zai-org/GLM-4.7-Flash")?.displayName).toBe("GLM-4.7 Flash");
   });
 });

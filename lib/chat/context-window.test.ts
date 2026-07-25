@@ -11,7 +11,6 @@ const metadata: ModelMetadataWithContext = {
   id: "test",
   maxOutputTokens: 1024,
   sourceUrl: "https://example.com",
-  verifiedAt: "2026-07-21",
 };
 
 describe("context window preparation", () => {
