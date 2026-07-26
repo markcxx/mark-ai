@@ -44,6 +44,7 @@ export async function PATCH(req: NextRequest) {
         general: settings.general,
         id: `settings-${authorization.userId}`,
         languageModel: settings.languageModel,
+        speech: settings.speech,
         userId: authorization.userId,
       })
       .onConflictDoUpdate({
@@ -51,6 +52,7 @@ export async function PATCH(req: NextRequest) {
         set: {
           general: settings.general,
           languageModel: settings.languageModel,
+          speech: settings.speech,
           updatedAt: new Date(),
         },
       });

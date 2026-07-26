@@ -46,6 +46,7 @@ export const userSettings = pgTable("user_settings", {
     .notNull(),
   general: jsonb("general"),
   languageModel: jsonb("language_model"),
+  speech: jsonb("speech"),
   defaultModel: text("default_model"),
   defaultProvider: text("default_provider"),
   plugins: jsonb("plugins"),

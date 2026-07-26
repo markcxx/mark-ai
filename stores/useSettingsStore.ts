@@ -6,8 +6,14 @@ import {
   PRIMARY_COLOR_VALUES,
   sanitizeGeneralSettings,
   sanitizeLanguageModelSettings,
+  sanitizeSpeechSettings,
 } from "@/lib/settings";
-import type { GeneralSettings, LanguageModelSettings, MarkAISettings } from "@/lib/settings";
+import type {
+  GeneralSettings,
+  LanguageModelSettings,
+  MarkAISettings,
+  SpeechSettings,
+} from "@/lib/settings";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -18,6 +24,7 @@ type SettingsState = MarkAISettings & {
   resetSettings: () => Promise<void>;
   updateGeneral: (patch: Partial<GeneralSettings>) => void;
   updateLanguageModel: (patch: Partial<LanguageModelSettings>) => void;
+  updateSpeech: (patch: Partial<SpeechSettings>) => void;
 };
 
 const STORAGE_KEY = "markai:settings";
@@ -31,6 +38,7 @@ const readLocalSettings = (): MarkAISettings | undefined => {
     return {
       general: sanitizeGeneralSettings(parsed.general),
       languageModel: sanitizeLanguageModelSettings(parsed.languageModel),
+      speech: sanitizeSpeechSettings(parsed.speech),
     };
   } catch {
     return undefined;
@@ -49,7 +57,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
   const persist = () => {
     if (saveTimer) clearTimeout(saveTimer);
     const version = ++saveVersion;
-    const settings = { general: get().general, languageModel: get().languageModel };
+    const settings = {
+      general: get().general,
+      languageModel: get().languageModel,
+      speech: get().speech,
+    };
 
     // Browser persistence and visual changes are immediate. The server write is
     // intentionally batched in the background so rapidly toggling settings does
@@ -140,6 +152,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
           { ...state.languageModel, ...patch },
           state.languageModel,
         ),
+      }));
+      persist();
+    },
+    updateSpeech: (patch) => {
+      set((state) => ({
+        speech: sanitizeSpeechSettings({ ...state.speech, ...patch }, state.speech),
       }));
       persist();
     },

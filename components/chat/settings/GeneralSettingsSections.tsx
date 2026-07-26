@@ -9,6 +9,7 @@ import { AppNumberInput } from "@/components/ui/AppNumberInput";
 import { AppSliderWithInput } from "@/components/ui/AppSliderWithInput";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
 import { getModelDisplayName, getModelKey } from "@/lib/chat/helpers";
+import { SPEECH_VOICES, SYSTEM_SPEECH_VOICE } from "@/lib/chat/speech-voices";
 import type { CodeTheme, PrimaryColor } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/useSettingsStore";
@@ -277,6 +278,33 @@ export function ChatSettings() {
         <ToggleSwitch
           checked={general.wideChatMode}
           onChange={(wideChatMode) => update({ wideChatMode })}
+        />
+      </SettingRow>
+    </div>
+  );
+}
+
+export function SpeechSettings() {
+  const speech = useSettingsStore((state) => state.speech);
+  const update = useSettingsStore((state) => state.updateSpeech);
+
+  return (
+    <div>
+      <SettingRow description="用于消息语音朗读，修改后会自动保存" title="默认音色">
+        <AppSelect
+          classNames={{ item: "min-h-9", list: "max-h-[min(480px,var(--available-height))]" }}
+          onChange={(value) => {
+            if (typeof value === "string") update({ voice: value as typeof speech.voice });
+          }}
+          options={[
+            { label: "系统默认", value: SYSTEM_SPEECH_VOICE },
+            ...SPEECH_VOICES.map((voice) => ({
+              label: `${voice.label} · ${voice.value}`,
+              value: voice.value,
+            })),
+          ]}
+          size="large"
+          value={speech.voice}
         />
       </SettingRow>
     </div>

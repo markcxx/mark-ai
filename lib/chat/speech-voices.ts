@@ -1,0 +1,63 @@
+export const SYSTEM_SPEECH_VOICE = "__system__";
+
+export const SPEECH_VOICES = [
+  { label: "芊悦", value: "Cherry" },
+  { label: "苏瑶", value: "Serena" },
+  { label: "晨煦", value: "Ethan" },
+  { label: "千雪", value: "Chelsie" },
+  { label: "茉兔", value: "Momo" },
+  { label: "十三", value: "Vivian" },
+  { label: "月白", value: "Moon" },
+  { label: "四月", value: "Maia" },
+  { label: "凯", value: "Kai" },
+  { label: "不吃鱼", value: "Nofish" },
+  { label: "萌宝", value: "Bella" },
+  { label: "詹妮弗", value: "Jennifer" },
+  { label: "甜茶", value: "Ryan" },
+  { label: "卡捷琳娜", value: "Katerina" },
+  { label: "艾登", value: "Aiden" },
+  { label: "沧明子", value: "Eldric Sage" },
+  { label: "乖小妹", value: "Mia" },
+  { label: "沙小弥", value: "Mochi" },
+  { label: "燕铮莺", value: "Bellona" },
+  { label: "田叔", value: "Vincent" },
+  { label: "萌小姬", value: "Bunny" },
+  { label: "阿闻", value: "Neil" },
+  { label: "墨讲师", value: "Elias" },
+  { label: "徐大爷", value: "Arthur" },
+  { label: "邻家妹妹", value: "Nini" },
+  { label: "小婉", value: "Seren" },
+  { label: "顽屁小孩", value: "Pip" },
+  { label: "少女阿月", value: "Stella" },
+  { label: "博德加", value: "Bodega" },
+  { label: "索尼莎", value: "Sonrisa" },
+  { label: "阿列克", value: "Alek" },
+  { label: "多尔切", value: "Dolce" },
+  { label: "素熙", value: "Sohee" },
+  { label: "小野杏", value: "Ono Anna" },
+  { label: "莱恩", value: "Lenn" },
+  { label: "埃米尔安", value: "Emilien" },
+  { label: "安德雷", value: "Andre" },
+  { label: "拉迪奥·戈尔", value: "Radio Gol" },
+  { label: "上海·阿珍", value: "Jada" },
+  { label: "北京·晓东", value: "Dylan" },
+  { label: "南京·老李", value: "Li" },
+  { label: "陕西·秦川", value: "Marcus" },
+  { label: "闽南·阿杰", value: "Roy" },
+  { label: "天津·李彼得", value: "Peter" },
+  { label: "四川·晴儿", value: "Sunny" },
+  { label: "四川·程川", value: "Eric" },
+  { label: "粤语·阿强", value: "Rocky" },
+  { label: "粤语·阿清", value: "Kiki" },
+] as const;
+
+export type SpeechVoice = (typeof SPEECH_VOICES)[number]["value"];
+export type SpeechVoicePreference = SpeechVoice | typeof SYSTEM_SPEECH_VOICE;
+
+const speechVoiceValues = new Set<string>(SPEECH_VOICES.map((voice) => voice.value));
+
+export const isSpeechVoice = (value: unknown): value is SpeechVoice =>
+  typeof value === "string" && speechVoiceValues.has(value);
+
+export const getSpeechVoiceLabel = (value: string) =>
+  SPEECH_VOICES.find((voice) => voice.value === value)?.label || value;

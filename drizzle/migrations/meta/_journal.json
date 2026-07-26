@@ -50,6 +50,13 @@
       "when": 1784381581431,
       "tag": "0006_moaning_supreme_intelligence",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785083601830,
+      "tag": "0007_true_daimon_hellstrom",
+      "breakpoints": true
     }
   ]
 }

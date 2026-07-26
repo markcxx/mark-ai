@@ -1,14 +1,12 @@
+import {
+  isSpeechVoice,
+  SYSTEM_SPEECH_VOICE,
+  type SpeechVoicePreference,
+} from "@/lib/chat/speech-voices";
+
 export type ThemeMode = "light" | "dark" | "system";
 export type PrimaryColor =
-  | "black"
-  | "blue"
-  | "cyan"
-  | "green"
-  | "indigo"
-  | "magenta"
-  | "orange"
-  | "red"
-  | "violet";
+  "black" | "blue" | "cyan" | "green" | "indigo" | "magenta" | "orange" | "red" | "violet";
 export type CodeTheme =
   | "dracula"
   | "duotone"
@@ -58,9 +56,14 @@ export type LanguageModelSettings = {
   responseTone: "direct" | "friendly" | "professional";
 };
 
+export type SpeechSettings = {
+  voice: SpeechVoicePreference;
+};
+
 export type MarkAISettings = {
   general: GeneralSettings;
   languageModel: LanguageModelSettings;
+  speech: SpeechSettings;
 };
 
 export const PRIMARY_COLOR_VALUES: Record<PrimaryColor, string> = {
@@ -109,9 +112,14 @@ export const DEFAULT_LANGUAGE_MODEL_SETTINGS: LanguageModelSettings = {
   responseTone: "friendly",
 };
 
+export const DEFAULT_SPEECH_SETTINGS: SpeechSettings = {
+  voice: SYSTEM_SPEECH_VOICE,
+};
+
 export const DEFAULT_SETTINGS: MarkAISettings = {
   general: DEFAULT_GENERAL_SETTINGS,
   languageModel: DEFAULT_LANGUAGE_MODEL_SETTINGS,
+  speech: DEFAULT_SPEECH_SETTINGS,
 };
 
 const stringOption = <T extends string>(value: unknown, options: readonly T[], fallback: T) =>
@@ -220,9 +228,20 @@ export const sanitizeLanguageModelSettings = (
   };
 };
 
+export const sanitizeSpeechSettings = (
+  value: unknown,
+  fallback = DEFAULT_SPEECH_SETTINGS,
+): SpeechSettings => {
+  const input = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const voice = input.voice;
+  return {
+    voice: voice === SYSTEM_SPEECH_VOICE || isSpeechVoice(voice) ? voice : fallback.voice,
+  };
+};
+
 export const mergeSettings = (
   current: MarkAISettings,
-  patch: Partial<{ general: unknown; languageModel: unknown }>,
+  patch: Partial<{ general: unknown; languageModel: unknown; speech: unknown }>,
 ): MarkAISettings => ({
   general: sanitizeGeneralSettings(
     patch.general && typeof patch.general === "object"
@@ -235,5 +254,11 @@ export const mergeSettings = (
       ? { ...current.languageModel, ...patch.languageModel }
       : current.languageModel,
     current.languageModel,
+  ),
+  speech: sanitizeSpeechSettings(
+    patch.speech && typeof patch.speech === "object"
+      ? { ...current.speech, ...patch.speech }
+      : current.speech,
+    current.speech,
   ),
 });

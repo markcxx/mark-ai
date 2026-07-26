@@ -2,6 +2,7 @@
 
 import {
   ChevronRight,
+  AudioLines,
   KeyRound,
   Palette,
   RotateCcw,
@@ -25,9 +26,13 @@ import { useUIStore } from "@/stores/useUIStore";
 
 import { ProviderBrandIcon } from "./ModelBrandIcon";
 import { SidebarNavItem } from "./SidebarNavItem";
-import { AppearanceSettings, ChatSettings } from "./settings/GeneralSettingsSections";
+import {
+  AppearanceSettings,
+  ChatSettings,
+  SpeechSettings,
+} from "./settings/GeneralSettingsSections";
 
-type SettingsSection = "appearance" | "chat" | "providers";
+type SettingsSection = "appearance" | "chat" | "providers" | "speech";
 type ProviderTemplate = {
   defaultBaseUrl: string;
   defaultModels: string[];
@@ -65,6 +70,7 @@ type ProviderForm = {
 const sections: Array<{ id: SettingsSection; icon: typeof Palette; label: string }> = [
   { id: "appearance", icon: Palette, label: "外观" },
   { id: "chat", icon: SlidersHorizontal, label: "对话" },
+  { id: "speech", icon: AudioLines, label: "语音" },
   { id: "providers", icon: KeyRound, label: "AI 提供商" },
 ];
 
@@ -702,6 +708,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             <div className="flex-1 overflow-y-auto px-5 sm:px-8">
               {section === "appearance" && <AppearanceSettings />}
               {section === "chat" && <ChatSettings />}
+              {section === "speech" && <SpeechSettings />}
               {section === "providers" && <ProviderSettings />}
             </div>
           </main>
@@ -709,7 +716,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
       </AppDialog>
       <ConfirmDialog
         confirmText="恢复默认"
-        description="外观和对话设置会恢复为初始值，此操作会立即应用。"
+        description="外观、对话和语音设置会恢复为初始值，此操作会立即应用。"
         onCancel={() => setResetConfirmOpen(false)}
         onConfirm={() => {
           setResetConfirmOpen(false);

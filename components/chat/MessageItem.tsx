@@ -1,6 +1,6 @@
 "use client";
 
-import { RefObject, useCallback, useMemo, useRef, useState } from "react";
+import { RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -13,6 +13,7 @@ import {
   MessageSquarePlus,
   Minimize2,
   MoreHorizontal,
+  Pause,
   Pencil,
   Play,
   RotateCw,
@@ -36,12 +37,15 @@ import { cn } from "@/lib/utils";
 import { TRANSLATION_LANGUAGES, type TranslationLanguage } from "@/lib/chat/translation-languages";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { AppTextArea } from "@/components/ui/AppInput";
+import { useSpeechPlayback } from "@/hooks/useSpeechPlayback";
+import { getSpeechVoiceLabel, SYSTEM_SPEECH_VOICE } from "@/lib/chat/speech-voices";
 
 import { CollapsibleContent } from "./CollapsibleContent";
 import { FloatingMenu } from "./FloatingMenu";
 import { FilePreviewDialog } from "./FilePreviewDialog";
 import { FirstTokenLoader } from "./FirstTokenLoader";
 import { MarkdownContent } from "./MarkdownContent";
+import { MessageAudioPlayer } from "./MessageAudioPlayer";
 import { MessageActionButton } from "./MessageActionButton";
 import { MessageSelectionWrapper } from "./MessageSelectionWrapper";
 import { ModelAvatar } from "./ModelAvatar";
@@ -337,8 +341,35 @@ export function MessageItem({
   translateMessage: (message: Message, language: TranslationLanguage) => Promise<void>;
 }) {
   const generalSettings = useSettingsStore((state) => state.general);
+  const speechSettings = useSettingsStore((state) => state.speech);
   const [previewFile, setPreviewFile] = useState<FileAttachment | null>(null);
   const [translating, setTranslating] = useState(false);
+  const speechToastIdRef = useRef<string | undefined>(undefined);
+  const dismissSpeechToast = useCallback(() => {
+    if (!speechToastIdRef.current) return;
+    toast.dismiss(speechToastIdRef.current);
+    speechToastIdRef.current = undefined;
+  }, []);
+  const speech = useSpeechPlayback({
+    onError: (error) => {
+      dismissSpeechToast();
+      toast.error(error, { duration: 4000 });
+    },
+    onPlaybackStart: dismissSpeechToast,
+  });
+  const {
+    pause: pauseSpeech,
+    replay: replaySpeech,
+    resume: resumeSpeech,
+    start: startSpeech,
+    state: speechState,
+    stop: stopSpeech,
+    chunkCount: speechChunkCount,
+    chunkIndex: speechChunkIndex,
+    currentTime: speechCurrentTime,
+    duration: speechDuration,
+    voice: activeSpeechVoice,
+  } = speech;
   const hasStreamingOutput = Boolean(
     message.content?.trim() ||
     message.reasoning?.trim() ||
@@ -372,6 +403,56 @@ export function MessageItem({
     },
     [message, translateMessage],
   );
+  const handleSpeech = useCallback(() => {
+    if (speechState === "loading") {
+      dismissSpeechToast();
+      stopSpeech();
+      return;
+    }
+    if (speechState === "playing") {
+      pauseSpeech();
+      return;
+    }
+    if (speechState === "paused") {
+      resumeSpeech();
+      return;
+    }
+    dismissSpeechToast();
+    speechToastIdRef.current = toast.loading("正在生成语音…", { duration: Infinity });
+    startSpeech(message.content || "", speechSettings.voice);
+  }, [
+    dismissSpeechToast,
+    message.content,
+    pauseSpeech,
+    resumeSpeech,
+    speechState,
+    speechSettings.voice,
+    startSpeech,
+    stopSpeech,
+  ]);
+  useEffect(() => dismissSpeechToast, [dismissSpeechToast]);
+  const speechItem = useMemo(
+    () => ({
+      icon:
+        speechState === "playing"
+          ? Pause
+          : speechState === "paused" || speechState === "ended"
+            ? Play
+            : Volume2,
+      label:
+        speechState === "loading"
+          ? "停止生成语音"
+          : speechState === "playing"
+            ? "暂停朗读"
+            : speechState === "paused"
+              ? "继续朗读"
+              : speechState === "ended"
+                ? "重新播放"
+                : "语音朗读",
+      onClick: speechState === "ended" ? replaySpeech : handleSpeech,
+    }),
+    [handleSpeech, replaySpeech, speechState],
+  );
   const moreItems = useMemo<MenuItem[]>(
     () => [
       { icon: Pencil, label: "编辑", onClick: () => startEditingMessage(message) },
@@ -382,7 +463,7 @@ export function MessageItem({
         label: collapsed ? "展开消息" : "收起消息",
         onClick: () => toggleCollapseMessage(message.id),
       },
-      { icon: Volume2, label: "语音朗读", onClick: menuUnavailable },
+      ...(message.role === "model" ? [speechItem] : []),
       {
         icon: Languages,
         label: translating ? "翻译中…" : "翻译",
@@ -413,6 +494,7 @@ export function MessageItem({
       regenerateMode,
       regenerateMessage,
       startEditingMessage,
+      speechItem,
       toggleCollapseMessage,
       translating,
     ],
@@ -628,6 +710,27 @@ export function MessageItem({
                 </>
               )}
               {!message.isStreaming && <MessageTranslation message={message} />}
+              {speechState !== "idle" && (
+                <MessageAudioPlayer
+                  chunkCount={speechChunkCount}
+                  chunkIndex={speechChunkIndex}
+                  currentTime={speechCurrentTime}
+                  duration={speechDuration}
+                  onPause={pauseSpeech}
+                  onReplay={replaySpeech}
+                  onResume={resumeSpeech}
+                  onStop={() => {
+                    dismissSpeechToast();
+                    stopSpeech();
+                  }}
+                  state={speechState}
+                  voice={
+                    activeSpeechVoice === SYSTEM_SPEECH_VOICE
+                      ? "系统默认音色"
+                      : getSpeechVoiceLabel(activeSpeechVoice)
+                  }
+                />
+              )}
               {!message.isStreaming && <MessageSources citations={citations} />}
               {message.interrupted && (
                 <InterruptedHint

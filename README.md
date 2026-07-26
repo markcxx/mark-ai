@@ -78,7 +78,7 @@ MarkAI 将正文、推理、工具调用、生成文件和翻译保存为带类�
 - 实时展示推理过程、推理耗时、生成耗时和 token 用量。
 - 支持 GFM、代码高亮、表格、引用、HTML 沙盒预览和来源列表。
 - `echarts`、`mermaid` 和 `markmap` 代码块会渲染为交互式内容。
-- 消息支持复制、编辑、删除、翻译、选择到此处和批量操作。
+- 消息支持复制、编辑、删除、翻译、语音朗读、选择到此处和批量操作；语音播放器支持分段进度、暂停、继续和重新播放。
 
 ![MarkAI 消息、推理与用量展示](public/images/readme/message-capabilities.png)
 
@@ -306,21 +306,25 @@ npm start
 
 完整配置和安全占位值见 [`.env.example`](.env.example)，生产部署示例见 [`deploy/env.production.example`](deploy/env.production.example)。
 
-| 变量                                | 用途                                        |
-| ----------------------------------- | ------------------------------------------- |
-| `AI_PROVIDERS` / `AI_MODEL_CONFIGS` | 自定义模型供应商和逐模型配置                |
-| `MARKAI_CONVERSATION_TITLE_MODEL`   | 自动生成会话标题，格式为 `provider/modelId` |
-| `MARKAI_TRANSLATION_MODEL`          | 默认翻译模型，格式为 `provider/modelId`     |
-| `TAVILY_API_KEY`                    | 联网搜索及网页读取回退                      |
-| `FIRECRAWL_API_KEY`                 | 网页正文提取，可配置多个 Key                |
-| `AUTH_REGISTRATION_MODE`            | `open`、`waitlist` 或 `closed`              |
-| `AUTH_ADMIN_EMAILS`                 | 初始管理员邮箱列表                          |
-| `AUTH_SSO_PROVIDERS`                | 启用 `google`、`github` SSO                 |
-| `SMTP_*`                            | 验证码、邀请和密码重置邮件                  |
-| `CREDENTIAL_ENCRYPTION_KEY`         | 加密用户保存的供应商 API Key                |
-| `MARKAI_MAX_FILE_BYTES`             | 单文件大小限制                              |
-| `MARKAI_MAX_FILE_COUNT`             | 云端用户文件数量限制                        |
-| `MARKAI_MAX_STORAGE_BYTES`          | 云端用户存储容量限制                        |
+| 变量                                    | 用途                                        |
+| --------------------------------------- | ------------------------------------------- |
+| `AI_PROVIDERS` / `AI_MODEL_CONFIGS`     | 自定义模型供应商和逐模型配置                |
+| `MARKAI_CONVERSATION_TITLE_MODEL`       | 自动生成会话标题，格式为 `provider/modelId` |
+| `MARKAI_TRANSLATION_MODEL`              | 默认翻译模型，格式为 `provider/modelId`     |
+| `MARKAI_TTS_PROVIDER`                   | 语音合成供应商                              |
+| `MARKAI_TTS_API_KEY`                    | 语音合成专用 API Key                        |
+| `MARKAI_TTS_BASE_URL`                   | 百炼兼容语音合成接口的完整 URL              |
+| `MARKAI_TTS_MODEL` / `MARKAI_TTS_VOICE` | 语音合成模型和音色                          |
+| `TAVILY_API_KEY`                        | 联网搜索及网页读取回退                      |
+| `FIRECRAWL_API_KEY`                     | 网页正文提取，可配置多个 Key                |
+| `AUTH_REGISTRATION_MODE`                | `open`、`waitlist` 或 `closed`              |
+| `AUTH_ADMIN_EMAILS`                     | 初始管理员邮箱列表                          |
+| `AUTH_SSO_PROVIDERS`                    | 启用 `google`、`github` SSO                 |
+| `SMTP_*`                                | 验证码、邀请和密码重置邮件                  |
+| `CREDENTIAL_ENCRYPTION_KEY`             | 加密用户保存的供应商 API Key                |
+| `MARKAI_MAX_FILE_BYTES`                 | 单文件大小限制                              |
+| `MARKAI_MAX_FILE_COUNT`                 | 云端用户文件数量限制                        |
+| `MARKAI_MAX_STORAGE_BYTES`              | 云端用户存储容量限制                        |
 
 `CREDENTIAL_ENCRYPTION_KEY` 和 `AUTH_SECRET` 在生产环境中必须妥善保管。更换加密密钥后，已有的用户模型 API Key 将无法解密。
 
