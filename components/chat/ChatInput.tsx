@@ -82,13 +82,19 @@ export function ChatInput({
       <div
         className={cn(
           placement === "bottom"
-            ? "pointer-events-none absolute bottom-0 left-0 right-0 z-20 flex justify-center bg-gradient-to-t from-[var(--chat-input-overlay-from)] via-[var(--chat-input-overlay-via)] to-transparent px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-8 md:p-4 md:px-8 md:pb-8 md:pt-10"
+            ? "pointer-events-none absolute bottom-0 left-0 right-0 z-20 flex justify-center px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-8 md:p-4 md:px-8 md:pb-8 md:pt-10"
             : "w-full",
         )}
       >
+        {placement === "bottom" && (
+          <div
+            aria-hidden="true"
+            className="absolute inset-y-0 left-0 right-[6px] bg-gradient-to-t from-[var(--chat-input-overlay-from)] via-[var(--chat-input-overlay-via)] to-transparent"
+          />
+        )}
         <div
           className={cn(
-            "w-full transition-[max-width] duration-300 ease-out",
+            "relative w-full transition-[max-width] duration-300 ease-out",
             placement === "bottom"
               ? "pointer-events-auto max-w-[840px]"
               : "max-w-[760px]",

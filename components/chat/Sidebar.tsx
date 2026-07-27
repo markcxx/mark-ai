@@ -164,7 +164,7 @@ export function Sidebar({
             </nav>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-3 pb-4">
+          <div className="markai-scrollbar-auto-hide flex-1 overflow-y-auto px-3 pb-4">
             <div className="mb-2 mt-4 px-3 font-jakarta text-xs font-semibold uppercase tracking-wider text-gray-400">
               历史
             </div>
