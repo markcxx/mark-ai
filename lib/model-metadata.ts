@@ -27,6 +27,48 @@ const DOUBAO_SOURCE_URL = "https://www.volcengine.com/docs/82379/1330310";
 // inheriting an unsafe context limit from a similarly named model.
 export const MODEL_METADATA: ModelMetadata[] = [
   {
+    aliases: ["gpt-5.6-sol-低", "gpt-5.6-sol-中", "gpt-5.6-sol-高"],
+    contextWindowTokens: 1_050_000,
+    description: "OpenAI GPT-5.6 系列旗舰推理模型，面向复杂专业工作、编码、研究和高级 Agent 工作流。",
+    displayName: "GPT-5.6 Sol",
+    family: "GPT-5.6",
+    id: "gpt-5.6-sol",
+    knowledgeCutoff: "2026-02-16",
+    maxOutputTokens: 128_000,
+    sourceUrl: "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVision: true,
+  },
+  {
+    aliases: ["gpt-5.6-terra-低", "gpt-5.6-terra-中", "gpt-5.6-terra-高"],
+    contextWindowTokens: 1_050_000,
+    description: "OpenAI GPT-5.6 系列均衡型号，在智能水平、速度和成本之间取得平衡。",
+    displayName: "GPT-5.6 Terra",
+    family: "GPT-5.6",
+    id: "gpt-5.6-terra",
+    knowledgeCutoff: "2026-02-16",
+    maxOutputTokens: 128_000,
+    sourceUrl: "https://developers.openai.com/api/docs/models/gpt-5.6-terra",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVision: true,
+  },
+  {
+    aliases: ["gpt-5.6-luna-低", "gpt-5.6-luna-中", "gpt-5.6-luna-高"],
+    contextWindowTokens: 1_050_000,
+    description: "OpenAI GPT-5.6 系列高效型号，针对成本敏感、高吞吐和轻量工作负载优化。",
+    displayName: "GPT-5.6 Luna",
+    family: "GPT-5.6",
+    id: "gpt-5.6-luna",
+    knowledgeCutoff: "2026-02-16",
+    maxOutputTokens: 128_000,
+    sourceUrl: "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVision: true,
+  },
+  {
     aliases: ["gpt-5-5"],
     contextWindowTokens: 1_050_000,
     description: "OpenAI 面向复杂专业工作、编码和长程 Agent 任务的前沿推理模型。",
@@ -150,6 +192,34 @@ export const MODEL_METADATA: ModelMetadata[] = [
     supportsVision: true,
   },
   {
+    contextWindowTokens: 1_048_576,
+    description:
+      "Google 面向真实 Agent 工作负载的高速前沿模型，擅长代码生成、代理执行和空间推理。",
+    displayName: "Gemini 3.6 Flash",
+    family: "Gemini 3.6",
+    id: "gemini-3.6-flash",
+    maxOutputTokens: 65_536,
+    sourceUrl: "https://ai.google.dev/gemini-api/docs/models/gemini-3.6-flash",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVideo: true,
+    supportsVision: true,
+  },
+  {
+    contextWindowTokens: 1_048_576,
+    description:
+      "Google 面向子 Agent、文档解析和高吞吐工作流的低延迟、低成本多模态模型。",
+    displayName: "Gemini 3.5 Flash-Lite",
+    family: "Gemini 3.5",
+    id: "gemini-3.5-flash-lite",
+    maxOutputTokens: 65_536,
+    sourceUrl: "https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVideo: true,
+    supportsVision: true,
+  },
+  {
     aliases: ["gemini-3.1-pro-preview", "gemini-pro-latest"],
     contextWindowTokens: 1_114_112,
     description:
@@ -209,6 +279,7 @@ export const MODEL_METADATA: ModelMetadata[] = [
     sourceUrl: "https://ai.google.dev/gemini-api/docs/models",
   },
   {
+    aliases: ["deepseek-v4-pro-260425"],
     contextWindowTokens: 1_048_576,
     description: "DeepSeek V4 系列旗舰模型，支持百万级上下文、多档推理强度和代理任务。",
     displayName: "DeepSeek V4 Pro",
@@ -220,6 +291,7 @@ export const MODEL_METADATA: ModelMetadata[] = [
     supportsToolCalling: true,
   },
   {
+    aliases: ["deepseek-v4-flash-260425"],
     contextWindowTokens: 1_048_576,
     description: "DeepSeek V4 系列高效预览模型，支持百万级上下文、推理和代理任务。",
     displayName: "DeepSeek V4 Flash",
@@ -509,6 +581,28 @@ export const MODEL_METADATA: ModelMetadata[] = [
     supportsVision: true,
   },
   {
+    aliases: ["kimi-k2-250905", "kimi-k2-instruct-0905"],
+    contextWindowTokens: 262_144,
+    description:
+      "Kimi K2 Instruct 的 0905 增强快照，将上下文扩展至 256K，并强化编码和 Agentic 工具调用。",
+    displayName: "Kimi K2 Instruct 0905",
+    family: "Kimi K2",
+    id: "kimi-k2-0905-preview",
+    sourceUrl: "https://huggingface.co/moonshotai/Kimi-K2-Instruct-0905",
+    supportsToolCalling: true,
+  },
+  {
+    aliases: ["kimi-k2-250711", "kimi-k2-instruct"],
+    contextWindowTokens: 131_072,
+    description: "Kimi K2 首个开源 Instruct 快照，面向代码、通用 Agent 和工具调用任务。",
+    displayName: "Kimi K2 Instruct 0711",
+    family: "Kimi K2",
+    id: "kimi-k2-0711-preview",
+    sourceUrl: "https://huggingface.co/moonshotai/Kimi-K2-Instruct",
+    supportsToolCalling: true,
+  },
+  {
+    aliases: ["kimi-k2-thinking-251104"],
     contextWindowTokens: 262_144,
     description: "面向深度推理与通用 Agent 的 Kimi 思考模型，擅长通过多步工具调用解决复杂问题。",
     displayName: "Kimi K2 Thinking",
@@ -687,7 +781,11 @@ export const MODEL_METADATA: ModelMetadata[] = [
     sourceUrl: DOUBAO_SOURCE_URL,
   },
   {
-    aliases: ["doubao-seed-2-0-lite", "doubao-seed-2-0-lite-260428"],
+    aliases: [
+      "doubao-seed-2-0-lite",
+      "doubao-seed-2-0-lite-260215",
+      "doubao-seed-2-0-lite-260428",
+    ],
     contextWindowTokens: 256_000,
     description: "兼顾成本和通用任务能力的豆包多模态深度推理模型，适合常规生产工作负载。",
     displayName: "Doubao Seed 2.0 Lite",
@@ -697,7 +795,11 @@ export const MODEL_METADATA: ModelMetadata[] = [
     sourceUrl: DOUBAO_SOURCE_URL,
   },
   {
-    aliases: ["doubao-seed-2-0-mini", "doubao-seed-2-0-mini-260428"],
+    aliases: [
+      "doubao-seed-2-0-mini",
+      "doubao-seed-2-0-mini-260215",
+      "doubao-seed-2-0-mini-260428",
+    ],
     contextWindowTokens: 256_000,
     description: "面向轻量任务和高并发场景的豆包快速模型，保留多模态、推理和工具调用能力。",
     displayName: "Doubao Seed 2.0 Mini",
@@ -741,7 +843,7 @@ export const MODEL_METADATA: ModelMetadata[] = [
     supportsVision: true,
   },
   {
-    aliases: ["doubao-seed-1-6", "doubao-seed-1-6-251015"],
+    aliases: ["doubao-seed-1-6", "doubao-seed-1-6-250615", "doubao-seed-1-6-251015"],
     contextWindowTokens: 256_000,
     description: "豆包多模态深度推理模型，提供自动、思考和非思考模式，适合通用对话与 Agent 任务。",
     displayName: "Doubao Seed 1.6",
@@ -755,7 +857,11 @@ export const MODEL_METADATA: ModelMetadata[] = [
     supportsVision: true,
   },
   {
-    aliases: ["doubao-seed-1-6-flash", "doubao-seed-1-6-flash-250828"],
+    aliases: [
+      "doubao-seed-1-6-flash",
+      "doubao-seed-1-6-flash-250615",
+      "doubao-seed-1-6-flash-250828",
+    ],
     contextWindowTokens: 256_000,
     description: "低延迟的豆包多模态深度推理模型，面向快速文本、视觉理解和高吞吐任务。",
     displayName: "Doubao Seed 1.6 Flash",
@@ -820,6 +926,7 @@ export const MODEL_METADATA: ModelMetadata[] = [
     supportsVision: true,
   },
   {
+    aliases: ["glm-5-2-260617"],
     contextWindowTokens: 1_000_000,
     description:
       "智谱面向长程任务的旗舰模型，提供百万级上下文，并强化长期规划、复杂编码和 Agent 执行。",
@@ -888,6 +995,20 @@ export const MODEL_METADATA: ModelMetadata[] = [
     sourceUrl: "https://docs.bigmodel.cn/cn/guide/start/model-overview",
   },
   {
+    contextWindowTokens: 131_072,
+    description:
+      "智谱原生多模态视觉推理模型，支持图像、视频、文件、深度思考和工具调用。",
+    displayName: "GLM-4.6V",
+    family: "GLM-4",
+    id: "glm-4.6v",
+    maxOutputTokens: 32_768,
+    sourceUrl: "https://docs.bigmodel.cn/cn/guide/models/vlm/glm-4.6v",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVideo: true,
+    supportsVision: true,
+  },
+  {
     aliases: ["glm-4.5-air", "glm-4.5-airx", "glm-4.5-x"],
     contextWindowTokens: 131_072,
     description: "智谱面向 Agent 的混合推理模型，支持思考与非思考模式，兼顾推理、编码和工具调用。",
@@ -896,6 +1017,19 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "glm-4.5",
     maxOutputTokens: 98_304,
     sourceUrl: "https://docs.bigmodel.cn/cn/guide/start/model-overview",
+  },
+  {
+    contextWindowTokens: 65_536,
+    description:
+      "智谱 MoE 视觉推理模型，覆盖图像、视频、文档理解和 GUI Agent，并支持思考模式。",
+    displayName: "GLM-4.5V",
+    family: "GLM-4",
+    id: "glm-4.5v",
+    maxOutputTokens: 16_384,
+    sourceUrl: "https://docs.bigmodel.cn/cn/guide/models/vlm/glm-4.5v",
+    supportsReasoning: true,
+    supportsVideo: true,
+    supportsVision: true,
   },
   {
     aliases: ["glm-4-flash"],
