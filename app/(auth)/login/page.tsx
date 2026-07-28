@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
 
+import { AppPasswordInput } from "@/components/ui/AppInput";
 import { getSocialErrorCallbackURL, signIn, type SocialProvider } from "@/lib/auth-client";
 
 const fieldClass =
@@ -155,14 +156,14 @@ export default function LoginPage() {
               忘记密码？
             </Link>
           </span>
-          <input
+          <AppPasswordInput
             autoComplete="current-password"
-            className={`${fieldClass} mt-2`}
+            className="mt-2"
+            inputClassName={fieldClass}
             minLength={8}
             onChange={(event) => setPassword(event.target.value)}
             placeholder="输入账户密码"
             required
-            type="password"
             value={password}
           />
         </label>

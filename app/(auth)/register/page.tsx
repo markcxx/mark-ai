@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 
+import { AppPasswordInput } from "@/components/ui/AppInput";
 import { getSocialErrorCallbackURL, signIn, signUp } from "@/lib/auth-client";
 
 type Step = "email" | "code" | "account";
@@ -479,13 +480,13 @@ export default function RegisterPage() {
           <form className="relative space-y-5" onSubmit={handleRegister}>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
               密码
-              <input
+              <AppPasswordInput
                 autoFocus
-                className={`${fieldClass} mt-2`}
+                className="mt-2"
+                inputClassName={fieldClass}
                 minLength={8}
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder="输入一个安全密码"
-                type="password"
                 value={password}
               />
             </label>

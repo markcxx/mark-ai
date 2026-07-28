@@ -17,14 +17,17 @@ export const AppInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInp
 
 export const AppPasswordInput = forwardRef<
   HTMLInputElement,
-  Omit<InputHTMLAttributes<HTMLInputElement>, "type">
->(function AppPasswordInput({ className, disabled, ...props }, ref) {
+  Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & { inputClassName?: string }
+>(function AppPasswordInput(
+  { className, disabled, inputClassName: passwordInputClassName, ...props },
+  ref,
+) {
   const [visible, setVisible] = useState(false);
 
   return (
     <span className={cn("relative block", className)}>
       <input
-        className={cn(inputClassName, "pr-9")}
+        className={cn(inputClassName, passwordInputClassName, "pr-10")}
         disabled={disabled}
         ref={ref}
         type={visible ? "text" : "password"}
@@ -32,7 +35,8 @@ export const AppPasswordInput = forwardRef<
       />
       <button
         aria-label={visible ? "隐藏密码" : "显示密码"}
-        className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-gray-400 transition-colors hover:text-gray-600 disabled:pointer-events-none disabled:opacity-40 dark:hover:text-gray-200"
+        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-gray-400 transition-colors hover:text-gray-600 disabled:pointer-events-none disabled:opacity-40 dark:hover:text-gray-200"
+        data-markai-tooltip={visible ? "隐藏密码" : "显示密码"}
         disabled={disabled}
         onClick={() => setVisible((current) => !current)}
         type="button"
@@ -59,4 +63,3 @@ export const AppTextArea = forwardRef<
     />
   );
 });
-

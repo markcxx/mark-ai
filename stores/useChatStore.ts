@@ -411,7 +411,12 @@ export const useChatStore = create<ChatStore>()(
           provider: modelConfig.provider,
           role: "model",
         };
-        set({ messages: [...historyMessages, modelMessage] });
+        const nextMessages = [
+          ...messages.slice(0, index + 1),
+          modelMessage,
+          ...messages.slice(index + 1),
+        ];
+        set({ messages: nextMessages });
         setOpenMenuMessageId(null);
 
         const streamedMessage = await streamAssistantMessage(
@@ -421,10 +426,14 @@ export const useChatStore = create<ChatStore>()(
           { sessionId: targetSessionId, webSearchEnabled },
         );
         const latestUserRetryMessage = get().messages.find((item) => item.id === targetId);
-        const savedMessages = [
-          ...historyMessages,
-          { ...modelMessage, ...(latestUserRetryMessage || {}), ...streamedMessage },
-        ];
+        const completedMessage = {
+          ...modelMessage,
+          ...(latestUserRetryMessage || {}),
+          ...streamedMessage,
+        };
+        const savedMessages = nextMessages.map((item) =>
+          item.id === modelMessage.id ? completedMessage : item,
+        );
         if (useSessionStore.getState().activeSessionId === targetSessionId) {
           set({ messages: savedMessages });
         }
@@ -432,7 +441,6 @@ export const useChatStore = create<ChatStore>()(
         return;
       }
 
-      const historyMessages = messages.slice(0, index);
       const promptIndex = (() => {
         for (let i = index - 1; i >= 0; i -= 1) {
           if (messages[i].role === "user") return i;
@@ -489,7 +497,9 @@ export const useChatStore = create<ChatStore>()(
         variants: retainedVariants,
         webSearch: undefined,
       };
-      const nextMessages = [...messages.slice(0, index), nextModelMessage];
+      const nextMessages = messages.map((item, messageIndex) =>
+        messageIndex === index ? nextModelMessage : item,
+      );
 
       set({ messages: nextMessages });
       setOpenMenuMessageId(null);
@@ -520,7 +530,9 @@ export const useChatStore = create<ChatStore>()(
           variants: completedVariants,
         };
       }
-      const savedMessages = [...nextMessages.slice(0, -1), completedMessage];
+      const savedMessages = nextMessages.map((item, messageIndex) =>
+        messageIndex === index ? completedMessage : item,
+      );
       if (useSessionStore.getState().activeSessionId === targetSessionId) {
         set({ messages: savedMessages });
       }
