@@ -8,6 +8,8 @@ import type PhotoSwipeLightbox from "photoswipe/lightbox";
 
 import { AppDialog } from "@/components/ui/AppDialog";
 
+import { useHtmlPreview } from "./HtmlPreviewContext";
+
 export type PreviewFile = {
   contentType: string;
   id: string;
@@ -180,12 +182,33 @@ export function FilePreviewDialog({
   previewUrl?: string;
 }) {
   const kind = file ? getPreviewKind(file) : "unsupported";
+  const htmlPreview = useHtmlPreview();
   const [loading, setLoading] = useState(kind !== "unsupported");
   useEffect(() => setLoading(kind !== "unsupported"), [file?.id, kind]);
 
+  const resolvedPreviewUrl = file
+    ? previewUrl || `/api/files/${file.id}/preview`
+    : previewUrl || "";
+  const resolvedDownloadUrl = file
+    ? downloadUrl || `/api/files/${file.id}/download`
+    : downloadUrl || "";
+
+  useEffect(() => {
+    if (!file || kind === "image" || kind === "unsupported" || !htmlPreview) return;
+
+    htmlPreview.openPreview({
+      contentType: file.contentType,
+      dataUrl: `/api/files/${file.id}/preview?raw=1`,
+      downloadUrl: resolvedDownloadUrl,
+      id: `file-${file.id}`,
+      kind: "file",
+      sourceUrl: resolvedPreviewUrl,
+      title: file.name,
+    });
+    onClose();
+  }, [file, htmlPreview, kind, onClose, resolvedDownloadUrl, resolvedPreviewUrl]);
+
   if (!file) return null;
-  const resolvedPreviewUrl = previewUrl || `/api/files/${file.id}/preview`;
-  const resolvedDownloadUrl = downloadUrl || `/api/files/${file.id}/download`;
   if (kind === "image") {
     return (
       <PhotoSwipeImagePreview
@@ -196,6 +219,7 @@ export function FilePreviewDialog({
       />
     );
   }
+  if (kind !== "unsupported" && htmlPreview) return null;
   const title = (
     <div className="flex min-w-0 items-center gap-2 pr-2">
       <span className="min-w-0 flex-1 truncate text-sm font-medium" title={file.name}>

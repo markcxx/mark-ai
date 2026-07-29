@@ -10,13 +10,27 @@ import { createOfficePreviewResponse, getOfficePreviewKind } from "@/lib/storage
 
 export const runtime = "nodejs";
 
-export async function GET(_request: Request, context: { params: Promise<{ fileId: string }> }) {
+export async function GET(request: Request, context: { params: Promise<{ fileId: string }> }) {
   const userId = await getCurrentStorageOwnerId();
   if (!userId) return NextResponse.json({ error: "请先登录" }, { status: 401 });
 
   const { fileId } = await context.params;
   const file = await getStoredFile(fileId, userId, true);
   if (!file) return NextResponse.json({ error: "文件不存在" }, { status: 404 });
+
+  if (new URL(request.url).searchParams.get("raw") === "1") {
+    const bytes = await getStoredFileBytes(file);
+    const body = new ArrayBuffer(bytes.byteLength);
+    new Uint8Array(body).set(bytes);
+    return new Response(body, {
+      headers: {
+        "Cache-Control": "private, max-age=300",
+        "Content-Length": String(file.size),
+        "Content-Type": file.contentType,
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  }
 
   if (getOfficePreviewKind(file)) {
     const bytes = await getStoredFileBytes(file);

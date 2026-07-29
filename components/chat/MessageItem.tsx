@@ -7,9 +7,7 @@ import {
   ChevronDown,
   CheckSquare,
   Copy,
-  FileText,
   GitBranch,
-  Eye,
   Languages,
   MessageSquarePlus,
   Minimize2,
@@ -45,6 +43,7 @@ import { getSpeechVoiceLabel, SYSTEM_SPEECH_VOICE } from "@/lib/chat/speech-voic
 import { CollapsibleContent } from "./CollapsibleContent";
 import { FloatingMenu } from "./FloatingMenu";
 import { FilePreviewDialog } from "./FilePreviewDialog";
+import { FileTypeIcon } from "./files/FileTypeIcon";
 import { FirstTokenLoader } from "./FirstTokenLoader";
 import { MarkdownContent } from "./MarkdownContent";
 import { MessageAudioPlayer } from "./MessageAudioPlayer";
@@ -148,6 +147,34 @@ function MessageEditor({
     </div>
   );
 }
+
+const getAttachmentTypeLabel = (file: FileAttachment) => {
+  const lowerName = file.name.toLocaleLowerCase();
+  if (
+    file.contentType.includes("spreadsheet") ||
+    [".csv", ".xls", ".xlsx"].some((extension) => lowerName.endsWith(extension))
+  ) {
+    return "电子表格";
+  }
+  if (
+    file.contentType.includes("wordprocessing") ||
+    file.contentType === "application/msword" ||
+    [".doc", ".docx"].some((extension) => lowerName.endsWith(extension))
+  ) {
+    return "Word 文档";
+  }
+  if (file.contentType === "application/pdf" || lowerName.endsWith(".pdf")) return "PDF 文档";
+  if (file.contentType.startsWith("image/")) return "图片";
+  if (file.contentType.startsWith("audio/")) return "音频";
+  if (file.contentType.startsWith("video/")) return "视频";
+  if (file.contentType.startsWith("text/")) return "文本文件";
+  return "文件";
+};
+
+const formatAttachmentSize = (size: number) =>
+  size < 1024 * 1024
+    ? `${Math.max(1, Math.ceil(size / 1024))} KB`
+    : `${(size / 1024 / 1024).toFixed(1)} MB`;
 
 function MessageStats({ message }: { message: Message }) {
   if (message.role !== "model" || message.isStreaming) return null;
@@ -547,36 +574,39 @@ export function MessageItem({
                 <span className="line-clamp-2">{quotedSelection.content}</span>
               </div>
             )}
+            {message.attachments && message.attachments.length > 0 && !collapsed && (
+              <div className="mb-2 flex w-full max-w-[360px] flex-col items-stretch gap-2">
+                {message.attachments.map((file) => (
+                  <button
+                    aria-label={`预览 ${file.name}`}
+                    className="group/file grid min-h-16 w-full grid-cols-[44px_minmax(0,1fr)] items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-left shadow-sm transition-[border-color,background-color,box-shadow] hover:border-gray-300 hover:bg-gray-50/70 hover:shadow-md dark:border-white/10 dark:bg-[#191919] dark:hover:border-white/20 dark:hover:bg-[#1d1d1d]"
+                    key={file.id}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setPreviewFile(file);
+                    }}
+                    type="button"
+                  >
+                    <FileTypeIcon
+                      className="h-[22px] w-[22px]"
+                      contentType={file.contentType}
+                      name={file.name}
+                      tile
+                      tileClassName="h-11 w-11"
+                    />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        {file.name}
+                      </span>
+                      <span className="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400">
+                        {getAttachmentTypeLabel(file)} · {formatAttachmentSize(file.size)}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="flex w-fit max-w-[92%] flex-col gap-3 break-words rounded-2xl rounded-tr-sm bg-[var(--chat-user-bubble-bg)] px-4 py-3 text-left text-[length:var(--chat-font-size)] text-gray-900 shadow-sm dark:text-gray-100 md:max-w-[85%] md:px-5">
-              {message.attachments && message.attachments.length > 0 && !collapsed && (
-                <div className="flex flex-wrap gap-2">
-                  {message.attachments.map((file) => (
-                    <button
-                      className="flex min-w-0 max-w-[260px] items-center gap-2 rounded-xl border border-black/[0.06] bg-white/60 px-2.5 py-2 transition-all hover:-translate-y-0.5 hover:bg-white hover:shadow-sm dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/[0.1]"
-                      key={file.id}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setPreviewFile(file);
-                      }}
-                      title={`预览 ${file.name}`}
-                      type="button"
-                    >
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-500 dark:bg-blue-500/15 dark:text-blue-300">
-                        <FileText size={16} />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-xs font-semibold">{file.name}</span>
-                        <span className="block text-[10px] text-gray-400">
-                          {file.size < 1024 * 1024
-                            ? `${Math.ceil(file.size / 1024)} KB`
-                            : `${(file.size / 1024 / 1024).toFixed(1)} MB`}
-                        </span>
-                      </span>
-                      <Eye className="shrink-0 text-gray-400" size={14} />
-                    </button>
-                  ))}
-                </div>
-              )}
               <div className="whitespace-pre-wrap">
                 <CollapsibleContent>
                   {collapsed ? "消息已收起" : message.content}

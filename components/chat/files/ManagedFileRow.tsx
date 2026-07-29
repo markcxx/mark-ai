@@ -117,9 +117,12 @@ export function ManagedFileTableRow({
           onClick={() => isFilePreviewable(file) && onPreview(file)}
           type="button"
         >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white ring-1 ring-gray-200 dark:bg-white/[0.05] dark:ring-white/10">
-            <FileTypeIcon contentType={file.contentType} name={file.name} />
-          </span>
+          <FileTypeIcon
+            contentType={file.contentType}
+            name={file.name}
+            tile
+            tileClassName="h-9 w-9"
+          />
           <span className="truncate font-medium" title={file.name}>
             {file.name}
           </span>
@@ -163,11 +166,16 @@ export function ManagedFileMobileRow({
         onChange={(checked) => onToggleSelected(file.id, checked)}
       />
       <button
-        className="flex h-9 w-9 items-center justify-center rounded-lg bg-white ring-1 ring-gray-200 dark:bg-white/[0.05] dark:ring-white/10"
+        className="flex h-9 w-9 items-center justify-center rounded-lg"
         onClick={() => isFilePreviewable(file) && onPreview(file)}
         type="button"
       >
-        <FileTypeIcon contentType={file.contentType} name={file.name} />
+        <FileTypeIcon
+          contentType={file.contentType}
+          name={file.name}
+          tile
+          tileClassName="h-9 w-9"
+        />
       </button>
       <div className="min-w-0">
         <p className="truncate text-sm font-medium" title={file.name}>

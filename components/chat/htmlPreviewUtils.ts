@@ -1,8 +1,19 @@
-export type HtmlPreviewPayload = {
-  content: string;
-  id: string;
-  title: string;
-};
+export type HtmlPreviewPayload =
+  | {
+      content: string;
+      id: string;
+      kind?: "html";
+      title: string;
+    }
+  | {
+      contentType: string;
+      dataUrl: string;
+      downloadUrl: string;
+      id: string;
+      kind: "file";
+      sourceUrl: string;
+      title: string;
+    };
 
 export const getHtmlPreviewId = (content: string) => {
   let hash = 0;

@@ -599,7 +599,16 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
             open={bulkDeleteOpen}
             title="批量删除文件？"
           />
-          <FilePreviewDialog file={previewFile} onClose={() => setPreviewFile(null)} />
+          <FilePreviewDialog
+            file={previewFile}
+            onClose={() => {
+              const openingWorkspacePreview = Boolean(
+                previewFile && !previewFile.contentType.startsWith("image/"),
+              );
+              setPreviewFile(null);
+              if (openingWorkspacePreview) onClose();
+            }}
+          />
         </motion.div>
       )}
     </AnimatePresence>,

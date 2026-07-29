@@ -1,13 +1,14 @@
 "use client";
 
-import { Code2, Download, Eye, Maximize2, Minimize2, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { AlertCircle, Code2, Download, Eye, Loader2, Maximize2, Minimize2, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Pre } from "@/components/CodeBlock";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useUIStore } from "@/stores/useUIStore";
 
+import { FileTypeIcon } from "./files/FileTypeIcon";
 import {
   downloadHtmlFile,
   getHtmlPreviewDocument,
@@ -15,15 +16,191 @@ import {
 } from "./htmlPreviewUtils";
 
 type PreviewMode = "preview" | "code";
+type FilePreviewPayload = Extract<HtmlPreviewPayload, { kind: "file" }>;
+type OfficePreviewRenderer = {
+  destroy: () => void;
+  preview: (source: ArrayBuffer) => Promise<unknown>;
+  xs?: { reRender?: () => void };
+};
 
-function PreviewFrame({ content, title }: { content: string; title: string }) {
+const getOfficeRendererKind = (preview: FilePreviewPayload) => {
+  const lowerName = preview.title.toLocaleLowerCase();
+  if (
+    preview.contentType ===
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    lowerName.endsWith(".docx")
+  ) {
+    return "docx" as const;
+  }
+  if (
+    preview.contentType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+    lowerName.endsWith(".xlsx")
+  ) {
+    return "excel" as const;
+  }
+  return undefined;
+};
+
+function OfficeFilePreview({ preview }: { preview: FilePreviewPayload }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const rendererKind = getOfficeRendererKind(preview);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !rendererKind) return;
+
+    let active = true;
+    let renderer: OfficePreviewRenderer | undefined;
+    let resizeFrame = 0;
+    const controller = new AbortController();
+    const resizeObserver = new ResizeObserver(() => {
+      window.cancelAnimationFrame(resizeFrame);
+      resizeFrame = window.requestAnimationFrame(() => renderer?.xs?.reRender?.());
+    });
+    resizeObserver.observe(container);
+    setError("");
+    setLoading(true);
+    container.replaceChildren();
+
+    const render = async () => {
+      try {
+        const modulePromise =
+          rendererKind === "docx" ? import("@js-preview/docx") : import("@js-preview/excel");
+        const [response, module] = await Promise.all([
+          fetch(preview.dataUrl, { cache: "no-store", signal: controller.signal }),
+          modulePromise,
+        ]);
+        if (!response.ok) {
+          const body = await response.json().catch(() => null);
+          throw new Error(body?.error || "无法读取文件内容");
+        }
+        const source = await response.arrayBuffer();
+        if (!active) return;
+
+        renderer = (
+          rendererKind === "docx"
+            ? module.default.init(container, {
+                breakPages: true,
+                ignoreFonts: false,
+                ignoreHeight: false,
+                ignoreWidth: false,
+                renderEndnotes: true,
+                renderFooters: true,
+                renderFootnotes: true,
+                renderHeaders: true,
+                useBase64URL: true,
+              })
+            : module.default.init(container, {
+                minColLength: 20,
+                minRowLength: 50,
+                showContextmenu: false,
+              })
+        ) as OfficePreviewRenderer;
+        await renderer.preview(source);
+        if (active) setLoading(false);
+      } catch (previewError) {
+        if (!active || controller.signal.aborted) return;
+        const message = previewError instanceof Error ? previewError.message : "";
+        setError(
+          /[\u4e00-\u9fff]/.test(message)
+            ? message
+            : "文件格式可能不受支持或文件已经损坏，请下载原文件查看。",
+        );
+        setLoading(false);
+      }
+    };
+
+    void render();
+    return () => {
+      active = false;
+      controller.abort();
+      resizeObserver.disconnect();
+      window.cancelAnimationFrame(resizeFrame);
+      try {
+        renderer?.destroy();
+      } catch {
+        container.replaceChildren();
+      }
+    };
+  }, [preview.dataUrl, preview.id, rendererKind]);
+
+  return (
+    <div className="relative h-full min-h-0 bg-[#e8e9ec] dark:bg-[#101113]">
+      <div
+        className={cn(
+          "markai-office-preview h-full min-h-0",
+          rendererKind === "excel" ? "overflow-hidden bg-white" : "overflow-auto",
+        )}
+        ref={containerRef}
+      />
+      {loading && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-gray-50 text-gray-400 dark:bg-[#111214] dark:text-gray-500">
+          <Loader2 className="animate-spin" size={20} />
+        </div>
+      )}
+      {error && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-gray-50 px-6 text-center dark:bg-[#111214]">
+          <AlertCircle className="text-red-500" size={24} />
+          <p className="mt-3 text-sm font-medium text-gray-700 dark:text-gray-200">
+            无法还原此文件
+          </p>
+          <p className="mt-1 max-w-sm text-xs text-gray-500 dark:text-gray-400">{error}</p>
+          <a
+            className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-white dark:text-gray-900"
+            href={preview.downloadUrl}
+          >
+            <Download size={14} /> 下载原文件
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PreviewFrame({ preview }: { preview: HtmlPreviewPayload }) {
+  const [loading, setLoading] = useState(preview.kind === "file");
+
+  useEffect(() => {
+    setLoading(preview.kind === "file");
+  }, [preview.id, preview.kind]);
+
+  if (preview.kind === "file") {
+    if (getOfficeRendererKind(preview)) return <OfficeFilePreview preview={preview} />;
+
+    const lowerName = preview.title.toLocaleLowerCase();
+    const renderedOfficeDocument =
+      preview.contentType === "application/msword" ||
+      preview.contentType.includes("officedocument") ||
+      [".doc", ".docx", ".xlsx"].some((extension) => lowerName.endsWith(extension));
+
+    return (
+      <div className="relative h-full w-full bg-white">
+        {loading && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-gray-50 text-gray-400 dark:bg-[#111214] dark:text-gray-500">
+            <Loader2 className="animate-spin" size={20} />
+          </div>
+        )}
+        <iframe
+          className="h-full w-full border-0 bg-white"
+          onLoad={() => setLoading(false)}
+          referrerPolicy="no-referrer"
+          sandbox={renderedOfficeDocument ? "" : undefined}
+          src={preview.sourceUrl}
+          title={`${preview.title} 预览`}
+        />
+      </div>
+    );
+  }
+
   return (
     <iframe
       className="h-full w-full bg-white"
       referrerPolicy="no-referrer"
       sandbox="allow-forms allow-modals allow-scripts"
-      srcDoc={content}
-      title={title}
+      srcDoc={getHtmlPreviewDocument(preview.content)}
+      title={preview.title}
     />
   );
 }
@@ -87,7 +264,9 @@ export function HtmlPreviewPanel({
   resizing: boolean;
 }) {
   const [mode, setMode] = useState<PreviewMode>("preview");
-  const previewDocument = useMemo(() => getHtmlPreviewDocument(preview.content), [preview.content]);
+  const htmlContent = preview.kind === "file" ? "" : preview.content;
+  const previewDocument = useMemo(() => getHtmlPreviewDocument(htmlContent), [htmlContent]);
+  const isFilePreview = preview.kind === "file";
 
   return (
     <aside className="relative flex min-w-0 flex-col overflow-hidden border-0 bg-[var(--chat-panel-bg)] opacity-100 shadow-none transition-opacity duration-300 ease-out dark:border-gray-700 md:rounded-xl md:border md:border-[#e5e5e5]">
@@ -112,21 +291,42 @@ export function HtmlPreviewPanel({
       )}
       <div className="flex min-h-12 items-center justify-between gap-3 border-b border-gray-200 bg-[var(--chat-header-bg)] px-3 backdrop-blur-md dark:border-white/10">
         <div className="flex min-w-0 items-center gap-2">
-          <PreviewTabs mode={mode} onModeChange={setMode} />
+          {isFilePreview ? (
+            <FileTypeIcon
+              contentType={preview.contentType}
+              name={preview.title}
+              tile
+              tileClassName="h-8 w-8 rounded-md"
+            />
+          ) : (
+            <PreviewTabs mode={mode} onModeChange={setMode} />
+          )}
           <div className="min-w-0 truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
             {preview.title}
           </div>
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
-          <button
-            className="flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-gray-100"
-            onClick={() => downloadHtmlFile(preview.content, preview.title)}
-            title="下载 HTML"
-            type="button"
-          >
-            <Download size={15} />
-          </button>
+          {isFilePreview ? (
+            <a
+              aria-label={`下载 ${preview.title}`}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-gray-100"
+              data-markai-tooltip="下载"
+              href={preview.downloadUrl}
+            >
+              <Download size={15} />
+            </a>
+          ) : (
+            <button
+              aria-label="下载 HTML"
+              className="flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-gray-100"
+              data-markai-tooltip="下载 HTML"
+              onClick={() => downloadHtmlFile(preview.content, preview.title)}
+              type="button"
+            >
+              <Download size={15} />
+            </button>
+          )}
           <button
             className="hidden h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-gray-100 md:flex"
             onClick={() => onFullscreenChange(!fullscreen)}
@@ -147,11 +347,17 @@ export function HtmlPreviewPanel({
       </div>
 
       <div className="min-h-0 flex-1 overflow-hidden">
-        {mode === "preview" ? (
-          <PreviewFrame content={previewDocument} title={preview.title} />
+        {isFilePreview || mode === "preview" ? (
+          <PreviewFrame
+            preview={
+              isFilePreview
+                ? preview
+                : { content: previewDocument, id: preview.id, title: preview.title }
+            }
+          />
         ) : (
           <div className="h-full overflow-auto p-4">
-            <Pre language="html">{preview.content}</Pre>
+            <Pre language="html">{htmlContent}</Pre>
           </div>
         )}
       </div>

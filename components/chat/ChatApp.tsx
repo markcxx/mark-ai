@@ -470,81 +470,81 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   // PLACEHOLDER_RENDER
 
   return (
-    <div
-      className={cn(
-        "flex h-dvh w-screen overflow-hidden bg-[var(--chat-app-bg)] p-0 font-sans text-gray-900 antialiased dark:text-gray-100 md:p-2",
-        (isResizingSidebar || isResizingPreview) && "cursor-col-resize select-none",
-      )}
+    <HtmlPreviewContext.Provider
+      value={{
+        activePreview: activeHtmlPreview,
+        closePreview: closeHtmlPreview,
+        openPreview: openHtmlPreview,
+      }}
     >
-      <Toaster
-        position="top-center"
-        toastOptions={{
-          className: "text-sm",
-          duration: 2200,
-          style: {
-            border: "1px solid #e5e7eb",
-            borderRadius: "12px",
-            boxShadow: "0 12px 36px rgba(0,0,0,0.12)",
-          },
-        }}
-      />
-      <input
-        accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.csv,.doc,.docx,.xlsx,.pptx"
-        className="hidden"
-        multiple
-        onChange={handleAttachmentFiles}
-        ref={fileInputRef}
-        type="file"
-      />
-
-      <Sidebar
-        activeSessionId={activeSessionId}
-        hasMoreSessions={hasMoreSessions}
-        isOpen={isSidebarOpen}
-        isResizing={isResizingSidebar}
-        isLoadingSessions={isLoadingSessions}
-        isLoadingMoreSessions={isLoadingMoreSessions}
-        generationStatusBySessionId={generationStatusBySessionId}
-        loadingSessionIds={loadingSessionIds}
-        onClose={() => useUIStore.getState().setSidebarOpen(false)}
-        onDeleteSession={(id) => void deleteChatSession(id)}
-        onLoadMoreSessions={() => void useSessionStore.getState().loadMoreSessions()}
-        onNewChat={() => {
-          handleNewChat();
-          if (isMobileViewport) useUIStore.getState().setSidebarOpen(false);
-        }}
-        onRenameSession={(id) => void renameChatSession(id)}
-        onSelectSession={(id) => {
-          void handleLoadSession(id);
-          if (isMobileViewport) useUIStore.getState().setSidebarOpen(false);
-        }}
-        onToggleFavorite={(id, favorite) =>
-          useSessionStore.getState().updateSessionFavorite(id, favorite)
-        }
-        onUpdateSessionTitle={(id, title) =>
-          useSessionStore.getState().updateSessionTitle(id, title)
-        }
-        sessions={sessions}
-        width={sidebarWidth}
-      />
-
-      {isMobileViewport && isSidebarOpen && (
-        <button
-          aria-label="收起历史会话"
-          className="fixed inset-y-0 right-0 z-30 bg-transparent"
-          onClick={() => useUIStore.getState().setSidebarOpen(false)}
-          style={{ left: mobileSidebarOffset }}
-          type="button"
-        />
-      )}
-
-      <HtmlPreviewContext.Provider
-        value={{
-          activePreview: activeHtmlPreview,
-          closePreview: closeHtmlPreview,
-          openPreview: openHtmlPreview,
-        }}
+      <div
+        className={cn(
+          "flex h-dvh w-screen overflow-hidden bg-[var(--chat-app-bg)] p-0 font-sans text-gray-900 antialiased dark:text-gray-100 md:p-2",
+          (isResizingSidebar || isResizingPreview) && "cursor-col-resize select-none",
+        )}
       >
+        <Toaster
+          position="top-center"
+          toastOptions={{
+            className: "text-sm",
+            duration: 2200,
+            style: {
+              border: "1px solid #e5e7eb",
+              borderRadius: "12px",
+              boxShadow: "0 12px 36px rgba(0,0,0,0.12)",
+            },
+          }}
+        />
+        <input
+          accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.csv,.doc,.docx,.xlsx,.pptx"
+          className="hidden"
+          multiple
+          onChange={handleAttachmentFiles}
+          ref={fileInputRef}
+          type="file"
+        />
+
+        <Sidebar
+          activeSessionId={activeSessionId}
+          hasMoreSessions={hasMoreSessions}
+          isOpen={isSidebarOpen}
+          isResizing={isResizingSidebar}
+          isLoadingSessions={isLoadingSessions}
+          isLoadingMoreSessions={isLoadingMoreSessions}
+          generationStatusBySessionId={generationStatusBySessionId}
+          loadingSessionIds={loadingSessionIds}
+          onClose={() => useUIStore.getState().setSidebarOpen(false)}
+          onDeleteSession={(id) => void deleteChatSession(id)}
+          onLoadMoreSessions={() => void useSessionStore.getState().loadMoreSessions()}
+          onNewChat={() => {
+            handleNewChat();
+            if (isMobileViewport) useUIStore.getState().setSidebarOpen(false);
+          }}
+          onRenameSession={(id) => void renameChatSession(id)}
+          onSelectSession={(id) => {
+            void handleLoadSession(id);
+            if (isMobileViewport) useUIStore.getState().setSidebarOpen(false);
+          }}
+          onToggleFavorite={(id, favorite) =>
+            useSessionStore.getState().updateSessionFavorite(id, favorite)
+          }
+          onUpdateSessionTitle={(id, title) =>
+            useSessionStore.getState().updateSessionTitle(id, title)
+          }
+          sessions={sessions}
+          width={sidebarWidth}
+        />
+
+        {isMobileViewport && isSidebarOpen && (
+          <button
+            aria-label="收起历史会话"
+            className="fixed inset-y-0 right-0 z-30 bg-transparent"
+            onClick={() => useUIStore.getState().setSidebarOpen(false)}
+            style={{ left: mobileSidebarOffset }}
+            type="button"
+          />
+        )}
+
         <div
           className={cn(
             "grid min-w-0 flex-1 duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] md:duration-300 md:ease-out",
@@ -863,44 +863,44 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
             />
           )}
         </div>
-      </HtmlPreviewContext.Provider>
 
-      {exportDialogOpen && (
-        <ExportDialog
-          initialMode={exportDialogMode}
-          messages={messages}
-          onClose={() => setExportDialogOpen(false)}
-          open
-          session={activeSession}
+        {exportDialogOpen && (
+          <ExportDialog
+            initialMode={exportDialogMode}
+            messages={messages}
+            onClose={() => setExportDialogOpen(false)}
+            open
+            session={activeSession}
+          />
+        )}
+        <PluginCenterDrawer
+          onClose={() => useUIStore.getState().setPluginCenterOpen(false)}
+          open={pluginCenterOpen}
         />
-      )}
-      <PluginCenterDrawer
-        onClose={() => useUIStore.getState().setPluginCenterOpen(false)}
-        open={pluginCenterOpen}
-      />
-      <SessionSearchDialog
-        onSelectSession={(id) => {
-          void handleLoadSession(id);
-          if (isMobileViewport) useUIStore.getState().setSidebarOpen(false);
-        }}
-      />
-      <SelectionQuoteAction
-        onQuote={(quote) => {
-          useChatStore.getState().setPendingQuote(quote);
-          window.requestAnimationFrame(() => textareaRef.current?.focus());
-        }}
-      />
-      <CommandCenter
-        onFocusComposer={() =>
-          window.requestAnimationFrame(() => {
-            textareaRef.current?.focus();
-          })
-        }
-        onNewChat={() => {
-          handleNewChat();
-          if (isMobileViewport) useUIStore.getState().setSidebarOpen(false);
-        }}
-      />
-    </div>
+        <SessionSearchDialog
+          onSelectSession={(id) => {
+            void handleLoadSession(id);
+            if (isMobileViewport) useUIStore.getState().setSidebarOpen(false);
+          }}
+        />
+        <SelectionQuoteAction
+          onQuote={(quote) => {
+            useChatStore.getState().setPendingQuote(quote);
+            window.requestAnimationFrame(() => textareaRef.current?.focus());
+          }}
+        />
+        <CommandCenter
+          onFocusComposer={() =>
+            window.requestAnimationFrame(() => {
+              textareaRef.current?.focus();
+            })
+          }
+          onNewChat={() => {
+            handleNewChat();
+            if (isMobileViewport) useUIStore.getState().setSidebarOpen(false);
+          }}
+        />
+      </div>
+    </HtmlPreviewContext.Provider>
   );
 }

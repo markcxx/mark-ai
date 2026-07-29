@@ -226,9 +226,12 @@ export function ChatInput({
                         title={`预览 ${file.name}`}
                         type="button"
                       >
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm ring-1 ring-gray-200/70 dark:bg-white/10 dark:ring-white/10">
-                          <FileTypeIcon contentType={file.contentType} name={file.name} />
-                        </span>
+                        <FileTypeIcon
+                          contentType={file.contentType}
+                          name={file.name}
+                          tile
+                          tileClassName="h-9 w-9"
+                        />
                         <span className="min-w-0">
                           <span className="block truncate text-xs font-medium text-gray-700 dark:text-gray-200">
                             {file.name}

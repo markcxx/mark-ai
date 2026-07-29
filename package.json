@@ -25,6 +25,8 @@
     "@fontsource-variable/plus-jakarta-sans": "^5.2.8",
     "@google/genai": "^2.4.0",
     "@hookform/resolvers": "^5.2.1",
+    "@js-preview/docx": "^1.6.4",
+    "@js-preview/excel": "^1.7.14",
     "@neondatabase/serverless": "^1.1.0",
     "@zumer/snapdom": "^2.15.0",
     "autoprefixer": "^10.4.21",
