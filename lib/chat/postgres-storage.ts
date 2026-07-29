@@ -8,6 +8,7 @@ import { chatMessages, chatSessions } from "@/lib/db/schema";
 import {
   ChatRevisionConflictError,
   type MessageWriteOptions,
+  type SessionListOptions,
   type StorageAdapter,
 } from "./storage-adapter";
 import type {
@@ -145,10 +146,28 @@ export class PostgresStorage implements StorageAdapter {
     throw new ChatRevisionConflictError(current.revision);
   }
 
-  async listChatSessions(userId?: string) {
+  async listChatSessions(userId?: string, options: SessionListOptions = {}) {
     if (!userId) throw new Error("userId is required in cloud mode");
 
     const db = getDb();
+    const conditions = [eq(chatSessions.userId, userId)];
+    const query = options.query?.trim();
+    if (query) {
+      conditions.push(sql`strpos(lower(${chatSessions.title}), lower(${query})) > 0`);
+    }
+    if (options.cursor) {
+      const updatedAt = new Date(options.cursor.updatedAt);
+      const position = sql`(
+        ${chatSessions.updatedAt} < ${updatedAt}
+        OR (${chatSessions.updatedAt} = ${updatedAt} AND ${chatSessions.id} < ${options.cursor.id})
+      )`;
+      conditions.push(
+        options.cursor.favorite
+          ? sql`((coalesce(${chatSessions.favorite}, false) = true AND ${position}) OR coalesce(${chatSessions.favorite}, false) = false)`
+          : sql`(coalesce(${chatSessions.favorite}, false) = false AND ${position})`,
+      );
+    }
+
     const rows = await db
       .select({
         session: chatSessions,
@@ -156,9 +175,14 @@ export class PostgresStorage implements StorageAdapter {
       })
       .from(chatSessions)
       .leftJoin(chatMessages, eq(chatMessages.sessionId, chatSessions.id))
-      .where(eq(chatSessions.userId, userId))
+      .where(and(...conditions))
       .groupBy(chatSessions.id)
-      .orderBy(desc(chatSessions.favorite), desc(chatSessions.updatedAt));
+      .orderBy(
+        sql`coalesce(${chatSessions.favorite}, false) desc`,
+        desc(chatSessions.updatedAt),
+        desc(chatSessions.id),
+      )
+      .limit(Math.max(1, Math.min(100, options.limit || 30)));
 
     return rows.map((r) => toSession(r.session, r.messageCount));
   }

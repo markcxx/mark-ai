@@ -25,7 +25,7 @@ import { formatBytes, ManagedFileRow } from "./files/ManagedFileRow";
 import type { ManagedFile } from "./files/ManagedFileRow";
 import { FilePreviewDialog } from "./FilePreviewDialog";
 
-const ACCEPTED_FILES = ".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.csv,.docx,.xlsx,.pptx";
+const ACCEPTED_FILES = ".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.csv,.doc,.docx,.xlsx,.pptx";
 
 type FilesResponse = {
   files: ManagedFile[];

@@ -8,6 +8,7 @@ import {
   CheckSquare,
   Copy,
   FileText,
+  GitBranch,
   Eye,
   Languages,
   MessageSquarePlus,
@@ -501,6 +502,10 @@ export function MessageItem({
   );
 
   const editing = editingMessageId === message.id;
+  const contextBoundary = message.segments?.find((segment) => segment.type === "context-boundary");
+  const contentSegments = message.segments?.filter(
+    (segment) => segment.type !== "context-boundary",
+  );
   const citations = useMemo(() => collectMessageCitations(message), [message]);
   const relativeTime = formatRelativeTime(message.createdAt);
   const absoluteTime = message.createdAt
@@ -637,17 +642,17 @@ export function MessageItem({
           ) : (
             <>
               {waitingForFirstOutput && <FirstTokenLoader />}
-              {message.segments &&
-              message.segments.some((segment) => segment.type !== "translation") ? (
+              {contentSegments &&
+              contentSegments.some((segment) => segment.type !== "translation") ? (
                 <>
-                  {!message.segments.some((segment) => segment.type === "thinking") && (
+                  {!contentSegments.some((segment) => segment.type === "thinking") && (
                     <ThinkingPanel
                       content={message.reasoning}
                       duration={message.reasoningDuration}
                       thinking={message.isReasoning}
                     />
                   )}
-                  {message.segments.map((seg, i) => {
+                  {contentSegments.map((seg, i) => {
                     if (seg.type === "translation") return null;
                     if (seg.type === "thinking") {
                       return (
@@ -676,11 +681,11 @@ export function MessageItem({
                         <MarkdownContent
                           animation={generalSettings.responseAnimation}
                           citations={citations}
-                          streaming={message.isStreaming && i === message.segments!.length - 1}
+                          streaming={message.isStreaming && i === contentSegments.length - 1}
                         >
                           {seg.content}
                         </MarkdownContent>
-                        {message.isStreaming && i === message.segments!.length - 1 && (
+                        {message.isStreaming && i === contentSegments.length - 1 && (
                           <span className="ml-1 inline-block h-4 w-2 animate-pulse rounded-full bg-primary align-middle" />
                         )}
                       </div>
@@ -777,6 +782,16 @@ export function MessageItem({
 
   return (
     <>
+      {contextBoundary && (
+        <div className="flex w-full items-center gap-3 py-1 text-[11px] text-gray-400 dark:text-gray-500">
+          <span className="h-px flex-1 bg-gray-200 dark:bg-white/10" />
+          <span className="flex shrink-0 items-center gap-1.5">
+            <GitBranch size={13} />
+            以下消息基于上方回复的旧版本
+          </span>
+          <span className="h-px flex-1 bg-gray-200 dark:bg-white/10" />
+        </div>
+      )}
       <div
         className={cn("relative w-full", message.role === "user" ? "flex justify-end" : "")}
         data-message-id={message.id}

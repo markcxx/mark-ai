@@ -13,6 +13,9 @@ export type PreviewFile = {
 };
 
 const getPreviewKind = (file: PreviewFile) => {
+  if (file.contentType === "application/msword" || file.name.toLowerCase().endsWith(".doc")) {
+    return "doc";
+  }
   if (
     file.contentType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
     file.name.toLowerCase().endsWith(".xlsx")
@@ -136,12 +139,16 @@ export function FilePreviewDialog({
             src={resolvedPreviewUrl}
           />
         )}
-        {(kind === "docx" || kind === "pdf" || kind === "spreadsheet" || kind === "text") && (
+        {(kind === "doc" ||
+          kind === "docx" ||
+          kind === "pdf" ||
+          kind === "spreadsheet" ||
+          kind === "text") && (
           <iframe
             className="h-full w-full border-0 bg-white"
             onLoad={() => setLoading(false)}
             referrerPolicy="no-referrer"
-            sandbox={kind === "docx" || kind === "spreadsheet" ? "" : undefined}
+            sandbox={kind === "doc" || kind === "docx" || kind === "spreadsheet" ? "" : undefined}
             src={resolvedPreviewUrl}
             title={`${file.name} 预览`}
           />

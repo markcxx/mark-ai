@@ -6,6 +6,7 @@ import path from "node:path";
 import {
   ChatRevisionConflictError,
   type MessageWriteOptions,
+  type SessionListOptions,
   type StorageAdapter,
 } from "./storage-adapter";
 import type { ChatSession, Message } from "./types";
@@ -289,7 +290,28 @@ const bumpSessionRevision = (database: DatabaseLike, sessionId: string) => {
 };
 
 export class SqliteStorage implements StorageAdapter {
-  listChatSessions() {
+  listChatSessions(_userId?: string, options: SessionListOptions = {}) {
+    const conditions: string[] = [];
+    const values: unknown[] = [];
+    const query = options.query?.trim();
+
+    if (query) {
+      conditions.push("instr(lower(s.title), lower(?)) > 0");
+      values.push(query);
+    }
+
+    if (options.cursor) {
+      const cursorPosition = "(s.updated_at < ? OR (s.updated_at = ? AND s.id < ?))";
+      conditions.push(
+        options.cursor.favorite
+          ? `((COALESCE(s.favorite, 0) = 1 AND ${cursorPosition}) OR COALESCE(s.favorite, 0) = 0)`
+          : `(COALESCE(s.favorite, 0) = 0 AND ${cursorPosition})`,
+      );
+      values.push(options.cursor.updatedAt, options.cursor.updatedAt, options.cursor.id);
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const limit = Math.max(1, Math.min(100, options.limit || 30));
     const rows = ensureDatabase()
       .prepare(
         `
@@ -305,11 +327,13 @@ export class SqliteStorage implements StorageAdapter {
           COUNT(m.id) AS message_count
         FROM chat_sessions s
         LEFT JOIN chat_messages m ON m.session_id = s.id
+        ${where}
         GROUP BY s.id
-        ORDER BY s.favorite DESC, s.updated_at DESC
+        ORDER BY COALESCE(s.favorite, 0) DESC, s.updated_at DESC, s.id DESC
+        LIMIT ?
       `,
       )
-      .all();
+      .all(...values, limit);
 
     return rows.map(toSession);
   }

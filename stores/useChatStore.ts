@@ -6,7 +6,13 @@ import { THINKING_TEXTS } from "@/lib/chat/constants";
 import { createMessageId, getModelKey } from "@/lib/chat/helpers";
 import { applyMessageVariant, toMessageVariant } from "@/lib/chat/message-variants";
 import { estimateMessageTokens } from "@/lib/chat/metrics";
-import type { ConfiguredModel, FileAttachment, Message, RegenerateMode } from "@/lib/chat/types";
+import type {
+  ConfiguredModel,
+  FileAttachment,
+  Message,
+  QueuedChatMessage,
+  RegenerateMode,
+} from "@/lib/chat/types";
 import type { TranslationLanguage } from "@/lib/chat/translation-languages";
 import { createStreamAssistantMessage } from "./chat/stream-assistant-message";
 import { useSessionStore } from "./useSessionStore";
@@ -44,6 +50,7 @@ interface ChatState {
   editingContent: string;
   abortController: AbortController | null;
   pendingAttachments: FileAttachment[];
+  queuedMessage: QueuedChatMessage | null;
 }
 
 interface ChatActions {
@@ -53,6 +60,9 @@ interface ChatActions {
   addPendingAttachment: (attachment: FileAttachment) => void;
   removePendingAttachment: (id: string) => void;
   sendMessage: () => Promise<void>;
+  sendQueuedMessage: () => Promise<void>;
+  sendQueuedMessageNow: () => void;
+  cancelQueuedMessage: () => void;
   streamAssistantMessage: (
     historyMessages: Message[],
     modelMessageId: string,
@@ -90,6 +100,21 @@ const copyText = async (text: string, successMessage = "已复制") => {
   }
 };
 
+const markDownstreamContext = (messages: Message[], sourceIndex: number, sourceMessageId: string) =>
+  messages.map((message, index) => {
+    if (index !== sourceIndex + 1) return message;
+    return {
+      ...message,
+      segments: [
+        ...(message.segments || []).filter(
+          (segment) =>
+            segment.type !== "context-boundary" || segment.sourceMessageId !== sourceMessageId,
+        ),
+        { createdAt: Date.now(), sourceMessageId, type: "context-boundary" as const },
+      ],
+    };
+  });
+
 export const useChatStore = create<ChatStore>()(
   subscribeWithSelector((set, get) => ({
     messages: [],
@@ -100,6 +125,7 @@ export const useChatStore = create<ChatStore>()(
     editingContent: "",
     abortController: null,
     pendingAttachments: [],
+    queuedMessage: null,
 
     setMessages: (messages) => set({ messages }),
     setInput: (input) => set({ input }),
@@ -115,14 +141,7 @@ export const useChatStore = create<ChatStore>()(
 
     abortStreaming: () => {
       const { abortController } = get();
-      if (abortController) {
-        abortController.abort();
-        set((state) =>
-          state.abortController === abortController
-            ? { abortController: null, isLoading: false }
-            : {},
-        );
-      }
+      if (abortController) abortController.abort();
     },
 
     reset: () => {
@@ -135,6 +154,7 @@ export const useChatStore = create<ChatStore>()(
         editingContent: "",
         abortController: null,
         pendingAttachments: [],
+        queuedMessage: null,
       });
     },
 
@@ -145,7 +165,23 @@ export const useChatStore = create<ChatStore>()(
       const { availableModels, selectedModelKey, webSearchEnabled } = useUIStore.getState();
       const selectedModel = availableModels.find((m) => getModelKey(m) === selectedModelKey);
 
-      if ((!input.trim() && pendingAttachments.length === 0) || isLoading || !selectedModel) return;
+      if ((!input.trim() && pendingAttachments.length === 0) || !selectedModel) return;
+
+      if (isLoading) {
+        if (get().queuedMessage) {
+          toast.error("已有一条消息正在等待发送");
+          return;
+        }
+        set({
+          input: "",
+          pendingAttachments: [],
+          queuedMessage: {
+            attachments: pendingAttachments,
+            content: input.trim() || "请查看我上传的附件。",
+          },
+        });
+        return;
+      }
 
       const prompt = input.trim() || "请查看我上传的附件。";
       const sessionStore = useSessionStore.getState();
@@ -243,6 +279,9 @@ export const useChatStore = create<ChatStore>()(
             sessionStore.setSessionLoading(targetSessionId, false);
           }
         }
+        if (useSessionStore.getState().activeSessionId === targetSessionId) {
+          void get().sendQueuedMessage();
+        }
       } finally {
         if (!startedStream) {
           set({ isLoading: false, abortController: null });
@@ -251,6 +290,39 @@ export const useChatStore = create<ChatStore>()(
           }
         }
       }
+    },
+
+    sendQueuedMessage: async () => {
+      const { isLoading, queuedMessage } = get();
+      if (isLoading || !queuedMessage) return;
+      set({
+        input: queuedMessage.content,
+        pendingAttachments: queuedMessage.attachments,
+        queuedMessage: null,
+      });
+      await get().sendMessage();
+    },
+
+    sendQueuedMessageNow: () => {
+      if (!get().queuedMessage) return;
+      get().abortStreaming();
+      const sendWhenReady = () => {
+        if (get().isLoading) {
+          window.setTimeout(sendWhenReady, 30);
+          return;
+        }
+        void get().sendQueuedMessage();
+      };
+      window.setTimeout(sendWhenReady, 0);
+    },
+
+    cancelQueuedMessage: () => {
+      const queuedMessage = get().queuedMessage;
+      if (!queuedMessage) return;
+      set({ queuedMessage: null });
+      queuedMessage.attachments.forEach((attachment) => {
+        void fetch(`/api/files/${attachment.id}`, { method: "DELETE" });
+      });
     },
 
     continueMessage: async (message) => {
@@ -359,6 +431,9 @@ export const useChatStore = create<ChatStore>()(
 
       const sessionStore = useSessionStore.getState();
       await sessionStore.persistSessionMessages(targetSessionId, savedMessages);
+      if (useSessionStore.getState().activeSessionId === targetSessionId) {
+        void get().sendQueuedMessage();
+      }
     },
 
     regenerateMessage: async (message, mode = "replace") => {
@@ -438,6 +513,9 @@ export const useChatStore = create<ChatStore>()(
           set({ messages: savedMessages });
         }
         await sessionStore.persistSessionMessages(targetSessionId, savedMessages);
+        if (useSessionStore.getState().activeSessionId === targetSessionId) {
+          void get().sendQueuedMessage();
+        }
         return;
       }
 
@@ -497,8 +575,10 @@ export const useChatStore = create<ChatStore>()(
         variants: retainedVariants,
         webSearch: undefined,
       };
-      const nextMessages = messages.map((item, messageIndex) =>
-        messageIndex === index ? nextModelMessage : item,
+      const nextMessages = markDownstreamContext(
+        messages.map((item, messageIndex) => (messageIndex === index ? nextModelMessage : item)),
+        index,
+        message.id,
       );
 
       set({ messages: nextMessages });
@@ -537,6 +617,9 @@ export const useChatStore = create<ChatStore>()(
         set({ messages: savedMessages });
       }
       await sessionStore.persistSessionMessages(targetSessionId, savedMessages);
+      if (useSessionStore.getState().activeSessionId === targetSessionId) {
+        void get().sendQueuedMessage();
+      }
     },
 
     selectMessageVariant: async (messageId, variantId) => {
@@ -567,9 +650,11 @@ export const useChatStore = create<ChatStore>()(
       const useSystemTranslationModel = translationModelKey === "__system__";
       const configuredTranslationModel =
         translationModelKey && !useSystemTranslationModel
-        ? availableModels.find((model) => getModelKey(model) === translationModelKey)
-        : undefined;
-      const selectedModel = availableModels.find((model) => getModelKey(model) === selectedModelKey);
+          ? availableModels.find((model) => getModelKey(model) === translationModelKey)
+          : undefined;
+      const selectedModel = availableModels.find(
+        (model) => getModelKey(model) === selectedModelKey,
+      );
       const messageModel = availableModels.find(
         (model) => model.id === message.model && model.provider === message.provider,
       );
@@ -606,7 +691,8 @@ export const useChatStore = create<ChatStore>()(
       set({ messages: nextMessages });
 
       const sessionId = useSessionStore.getState().activeSessionId;
-      if (sessionId) await useSessionStore.getState().persistSessionMessages(sessionId, nextMessages);
+      if (sessionId)
+        await useSessionStore.getState().persistSessionMessages(sessionId, nextMessages);
     },
 
     startEditing: (message) => {

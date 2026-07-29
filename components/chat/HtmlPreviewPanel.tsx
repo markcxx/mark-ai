@@ -5,6 +5,8 @@ import { useMemo, useState } from "react";
 
 import { Pre } from "@/components/CodeBlock";
 import { cn } from "@/lib/utils";
+import { useSettingsStore } from "@/stores/useSettingsStore";
+import { useUIStore } from "@/stores/useUIStore";
 
 import {
   downloadHtmlFile,
@@ -73,18 +75,41 @@ export function HtmlPreviewPanel({
   fullscreen,
   onClose,
   onFullscreenChange,
+  onResizePointerDown,
   preview,
+  resizing,
 }: {
   fullscreen: boolean;
   onClose: () => void;
   onFullscreenChange: (fullscreen: boolean) => void;
+  onResizePointerDown: (event: React.PointerEvent<HTMLDivElement>) => void;
   preview: HtmlPreviewPayload;
+  resizing: boolean;
 }) {
   const [mode, setMode] = useState<PreviewMode>("preview");
   const previewDocument = useMemo(() => getHtmlPreviewDocument(preview.content), [preview.content]);
 
   return (
     <aside className="relative flex min-w-0 flex-col overflow-hidden border-0 bg-[var(--chat-panel-bg)] opacity-100 shadow-none transition-opacity duration-300 ease-out dark:border-gray-700 md:rounded-xl md:border md:border-[#e5e5e5]">
+      {!fullscreen && (
+        <div
+          aria-label="调整预览宽度"
+          className="group absolute inset-y-0 left-0 z-30 hidden w-3 -translate-x-1/2 touch-none cursor-col-resize md:block"
+          onDoubleClick={() => {
+            useUIStore.getState().setPreviewWidth(48);
+            useSettingsStore.getState().updateGeneral({ previewWidth: 48 });
+          }}
+          onPointerDown={onResizePointerDown}
+          role="separator"
+        >
+          <div
+            className={cn(
+              "absolute inset-y-0 left-1/2 w-0.5 bg-transparent transition-colors duration-150 group-hover:bg-primary/70",
+              resizing && "bg-primary",
+            )}
+          />
+        </div>
+      )}
       <div className="flex min-h-12 items-center justify-between gap-3 border-b border-gray-200 bg-[var(--chat-header-bg)] px-3 backdrop-blur-md dark:border-white/10">
         <div className="flex min-w-0 items-center gap-2">
           <PreviewTabs mode={mode} onModeChange={setMode} />

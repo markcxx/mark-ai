@@ -37,12 +37,19 @@ export type TranslationSegment = {
   language: string;
 };
 
+export type ContextBoundarySegment = {
+  createdAt: number;
+  sourceMessageId: string;
+  type: "context-boundary";
+};
+
 export type MessageSegment =
   | ThinkingSegment
   | ToolSegment
   | ContentSegment
   | GeneratedFileSegment
-  | TranslationSegment;
+  | TranslationSegment
+  | ContextBoundarySegment;
 
 export type FileAttachment = {
   id: string;
@@ -50,6 +57,11 @@ export type FileAttachment = {
   size: number;
   contentType: string;
   kind?: "attachment" | "avatar";
+};
+
+export type QueuedChatMessage = {
+  attachments: FileAttachment[];
+  content: string;
 };
 
 export type MessageVariant = {

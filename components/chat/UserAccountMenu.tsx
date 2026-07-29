@@ -12,6 +12,7 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
 import { signOut, useSession } from "@/lib/auth-client";
+import { useUIStore } from "@/stores/useUIStore";
 
 import { FileManagerDrawer } from "./FileManagerDrawer";
 import { ProfileDialog } from "./ProfileDialog";
@@ -20,12 +21,12 @@ import type { UserProfile } from "./ProfileDialog";
 
 export function UserAccountMenu() {
   const { data } = useSession();
-  const [fileManagerOpen, setFileManagerOpen] = useState(false);
+  const fileManagerOpen = useUIStore((state) => state.fileManagerOpen);
+  const settingsOpen = useUIStore((state) => state.settingsOpen);
   const [isAdmin, setIsAdmin] = useState(false);
   const [open, setOpen] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const user = data?.user;
   const name = profile?.fullName || user?.name || user?.email?.split("@")[0] || "MarkAI 用户";
@@ -70,7 +71,7 @@ export function UserAccountMenu() {
                 className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-gray-700 transition-all hover:bg-gray-100 active:scale-[0.98] dark:text-gray-200 dark:hover:bg-white/[0.07]"
                 onClick={() => {
                   setOpen(false);
-                  setFileManagerOpen(true);
+                  useUIStore.getState().setFileManagerOpen(true);
                 }}
                 type="button"
               >
@@ -92,7 +93,7 @@ export function UserAccountMenu() {
                 className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-gray-700 transition-all hover:bg-gray-100 active:scale-[0.98] dark:text-gray-200 dark:hover:bg-white/[0.07]"
                 onClick={() => {
                   setOpen(false);
-                  setSettingsOpen(true);
+                  useUIStore.getState().setSettingsOpen(true);
                 }}
                 type="button"
               >
@@ -162,7 +163,10 @@ export function UserAccountMenu() {
           />
         </button>
       </div>
-      <FileManagerDrawer onClose={() => setFileManagerOpen(false)} open={fileManagerOpen} />
+      <FileManagerDrawer
+        onClose={() => useUIStore.getState().setFileManagerOpen(false)}
+        open={fileManagerOpen}
+      />
       {profileOpen && (
         <ProfileDialog
           email={user.email}
@@ -173,7 +177,9 @@ export function UserAccountMenu() {
           profile={profile}
         />
       )}
-      {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && (
+        <SettingsDialog onClose={() => useUIStore.getState().setSettingsOpen(false)} />
+      )}
     </>
   );
 }

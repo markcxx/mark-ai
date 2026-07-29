@@ -7,13 +7,16 @@ import type { ChatSession, ConfiguredModel, Message } from "@/lib/chat/types";
 interface SessionState {
   sessions: ChatSession[];
   activeSessionId: string | null;
+  hasMoreSessions: boolean;
   isLoadingSessions: boolean;
+  isLoadingMoreSessions: boolean;
   isLoadingActiveSession: boolean;
   loadingSessionIds: string[];
 }
 
 interface SessionActions {
   loadSessions: () => Promise<void>;
+  loadMoreSessions: () => Promise<void>;
   loadSession: (
     sessionId: string,
     options?: { history?: "push" | "replace" | "none" },
@@ -62,19 +65,35 @@ const navigateToNewChat = (history: "push" | "replace" | "none" = "push") => {
 let activeSessionLoadController: AbortController | null = null;
 let activeSessionLoadRequest = 0;
 let sessionsLoadPromise: Promise<void> | null = null;
+let nextSessionsCursor: string | null = null;
+let sessionsPageGeneration = 0;
+let sessionsLoadMoreController: AbortController | null = null;
+
+const compareSessions = (a: ChatSession, b: ChatSession) =>
+  Number(Boolean(b.favorite)) - Number(Boolean(a.favorite)) ||
+  b.updatedAt - a.updatedAt ||
+  b.id.localeCompare(a.id);
+
+const mergeSessionPages = (current: ChatSession[], next: ChatSession[]) => {
+  const merged = new Map(current.map((session) => [session.id, session]));
+  next.forEach((session) => merged.set(session.id, session));
+  return [...merged.values()].sort(compareSessions);
+};
 
 export const useSessionStore = create<SessionStore>()(
   subscribeWithSelector((set, get) => ({
     sessions: [],
     activeSessionId: null,
+    hasMoreSessions: true,
     isLoadingSessions: true,
+    isLoadingMoreSessions: false,
     isLoadingActiveSession: false,
     loadingSessionIds: [],
 
     upsertSession: (session) =>
       set((s) => ({
         sessions: [session, ...s.sessions.filter((item) => item.id !== session.id)].sort(
-          (a, b) => b.updatedAt - a.updatedAt,
+          compareSessions,
         ),
       })),
 
@@ -99,10 +118,13 @@ export const useSessionStore = create<SessionStore>()(
     loadSessions: async () => {
       if (sessionsLoadPromise) return sessionsLoadPromise;
 
-      set({ isLoadingSessions: true });
+      const generation = ++sessionsPageGeneration;
+      sessionsLoadMoreController?.abort();
+      sessionsLoadMoreController = null;
+      set({ isLoadingMoreSessions: false, isLoadingSessions: true });
       sessionsLoadPromise = (async () => {
         try {
-          const response = await fetch("/api/sessions", { cache: "no-store" });
+          const response = await fetch("/api/sessions?limit=30", { cache: "no-store" });
           if (response.status === 401) {
             const callbackUrl = `${window.location.pathname}${window.location.search}`;
             window.location.replace(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
@@ -111,8 +133,10 @@ export const useSessionStore = create<SessionStore>()(
           if (!response.ok) throw new Error("加载历史会话失败");
 
           const data = await response.json();
+          if (generation !== sessionsPageGeneration) return;
           const nextSessions: ChatSession[] = Array.isArray(data.sessions) ? data.sessions : [];
-          set({ sessions: nextSessions });
+          nextSessionsCursor = typeof data.nextCursor === "string" ? data.nextCursor : null;
+          set({ hasMoreSessions: Boolean(nextSessionsCursor), sessions: nextSessions });
         } catch (error) {
           console.error("Sessions list error:", error);
           toast.error("加载历史会话失败");
@@ -123,6 +147,42 @@ export const useSessionStore = create<SessionStore>()(
       })();
 
       return sessionsLoadPromise;
+    },
+
+    loadMoreSessions: async () => {
+      const { hasMoreSessions, isLoadingMoreSessions } = get();
+      if (!hasMoreSessions || isLoadingMoreSessions || !nextSessionsCursor) return;
+
+      set({ isLoadingMoreSessions: true });
+      const generation = sessionsPageGeneration;
+      const cursor = nextSessionsCursor;
+      const controller = new AbortController();
+      sessionsLoadMoreController = controller;
+      try {
+        const params = new URLSearchParams({ cursor, limit: "30" });
+        const response = await fetch(`/api/sessions?${params}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("加载更多历史会话失败");
+        const data = await response.json();
+        if (controller.signal.aborted || generation !== sessionsPageGeneration) return;
+        const nextSessions: ChatSession[] = Array.isArray(data.sessions) ? data.sessions : [];
+        nextSessionsCursor = typeof data.nextCursor === "string" ? data.nextCursor : null;
+        set((state) => ({
+          hasMoreSessions: Boolean(nextSessionsCursor),
+          sessions: mergeSessionPages(state.sessions, nextSessions),
+        }));
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        console.error("More sessions load error:", error);
+        toast.error("加载更多历史会话失败");
+      } finally {
+        if (sessionsLoadMoreController === controller) {
+          sessionsLoadMoreController = null;
+          set({ isLoadingMoreSessions: false });
+        }
+      }
     },
 
     loadSession: async (sessionId, options = {}) => {

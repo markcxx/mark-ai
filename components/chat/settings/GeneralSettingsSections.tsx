@@ -274,6 +274,23 @@ export function ChatSettings() {
           value={general.sendShortcut}
         />
       </SettingRow>
+      <SettingRow description="Windows 和 Linux 使用 Ctrl，macOS 使用 Cmd" title="命令中心快捷键">
+        <AppSelect
+          onChange={(value) => {
+            if (typeof value === "string") {
+              update({
+                commandCenterShortcut: value as typeof general.commandCenterShortcut,
+              });
+            }
+          }}
+          options={[
+            { label: "Ctrl / Cmd + K", value: "mod-k" },
+            { label: "Ctrl / Cmd + Shift + K", value: "mod-shift-k" },
+            { label: "Ctrl / Cmd + /", value: "mod-slash" },
+          ]}
+          value={general.commandCenterShortcut}
+        />
+      </SettingRow>
       <SettingRow title="默认宽屏对话">
         <ToggleSwitch
           checked={general.wideChatMode}

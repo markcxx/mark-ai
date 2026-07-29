@@ -22,6 +22,7 @@ type PresignResponse = {
 
 const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
   csv: "text/csv",
+  doc: "application/msword",
   docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   gif: "image/gif",
   jpeg: "image/jpeg",
@@ -55,9 +56,8 @@ const responseError = (data: unknown, fallback: string) => {
 };
 
 export const resolveFileContentType = (file: File) => {
-  if (file.type) return file.type;
   const extension = file.name.split(".").pop()?.toLowerCase() || "";
-  return CONTENT_TYPE_BY_EXTENSION[extension] || "application/octet-stream";
+  return CONTENT_TYPE_BY_EXTENSION[extension] || file.type || "application/octet-stream";
 };
 
 export async function uploadFile(

@@ -5,6 +5,18 @@ export type MessageWriteOptions = {
   position?: number;
 };
 
+export type SessionListCursor = {
+  favorite: boolean;
+  id: string;
+  updatedAt: number;
+};
+
+export type SessionListOptions = {
+  cursor?: SessionListCursor;
+  limit?: number;
+  query?: string;
+};
+
 export class ChatRevisionConflictError extends Error {
   constructor(public readonly currentRevision: number) {
     super("Chat session revision conflict");
@@ -13,7 +25,10 @@ export class ChatRevisionConflictError extends Error {
 }
 
 export interface StorageAdapter {
-  listChatSessions(userId?: string): ChatSession[] | Promise<ChatSession[]>;
+  listChatSessions(
+    userId?: string,
+    options?: SessionListOptions,
+  ): ChatSession[] | Promise<ChatSession[]>;
   createChatSession(params: {
     initialMessage?: string;
     model?: string;

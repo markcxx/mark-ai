@@ -1,13 +1,6 @@
-import {
-  Download,
-  Eye,
-  FileImage,
-  FileSpreadsheet,
-  FileText,
-  Presentation,
-  Trash2,
-} from "lucide-react";
+import { Download, Eye, Trash2 } from "lucide-react";
 import { isFilePreviewable } from "../FilePreviewDialog";
+import { FileTypeIcon } from "./FileTypeIcon";
 
 export type ManagedFile = {
   contentType: string;
@@ -32,21 +25,6 @@ const formatDate = (value: string) =>
     month: "short",
     year: "numeric",
   }).format(new Date(value));
-
-function FileTypeIcon({ contentType, name }: Pick<ManagedFile, "contentType" | "name">) {
-  const className = "h-5 w-5";
-
-  if (contentType.startsWith("image/")) {
-    return <FileImage className={`${className} text-blue-600 dark:text-blue-400`} />;
-  }
-  if (contentType.includes("spreadsheet") || name.toLowerCase().endsWith(".csv")) {
-    return <FileSpreadsheet className={`${className} text-emerald-600 dark:text-emerald-400`} />;
-  }
-  if (contentType.includes("presentation")) {
-    return <Presentation className={`${className} text-amber-600 dark:text-amber-400`} />;
-  }
-  return <FileText className={`${className} text-gray-600 dark:text-gray-300`} />;
-}
 
 export function ManagedFileRow({
   file,

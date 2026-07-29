@@ -9,10 +9,9 @@ export const useChatAttachments = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [attachmentUploading, setAttachmentUploading] = useState(false);
 
-  const handleAttachmentFiles = async (event: ChangeEvent<HTMLInputElement>) => {
+  const uploadAttachmentFiles = async (incomingFiles: File[] | FileList) => {
     const slots = Math.max(0, 4 - useChatStore.getState().pendingAttachments.length);
-    const files = Array.from(event.target.files || []).slice(0, slots);
-    event.target.value = "";
+    const files = Array.from(incomingFiles).slice(0, slots);
     if (files.length === 0) return;
 
     setAttachmentUploading(true);
@@ -29,6 +28,12 @@ export const useChatAttachments = () => {
     }
   };
 
+  const handleAttachmentFiles = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = "";
+    await uploadAttachmentFiles(files);
+  };
+
   const removeAttachment = (id: string) => {
     useChatStore.getState().removePendingAttachment(id);
     void fetch(`/api/files/${id}`, { method: "DELETE" });
@@ -39,5 +44,6 @@ export const useChatAttachments = () => {
     fileInputRef,
     handleAttachmentFiles,
     removeAttachment,
+    uploadAttachmentFiles,
   };
 };

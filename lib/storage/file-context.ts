@@ -4,6 +4,7 @@ import type { ChatMessage, ModelImageInput } from "@/lib/chat/server/types";
 import { getStoredFileBytes, getStoredFilesByIds, type StoredFileRecord } from "./file-storage";
 import { extractPdfContent } from "./pdf";
 import { extractSpreadsheetContent } from "./spreadsheet";
+import { extractLegacyWordText } from "./word";
 
 const MAX_FILE_CONTEXT_CHARS = 120_000;
 const MAX_TOTAL_CONTEXT_CHARS = 180_000;
@@ -41,7 +42,9 @@ const extractFileContent = async (file: StoredFileRecord) => {
   const extension = extensionOf(file.originalName);
   let content = "";
 
-  if (extension === "docx") {
+  if (extension === "doc") {
+    content = await extractLegacyWordText(bytes);
+  } else if (extension === "docx") {
     const result = await mammoth.extractRawText({ buffer: Buffer.from(bytes) });
     content = result.value;
   } else if (extension === "xlsx") {

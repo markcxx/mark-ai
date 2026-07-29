@@ -14,6 +14,7 @@ import {
 import { getModelKey } from "@/lib/chat/helpers";
 import { useChatAttachments } from "@/hooks/use-chat-attachments";
 import { useConversationScroll } from "@/hooks/use-conversation-scroll";
+import { usePreviewResize } from "@/hooks/use-preview-resize";
 import { useSidebarResize } from "@/hooks/use-sidebar-resize";
 import { PRIMARY_COLOR_VALUES } from "@/lib/settings";
 import { cn } from "@/lib/utils";
@@ -26,6 +27,7 @@ import { PluginCenterDrawer } from "@/components/tools/PluginCenterDrawer";
 
 import { ChatInput } from "./ChatInput";
 import { ChatMiniMap } from "./ChatMiniMap";
+import { CommandCenter } from "./CommandCenter";
 import { ExportDialog, type ExportMode } from "./ExportDialog";
 import { HtmlPreviewContext } from "./HtmlPreviewContext";
 import { HtmlPreviewPanel } from "./HtmlPreviewPanel";
@@ -84,6 +86,8 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   const isSidebarOpen = useUIStore((s) => s.isSidebarOpen);
   const sidebarWidth = useUIStore((s) => s.sidebarWidth);
   const isResizingSidebar = useUIStore((s) => s.isResizingSidebar);
+  const isResizingPreview = useUIStore((s) => s.isResizingPreview);
+  const previewWidth = useUIStore((s) => s.previewWidth);
   const openMenuMessageId = useUIStore((s) => s.openMenuMessageId);
   const collapsedMessageIds = useUIStore((s) => s.collapsedMessageIds);
   const multiSelectMode = useUIStore((s) => s.multiSelectMode);
@@ -100,7 +104,9 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   // Session Store
   const sessions = useSessionStore((s) => s.sessions);
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
+  const hasMoreSessions = useSessionStore((s) => s.hasMoreSessions);
   const isLoadingSessions = useSessionStore((s) => s.isLoadingSessions);
+  const isLoadingMoreSessions = useSessionStore((s) => s.isLoadingMoreSessions);
   const isLoadingActiveSession = useSessionStore((s) => s.isLoadingActiveSession);
   const loadingSessionIds = useSessionStore((s) => s.loadingSessionIds);
 
@@ -112,6 +118,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   const editingMessageId = useChatStore((s) => s.editingMessageId);
   const editingContent = useChatStore((s) => s.editingContent);
   const pendingAttachments = useChatStore((s) => s.pendingAttachments);
+  const queuedMessage = useChatStore((s) => s.queuedMessage);
 
   const {
     activeMessageId: activeMiniMapMessageId,
@@ -121,17 +128,25 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
     resetScrollIntent,
     scrollToBottom,
   } = useConversationScroll(generalSettings.autoScroll);
-  const { attachmentUploading, fileInputRef, handleAttachmentFiles, removeAttachment } =
-    useChatAttachments();
+  const {
+    attachmentUploading,
+    fileInputRef,
+    handleAttachmentFiles,
+    removeAttachment,
+    uploadAttachmentFiles,
+  } = useChatAttachments();
   const handleSidebarResizePointerDown = useSidebarResize(sidebarWidth);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const splitPanelRef = useRef<HTMLDivElement>(null);
+  const dragDepthRef = useRef(0);
   const [selectionLayoutMode, setSelectionLayoutMode] = useState(false);
   const [activeHtmlPreview, setActiveHtmlPreview] = useState<HtmlPreviewPayload | null>(null);
   const [htmlPreviewFullscreen, setHtmlPreviewFullscreen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exportDialogMode, setExportDialogMode] = useState<ExportMode>("image");
+  const [attachmentDragActive, setAttachmentDragActive] = useState(false);
 
   useEffect(() => {
     const guestDraft = window.localStorage.getItem("markai:guest-draft")?.trim();
@@ -198,6 +213,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
     useUIStore.getState().setWebSearchEnabled(generalSettings.defaultWebSearch);
     useUIStore.getState().setWideChatMode(generalSettings.wideChatMode);
     useUIStore.getState().setSidebarWidth(generalSettings.sidebarWidth);
+    useUIStore.getState().setPreviewWidth(generalSettings.previewWidth);
   }, [generalSettings, setTheme, settingsLoaded]);
 
   // Auto-scroll on new messages
@@ -328,6 +344,24 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [multiSelectMode]);
 
+  useEffect(() => {
+    const handleCommandCenterShortcut = (event: KeyboardEvent) => {
+      const mod = event.metaKey || event.ctrlKey;
+      const shortcut = generalSettings.commandCenterShortcut;
+      const matches =
+        mod &&
+        ((shortcut === "mod-k" && !event.shiftKey && event.key.toLowerCase() === "k") ||
+          (shortcut === "mod-shift-k" && event.shiftKey && event.key.toLowerCase() === "k") ||
+          (shortcut === "mod-slash" && !event.shiftKey && event.key === "/"));
+      if (!matches) return;
+      event.preventDefault();
+      const ui = useUIStore.getState();
+      ui.setCommandCenterOpen(!ui.commandCenterOpen);
+    };
+    window.addEventListener("keydown", handleCommandCenterShortcut);
+    return () => window.removeEventListener("keydown", handleCommandCenterShortcut);
+  }, [generalSettings.commandCenterShortcut]);
+
   // Keep the full-width selection layout briefly after exit so the row can animate closed.
   useEffect(() => {
     if (multiSelectMode) return;
@@ -373,8 +407,20 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
     }
   };
 
+  const handleAttachmentPaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const clipboardFiles = Array.from(event.clipboardData.files);
+    const itemFiles = Array.from(event.clipboardData.items)
+      .filter((item) => item.kind === "file")
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => Boolean(file));
+    const files = clipboardFiles.length > 0 ? clipboardFiles : itemFiles;
+    if (files.length === 0) return;
+    event.preventDefault();
+    void uploadAttachmentFiles(files);
+  };
+
   const handleSend = () => {
-    if (isLoading) {
+    if (isLoading && !input.trim() && pendingAttachments.length === 0) {
       useChatStore.getState().abortStreaming();
       return;
     }
@@ -410,6 +456,11 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
     setHtmlPreviewFullscreen(false);
     if (!isMobileViewport) useUIStore.getState().setSidebarOpen(true);
   }, [isMobileViewport]);
+  const handlePreviewResizePointerDown = usePreviewResize(
+    splitPanelRef,
+    previewWidth,
+    closeHtmlPreview,
+  );
 
   // PLACEHOLDER_RENDER
 
@@ -417,7 +468,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
     <div
       className={cn(
         "flex h-dvh w-screen overflow-hidden bg-[var(--chat-app-bg)] p-0 font-sans text-gray-900 antialiased dark:text-gray-100 md:p-2",
-        isResizingSidebar && "cursor-col-resize select-none",
+        (isResizingSidebar || isResizingPreview) && "cursor-col-resize select-none",
       )}
     >
       <Toaster
@@ -433,7 +484,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
         }}
       />
       <input
-        accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.csv,.docx,.xlsx,.pptx"
+        accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.csv,.doc,.docx,.xlsx,.pptx"
         className="hidden"
         multiple
         onChange={handleAttachmentFiles}
@@ -443,12 +494,15 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
 
       <Sidebar
         activeSessionId={activeSessionId}
+        hasMoreSessions={hasMoreSessions}
         isOpen={isSidebarOpen}
         isResizing={isResizingSidebar}
         isLoadingSessions={isLoadingSessions}
+        isLoadingMoreSessions={isLoadingMoreSessions}
         loadingSessionIds={loadingSessionIds}
         onClose={() => useUIStore.getState().setSidebarOpen(false)}
         onDeleteSession={(id) => void deleteChatSession(id)}
+        onLoadMoreSessions={() => void useSessionStore.getState().loadMoreSessions()}
         onNewChat={() => {
           handleNewChat();
           if (isMobileViewport) useUIStore.getState().setSidebarOpen(false);
@@ -487,18 +541,20 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
       >
         <div
           className={cn(
-            "grid min-w-0 flex-1 transition-[grid-template-columns,gap,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] md:duration-300 md:ease-out",
+            "grid min-w-0 flex-1 duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] md:duration-300 md:ease-out",
+            !isResizingPreview && "transition-[grid-template-columns,gap,transform]",
             activeHtmlPreview && (htmlPreviewFullscreen || isMobileViewport) ? "gap-0" : "gap-2",
           )}
           style={{
             gridTemplateColumns: activeHtmlPreview
               ? htmlPreviewFullscreen || isMobileViewport
                 ? "minmax(0, 0fr) minmax(0, 1fr)"
-                : "minmax(0, 1fr) minmax(360px, 48%)"
+                : `minmax(0, 1fr) minmax(360px, ${previewWidth}%)`
               : "minmax(0, 1fr)",
             transform:
               isMobileViewport && isSidebarOpen ? `translateX(${mobileSidebarOffset})` : undefined,
           }}
+          ref={splitPanelRef}
         >
           <main
             className={cn(
@@ -507,7 +563,34 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                 ? "pointer-events-none border-transparent opacity-0"
                 : "opacity-100",
             )}
+            onDragEnter={(event) => {
+              if (!event.dataTransfer.types.includes("Files")) return;
+              dragDepthRef.current += 1;
+              setAttachmentDragActive(true);
+            }}
+            onDragLeave={(event) => {
+              if (!event.dataTransfer.types.includes("Files")) return;
+              dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+              if (dragDepthRef.current === 0) setAttachmentDragActive(false);
+            }}
+            onDragOver={(event) => {
+              if (!event.dataTransfer.types.includes("Files")) return;
+              event.preventDefault();
+              event.dataTransfer.dropEffect = "copy";
+            }}
+            onDrop={(event) => {
+              if (!event.dataTransfer.files.length) return;
+              event.preventDefault();
+              dragDepthRef.current = 0;
+              setAttachmentDragActive(false);
+              void uploadAttachmentFiles(event.dataTransfer.files);
+            }}
           >
+            {attachmentDragActive && (
+              <div className="pointer-events-none absolute inset-3 z-50 flex items-center justify-center rounded-xl border-2 border-dashed border-primary/60 bg-[var(--chat-panel-bg)]/90 text-sm font-medium text-gray-700 backdrop-blur-sm dark:text-gray-200">
+                松开即可添加附件
+              </div>
+            )}
             {isSidebarOpen && (
               <div
                 aria-label="调整侧栏宽度"
@@ -517,8 +600,8 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
               >
                 <div
                   className={cn(
-                    "absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-transparent transition-colors duration-150 group-hover:bg-gray-300 dark:group-hover:bg-gray-600",
-                    isResizingSidebar && "bg-primary/50",
+                    "absolute inset-y-0 left-1/2 w-0.5 bg-transparent transition-colors duration-150 group-hover:bg-primary/70",
+                    isResizingSidebar && "bg-primary",
                   )}
                 />
               </div>
@@ -601,11 +684,14 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                     modelSearchKeyword={modelSearchKeyword}
                     messages={messages}
                     onAttachment={() => fileInputRef.current?.click()}
+                    onCancelQueuedMessage={() => useChatStore.getState().cancelQueuedMessage()}
                     onInput={handleInput}
                     onKeyDown={handleKeyDown}
+                    onPaste={handleAttachmentPaste}
                     onMic={() => toast(NOT_IMPLEMENTED_TOAST)}
                     onRemoveAttachment={removeAttachment}
                     onSend={handleSend}
+                    onSendQueuedMessageNow={() => useChatStore.getState().sendQueuedMessageNow()}
                     onToggleWebSearch={() => {
                       const enabled = !useUIStore.getState().webSearchEnabled;
                       useUIStore.getState().setWebSearchEnabled(enabled);
@@ -615,6 +701,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                     }}
                     placement="center"
                     providerNames={providerNames}
+                    queuedMessage={queuedMessage}
                     selectedModel={selectedModel}
                     selectedModelKey={selectedModelKey}
                     setModelSearchKeyword={(kw) => useUIStore.getState().setModelSearchKeyword(kw)}
@@ -726,11 +813,14 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                 modelSearchKeyword={modelSearchKeyword}
                 messages={messages}
                 onAttachment={() => fileInputRef.current?.click()}
+                onCancelQueuedMessage={() => useChatStore.getState().cancelQueuedMessage()}
                 onInput={handleInput}
                 onKeyDown={handleKeyDown}
+                onPaste={handleAttachmentPaste}
                 onMic={() => toast(NOT_IMPLEMENTED_TOAST)}
                 onRemoveAttachment={removeAttachment}
                 onSend={handleSend}
+                onSendQueuedMessageNow={() => useChatStore.getState().sendQueuedMessageNow()}
                 onToggleWebSearch={() => {
                   const enabled = !useUIStore.getState().webSearchEnabled;
                   useUIStore.getState().setWebSearchEnabled(enabled);
@@ -739,6 +829,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                   });
                 }}
                 providerNames={providerNames}
+                queuedMessage={queuedMessage}
                 selectedModel={selectedModel}
                 selectedModelKey={selectedModelKey}
                 setModelSearchKeyword={(kw) => useUIStore.getState().setModelSearchKeyword(kw)}
@@ -754,7 +845,9 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
               fullscreen={htmlPreviewFullscreen}
               onClose={closeHtmlPreview}
               onFullscreenChange={setHtmlPreviewFullscreen}
+              onResizePointerDown={handlePreviewResizePointerDown}
               preview={activeHtmlPreview}
+              resizing={isResizingPreview}
             />
           )}
         </div>
@@ -772,6 +865,17 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
       <PluginCenterDrawer
         onClose={() => useUIStore.getState().setPluginCenterOpen(false)}
         open={pluginCenterOpen}
+      />
+      <CommandCenter
+        onFocusComposer={() =>
+          window.requestAnimationFrame(() => {
+            textareaRef.current?.focus();
+          })
+        }
+        onNewChat={() => {
+          handleNewChat();
+          if (isMobileViewport) useUIStore.getState().setSidebarOpen(false);
+        }}
       />
     </div>
   );

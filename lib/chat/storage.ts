@@ -1,6 +1,6 @@
 import { isCloudMode } from "@/lib/env";
 
-import type { MessageWriteOptions, StorageAdapter } from "./storage-adapter";
+import type { MessageWriteOptions, SessionListOptions, StorageAdapter } from "./storage-adapter";
 import type { Message } from "./types";
 
 let _storage: StorageAdapter | undefined;
@@ -19,7 +19,8 @@ export const getStorage = (): StorageAdapter => {
   return _storage!;
 };
 
-export const listChatSessions = (userId?: string) => getStorage().listChatSessions(userId);
+export const listChatSessions = (userId?: string, options?: SessionListOptions) =>
+  getStorage().listChatSessions(userId, options);
 
 export const createChatSession = (params: {
   initialMessage?: string;

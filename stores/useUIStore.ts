@@ -11,6 +11,8 @@ interface UIState {
   isSidebarOpen: boolean;
   sidebarWidth: number;
   isResizingSidebar: boolean;
+  isResizingPreview: boolean;
+  previewWidth: number;
   openMenuMessageId: string | null;
   collapsedMessageIds: string[];
   multiSelectMode: boolean;
@@ -24,6 +26,9 @@ interface UIState {
   selectedModelKey: string;
   webSearchEnabled: boolean;
   pluginCenterOpen: boolean;
+  commandCenterOpen: boolean;
+  fileManagerOpen: boolean;
+  settingsOpen: boolean;
 }
 
 interface UIActions {
@@ -33,6 +38,8 @@ interface UIActions {
   setSidebarOpen: (open: boolean) => void;
   setSidebarWidth: (width: number) => void;
   setIsResizingSidebar: (resizing: boolean) => void;
+  setIsResizingPreview: (resizing: boolean) => void;
+  setPreviewWidth: (width: number) => void;
   setOpenMenuMessageId: (id: string | null) => void;
   toggleCollapseMessage: (id: string) => void;
   enableMultiSelect: (id: string) => void;
@@ -48,11 +55,14 @@ interface UIActions {
   setWebSearchEnabled: (enabled: boolean) => void;
   toggleWebSearch: () => void;
   setPluginCenterOpen: (open: boolean) => void;
+  setCommandCenterOpen: (open: boolean) => void;
+  setFileManagerOpen: (open: boolean) => void;
+  setSettingsOpen: (open: boolean) => void;
 }
 
 export type UIStore = UIState & UIActions;
 
-const SIDEBAR_MIN_WIDTH = 220;
+export const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 380;
 const SELECTED_MODEL_STORAGE_KEY = "markai:selected-model";
 
@@ -67,6 +77,8 @@ export const useUIStore = create<UIStore>()(
     isSidebarOpen: true,
     sidebarWidth: 260,
     isResizingSidebar: false,
+    isResizingPreview: false,
+    previewWidth: 48,
     openMenuMessageId: null,
     collapsedMessageIds: [],
     multiSelectMode: false,
@@ -80,6 +92,9 @@ export const useUIStore = create<UIStore>()(
     selectedModelKey: "",
     webSearchEnabled: false,
     pluginCenterOpen: false,
+    commandCenterOpen: false,
+    fileManagerOpen: false,
+    settingsOpen: false,
 
     setAppReady: (ready) => set({ isAppReady: ready }),
     setBootProgress: (progress, message) =>
@@ -91,6 +106,8 @@ export const useUIStore = create<UIStore>()(
     setSidebarOpen: (open) => set({ isSidebarOpen: open }),
     setSidebarWidth: (width) => set({ sidebarWidth: clampSidebarWidth(width) }),
     setIsResizingSidebar: (resizing) => set({ isResizingSidebar: resizing }),
+    setIsResizingPreview: (resizing) => set({ isResizingPreview: resizing }),
+    setPreviewWidth: (width) => set({ previewWidth: Math.min(70, Math.max(30, width)) }),
     setOpenMenuMessageId: (id) => set({ openMenuMessageId: id }),
 
     toggleCollapseMessage: (id) =>
@@ -239,5 +256,8 @@ export const useUIStore = create<UIStore>()(
     setWebSearchEnabled: (enabled) => set({ webSearchEnabled: enabled }),
     toggleWebSearch: () => set((s) => ({ webSearchEnabled: !s.webSearchEnabled })),
     setPluginCenterOpen: (open) => set({ pluginCenterOpen: open }),
+    setCommandCenterOpen: (open) => set({ commandCenterOpen: open }),
+    setFileManagerOpen: (open) => set({ fileManagerOpen: open }),
+    setSettingsOpen: (open) => set({ settingsOpen: open }),
   })),
 );

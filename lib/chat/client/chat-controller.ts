@@ -7,10 +7,17 @@ const resetTransientChatUI = () => {
   useUIStore.getState().setOpenMenuMessageId(null);
 };
 
+const cancelQueuedMessage = () => {
+  if (useChatStore.getState().queuedMessage) {
+    useChatStore.getState().cancelQueuedMessage();
+  }
+};
+
 export const loadChatSession = async (
   sessionId: string,
   options: { history?: "none" | "push" | "replace" } = {},
 ) => {
+  cancelQueuedMessage();
   useChatStore.getState().abortStreaming();
   const loadedMessages = await useSessionStore.getState().loadSession(sessionId, options);
   if (!loadedMessages) return false;
@@ -22,6 +29,7 @@ export const loadChatSession = async (
 };
 
 export const startNewChat = (history: "none" | "push" | "replace" = "push") => {
+  cancelQueuedMessage();
   useChatStore.getState().reset();
   useSessionStore.getState().resetActiveSession();
   resetTransientChatUI();
@@ -32,6 +40,7 @@ export const deleteChatSession = async (sessionId: string) => {
   const deletedActiveSession = await useSessionStore.getState().deleteSession(sessionId);
   if (!deletedActiveSession) return;
 
+  cancelQueuedMessage();
   useChatStore.getState().reset();
   resetTransientChatUI();
 };

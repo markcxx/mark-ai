@@ -21,6 +21,7 @@ export type CodeTheme =
 export type CodeColorMode = "auto" | "dark" | "light";
 export type ThinkingDisplay = "auto" | "collapsed" | "expanded";
 export type SendShortcut = "enter" | "mod-enter";
+export type CommandCenterShortcut = "mod-k" | "mod-shift-k" | "mod-slash";
 
 export type GeneralSettings = {
   autoScroll: boolean;
@@ -30,9 +31,11 @@ export type GeneralSettings = {
   codeLineNumbers: boolean;
   codeTheme: CodeTheme;
   codeWrap: boolean;
+  commandCenterShortcut: CommandCenterShortcut;
   defaultWebSearch: boolean;
   density: "compact" | "comfortable" | "spacious";
   overwriteRegeneratedResponse: boolean;
+  previewWidth: number;
   primaryColor: PrimaryColor;
   reduceMotion: boolean;
   responseAnimation: "none" | "fade" | "smooth";
@@ -86,9 +89,11 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
   codeLineNumbers: true,
   codeTheme: "one",
   codeWrap: false,
+  commandCenterShortcut: "mod-k",
   defaultWebSearch: false,
   density: "comfortable",
   overwriteRegeneratedResponse: true,
+  previewWidth: 48,
   primaryColor: "black",
   reduceMotion: false,
   responseAnimation: "fade",
@@ -165,12 +170,18 @@ export const sanitizeGeneralSettings = (
       fallback.codeTheme,
     ),
     codeWrap: booleanValue(input.codeWrap, fallback.codeWrap),
+    commandCenterShortcut: stringOption(
+      input.commandCenterShortcut,
+      ["mod-k", "mod-shift-k", "mod-slash"],
+      fallback.commandCenterShortcut,
+    ),
     defaultWebSearch: booleanValue(input.defaultWebSearch, fallback.defaultWebSearch),
     density: stringOption(input.density, ["compact", "comfortable", "spacious"], fallback.density),
     overwriteRegeneratedResponse: booleanValue(
       input.overwriteRegeneratedResponse,
       fallback.overwriteRegeneratedResponse,
     ),
+    previewWidth: numberInRange(input.previewWidth, fallback.previewWidth, 30, 70),
     primaryColor: stringOption(
       input.primaryColor,
       ["black", "blue", "indigo", "violet", "magenta", "red", "orange", "green", "cyan"],
