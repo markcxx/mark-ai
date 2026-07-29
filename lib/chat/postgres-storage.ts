@@ -153,7 +153,14 @@ export class PostgresStorage implements StorageAdapter {
     const conditions = [eq(chatSessions.userId, userId)];
     const query = options.query?.trim();
     if (query) {
-      conditions.push(sql`strpos(lower(${chatSessions.title}), lower(${query})) > 0`);
+      conditions.push(sql`(
+        strpos(lower(${chatSessions.title}), lower(${query})) > 0
+        OR EXISTS (
+          SELECT 1 FROM chat_messages search_message
+          WHERE search_message.session_id = ${chatSessions.id}
+            AND strpos(lower(search_message.content), lower(${query})) > 0
+        )
+      )`);
     }
     if (options.cursor) {
       const updatedAt = new Date(options.cursor.updatedAt);
@@ -172,6 +179,20 @@ export class PostgresStorage implements StorageAdapter {
       .select({
         session: chatSessions,
         messageCount: count(chatMessages.id),
+        searchSnippet: query
+          ? sql<string | null>`(
+              SELECT substring(
+                search_message.content
+                FROM greatest(strpos(lower(search_message.content), lower(${query})) - 60, 1)
+                FOR 180
+              )
+              FROM chat_messages search_message
+              WHERE search_message.session_id = ${chatSessions.id}
+                AND strpos(lower(search_message.content), lower(${query})) > 0
+              ORDER BY search_message.position ASC
+              LIMIT 1
+            )`
+          : sql<null>`null`,
       })
       .from(chatSessions)
       .leftJoin(chatMessages, eq(chatMessages.sessionId, chatSessions.id))
@@ -184,7 +205,10 @@ export class PostgresStorage implements StorageAdapter {
       )
       .limit(Math.max(1, Math.min(100, options.limit || 30)));
 
-    return rows.map((r) => toSession(r.session, r.messageCount));
+    return rows.map((r) => ({
+      ...toSession(r.session, r.messageCount),
+      searchSnippet: r.searchSnippet || undefined,
+    }));
   }
 
   async createChatSession({

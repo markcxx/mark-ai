@@ -3,7 +3,9 @@
 import type { RefObject } from "react";
 import { useState } from "react";
 import {
+  ArrowDown,
   ChevronRight,
+  CornerDownRight,
   Globe,
   LoaderCircle,
   Mic,
@@ -13,7 +15,13 @@ import {
   X,
 } from "lucide-react";
 
-import type { ConfiguredModel, FileAttachment, Message, QueuedChatMessage } from "@/lib/chat/types";
+import type {
+  ConfiguredModel,
+  FileAttachment,
+  Message,
+  QueuedChatMessage,
+  QuotedSelection,
+} from "@/lib/chat/types";
 import { getModelDisplayName } from "@/lib/chat/helpers";
 import { cn } from "@/lib/utils";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
@@ -40,13 +48,17 @@ export function ChatInput({
   onInput,
   onKeyDown,
   onPaste,
+  onClearQuote,
+  onScrollToBottom,
   onMic,
   onCancelQueuedMessage,
   onSendQueuedMessageNow,
   onSend,
   placement = "bottom",
   providerNames,
+  pendingQuote,
   queuedMessage,
+  showScrollToBottom = false,
   selectedModel,
   selectedModelKey,
   setModelSearchKeyword,
@@ -68,13 +80,17 @@ export function ChatInput({
   onInput: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onPaste: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void;
+  onClearQuote: () => void;
+  onScrollToBottom?: () => void;
   onMic: () => void;
   onCancelQueuedMessage: () => void;
   onSendQueuedMessageNow: () => void;
   onSend: () => void;
   placement?: "bottom" | "center";
   providerNames: Record<string, string>;
+  pendingQuote: QuotedSelection | null;
   queuedMessage: QueuedChatMessage | null;
+  showScrollToBottom?: boolean;
   selectedModel?: ConfiguredModel;
   selectedModelKey: string;
   setModelSearchKeyword: (keyword: string) => void;
@@ -109,6 +125,16 @@ export function ChatInput({
             placement === "bottom" ? "pointer-events-auto max-w-[840px]" : "max-w-[760px]",
           )}
         >
+          {placement === "bottom" && showScrollToBottom && onScrollToBottom && (
+            <button
+              className="mx-auto mb-2 flex h-9 items-center gap-1.5 rounded-xl border border-gray-200 bg-[var(--chat-input-bg)] px-3 text-xs font-medium text-gray-600 shadow-[0_6px_18px_rgba(0,0,0,0.08)] transition-colors hover:text-gray-950 dark:border-white/10 dark:text-gray-300 dark:shadow-[0_8px_22px_rgba(0,0,0,0.28)] dark:hover:text-white"
+              onClick={onScrollToBottom}
+              type="button"
+            >
+              <ArrowDown size={14} />
+              回到底部
+            </button>
+          )}
           {queuedMessage && (
             <div className="relative z-10 mx-auto -mb-1 flex h-11 w-[calc(100%-24px)] min-w-0 items-center rounded-xl border border-gray-200 bg-[var(--chat-input-bg)] pl-3 pr-1 text-xs text-gray-500 shadow-[0_6px_18px_rgba(0,0,0,0.07)] dark:border-white/10 dark:text-gray-400 dark:shadow-[0_8px_22px_rgba(0,0,0,0.26)] md:h-10">
               <LoaderCircle className="shrink-0 animate-spin text-primary" size={14} />
@@ -120,6 +146,7 @@ export function ChatInput({
                 {queuedMessage.attachments.length > 0
                   ? ` · ${queuedMessage.attachments.length} 个附件`
                   : ""}
+                {queuedMessage.quote ? " · 含引用" : ""}
               </span>
               <button
                 aria-label="立即发送待发送消息"
@@ -142,6 +169,21 @@ export function ChatInput({
             </div>
           )}
           <div className="relative z-20 flex flex-col rounded-xl border border-gray-200 bg-[var(--chat-input-bg)] shadow-[0_12px_32px_rgba(0,0,0,0.06)] transition-all duration-300 focus-within:border-primary/30 focus-within:ring-2 focus-within:ring-primary/20 dark:border-white/10 dark:shadow-[0_14px_40px_rgba(0,0,0,0.35)] dark:focus-within:border-white/20 dark:focus-within:ring-white/[0.06]">
+            {pendingQuote && (
+              <div className="mx-3 mt-3 flex min-w-0 items-start gap-2 rounded-lg bg-gray-50 px-3 py-2.5 text-xs leading-5 text-gray-500 dark:bg-white/[0.05] dark:text-gray-400 md:mx-4">
+                <CornerDownRight className="mt-0.5 shrink-0 text-gray-400" size={15} />
+                <span className="line-clamp-3 min-w-0 flex-1">{pendingQuote.content}</span>
+                <button
+                  aria-label="移除引用"
+                  className="-mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-800 dark:hover:bg-white/10 dark:hover:text-gray-100"
+                  data-markai-tooltip="移除引用"
+                  onClick={onClearQuote}
+                  type="button"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            )}
             {(attachments.length > 0 || attachmentUploading) && (
               <div className="flex gap-2 overflow-x-auto px-3 pt-3 md:px-4">
                 {attachments.map((file) => {
@@ -273,7 +315,7 @@ export function ChatInput({
                 <span className="hidden sm:block">
                   <ContextWindowIndicator
                     attachments={attachments}
-                    draft={input}
+                    draft={pendingQuote ? `${pendingQuote.content}\n\n${input}` : input}
                     messages={messages}
                     modelId={selectedModel?.id}
                     webSearchEnabled={webSearchEnabled}

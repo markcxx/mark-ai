@@ -3,7 +3,7 @@ import type { StoreApi } from "zustand";
 
 import { getNextThinkingText } from "@/lib/chat/constants";
 import { createSmoothTextController, parseChatStreamLine } from "@/lib/chat/client/streaming";
-import { extractThinkingFromText } from "@/lib/chat/helpers";
+import { extractThinkingFromText, getMessageContentForModel } from "@/lib/chat/helpers";
 import {
   estimateMessageTokens,
   estimateMessagesTokens,
@@ -11,8 +11,18 @@ import {
 } from "@/lib/chat/metrics";
 import type { Message, MessageSegment } from "@/lib/chat/types";
 import { useSettingsStore } from "@/stores/useSettingsStore";
+import { useSessionStore } from "@/stores/useSessionStore";
 
 import type { ChatStore } from "../useChatStore";
+
+const sessionStreamControllers = new Map<string, AbortController>();
+
+export const getSessionStreamController = (sessionId: string | null) =>
+  sessionId ? sessionStreamControllers.get(sessionId) || null : null;
+
+export const abortSessionStream = (sessionId: string) => {
+  sessionStreamControllers.get(sessionId)?.abort();
+};
 
 const getTotalTokens = (inputTokens: number, outputTokens: number, totalTokens?: number) =>
   totalTokens ?? inputTokens + outputTokens;
@@ -35,7 +45,12 @@ export const createStreamAssistantMessage =
     const settings = useSettingsStore.getState().general;
     const responseAnimation = settings.reduceMotion ? "none" : settings.responseAnimation;
     let plainContent = options.initialContent || "";
-    let inputTokens = estimateMessagesTokens(historyMessages);
+    let inputTokens = estimateMessagesTokens(
+      historyMessages.map((message) => ({
+        ...message,
+        content: getMessageContentForModel(message),
+      })),
+    );
     let outputTokens = 0;
     let totalTokens: number | undefined;
     let tokenUsageSource: Message["tokenUsageSource"] = "estimated";
@@ -70,6 +85,12 @@ export const createStreamAssistantMessage =
     };
 
     const controller = new AbortController();
+    const sessionId = options.sessionId;
+    let outcome: "aborted" | "completed" | "failed" = "completed";
+    if (sessionId) {
+      sessionStreamControllers.set(sessionId, controller);
+      useSessionStore.getState().setSessionGenerationStatus(sessionId, "generating");
+    }
     let contentController: ReturnType<typeof createSmoothTextController> | undefined;
     let reasoningController: ReturnType<typeof createSmoothTextController> | undefined;
     set({ abortController: controller });
@@ -86,7 +107,7 @@ export const createStreamAssistantMessage =
         body: JSON.stringify({
           messages: historyMessages.map((m) => ({
             attachments: m.attachments,
-            content: m.content,
+            content: getMessageContentForModel(m),
             role: m.role,
           })),
           model: modelConfig.id,
@@ -120,7 +141,9 @@ export const createStreamAssistantMessage =
           removedContextMessages > 0 ? `${removedContextMessages} 条较早消息` : "",
           contextContentTruncated ? "过长的附件或消息内容" : "",
         ].filter(Boolean);
-        toast(`上下文已自动裁剪：${details.join("、")}`);
+        if (!sessionId || useSessionStore.getState().activeSessionId === sessionId) {
+          toast(`上下文已自动裁剪：${details.join("、")}`);
+        }
       }
 
       const reader = response.body.getReader();
@@ -323,6 +346,7 @@ export const createStreamAssistantMessage =
       };
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
+        outcome = "aborted";
         contentController?.flush();
         reasoningController?.flush();
         finishCurrentReasoning();
@@ -359,9 +383,12 @@ export const createStreamAssistantMessage =
       }
       contentController?.flush();
       reasoningController?.flush();
+      outcome = "failed";
       console.error("Chat error:", error);
       const failureMessage = "生成失败，请稍后重试。";
-      toast.error(failureMessage);
+      if (!sessionId || useSessionStore.getState().activeSessionId === sessionId) {
+        toast.error(failureMessage);
+      }
       set((s) => ({
         messages: s.messages.map((m) =>
           m.id === modelMessageId
@@ -389,6 +416,21 @@ export const createStreamAssistantMessage =
         totalTokens: inputTokens + estimateTextTokens(failureMessage),
       };
     } finally {
+      if (sessionId && sessionStreamControllers.get(sessionId) === controller) {
+        sessionStreamControllers.delete(sessionId);
+        const sessionStore = useSessionStore.getState();
+        if (outcome === "aborted") {
+          sessionStore.setSessionGenerationStatus(sessionId, undefined);
+        } else if (outcome === "failed") {
+          sessionStore.setSessionGenerationStatus(sessionId, "failed");
+        } else if (
+          (sessionStore.sessionNavigationTargetId || sessionStore.activeSessionId) === sessionId
+        ) {
+          sessionStore.setSessionGenerationStatus(sessionId, undefined);
+        } else {
+          sessionStore.setSessionGenerationStatus(sessionId, "unread");
+        }
+      }
       set((s) => ({
         ...(s.abortController === controller ? { isLoading: false, abortController: null } : {}),
         messages: s.messages.map((m) =>

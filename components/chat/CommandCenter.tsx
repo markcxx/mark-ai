@@ -49,6 +49,13 @@ export function CommandCenter({
       },
       {
         icon: Search,
+        id: "search-sessions",
+        keywords: "历史 会话 消息 内容 查找 search",
+        label: "搜索会话",
+        onSelect: () => useUIStore.getState().setSessionSearchOpen(true),
+      },
+      {
+        icon: Search,
         id: "focus-composer",
         keywords: "输入 聚焦 提问 composer",
         label: "聚焦消息输入框",

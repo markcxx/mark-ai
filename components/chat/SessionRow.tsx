@@ -1,7 +1,16 @@
 "use client";
 
 import type { RefObject } from "react";
-import { Copy, Hash, MoreHorizontal, PencilLine, Star, Trash2, Wand2 } from "lucide-react";
+import {
+  CircleAlert,
+  Copy,
+  Hash,
+  MoreHorizontal,
+  PencilLine,
+  Star,
+  Trash2,
+  Wand2,
+} from "lucide-react";
 
 import { DropdownSurface } from "@/components/ui/DropdownSurface";
 import { IconButton } from "@/components/ui/IconButton";
@@ -9,11 +18,13 @@ import { InlineTextEdit } from "@/components/ui/InlineTextEdit";
 import { MenuAction } from "@/components/ui/MenuAction";
 import type { ChatSession } from "@/lib/chat/types";
 import { cn } from "@/lib/utils";
+import type { SessionGenerationStatus } from "@/stores/useSessionStore";
 
 export function SessionRow({
   active,
   editing,
   editingTitle,
+  generationStatus,
   loading,
   menuOpen,
   menuRef,
@@ -32,6 +43,7 @@ export function SessionRow({
   active: boolean;
   editing: boolean;
   editingTitle: string;
+  generationStatus?: SessionGenerationStatus;
   loading: boolean;
   menuOpen: boolean;
   menuRef?: RefObject<HTMLDivElement | null>;
@@ -98,9 +110,18 @@ export function SessionRow({
           </IconButton>
         )}
 
-        {loading ? (
+        {loading || generationStatus === "generating" ? (
           <span className="flex h-7 w-7 shrink-0 items-center justify-center">
             <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
+          </span>
+        ) : generationStatus === "unread" ? (
+          <span
+            aria-label="有新的模型回复"
+            className="mx-[9px] h-2.5 w-2.5 shrink-0 rounded-full bg-primary"
+          />
+        ) : generationStatus === "failed" ? (
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center text-red-500">
+            <CircleAlert aria-label="生成失败" size={15} />
           </span>
         ) : (
           <IconButton
@@ -126,6 +147,11 @@ export function SessionRow({
         <DropdownSurface className="absolute right-1 top-8 min-w-36 rounded-lg border-gray-200 bg-white py-1 text-sm shadow-[0_12px_32px_rgba(0,0,0,0.12)] dark:border-gray-700 dark:bg-gray-800">
           <MenuAction icon={Wand2} label="自动命名" onClick={onAutoRename} />
           <MenuAction icon={PencilLine} label="重命名" onClick={onStartRename} />
+          <MenuAction
+            icon={Star}
+            label={session.favorite ? "取消收藏" : "收藏"}
+            onClick={onToggleFavorite}
+          />
           <MenuAction icon={Copy} label="复制 ID" onClick={onCopyId} />
           <div className="my-1 h-px bg-gray-100 dark:bg-gray-700" />
           <MenuAction danger icon={Trash2} label="删除" onClick={onDelete} />

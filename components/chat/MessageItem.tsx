@@ -17,6 +17,7 @@ import {
   Pause,
   Pencil,
   Play,
+  Quote,
   RotateCw,
   Share2,
   Trash2,
@@ -503,6 +504,7 @@ export function MessageItem({
 
   const editing = editingMessageId === message.id;
   const contextBoundary = message.segments?.find((segment) => segment.type === "context-boundary");
+  const quotedSelection = message.segments?.find((segment) => segment.type === "quote");
   const contentSegments = message.segments?.filter(
     (segment) => segment.type !== "context-boundary",
   );
@@ -538,41 +540,51 @@ export function MessageItem({
             onSave={saveEditingMessage}
           />
         ) : (
-          <div className="flex w-fit max-w-[92%] flex-col gap-3 break-words rounded-2xl rounded-tr-sm bg-[var(--chat-user-bubble-bg)] px-4 py-3 text-left text-[length:var(--chat-font-size)] text-gray-900 shadow-sm dark:text-gray-100 md:max-w-[85%] md:px-5">
-            {message.attachments && message.attachments.length > 0 && !collapsed && (
-              <div className="flex flex-wrap gap-2">
-                {message.attachments.map((file) => (
-                  <button
-                    className="flex min-w-0 max-w-[260px] items-center gap-2 rounded-xl border border-black/[0.06] bg-white/60 px-2.5 py-2 transition-all hover:-translate-y-0.5 hover:bg-white hover:shadow-sm dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/[0.1]"
-                    key={file.id}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setPreviewFile(file);
-                    }}
-                    title={`预览 ${file.name}`}
-                    type="button"
-                  >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-500 dark:bg-blue-500/15 dark:text-blue-300">
-                      <FileText size={16} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-xs font-semibold">{file.name}</span>
-                      <span className="block text-[10px] text-gray-400">
-                        {file.size < 1024 * 1024
-                          ? `${Math.ceil(file.size / 1024)} KB`
-                          : `${(file.size / 1024 / 1024).toFixed(1)} MB`}
-                      </span>
-                    </span>
-                    <Eye className="shrink-0 text-gray-400" size={14} />
-                  </button>
-                ))}
+          <>
+            {quotedSelection?.type === "quote" && (
+              <div className="mb-1 flex max-w-[92%] items-start gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs leading-5 text-gray-400 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-white/[0.06] dark:hover:text-gray-300 md:max-w-[85%]">
+                <Quote className="mt-0.5 shrink-0" size={14} />
+                <span className="line-clamp-2">{quotedSelection.content}</span>
               </div>
             )}
-            <div className="whitespace-pre-wrap">
-              <CollapsibleContent>{collapsed ? "消息已收起" : message.content}</CollapsibleContent>
+            <div className="flex w-fit max-w-[92%] flex-col gap-3 break-words rounded-2xl rounded-tr-sm bg-[var(--chat-user-bubble-bg)] px-4 py-3 text-left text-[length:var(--chat-font-size)] text-gray-900 shadow-sm dark:text-gray-100 md:max-w-[85%] md:px-5">
+              {message.attachments && message.attachments.length > 0 && !collapsed && (
+                <div className="flex flex-wrap gap-2">
+                  {message.attachments.map((file) => (
+                    <button
+                      className="flex min-w-0 max-w-[260px] items-center gap-2 rounded-xl border border-black/[0.06] bg-white/60 px-2.5 py-2 transition-all hover:-translate-y-0.5 hover:bg-white hover:shadow-sm dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/[0.1]"
+                      key={file.id}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setPreviewFile(file);
+                      }}
+                      title={`预览 ${file.name}`}
+                      type="button"
+                    >
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-500 dark:bg-blue-500/15 dark:text-blue-300">
+                        <FileText size={16} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-xs font-semibold">{file.name}</span>
+                        <span className="block text-[10px] text-gray-400">
+                          {file.size < 1024 * 1024
+                            ? `${Math.ceil(file.size / 1024)} KB`
+                            : `${(file.size / 1024 / 1024).toFixed(1)} MB`}
+                        </span>
+                      </span>
+                      <Eye className="shrink-0 text-gray-400" size={14} />
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="whitespace-pre-wrap">
+                <CollapsibleContent>
+                  {collapsed ? "消息已收起" : message.content}
+                </CollapsibleContent>
+              </div>
+              {!collapsed && <MessageTranslation message={message} />}
             </div>
-            {!collapsed && <MessageTranslation message={message} />}
-          </div>
+          </>
         )}
         {!multiSelectMode && (
           <div className="mr-1 mt-2 flex items-center gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
@@ -599,7 +611,7 @@ export function MessageItem({
         )}
       </div>
     ) : (
-      <div className="group group/message relative w-full">
+      <div className="group group/message relative w-full" data-message-id={message.id}>
         <div className="message-header mb-3 flex items-center gap-2.5">
           <ModelAvatar model={message.model} provider={message.provider} />
           <div className="flex min-w-0 flex-col">
@@ -627,7 +639,11 @@ export function MessageItem({
           </div>
         </div>
 
-        <div className="markdown-body ml-10 text-[length:var(--chat-font-size)] leading-relaxed text-gray-900 dark:text-gray-100">
+        <div
+          className="markdown-body ml-10 text-[length:var(--chat-font-size)] leading-relaxed text-gray-900 dark:text-gray-100"
+          data-message-id={message.id}
+          data-selection-quote-source="true"
+        >
           {editing ? (
             <MessageEditor
               content={editingContent}

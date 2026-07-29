@@ -27,6 +27,7 @@ interface UIState {
   webSearchEnabled: boolean;
   pluginCenterOpen: boolean;
   commandCenterOpen: boolean;
+  sessionSearchOpen: boolean;
   fileManagerOpen: boolean;
   settingsOpen: boolean;
 }
@@ -56,6 +57,7 @@ interface UIActions {
   toggleWebSearch: () => void;
   setPluginCenterOpen: (open: boolean) => void;
   setCommandCenterOpen: (open: boolean) => void;
+  setSessionSearchOpen: (open: boolean) => void;
   setFileManagerOpen: (open: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
 }
@@ -93,6 +95,7 @@ export const useUIStore = create<UIStore>()(
     webSearchEnabled: false,
     pluginCenterOpen: false,
     commandCenterOpen: false,
+    sessionSearchOpen: false,
     fileManagerOpen: false,
     settingsOpen: false,
 
@@ -257,6 +260,7 @@ export const useUIStore = create<UIStore>()(
     toggleWebSearch: () => set((s) => ({ webSearchEnabled: !s.webSearchEnabled })),
     setPluginCenterOpen: (open) => set({ pluginCenterOpen: open }),
     setCommandCenterOpen: (open) => set({ commandCenterOpen: open }),
+    setSessionSearchOpen: (open) => set({ sessionSearchOpen: open }),
     setFileManagerOpen: (open) => set({ fileManagerOpen: open }),
     setSettingsOpen: (open) => set({ settingsOpen: open }),
   })),

@@ -1,4 +1,4 @@
-import type { ConfiguredModel } from "./types";
+import type { ConfiguredModel, Message } from "./types";
 
 export const createMessageId = () => {
   if (globalThis.crypto?.randomUUID) {
@@ -15,9 +15,13 @@ export const getModelDisplayName = (modelId: string) => {
   return slashIndex >= 0 ? modelId.slice(slashIndex + 1) : modelId;
 };
 
-const THINKING_TAGS = [
-  { close: "</think>", open: "<think>" },
-];
+export const getMessageContentForModel = (message: Message) => {
+  const quote = message.segments?.find((segment) => segment.type === "quote");
+  if (!quote || quote.type !== "quote") return message.content;
+  return `[引用内容]\n${quote.content}\n[/引用内容]\n\n${message.content}`;
+};
+
+const THINKING_TAGS = [{ close: "</think>", open: "<think>" }];
 
 export const extractThinkingFromText = (text: string) => {
   let content = "";

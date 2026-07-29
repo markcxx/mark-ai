@@ -8,6 +8,7 @@ export const useConversationScroll = (autoScroll: boolean) => {
   const userHasScrolledAwayRef = useRef(false);
   const isAutoScrollingRef = useRef(false);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
+  const [isAwayFromBottom, setIsAwayFromBottom] = useState(false);
 
   const scrollToBottom = useCallback(
     (force = false) => {
@@ -19,6 +20,7 @@ export const useConversationScroll = (autoScroll: boolean) => {
       }
       if (!force && userHasScrolledAwayRef.current) return;
       isAutoScrollingRef.current = true;
+      setIsAwayFromBottom(false);
       requestAnimationFrame(() => {
         container.scrollTop = container.scrollHeight;
         requestAnimationFrame(() => {
@@ -34,9 +36,11 @@ export const useConversationScroll = (autoScroll: boolean) => {
     const container = messagesScrollRef.current;
     if (!container) return;
 
-    userHasScrolledAwayRef.current =
+    const awayFromBottom =
       container.scrollHeight - container.scrollTop - container.clientHeight >
       BOTTOM_SCROLL_THRESHOLD;
+    userHasScrolledAwayRef.current = awayFromBottom;
+    setIsAwayFromBottom((current) => (current === awayFromBottom ? current : awayFromBottom));
 
     const containerTop = container.getBoundingClientRect().top;
     const nodes = Array.from(container.querySelectorAll<HTMLElement>("[data-message-id]"));
@@ -56,11 +60,13 @@ export const useConversationScroll = (autoScroll: boolean) => {
 
   const resetScrollIntent = useCallback(() => {
     userHasScrolledAwayRef.current = false;
+    setIsAwayFromBottom(false);
   }, []);
 
   return {
     activeMessageId,
     handleScroll,
+    isAwayFromBottom,
     messagesEndRef,
     messagesScrollRef,
     resetScrollIntent,

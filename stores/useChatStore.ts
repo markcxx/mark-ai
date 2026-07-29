@@ -10,6 +10,7 @@ import type {
   ConfiguredModel,
   FileAttachment,
   Message,
+  QuotedSelection,
   QueuedChatMessage,
   RegenerateMode,
 } from "@/lib/chat/types";
@@ -50,6 +51,7 @@ interface ChatState {
   editingContent: string;
   abortController: AbortController | null;
   pendingAttachments: FileAttachment[];
+  pendingQuote: QuotedSelection | null;
   queuedMessage: QueuedChatMessage | null;
 }
 
@@ -59,6 +61,7 @@ interface ChatActions {
   setLoadingText: (text: string) => void;
   addPendingAttachment: (attachment: FileAttachment) => void;
   removePendingAttachment: (id: string) => void;
+  setPendingQuote: (quote: QuotedSelection | null) => void;
   sendMessage: () => Promise<void>;
   sendQueuedMessage: () => Promise<void>;
   sendQueuedMessageNow: () => void;
@@ -125,6 +128,7 @@ export const useChatStore = create<ChatStore>()(
     editingContent: "",
     abortController: null,
     pendingAttachments: [],
+    pendingQuote: null,
     queuedMessage: null,
 
     setMessages: (messages) => set({ messages }),
@@ -138,6 +142,7 @@ export const useChatStore = create<ChatStore>()(
       set((state) => ({
         pendingAttachments: state.pendingAttachments.filter((item) => item.id !== id),
       })),
+    setPendingQuote: (pendingQuote) => set({ pendingQuote }),
 
     abortStreaming: () => {
       const { abortController } = get();
@@ -154,6 +159,7 @@ export const useChatStore = create<ChatStore>()(
         editingContent: "",
         abortController: null,
         pendingAttachments: [],
+        pendingQuote: null,
         queuedMessage: null,
       });
     },
@@ -161,7 +167,14 @@ export const useChatStore = create<ChatStore>()(
     streamAssistantMessage: createStreamAssistantMessage(set, get),
 
     sendMessage: async () => {
-      const { input, isLoading, messages, pendingAttachments, streamAssistantMessage } = get();
+      const {
+        input,
+        isLoading,
+        messages,
+        pendingAttachments,
+        pendingQuote,
+        streamAssistantMessage,
+      } = get();
       const { availableModels, selectedModelKey, webSearchEnabled } = useUIStore.getState();
       const selectedModel = availableModels.find((m) => getModelKey(m) === selectedModelKey);
 
@@ -178,7 +191,9 @@ export const useChatStore = create<ChatStore>()(
           queuedMessage: {
             attachments: pendingAttachments,
             content: input.trim() || "请查看我上传的附件。",
+            quote: pendingQuote || undefined,
           },
+          pendingQuote: null,
         });
         return;
       }
@@ -196,7 +211,18 @@ export const useChatStore = create<ChatStore>()(
         createdAt: now,
         id: createMessageId(),
         role: "user",
-        totalTokens: estimateMessageTokens({ content: prompt }),
+        segments: pendingQuote
+          ? [
+              {
+                content: pendingQuote.content,
+                sourceMessageId: pendingQuote.sourceMessageId,
+                type: "quote",
+              },
+            ]
+          : undefined,
+        totalTokens: estimateMessageTokens({
+          content: pendingQuote ? `${pendingQuote.content}\n\n${prompt}` : prompt,
+        }),
       };
       const modelMessageId = createMessageId();
       const modelMessage: Message = {
@@ -215,6 +241,7 @@ export const useChatStore = create<ChatStore>()(
         isLoading: true,
         messages: [...messages, userMessage, modelMessage],
         pendingAttachments: [],
+        pendingQuote: null,
       });
 
       try {
@@ -225,6 +252,7 @@ export const useChatStore = create<ChatStore>()(
             });
             targetSessionId = session.id;
             createdSession = true;
+            sessionStore.setSessionGenerationStatus(session.id, "generating");
             sessionStore.setSessionLoading(session.id, true);
             try {
               await useToolStore.getState().persistDraftToSession(session.id);
@@ -245,6 +273,7 @@ export const useChatStore = create<ChatStore>()(
               ),
               pendingAttachments:
                 state.pendingAttachments.length > 0 ? state.pendingAttachments : pendingAttachments,
+              pendingQuote: state.pendingQuote || pendingQuote,
             }));
             if (!(error instanceof DOMException && error.name === "AbortError")) {
               toast.error("创建会话失败");
@@ -253,7 +282,13 @@ export const useChatStore = create<ChatStore>()(
           }
         }
         if (!targetSessionId) return;
+        sessionStore.setSessionGenerationStatus(targetSessionId, "generating");
 
+        await sessionStore.persistSessionMessages(targetSessionId, [
+          ...messages,
+          userMessage,
+          modelMessage,
+        ]);
         startedStream = true;
         const streamedMessage = await streamAssistantMessage(
           [...messages, userMessage],
@@ -298,6 +333,7 @@ export const useChatStore = create<ChatStore>()(
       set({
         input: queuedMessage.content,
         pendingAttachments: queuedMessage.attachments,
+        pendingQuote: queuedMessage.quote || null,
         queuedMessage: null,
       });
       await get().sendMessage();
@@ -385,6 +421,9 @@ export const useChatStore = create<ChatStore>()(
 
       set({ messages: nextMessages });
       setOpenMenuMessageId(null);
+      useSessionStore.getState().setSessionGenerationStatus(targetSessionId, "generating");
+
+      await useSessionStore.getState().persistSessionMessages(targetSessionId, nextMessages);
 
       const streamedMessage = await streamAssistantMessage(
         historyMessages,
@@ -493,6 +532,9 @@ export const useChatStore = create<ChatStore>()(
         ];
         set({ messages: nextMessages });
         setOpenMenuMessageId(null);
+        sessionStore.setSessionGenerationStatus(targetSessionId, "generating");
+
+        await sessionStore.persistSessionMessages(targetSessionId, nextMessages);
 
         const streamedMessage = await streamAssistantMessage(
           historyMessages,
@@ -583,6 +625,9 @@ export const useChatStore = create<ChatStore>()(
 
       set({ messages: nextMessages });
       setOpenMenuMessageId(null);
+      sessionStore.setSessionGenerationStatus(targetSessionId, "generating");
+
+      await sessionStore.persistSessionMessages(targetSessionId, nextMessages);
 
       const streamedMessage = await streamAssistantMessage(
         regenerateHistoryMessages,

@@ -150,6 +150,7 @@ const toSession = (row: any): ChatSession => ({
   model: row.model || undefined,
   provider: row.provider || undefined,
   revision: Number(row.revision || 0),
+  searchSnippet: row.search_snippet ? String(row.search_snippet) : undefined,
   title: String(row.title || DEFAULT_SESSION_TITLE),
   updatedAt: Number(row.updated_at),
 });
@@ -292,12 +293,23 @@ const bumpSessionRevision = (database: DatabaseLike, sessionId: string) => {
 export class SqliteStorage implements StorageAdapter {
   listChatSessions(_userId?: string, options: SessionListOptions = {}) {
     const conditions: string[] = [];
+    const selectValues: unknown[] = [];
     const values: unknown[] = [];
     const query = options.query?.trim();
+    const searchSnippet = query
+      ? `(SELECT substr(sm.content, MAX(1, instr(lower(sm.content), lower(?)) - 60), 180)
+          FROM chat_messages sm
+          WHERE sm.session_id = s.id AND instr(lower(sm.content), lower(?)) > 0
+          ORDER BY sm.position ASC
+          LIMIT 1) AS search_snippet,`
+      : "NULL AS search_snippet,";
 
     if (query) {
-      conditions.push("instr(lower(s.title), lower(?)) > 0");
-      values.push(query);
+      selectValues.push(query, query);
+      conditions.push(
+        "(instr(lower(s.title), lower(?)) > 0 OR EXISTS (SELECT 1 FROM chat_messages sm WHERE sm.session_id = s.id AND instr(lower(sm.content), lower(?)) > 0))",
+      );
+      values.push(query, query);
     }
 
     if (options.cursor) {
@@ -324,6 +336,7 @@ export class SqliteStorage implements StorageAdapter {
           s.revision,
           s.created_at,
           s.updated_at,
+          ${searchSnippet}
           COUNT(m.id) AS message_count
         FROM chat_sessions s
         LEFT JOIN chat_messages m ON m.session_id = s.id
@@ -333,7 +346,7 @@ export class SqliteStorage implements StorageAdapter {
         LIMIT ?
       `,
       )
-      .all(...values, limit);
+      .all(...selectValues, ...values, limit);
 
     return rows.map(toSession);
   }

@@ -4,6 +4,8 @@ import { subscribeWithSelector } from "zustand/middleware";
 
 import type { ChatSession, ConfiguredModel, Message } from "@/lib/chat/types";
 
+export type SessionGenerationStatus = "failed" | "generating" | "unread";
+
 interface SessionState {
   sessions: ChatSession[];
   activeSessionId: string | null;
@@ -12,6 +14,8 @@ interface SessionState {
   isLoadingMoreSessions: boolean;
   isLoadingActiveSession: boolean;
   loadingSessionIds: string[];
+  sessionNavigationTargetId: string | null;
+  generationStatusBySessionId: Record<string, SessionGenerationStatus>;
 }
 
 interface SessionActions {
@@ -38,6 +42,11 @@ interface SessionActions {
   upsertSession: (session: ChatSession) => void;
   setActiveSessionId: (id: string | null) => void;
   setSessionLoading: (sessionId: string, loading: boolean) => void;
+  setSessionGenerationStatus: (
+    sessionId: string,
+    status: SessionGenerationStatus | undefined,
+  ) => void;
+  markSessionGenerationRead: (sessionId: string) => void;
   resetActiveSession: () => void;
 }
 
@@ -89,6 +98,8 @@ export const useSessionStore = create<SessionStore>()(
     isLoadingMoreSessions: false,
     isLoadingActiveSession: false,
     loadingSessionIds: [],
+    sessionNavigationTargetId: null,
+    generationStatusBySessionId: {},
 
     upsertSession: (session) =>
       set((s) => ({
@@ -108,11 +119,31 @@ export const useSessionStore = create<SessionStore>()(
           : s.loadingSessionIds.filter((id) => id !== sessionId),
       })),
 
+    setSessionGenerationStatus: (sessionId, status) =>
+      set((state) => {
+        const next = { ...state.generationStatusBySessionId };
+        if (status) next[sessionId] = status;
+        else delete next[sessionId];
+        return { generationStatusBySessionId: next };
+      }),
+
+    markSessionGenerationRead: (sessionId) =>
+      set((state) => {
+        if (state.generationStatusBySessionId[sessionId] === "generating") return state;
+        const next = { ...state.generationStatusBySessionId };
+        delete next[sessionId];
+        return { generationStatusBySessionId: next };
+      }),
+
     resetActiveSession: () => {
       activeSessionLoadRequest += 1;
       activeSessionLoadController?.abort();
       activeSessionLoadController = null;
-      set({ activeSessionId: null, isLoadingActiveSession: false });
+      set({
+        activeSessionId: null,
+        isLoadingActiveSession: false,
+        sessionNavigationTargetId: null,
+      });
     },
 
     loadSessions: async () => {
@@ -192,7 +223,8 @@ export const useSessionStore = create<SessionStore>()(
       activeSessionLoadController = controller;
 
       try {
-        set({ isLoadingActiveSession: true });
+        set({ isLoadingActiveSession: true, sessionNavigationTargetId: sessionId });
+        get().markSessionGenerationRead(sessionId);
         const response = await fetch(`/api/sessions/${sessionId}`, {
           cache: "no-store",
           signal: controller.signal,
@@ -203,7 +235,11 @@ export const useSessionStore = create<SessionStore>()(
         if (requestId !== activeSessionLoadRequest) return undefined;
         const messages: Message[] = Array.isArray(data.messages) ? data.messages : [];
 
-        set({ activeSessionId: data.session?.id || sessionId });
+        set({
+          activeSessionId: data.session?.id || sessionId,
+          sessionNavigationTargetId: null,
+        });
+        get().markSessionGenerationRead(data.session?.id || sessionId);
         if (options.history !== "none") {
           navigateToSession(data.session?.id || sessionId, options.history || "push");
         }
@@ -218,7 +254,7 @@ export const useSessionStore = create<SessionStore>()(
       } finally {
         if (requestId === activeSessionLoadRequest) {
           activeSessionLoadController = null;
-          set({ isLoadingActiveSession: false });
+          set({ isLoadingActiveSession: false, sessionNavigationTargetId: null });
         }
       }
     },
@@ -240,7 +276,7 @@ export const useSessionStore = create<SessionStore>()(
       const data = await response.json();
       const session = data.session as ChatSession;
       get().upsertSession(session);
-      set({ activeSessionId: session.id });
+      set({ activeSessionId: session.id, sessionNavigationTargetId: null });
       navigateToSession(session.id);
       return session;
     },
@@ -253,6 +289,9 @@ export const useSessionStore = create<SessionStore>()(
 
         get().setSessionLoading(sessionId, false);
         set((s) => ({
+          generationStatusBySessionId: Object.fromEntries(
+            Object.entries(s.generationStatusBySessionId).filter(([id]) => id !== sessionId),
+          ),
           sessions: s.sessions.filter((session) => session.id !== sessionId),
         }));
 
@@ -353,6 +392,12 @@ export const useSessionStore = create<SessionStore>()(
         });
 
         if (!response.ok) {
+          if (
+            response.status === 404 &&
+            !get().sessions.some((session) => session.id === sessionId)
+          ) {
+            return undefined;
+          }
           const errorPayload = await response.text();
           let message = errorPayload || "保存消息失败";
           try {

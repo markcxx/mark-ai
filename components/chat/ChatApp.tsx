@@ -36,6 +36,8 @@ import { MessageItem } from "./MessageItem";
 import { SelectToHereButton } from "./SelectToHereButton";
 import { SelectionFooterBar } from "./SelectionFooterBar";
 import { Sidebar } from "./Sidebar";
+import { SessionSearchDialog } from "./SessionSearchDialog";
+import { SelectionQuoteAction } from "./SelectionQuoteAction";
 import { TopHeader } from "./TopHeader";
 import { WelcomePanel } from "./WelcomePanel";
 
@@ -109,6 +111,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   const isLoadingMoreSessions = useSessionStore((s) => s.isLoadingMoreSessions);
   const isLoadingActiveSession = useSessionStore((s) => s.isLoadingActiveSession);
   const loadingSessionIds = useSessionStore((s) => s.loadingSessionIds);
+  const generationStatusBySessionId = useSessionStore((s) => s.generationStatusBySessionId);
 
   // Chat Store
   const messages = useChatStore((s) => s.messages);
@@ -118,11 +121,13 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   const editingMessageId = useChatStore((s) => s.editingMessageId);
   const editingContent = useChatStore((s) => s.editingContent);
   const pendingAttachments = useChatStore((s) => s.pendingAttachments);
+  const pendingQuote = useChatStore((s) => s.pendingQuote);
   const queuedMessage = useChatStore((s) => s.queuedMessage);
 
   const {
     activeMessageId: activeMiniMapMessageId,
     handleScroll: handleMessagesScroll,
+    isAwayFromBottom,
     messagesEndRef,
     messagesScrollRef,
     resetScrollIntent,
@@ -499,6 +504,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
         isResizing={isResizingSidebar}
         isLoadingSessions={isLoadingSessions}
         isLoadingMoreSessions={isLoadingMoreSessions}
+        generationStatusBySessionId={generationStatusBySessionId}
         loadingSessionIds={loadingSessionIds}
         onClose={() => useUIStore.getState().setSidebarOpen(false)}
         onDeleteSession={(id) => void deleteChatSession(id)}
@@ -688,6 +694,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                     onInput={handleInput}
                     onKeyDown={handleKeyDown}
                     onPaste={handleAttachmentPaste}
+                    onClearQuote={() => useChatStore.getState().setPendingQuote(null)}
                     onMic={() => toast(NOT_IMPLEMENTED_TOAST)}
                     onRemoveAttachment={removeAttachment}
                     onSend={handleSend}
@@ -701,6 +708,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                     }}
                     placement="center"
                     providerNames={providerNames}
+                    pendingQuote={pendingQuote}
                     queuedMessage={queuedMessage}
                     selectedModel={selectedModel}
                     selectedModelKey={selectedModelKey}
@@ -817,6 +825,8 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                 onInput={handleInput}
                 onKeyDown={handleKeyDown}
                 onPaste={handleAttachmentPaste}
+                onClearQuote={() => useChatStore.getState().setPendingQuote(null)}
+                onScrollToBottom={() => scrollToBottom(true)}
                 onMic={() => toast(NOT_IMPLEMENTED_TOAST)}
                 onRemoveAttachment={removeAttachment}
                 onSend={handleSend}
@@ -829,7 +839,9 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                   });
                 }}
                 providerNames={providerNames}
+                pendingQuote={pendingQuote}
                 queuedMessage={queuedMessage}
+                showScrollToBottom={isAwayFromBottom}
                 selectedModel={selectedModel}
                 selectedModelKey={selectedModelKey}
                 setModelSearchKeyword={(kw) => useUIStore.getState().setModelSearchKeyword(kw)}
@@ -865,6 +877,18 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
       <PluginCenterDrawer
         onClose={() => useUIStore.getState().setPluginCenterOpen(false)}
         open={pluginCenterOpen}
+      />
+      <SessionSearchDialog
+        onSelectSession={(id) => {
+          void handleLoadSession(id);
+          if (isMobileViewport) useUIStore.getState().setSidebarOpen(false);
+        }}
+      />
+      <SelectionQuoteAction
+        onQuote={(quote) => {
+          useChatStore.getState().setPendingQuote(quote);
+          window.requestAnimationFrame(() => textareaRef.current?.focus());
+        }}
       />
       <CommandCenter
         onFocusComposer={() =>

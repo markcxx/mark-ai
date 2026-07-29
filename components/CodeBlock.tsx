@@ -20,7 +20,7 @@ import {
   vs,
   vscDarkPlus,
 } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { Check, ChevronDown, ChevronUp, Copy } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Copy, Download, WrapText } from "lucide-react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/useSettingsStore";
@@ -30,6 +30,28 @@ const countLines = (value: string) => (value.match(/\n/g)?.length || 0) + 1;
 const normalizeLanguage = (language?: string) => {
   if (!language?.trim()) return "txt";
   return language.trim().toLowerCase();
+};
+
+const LANGUAGE_EXTENSIONS: Record<string, string> = {
+  bash: "sh",
+  csharp: "cs",
+  css: "css",
+  html: "html",
+  javascript: "js",
+  js: "js",
+  json: "json",
+  jsx: "jsx",
+  markdown: "md",
+  md: "md",
+  python: "py",
+  shell: "sh",
+  sql: "sql",
+  ts: "ts",
+  tsx: "tsx",
+  typescript: "ts",
+  xml: "xml",
+  yaml: "yaml",
+  yml: "yml",
 };
 
 type SyntaxTheme = Record<string, Record<string, string | number>>;
@@ -57,6 +79,7 @@ export const Pre = ({ children, language }: { children: string; language: string
   const normalizedLanguage = normalizeLanguage(language);
   const lineCount = countLines(children.replace(/\n$/, ""));
   const settings = useSettingsStore((state) => state.general);
+  const [wrapLongLines, setWrapLongLines] = useState(settings.codeWrap);
   const collapsible = settings.codeCollapseLines > 0 && lineCount > settings.codeCollapseLines;
   const [collapsed, setCollapsed] = useState(false);
   const isDark =
@@ -82,6 +105,17 @@ export const Pre = ({ children, language }: { children: string; language: string
     navigator.clipboard.writeText(children);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownload = () => {
+    const extension = LANGUAGE_EXTENSIONS[normalizedLanguage] || normalizedLanguage || "txt";
+    const blob = new Blob([children], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `code.${extension}`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -129,12 +163,50 @@ export const Pre = ({ children, language }: { children: string; language: string
                   ? "text-gray-400 hover:bg-white/[0.08] hover:text-gray-100"
                   : "text-gray-500 hover:bg-gray-100 hover:text-gray-900",
               )}
-              title={collapsed ? "展开代码" : "折叠代码"}
+              aria-label={collapsed ? "展开代码" : "折叠代码"}
+              data-markai-tooltip={collapsed ? "展开代码" : "折叠代码"}
             >
               {collapsed ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
             </span>
           )}
           <button
+            aria-label={wrapLongLines ? "关闭自动换行" : "开启自动换行"}
+            className={cn(
+              "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
+              wrapLongLines
+                ? "bg-primary/10 text-primary"
+                : isDark
+                  ? "text-gray-400 hover:bg-white/[0.08] hover:text-gray-100"
+                  : "text-gray-500 hover:bg-gray-100 hover:text-gray-900",
+            )}
+            data-markai-tooltip={wrapLongLines ? "关闭自动换行" : "开启自动换行"}
+            onClick={(event) => {
+              event.stopPropagation();
+              setWrapLongLines((value) => !value);
+            }}
+            type="button"
+          >
+            <WrapText size={14} />
+          </button>
+          <button
+            aria-label="下载代码"
+            className={cn(
+              "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
+              isDark
+                ? "text-gray-400 hover:bg-white/[0.08] hover:text-gray-100"
+                : "text-gray-500 hover:bg-gray-100 hover:text-gray-900",
+            )}
+            data-markai-tooltip="下载代码"
+            onClick={(event) => {
+              event.stopPropagation();
+              handleDownload();
+            }}
+            type="button"
+          >
+            <Download size={14} />
+          </button>
+          <button
+            aria-label="复制代码"
             className={cn(
               "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
               isDark
@@ -145,7 +217,7 @@ export const Pre = ({ children, language }: { children: string; language: string
               event.stopPropagation();
               handleCopy();
             }}
-            title="复制代码"
+            data-markai-tooltip="复制代码"
             type="button"
           >
             {copied ? <Check className="text-green-600" size={14} /> : <Copy size={14} />}
@@ -162,7 +234,7 @@ export const Pre = ({ children, language }: { children: string; language: string
           language={normalizedLanguage}
           style={syntaxTheme as any}
           showLineNumbers={settings.codeLineNumbers}
-          wrapLongLines={settings.codeWrap}
+          wrapLongLines={wrapLongLines}
           customStyle={{ borderRadius: 0, margin: 0, padding: "1rem" }}
           lineNumberStyle={{
             color: isDark ? "#6e7681" : "#94a3b8",

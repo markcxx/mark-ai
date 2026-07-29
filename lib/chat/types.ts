@@ -43,13 +43,25 @@ export type ContextBoundarySegment = {
   type: "context-boundary";
 };
 
+export type QuoteSegment = {
+  content: string;
+  sourceMessageId?: string;
+  type: "quote";
+};
+
 export type MessageSegment =
   | ThinkingSegment
   | ToolSegment
   | ContentSegment
   | GeneratedFileSegment
   | TranslationSegment
-  | ContextBoundarySegment;
+  | ContextBoundarySegment
+  | QuoteSegment;
+
+export type QuotedSelection = {
+  content: string;
+  sourceMessageId?: string;
+};
 
 export type FileAttachment = {
   id: string;
@@ -62,6 +74,7 @@ export type FileAttachment = {
 export type QueuedChatMessage = {
   attachments: FileAttachment[];
   content: string;
+  quote?: QuotedSelection;
 };
 
 export type MessageVariant = {
@@ -131,6 +144,7 @@ export type ChatSession = {
   provider?: string;
   revision: number;
   messageCount: number;
+  searchSnippet?: string;
 };
 
 export type ChatStreamEvent = {
