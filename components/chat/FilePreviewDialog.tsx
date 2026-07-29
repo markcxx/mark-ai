@@ -1,7 +1,10 @@
 "use client";
 
 import { Download, ExternalLink, FileQuestion, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import toast from "react-hot-toast";
+
+import type PhotoSwipeLightbox from "photoswipe/lightbox";
 
 import { AppDialog } from "@/components/ui/AppDialog";
 
@@ -48,6 +51,123 @@ const getPreviewKind = (file: PreviewFile) => {
 
 export const isFilePreviewable = (file: PreviewFile) => getPreviewKind(file) !== "unsupported";
 
+function PhotoSwipeImagePreview({
+  downloadUrl,
+  file,
+  onClose,
+  previewUrl,
+}: {
+  downloadUrl: string;
+  file: PreviewFile;
+  onClose: () => void;
+  previewUrl: string;
+}) {
+  const lightboxRef = useRef<PhotoSwipeLightbox | null>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    let active = true;
+    const image = new Image();
+
+    const openImage = async () => {
+      try {
+        await image.decode();
+        if (!active) return;
+
+        const { default: Lightbox } = await import("photoswipe/lightbox");
+        if (!active) return;
+
+        const lightbox = new Lightbox({
+          bgOpacity: 0.92,
+          closeOnVerticalDrag: true,
+          dataSource: [
+            {
+              alt: file.name,
+              height: image.naturalHeight,
+              src: previewUrl,
+              width: image.naturalWidth,
+            },
+          ],
+          imageClickAction: "zoom-or-close",
+          paddingFn: (viewportSize) => ({
+            bottom: viewportSize.x < 768 ? 72 : 64,
+            left: viewportSize.x < 768 ? 12 : 32,
+            right: viewportSize.x < 768 ? 12 : 32,
+            top: viewportSize.x < 768 ? 52 : 64,
+          }),
+          pswpModule: () => import("photoswipe"),
+          returnFocus: true,
+          showHideAnimationType: "fade",
+          wheelToZoom: true,
+        });
+
+        lightbox.on("uiRegister", () => {
+          lightbox.pswp?.ui?.registerElement({
+            appendTo: "root",
+            className: "markai-pswp-caption",
+            html: "",
+            name: "markai-caption",
+            onInit: (element) => {
+              element.textContent = file.name;
+            },
+            order: 8,
+          });
+          lightbox.pswp?.ui?.registerElement({
+            appendTo: "bar",
+            ariaLabel: `下载 ${file.name}`,
+            className: "markai-pswp-download",
+            html: "下载",
+            name: "markai-download",
+            onInit: (element) => {
+              const link = element as HTMLAnchorElement;
+              link.download = file.name;
+              link.href = downloadUrl;
+            },
+            order: 8,
+            tagName: "a",
+            title: "下载",
+          });
+        });
+        lightbox.on("close", () => {
+          if (active) onCloseRef.current();
+        });
+        lightbox.init();
+        lightboxRef.current = lightbox;
+        lightbox.loadAndOpen(0);
+      } catch {
+        if (!active) return;
+        toast.error("图片加载失败，请下载后查看");
+        onCloseRef.current();
+      }
+    };
+
+    image.src = previewUrl;
+    void openImage();
+
+    return () => {
+      active = false;
+      image.src = "";
+      lightboxRef.current?.destroy();
+      lightboxRef.current = null;
+    };
+  }, [downloadUrl, file.id, file.name, previewUrl]);
+
+  return (
+    <div
+      aria-label={`正在打开 ${file.name}`}
+      aria-live="polite"
+      className="fixed inset-0 z-[95] flex items-center justify-center bg-black/90 text-white"
+      role="status"
+    >
+      <Loader2 className="animate-spin" size={22} />
+    </div>
+  );
+}
+
 export function FilePreviewDialog({
   downloadUrl,
   file,
@@ -66,6 +186,16 @@ export function FilePreviewDialog({
   if (!file) return null;
   const resolvedPreviewUrl = previewUrl || `/api/files/${file.id}/preview`;
   const resolvedDownloadUrl = downloadUrl || `/api/files/${file.id}/download`;
+  if (kind === "image") {
+    return (
+      <PhotoSwipeImagePreview
+        downloadUrl={resolvedDownloadUrl}
+        file={file}
+        onClose={onClose}
+        previewUrl={resolvedPreviewUrl}
+      />
+    );
+  }
   const title = (
     <div className="flex min-w-0 items-center gap-2 pr-2">
       <span className="min-w-0 flex-1 truncate text-sm font-medium" title={file.name}>
@@ -110,16 +240,6 @@ export function FilePreviewDialog({
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#f2f3f5]/80 text-gray-400 backdrop-blur-[2px] dark:bg-[#101113]/80">
             <Loader2 className="animate-spin" size={20} />
           </div>
-        )}
-        {kind === "image" && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            alt={file.name}
-            className="max-h-full max-w-full object-contain p-4"
-            onError={() => setLoading(false)}
-            onLoad={() => setLoading(false)}
-            src={resolvedPreviewUrl}
-          />
         )}
         {kind === "audio" && (
           <audio

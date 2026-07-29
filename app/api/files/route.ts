@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 
 import { getCurrentStorageOwnerId } from "@/lib/auth-helpers";
 import {
+  deleteStoredFile,
+  getStoredFilesByIds,
   getStoredFileUsage,
   isStoredFileQuotaUnlimited,
   listStoredAttachmentFiles,
@@ -45,4 +47,29 @@ export async function GET() {
     },
     usage,
   });
+}
+
+export async function DELETE(request: Request) {
+  const userId = await getCurrentStorageOwnerId();
+  if (!userId) return NextResponse.json({ error: "请先登录" }, { status: 401 });
+
+  const body = await request.json().catch(() => null);
+  const rawFileIds: unknown[] = Array.isArray(body?.fileIds) ? body.fileIds : [];
+  const fileIds = Array.from(
+    new Set(rawFileIds.filter((id): id is string => typeof id === "string")),
+  );
+  if (
+    fileIds.length === 0 ||
+    fileIds.length > 50 ||
+    fileIds.some((id) => id.length === 0 || id.length > 256)
+  ) {
+    return NextResponse.json({ error: "请选择 1 至 50 个有效文件" }, { status: 400 });
+  }
+
+  const files = (await getStoredFilesByIds(fileIds, userId)).filter(
+    (file) => file.kind === "attachment",
+  );
+  for (const file of files) await deleteStoredFile(file);
+
+  return NextResponse.json({ deletedIds: files.map((file) => file.id), ok: true });
 }

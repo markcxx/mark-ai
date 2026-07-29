@@ -15,30 +15,39 @@ export const useConversationScroll = (autoScroll: boolean) => {
       if (!force && !autoScroll) return;
       const container = messagesScrollRef.current;
       if (!container) {
-        messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+        messagesEndRef.current?.scrollIntoView({ behavior: force ? "smooth" : "auto" });
         return;
       }
       if (!force && userHasScrolledAwayRef.current) return;
       isAutoScrollingRef.current = true;
+      userHasScrolledAwayRef.current = false;
       setIsAwayFromBottom(false);
       requestAnimationFrame(() => {
-        container.scrollTop = container.scrollHeight;
-        requestAnimationFrame(() => {
-          isAutoScrollingRef.current = false;
+        container.scrollTo({
+          behavior: force ? "smooth" : "auto",
+          top: container.scrollHeight,
         });
+        if (!force) {
+          requestAnimationFrame(() => {
+            isAutoScrollingRef.current = false;
+          });
+        }
       });
     },
     [autoScroll],
   );
 
   const handleScroll = useCallback(() => {
-    if (isAutoScrollingRef.current) return;
     const container = messagesScrollRef.current;
     if (!container) return;
 
     const awayFromBottom =
       container.scrollHeight - container.scrollTop - container.clientHeight >
       BOTTOM_SCROLL_THRESHOLD;
+    if (isAutoScrollingRef.current) {
+      if (!awayFromBottom) isAutoScrollingRef.current = false;
+      return;
+    }
     userHasScrolledAwayRef.current = awayFromBottom;
     setIsAwayFromBottom((current) => (current === awayFromBottom ? current : awayFromBottom));
 

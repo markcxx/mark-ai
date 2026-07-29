@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "photoswipe/style.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -47,6 +48,40 @@ html,
 body {
   height: 100%;
   overflow: hidden;
+}
+
+.markai-pswp-caption {
+  align-items: center;
+  bottom: 20px;
+  color: white;
+  display: flex;
+  font-size: 14px;
+  justify-content: center;
+  left: 50%;
+  max-width: min(680px, calc(100vw - 32px));
+  overflow: hidden;
+  padding: 8px 12px;
+  pointer-events: none;
+  position: absolute;
+  text-overflow: ellipsis;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.markai-pswp-download {
+  align-items: center;
+  color: white;
+  display: flex;
+  font-size: 13px;
+  height: 44px;
+  justify-content: center;
+  opacity: 0.85;
+  padding: 0 12px;
+  text-decoration: none;
+}
+
+.markai-pswp-download:hover {
+  opacity: 1;
 }
 
 body {

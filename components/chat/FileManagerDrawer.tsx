@@ -7,7 +7,9 @@ import {
   HardDrive,
   LoaderCircle,
   Plus,
+  Paperclip,
   Search,
+  Trash2,
   UploadCloud,
   X,
 } from "lucide-react";
@@ -16,12 +18,13 @@ import type { DragEvent } from "react";
 import { createPortal } from "react-dom";
 import toast from "react-hot-toast";
 
+import { AdminButton, AdminCheckbox } from "@/components/admin/AdminPrimitives";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { IconButton } from "@/components/ui/IconButton";
 import { uploadFile } from "@/lib/client/file-upload";
 import { useChatStore } from "@/stores/useChatStore";
 
-import { formatBytes, ManagedFileRow } from "./files/ManagedFileRow";
+import { formatBytes, ManagedFileMobileRow, ManagedFileTableRow } from "./files/ManagedFileRow";
 import type { ManagedFile } from "./files/ManagedFileRow";
 import { FilePreviewDialog } from "./FilePreviewDialog";
 
@@ -45,10 +48,13 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
   const [data, setData] = useState<FilesResponse | null>(null);
   const [deletingFile, setDeletingFile] = useState<ManagedFile | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [previewFile, setPreviewFile] = useState<ManagedFile | null>(null);
+  const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
   const [upload, setUpload] = useState<{
     completed: number;
     current: string;
@@ -92,18 +98,30 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
   }, [open]);
 
   useEffect(() => {
+    if (open) return;
+    setSelectedFileIds([]);
+    setBulkDeleteOpen(false);
+  }, [open]);
+
+  useEffect(() => {
+    setSelectedFileIds([]);
+  }, [query]);
+
+  useEffect(() => {
     if (!open) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
+      if (deleting || bulkDeleting) return;
       if (previewFile) setPreviewFile(null);
+      else if (bulkDeleteOpen) setBulkDeleteOpen(false);
       else if (deletingFile) setDeletingFile(null);
       else onClose();
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [deletingFile, onClose, open, previewFile]);
+  }, [bulkDeleteOpen, bulkDeleting, deleting, deletingFile, onClose, open, previewFile]);
 
   const visibleFiles = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -112,6 +130,84 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
       file.name.toLocaleLowerCase().includes(normalizedQuery),
     );
   }, [data?.files, query]);
+  const selectedFiles = useMemo(() => {
+    const selected = new Set(selectedFileIds);
+    return visibleFiles.filter((file) => selected.has(file.id));
+  }, [selectedFileIds, visibleFiles]);
+  const allVisibleSelected =
+    visibleFiles.length > 0 && selectedFiles.length === visibleFiles.length;
+
+  const toggleSelectedFile = (fileId: string, checked: boolean) => {
+    setSelectedFileIds((current) =>
+      checked
+        ? current.includes(fileId)
+          ? current
+          : [...current, fileId]
+        : current.filter((id) => id !== fileId),
+    );
+  };
+
+  const toggleSelectAllVisible = () => {
+    setSelectedFileIds(allVisibleSelected ? [] : visibleFiles.map((file) => file.id));
+  };
+
+  const addSelectedToConversation = () => {
+    if (selectedFiles.length === 0) return;
+    const chatStore = useChatStore.getState();
+    const pendingIds = new Set(chatStore.pendingAttachments.map((file) => file.id));
+    const availableSlots = Math.max(0, 4 - pendingIds.size);
+    const candidates = selectedFiles.filter((file) => !pendingIds.has(file.id));
+    const added = candidates.slice(0, availableSlots);
+    added.forEach((file) => chatStore.addPendingAttachment(file));
+
+    if (added.length === 0) {
+      toast.error(availableSlots === 0 ? "当前对话最多添加 4 个附件" : "所选文件已在输入框中");
+      return;
+    }
+    toast.success(`${added.length} 个文件已加入当前对话`);
+    if (added.length < candidates.length) toast.error("部分文件因附件数量限制未添加");
+    setSelectedFileIds([]);
+    onClose();
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedFiles.length === 0 || bulkDeleting) return;
+    setBulkDeleting(true);
+    try {
+      const response = await fetch("/api/files", {
+        body: JSON.stringify({ fileIds: selectedFiles.map((file) => file.id) }),
+        headers: { "Content-Type": "application/json" },
+        method: "DELETE",
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(body?.error || "批量删除失败");
+
+      const deletedIds: string[] = Array.isArray(body?.deletedIds) ? body.deletedIds : [];
+      const deletedSet = new Set(deletedIds);
+      deletedIds.forEach((id) => useChatStore.getState().removePendingAttachment(id));
+      setData((current) => {
+        if (!current) return current;
+        const deletedFiles = current.files.filter((file) => deletedSet.has(file.id));
+        const deletedBytes = deletedFiles.reduce((total, file) => total + file.size, 0);
+        return {
+          ...current,
+          files: current.files.filter((file) => !deletedSet.has(file.id)),
+          usage: {
+            count: Math.max(0, current.usage.count - deletedFiles.length),
+            size: Math.max(0, current.usage.size - deletedBytes),
+          },
+        };
+      });
+      setSelectedFileIds((current) => current.filter((id) => !deletedSet.has(id)));
+      setBulkDeleteOpen(false);
+      if (deletedIds.length > 0) toast.success(`已删除 ${deletedIds.length} 个文件`);
+      if (deletedIds.length < selectedFiles.length) toast.error("部分文件未能删除，请刷新后重试");
+    } catch (deleteError) {
+      toast.error(deleteError instanceof Error ? deleteError.message : "批量删除失败");
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
 
   const uploadFiles = async (selectedFiles: File[]) => {
     if (selectedFiles.length === 0 || upload) return;
@@ -157,6 +253,7 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
             }
           : current,
       );
+      setSelectedFileIds((current) => current.filter((id) => id !== deletingFile.id));
       setDeletingFile(null);
       toast.success("文件已删除");
     } catch (deleteError) {
@@ -341,7 +438,35 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
                   </p>
                 </div>
 
-                <section className="mt-4 min-h-[260px] flex-1 border-t border-gray-200 dark:border-white/[0.08]">
+                <div className="mt-3 flex min-h-9 flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-sm text-gray-500 md:hidden">
+                    <AdminCheckbox
+                      checked={allVisibleSelected}
+                      disabled={visibleFiles.length === 0}
+                      indeterminate={
+                        selectedFiles.length > 0 && selectedFiles.length < visibleFiles.length
+                      }
+                      label="全选当前文件"
+                      onChange={toggleSelectAllVisible}
+                    />
+                    已选择 {selectedFiles.length} 个文件
+                  </div>
+                  <span className="hidden text-sm text-gray-500 md:block">
+                    已选择 {selectedFiles.length} 个文件
+                  </span>
+                  {selectedFiles.length > 0 && (
+                    <div className="ml-auto flex items-center gap-1">
+                      <AdminButton compact onClick={addSelectedToConversation}>
+                        <Paperclip size={14} /> 加入对话
+                      </AdminButton>
+                      <AdminButton compact danger onClick={() => setBulkDeleteOpen(true)}>
+                        <Trash2 size={14} /> 批量删除
+                      </AdminButton>
+                    </div>
+                  )}
+                </div>
+
+                <section className="mt-2 min-h-[260px] flex-1 border-t border-gray-200 dark:border-white/[0.08]">
                   {!data && !error && (
                     <div className="flex min-h-[320px] items-center justify-center text-gray-400">
                       <LoaderCircle className="animate-spin" size={22} />
@@ -376,14 +501,68 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
                     </div>
                   )}
 
-                  {visibleFiles.map((file) => (
-                    <ManagedFileRow
-                      file={file}
-                      key={file.id}
-                      onDelete={setDeletingFile}
-                      onPreview={setPreviewFile}
-                    />
-                  ))}
+                  {visibleFiles.length > 0 && (
+                    <>
+                      <div className="hidden overflow-x-auto md:block">
+                        <table className="w-full min-w-[820px] table-fixed text-left text-sm">
+                          <colgroup>
+                            <col className="w-12" />
+                            <col />
+                            <col className="w-24" />
+                            <col className="w-48" />
+                            <col className="w-24" />
+                            <col className="w-32" />
+                          </colgroup>
+                          <thead className="text-xs text-gray-400">
+                            <tr>
+                              <th className="px-3 py-3">
+                                <AdminCheckbox
+                                  checked={allVisibleSelected}
+                                  indeterminate={
+                                    selectedFiles.length > 0 &&
+                                    selectedFiles.length < visibleFiles.length
+                                  }
+                                  label="全选当前文件"
+                                  onChange={toggleSelectAllVisible}
+                                />
+                              </th>
+                              <th className="px-5 py-3 font-medium">文件</th>
+                              <th className="px-5 py-3 font-medium">类型</th>
+                              <th className="px-5 py-3 font-medium">上传时间</th>
+                              <th className="px-5 py-3 text-right font-medium">大小</th>
+                              <th className="px-3 py-3 text-right font-medium">操作</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {visibleFiles.map((file, index) => (
+                              <ManagedFileTableRow
+                                file={file}
+                                index={index}
+                                isSelected={selectedFileIds.includes(file.id)}
+                                key={file.id}
+                                onDelete={setDeletingFile}
+                                onPreview={setPreviewFile}
+                                onToggleSelected={toggleSelectedFile}
+                              />
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="space-y-0.5 py-1 md:hidden">
+                        {visibleFiles.map((file, index) => (
+                          <ManagedFileMobileRow
+                            file={file}
+                            index={index}
+                            isSelected={selectedFileIds.includes(file.id)}
+                            key={file.id}
+                            onDelete={setDeletingFile}
+                            onPreview={setPreviewFile}
+                            onToggleSelected={toggleSelectedFile}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </section>
               </div>
 
@@ -410,6 +589,15 @@ export function FileManagerDrawer({ onClose, open }: { onClose: () => void; open
             onConfirm={() => void handleDelete()}
             open={Boolean(deletingFile)}
             title="删除这个文件？"
+          />
+          <ConfirmDialog
+            confirmText="删除所选文件"
+            description={`确定删除选中的 ${selectedFiles.length} 个文件吗？历史对话中的对应附件也将无法下载。`}
+            loading={bulkDeleting}
+            onCancel={() => setBulkDeleteOpen(false)}
+            onConfirm={() => void handleBulkDelete()}
+            open={bulkDeleteOpen}
+            title="批量删除文件？"
           />
           <FilePreviewDialog file={previewFile} onClose={() => setPreviewFile(null)} />
         </motion.div>
