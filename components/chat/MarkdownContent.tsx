@@ -4,7 +4,9 @@ import React from "react";
 import { Check, Copy } from "lucide-react";
 import dynamic from "next/dynamic";
 import ReactMarkdown from "react-markdown";
+import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 
 import { Pre, PreSingleLine } from "@/components/CodeBlock";
 import type { WebCitation } from "@/lib/chat/citations";
@@ -288,13 +290,18 @@ export function MarkdownContent({
   );
 
   return (
-    <div className={cn(animateNewWords && "streaming-markdown")}>
+    <div className={cn("markdown-content", animateNewWords && "streaming-markdown")}>
       <ReactMarkdown
         components={components}
         rehypePlugins={
-          animateNewWords ? [[rehypeStreamAnimated, { granularity: "word" }]] : undefined
+          animateNewWords
+            ? [
+                [rehypeKatex, { strict: "ignore", throwOnError: false }],
+                [rehypeStreamAnimated, { granularity: "word" }],
+              ]
+            : [[rehypeKatex, { strict: "ignore", throwOnError: false }]]
         }
-        remarkPlugins={[remarkGfm, citationPlugin]}
+        remarkPlugins={[remarkGfm, remarkMath, citationPlugin]}
       >
         {children}
       </ReactMarkdown>

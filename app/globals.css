@@ -2,6 +2,7 @@
 @import "@js-preview/excel/lib/index.css" layer(office-preview);
 @import "tailwindcss";
 @import "photoswipe/style.css";
+@import "katex/dist/katex.min.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -96,6 +97,26 @@ body {
 
 .markai-office-preview .docx-wrapper {
   min-height: 100%;
+}
+
+.markdown-content {
+  min-width: 0;
+}
+
+.markdown-content .katex {
+  max-width: 100%;
+}
+
+.markdown-content .katex-display {
+  margin: 1.15em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.2em 0;
+  scrollbar-width: thin;
+}
+
+.markdown-content .katex-display > .katex {
+  min-width: max-content;
 }
 
 body {
