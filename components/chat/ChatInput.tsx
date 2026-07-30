@@ -23,6 +23,7 @@ import type {
   QuotedSelection,
 } from "@/lib/chat/types";
 import { getModelDisplayName } from "@/lib/chat/helpers";
+import { isImageGenerationModel } from "@/lib/chat/image-models";
 import { cn } from "@/lib/utils";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
 import { GlobeOffIcon } from "@/components/icons/GlobeOffIcon";
@@ -103,6 +104,7 @@ export function ChatInput({
   const [previewFile, setPreviewFile] = useState<FileAttachment | null>(null);
   const hasDraft = Boolean(input.trim() || attachments.length > 0);
   const stopping = isLoading && !hasDraft;
+  const imageGenerationModel = isImageGenerationModel(selectedModel?.id);
 
   return (
     <>
@@ -268,7 +270,13 @@ export function ChatInput({
               onChange={onInput}
               onKeyDown={onKeyDown}
               onPaste={onPaste}
-              placeholder={selectedModel ? "尽管问，带图也行..." : "正在加载可用模型列表……"}
+              placeholder={
+                selectedModel
+                  ? imageGenerationModel
+                    ? "描述想生成的画面，或上传图片继续修改..."
+                    : "尽管问，带图也行..."
+                  : "正在加载可用模型列表……"
+              }
               ref={textareaRef}
               rows={1}
               value={input}
@@ -293,18 +301,27 @@ export function ChatInput({
                 >
                   <Mic size={20} />
                 </button>
-                <ToolMenu disabled={isLoading} />
+                <ToolMenu disabled={isLoading || imageGenerationModel} />
                 <button
                   className={cn(
                     "flex h-11 items-center gap-1.5 rounded-lg px-2 text-sm transition-colors md:h-9",
                     webSearchEnabled
                       ? "text-primary hover:bg-primary/5 dark:text-primary dark:hover:bg-primary/10"
                       : "text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-200",
-                    isLoading && "cursor-not-allowed opacity-60",
+                    (isLoading || imageGenerationModel) && "cursor-not-allowed opacity-60",
                   )}
-                  disabled={isLoading}
+                  data-markai-tooltip={
+                    imageGenerationModel ? "图片生成模型暂不支持联网搜索" : undefined
+                  }
+                  disabled={isLoading || imageGenerationModel}
                   onClick={onToggleWebSearch}
-                  title={webSearchEnabled ? "关闭联网搜索" : "开启联网搜索"}
+                  title={
+                    imageGenerationModel
+                      ? "图片生成模型暂不支持联网搜索"
+                      : webSearchEnabled
+                        ? "关闭联网搜索"
+                        : "开启联网搜索"
+                  }
                   type="button"
                 >
                   {webSearchEnabled ? <Globe size={18} /> : <GlobeOffIcon size={18} />}
@@ -315,15 +332,17 @@ export function ChatInput({
                 </button>
               </div>
               <div className="flex items-center gap-2">
-                <span className="hidden sm:block">
-                  <ContextWindowIndicator
-                    attachments={attachments}
-                    draft={pendingQuote ? `${pendingQuote.content}\n\n${input}` : input}
-                    messages={messages}
-                    modelId={selectedModel?.id}
-                    webSearchEnabled={webSearchEnabled}
-                  />
-                </span>
+                {!imageGenerationModel && (
+                  <span className="hidden sm:block">
+                    <ContextWindowIndicator
+                      attachments={attachments}
+                      draft={pendingQuote ? `${pendingQuote.content}\n\n${input}` : input}
+                      messages={messages}
+                      modelId={selectedModel?.id}
+                      webSearchEnabled={webSearchEnabled}
+                    />
+                  </span>
+                )}
                 <button
                   className="flex h-11 max-w-[240px] items-center gap-2 rounded-lg px-2.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:text-gray-300 dark:hover:bg-gray-700 md:h-9"
                   disabled={isLoadingModels || availableModels.length === 0}

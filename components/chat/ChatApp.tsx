@@ -12,6 +12,7 @@ import {
   startNewChat,
 } from "@/lib/chat/client/chat-controller";
 import { getModelKey } from "@/lib/chat/helpers";
+import { isImageGenerationModel } from "@/lib/chat/image-models";
 import { useChatAttachments } from "@/hooks/use-chat-attachments";
 import { useConversationScroll } from "@/hooks/use-conversation-scroll";
 import { usePreviewResize } from "@/hooks/use-preview-resize";
@@ -496,7 +497,11 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
           }}
         />
         <input
-          accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.csv,.doc,.docx,.xlsx,.pptx"
+          accept={
+            isImageGenerationModel(selectedModel?.id)
+              ? ".png,.jpg,.jpeg,.webp"
+              : ".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.md,.csv,.doc,.docx,.xlsx,.pptx"
+          }
           className="hidden"
           multiple
           onChange={handleAttachmentFiles}

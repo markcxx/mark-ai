@@ -9,13 +9,13 @@ export type ModelImageInput = {
 export type ChatMessage = {
   attachments?: FileAttachment[];
   content: string;
+  generatedImageIds?: string[];
   imageInputs?: ModelImageInput[];
   role: "user" | "model" | "assistant" | "system";
 };
 
 export type OpenAIContentPart =
-  | { text: string; type: "text" }
-  | { image_url: { url: string }; type: "image_url" };
+  { text: string; type: "text" } | { image_url: { url: string }; type: "image_url" };
 
 export type OpenAIChatMessage = {
   content: string | OpenAIContentPart[] | null;

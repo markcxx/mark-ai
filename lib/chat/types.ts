@@ -37,6 +37,17 @@ export type TranslationSegment = {
   language: string;
 };
 
+export type GeneratedImageState = {
+  file: FileAttachment;
+  prompt: string;
+  revisedPrompt?: string;
+};
+
+export type GeneratedImageSegment = {
+  type: "generated-image";
+  generatedImage: GeneratedImageState;
+};
+
 export type ContextBoundarySegment = {
   createdAt: number;
   sourceMessageId: string;
@@ -54,6 +65,7 @@ export type MessageSegment =
   | ToolSegment
   | ContentSegment
   | GeneratedFileSegment
+  | GeneratedImageSegment
   | TranslationSegment
   | ContextBoundarySegment
   | QuoteSegment;
@@ -149,12 +161,13 @@ export type ChatSession = {
 
 export type ChatStreamEvent = {
   generatedFile?: GeneratedFileState;
+  generatedImage?: GeneratedImageState;
   inputTokens?: number;
   outputTokens?: number;
   text?: string;
   totalTokens?: number;
   tokenUsageSource?: TokenUsageSource;
-  type?: "content" | "file" | "reasoning" | "tool" | "usage";
+  type?: "content" | "file" | "image" | "reasoning" | "tool" | "usage";
   webSearch?: WebSearchState;
 };
 

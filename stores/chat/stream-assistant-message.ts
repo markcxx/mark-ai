@@ -4,6 +4,7 @@ import type { StoreApi } from "zustand";
 import { getNextThinkingText } from "@/lib/chat/constants";
 import { createSmoothTextController, parseChatStreamLine } from "@/lib/chat/client/streaming";
 import { extractThinkingFromText, getMessageContentForModel } from "@/lib/chat/helpers";
+import { isImageGenerationModel } from "@/lib/chat/image-models";
 import {
   estimateMessageTokens,
   estimateMessagesTokens,
@@ -108,6 +109,9 @@ export const createStreamAssistantMessage =
           messages: historyMessages.map((m) => ({
             attachments: m.attachments,
             content: getMessageContentForModel(m),
+            generatedImageIds: m.segments
+              ?.filter((segment) => segment.type === "generated-image")
+              .map((segment) => segment.generatedImage.file.id),
             role: m.role,
           })),
           model: modelConfig.id,
@@ -289,6 +293,15 @@ export const createStreamAssistantMessage =
           updateStreamingMessage();
           return;
         }
+        if (event.type === "image" && event.generatedImage) {
+          contentController?.flush();
+          reasoningController?.flush();
+          finishCurrentReasoning();
+          currentThinkingSegment = undefined;
+          segments.push({ generatedImage: event.generatedImage, type: "generated-image" });
+          updateStreamingMessage();
+          return;
+        }
         if (event.type === "reasoning" && event.text) {
           appendReasoning(event.text);
           return;
@@ -385,7 +398,10 @@ export const createStreamAssistantMessage =
       reasoningController?.flush();
       outcome = "failed";
       console.error("Chat error:", error);
-      const failureMessage = "生成失败，请稍后重试。";
+      const failureMessage =
+        isImageGenerationModel(modelConfig.id) && error instanceof Error && error.message.trim()
+          ? error.message
+          : "生成失败，请稍后重试。";
       if (!sessionId || useSessionStore.getState().activeSessionId === sessionId) {
         toast.error(failureMessage);
       }

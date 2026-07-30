@@ -45,6 +45,7 @@ import { FloatingMenu } from "./FloatingMenu";
 import { FilePreviewDialog } from "./FilePreviewDialog";
 import { FileTypeIcon } from "./files/FileTypeIcon";
 import { FirstTokenLoader } from "./FirstTokenLoader";
+import { ImageGenerationSkeleton } from "./ImageGenerationSkeleton";
 import { MarkdownContent } from "./MarkdownContent";
 import { MessageAudioPlayer } from "./MessageAudioPlayer";
 import { MessageActionButton } from "./MessageActionButton";
@@ -52,8 +53,10 @@ import { MessageSelectionWrapper } from "./MessageSelectionWrapper";
 import { ModelAvatar } from "./ModelAvatar";
 import { ThinkingPanel } from "./ThinkingPanel";
 import { GeneratedFileToolBlock } from "./message/GeneratedFileToolBlock";
+import { GeneratedImageBlock } from "./message/GeneratedImageBlock";
 import { WebSearchToolBlock, WebSearchToolBlockItem } from "./message/WebSearchToolBlock";
 import { MessageSources } from "./message/MessageSources";
+import { isImageGenerationModel } from "@/lib/chat/image-models";
 
 function MoreMenuButton({
   align,
@@ -411,6 +414,7 @@ export function MessageItem({
     }),
   );
   const waitingForFirstOutput = Boolean(message.isStreaming && !hasStreamingOutput);
+  const waitingForImage = waitingForFirstOutput && isImageGenerationModel(message.model);
   const regenerateMode: RegenerateMode = generalSettings.overwriteRegeneratedResponse
     ? "replace"
     : "preserve";
@@ -482,9 +486,12 @@ export function MessageItem({
     }),
     [handleSpeech, replaySpeech, speechState],
   );
+  const hasTextContent = Boolean(message.content.trim());
   const moreItems = useMemo<MenuItem[]>(
     () => [
-      { icon: Pencil, label: "编辑", onClick: () => startEditingMessage(message) },
+      ...(message.role === "user" || hasTextContent
+        ? [{ icon: Pencil, label: "编辑", onClick: () => startEditingMessage(message) }]
+        : []),
       { icon: Copy, label: "复制", onClick: () => copyMessage(message) },
       { icon: MessageSquarePlus, label: "创建子话题", onClick: menuUnavailable },
       {
@@ -492,17 +499,21 @@ export function MessageItem({
         label: collapsed ? "展开消息" : "收起消息",
         onClick: () => toggleCollapseMessage(message.id),
       },
-      ...(message.role === "model" ? [speechItem] : []),
-      {
-        icon: Languages,
-        label: translating ? "翻译中…" : "翻译",
-        submenu: TRANSLATION_LANGUAGES.map((language) => ({
-          label: language.label,
-          onClick: () => {
-            if (!translating) void handleTranslate(language.value);
-          },
-        })),
-      },
+      ...(message.role === "model" && hasTextContent ? [speechItem] : []),
+      ...(hasTextContent
+        ? [
+            {
+              icon: Languages,
+              label: translating ? "翻译中…" : "翻译",
+              submenu: TRANSLATION_LANGUAGES.map((language) => ({
+                label: language.label,
+                onClick: () => {
+                  if (!translating) void handleTranslate(language.value);
+                },
+              })),
+            },
+          ]
+        : []),
       { icon: Share2, label: "分享", onClick: menuUnavailable },
       { icon: CheckSquare, label: "多选", onClick: () => enableMultiSelect(message.id) },
       {
@@ -518,6 +529,7 @@ export function MessageItem({
       deleteMessage,
       enableMultiSelect,
       handleTranslate,
+      hasTextContent,
       menuUnavailable,
       message,
       regenerateMode,
@@ -661,7 +673,7 @@ export function MessageItem({
                 </time>
               )}
             </div>
-            {waitingForFirstOutput && (
+            {waitingForFirstOutput && !waitingForImage && (
               <span className="mt-0.5 animate-pulse text-xs font-medium text-gray-400">
                 {loadingText}
               </span>
@@ -687,7 +699,11 @@ export function MessageItem({
             </div>
           ) : (
             <>
-              {waitingForFirstOutput && <FirstTokenLoader />}
+              {waitingForImage ? (
+                <ImageGenerationSkeleton />
+              ) : (
+                waitingForFirstOutput && <FirstTokenLoader />
+              )}
               {contentSegments &&
               contentSegments.some((segment) => segment.type !== "translation") ? (
                 <>
@@ -717,6 +733,15 @@ export function MessageItem({
                       return (
                         <GeneratedFileToolBlock
                           generatedFile={seg.generatedFile}
+                          key={`seg-${i}`}
+                          onPreview={setPreviewFile}
+                        />
+                      );
+                    }
+                    if (seg.type === "generated-image") {
+                      return (
+                        <GeneratedImageBlock
+                          generatedImage={seg.generatedImage}
                           key={`seg-${i}`}
                           onPreview={setPreviewFile}
                         />
@@ -803,11 +828,13 @@ export function MessageItem({
               title="重新生成"
             />
             <MessageVariantSwitcher message={message} onSelect={selectMessageVariant} />
-            <MessageActionButton
-              icon={Pencil}
-              onClick={() => startEditingMessage(message)}
-              title="编辑"
-            />
+            {hasTextContent && (
+              <MessageActionButton
+                icon={Pencil}
+                onClick={() => startEditingMessage(message)}
+                title="编辑"
+              />
+            )}
             <MessageActionButton
               danger
               icon={Trash2}

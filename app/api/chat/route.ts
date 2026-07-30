@@ -5,8 +5,10 @@ import { LOCAL_STORAGE_OWNER_ID } from "@/lib/auth-helpers";
 import { findAvailableModel } from "@/lib/available-models";
 import { prepareMessagesForContext } from "@/lib/chat/context-window";
 import { estimateTextTokens } from "@/lib/chat/metrics";
+import { isImageGenerationModel } from "@/lib/chat/image-models";
 import { getChatSession } from "@/lib/chat/storage";
 import { createGeminiStream } from "@/lib/chat/server/gemini-runtime";
+import { generateOrEditImage } from "@/lib/chat/server/image-runtime";
 import { createOpenAICompatibleStream } from "@/lib/chat/server/openai-runtime";
 import {
   getRuntimeSystemPrompt,
@@ -72,7 +74,11 @@ export async function POST(req: NextRequest) {
                   file &&
                   typeof file === "object" &&
                   typeof (file as FileAttachment).id === "string",
-              ))),
+              ))) &&
+          (!message.generatedImageIds ||
+            (Array.isArray(message.generatedImageIds) &&
+              message.generatedImageIds.length <= 4 &&
+              message.generatedImageIds.every((id: unknown) => typeof id === "string"))),
       )
     ) {
       return NextResponse.json({ error: "消息内容为空、过长或格式无效" }, { status: 400 });
@@ -83,11 +89,39 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "无法确认当前存储用户，请重新登录" }, { status: 401 });
     }
 
-    let enabledToolIds: string[] = [];
     if (typeof sessionId === "string" && sessionId) {
       const session = await getChatSession(sessionId, authorization.userId);
       if (!session) return NextResponse.json({ error: "会话不存在或无权访问" }, { status: 404 });
+    }
 
+    if (isImageGenerationModel(selectedModel.id)) {
+      try {
+        const generatedImage = await generateOrEditImage({
+          apiKey: selectedModel.apiKey,
+          baseUrl: selectedModel.baseUrl,
+          messages: messages as ChatMessage[],
+          model: selectedModel.id,
+          signal: req.signal,
+          userId: storageOwnerId,
+        });
+        return new Response(`${JSON.stringify({ generatedImage, type: "image" })}\n`, {
+          headers: {
+            "Cache-Control": "no-cache, no-transform",
+            "Content-Type": "application/x-ndjson; charset=utf-8",
+          },
+        });
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") throw error;
+        console.error("Image generation error:", error);
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : "图片生成失败，请稍后重试" },
+          { status: 502 },
+        );
+      }
+    }
+
+    let enabledToolIds: string[] = [];
+    if (typeof sessionId === "string" && sessionId) {
       const [sessionToolIds, installedToolIds] = await Promise.all([
         listSessionEnabledToolIds(storageOwnerId, sessionId),
         listInstalledToolIds(storageOwnerId),
