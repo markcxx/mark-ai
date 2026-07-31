@@ -387,12 +387,6 @@ export const useChatStore = create<ChatStore>()(
       }
 
       const baseContent = message.content.trimEnd();
-      const previousUsage = {
-        inputTokens: message.inputTokens || 0,
-        outputTokens: message.outputTokens || 0,
-        tokenUsageSource: message.tokenUsageSource || "estimated",
-        totalTokens: message.totalTokens || 0,
-      } as const;
       const initialContent = baseContent ? `${baseContent}\n\n` : "";
       const continuePrompt: Message = {
         content: "请从上次中断的位置继续，不要重复已经输出过的内容。",
@@ -433,22 +427,9 @@ export const useChatStore = create<ChatStore>()(
       );
       const savedMessages = nextMessages.map((item) => {
         if (item.id !== message.id) return item;
-        const hasPreviousUsage = previousUsage.totalTokens > 0;
         let completedMessage: Message = {
           ...item,
           ...streamedMessage,
-          ...(hasPreviousUsage
-            ? {
-                inputTokens: previousUsage.inputTokens + (streamedMessage.inputTokens || 0),
-                outputTokens: previousUsage.outputTokens + (streamedMessage.outputTokens || 0),
-                tokenUsageSource:
-                  previousUsage.tokenUsageSource === "provider" &&
-                  streamedMessage.tokenUsageSource === "provider"
-                    ? "provider"
-                    : "estimated",
-                totalTokens: previousUsage.totalTokens + (streamedMessage.totalTokens || 0),
-              }
-            : {}),
         };
         if (completedMessage.variants && completedMessage.activeVariantId) {
           const activeVariant = toMessageVariant(

@@ -14,6 +14,7 @@ import {
   getHtmlPreviewDocument,
   type HtmlPreviewPayload,
 } from "./htmlPreviewUtils";
+import { WordDocumentLivePreview } from "./WordDocumentLivePreview";
 
 type PreviewMode = "preview" | "code";
 type FilePreviewPayload = Extract<HtmlPreviewPayload, { kind: "file" }>;
@@ -166,6 +167,16 @@ function PreviewFrame({ preview }: { preview: HtmlPreviewPayload }) {
     setLoading(preview.kind === "file");
   }, [preview.id, preview.kind]);
 
+  if (preview.kind === "word-document") {
+    return (
+      <WordDocumentLivePreview
+        document={preview.document}
+        progress={preview.progress}
+        status={preview.status}
+      />
+    );
+  }
+
   if (preview.kind === "file") {
     if (getOfficeRendererKind(preview)) return <OfficeFilePreview preview={preview} />;
 
@@ -264,9 +275,10 @@ export function HtmlPreviewPanel({
   resizing: boolean;
 }) {
   const [mode, setMode] = useState<PreviewMode>("preview");
-  const htmlContent = preview.kind === "file" ? "" : preview.content;
+  const htmlContent = preview.kind === "html" || preview.kind === undefined ? preview.content : "";
   const previewDocument = useMemo(() => getHtmlPreviewDocument(htmlContent), [htmlContent]);
   const isFilePreview = preview.kind === "file";
+  const isWordPreview = preview.kind === "word-document";
 
   return (
     <aside className="relative flex min-w-0 flex-col overflow-hidden border-0 bg-[var(--chat-panel-bg)] opacity-100 shadow-none transition-opacity duration-300 ease-out dark:border-gray-700 md:rounded-xl md:border md:border-[#e5e5e5]">
@@ -291,9 +303,13 @@ export function HtmlPreviewPanel({
       )}
       <div className="flex min-h-12 items-center justify-between gap-3 border-b border-gray-200 bg-[var(--chat-header-bg)] px-3 backdrop-blur-md dark:border-white/10">
         <div className="flex min-w-0 items-center gap-2">
-          {isFilePreview ? (
+          {isFilePreview || isWordPreview ? (
             <FileTypeIcon
-              contentType={preview.contentType}
+              contentType={
+                isFilePreview
+                  ? preview.contentType
+                  : "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              }
               name={preview.title}
               tile
               tileClassName="h-8 w-8 rounded-md"
@@ -316,7 +332,7 @@ export function HtmlPreviewPanel({
             >
               <Download size={15} />
             </a>
-          ) : (
+          ) : !isWordPreview ? (
             <button
               aria-label="下载 HTML"
               className="flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-gray-100"
@@ -326,7 +342,7 @@ export function HtmlPreviewPanel({
             >
               <Download size={15} />
             </button>
-          )}
+          ) : null}
           <button
             className="hidden h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-gray-100 md:flex"
             onClick={() => onFullscreenChange(!fullscreen)}
@@ -347,10 +363,10 @@ export function HtmlPreviewPanel({
       </div>
 
       <div className="min-h-0 flex-1 overflow-hidden">
-        {isFilePreview || mode === "preview" ? (
+        {isFilePreview || isWordPreview || mode === "preview" ? (
           <PreviewFrame
             preview={
-              isFilePreview
+              isFilePreview || isWordPreview
                 ? preview
                 : { content: previewDocument, id: preview.id, title: preview.title }
             }

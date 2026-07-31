@@ -26,7 +26,6 @@ import {
 } from "@/lib/chat/server/stream-protocol";
 import type { ChatMessage, OpenAIChatMessage, OpenAIToolCall } from "@/lib/chat/server/types";
 import {
-  addTokenUsage,
   getUsageNumber,
   resolveTokenUsage,
   type ResolvedTokenUsage,
@@ -81,6 +80,7 @@ export const createOpenAICompatibleStream = async (
 
   const stream = new ReadableStream({
     async start(controller) {
+      const toolRuntimeState = new Map<string, unknown>();
       const citationIdsByUrl = new Map<string, number>();
       let nextCitationId = 1;
 
@@ -321,13 +321,17 @@ export const createOpenAICompatibleStream = async (
       };
 
       try {
-        const MAX_TOOL_ROUNDS = 5;
+        const MAX_TOOL_ROUNDS = builtinFunctions.some(
+          (toolFunction) => toolFunction.name === "word_document_begin",
+        )
+          ? 16
+          : 5;
         let currentMessages = openAIMessages;
-        let cumulativeUsage: ResolvedTokenUsage | undefined;
+        let latestUsage: ResolvedTokenUsage | undefined;
 
         for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
           const pass = await streamModelResponse(currentMessages, availableTools.length > 0);
-          cumulativeUsage = addTokenUsage(cumulativeUsage, pass.usage);
+          latestUsage = pass.usage;
           const executableToolCalls = pass.toolCalls.filter((toolCall) =>
             allowedToolNames.has(toolCall.function.name),
           );
@@ -344,7 +348,17 @@ export const createOpenAICompatibleStream = async (
           for (const toolCall of executableToolCalls) {
             const builtinTool = getBuiltinToolByFunction(toolCall.function.name);
             if (builtinTool && toolRuntime) {
+              let args: Record<string, unknown> = {};
+              try {
+                const parsedArgs = JSON.parse(toolCall.function.arguments || "{}");
+                if (parsedArgs && typeof parsedArgs === "object") {
+                  args = parsedArgs as Record<string, unknown>;
+                }
+              } catch {
+                // The executor will surface required-argument errors in a consistent format.
+              }
               const runningState = {
+                artifactId: typeof args.documentId === "string" ? args.documentId : undefined,
                 callId: toolCall.id,
                 status: "running" as const,
                 toolId: builtinTool.id,
@@ -353,19 +367,18 @@ export const createOpenAICompatibleStream = async (
               controller.enqueue(encodeGeneratedFileEvent(encoder, runningState));
 
               try {
-                const parsedArgs = JSON.parse(toolCall.function.arguments || "{}");
-                const args =
-                  parsedArgs && typeof parsedArgs === "object"
-                    ? (parsedArgs as Record<string, unknown>)
-                    : {};
                 const result = await executeBuiltinTool(toolCall.function.name, args, {
+                  runtimeState: toolRuntimeState,
                   sessionId: toolRuntime.sessionId,
                   userId: toolRuntime.userId,
                 });
                 controller.enqueue(
                   encodeGeneratedFileEvent(encoder, {
                     ...runningState,
+                    artifactId: result.preview?.documentId || runningState.artifactId,
                     file: result.file,
+                    preview: result.preview,
+                    progress: result.progress,
                     status: "done",
                   }),
                 );
@@ -498,8 +511,8 @@ export const createOpenAICompatibleStream = async (
           currentMessages = [...currentMessages, assistantToolMessage, ...toolResultMessages];
         }
 
-        if (cumulativeUsage) {
-          controller.enqueue(encodeUsageEvent(encoder, cumulativeUsage));
+        if (latestUsage) {
+          controller.enqueue(encodeUsageEvent(encoder, latestUsage));
         }
         controller.close();
       } catch (error) {

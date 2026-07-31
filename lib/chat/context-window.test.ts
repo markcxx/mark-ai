@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { ModelMetadataWithContext } from "@/lib/model-metadata";
-import { getOutputReserveTokens, prepareMessagesForContext } from "./context-window";
+import {
+  estimateDraftContextTokens,
+  getOutputReserveTokens,
+  prepareMessagesForContext,
+} from "./context-window";
 
 const metadata: ModelMetadataWithContext = {
   contextWindowTokens: 4096,
@@ -29,5 +33,17 @@ describe("context window preparation", () => {
     expect(result.removedMessageCount).toBe(2);
     expect(result.messages).toEqual([{ content: "新问题", role: "user" }]);
     expect(result.estimatedInputTokens).toBeLessThanOrEqual(result.inputBudgetTokens + 256);
+  });
+
+  it("counts enabled tool context before the conversation starts", () => {
+    expect(
+      estimateDraftContextTokens({
+        attachments: [],
+        draft: "",
+        messages: [],
+        toolContextTokens: 4000,
+        webSearchEnabled: false,
+      }),
+    ).toBe(4512);
   });
 });

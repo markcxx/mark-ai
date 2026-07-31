@@ -125,16 +125,26 @@ export const estimateDraftContextTokens = ({
   webSearchEnabled: boolean;
 }) => {
   const draftContent = draft.trim();
-  if (messages.length === 0 && !draftContent && attachments.length === 0) return 0;
+  if (
+    messages.length === 0 &&
+    !draftContent &&
+    attachments.length === 0 &&
+    toolContextTokens === 0 &&
+    !webSearchEnabled
+  ) {
+    return 0;
+  }
 
   const draftMessage =
     draftContent || attachments.length > 0
       ? [{ content: draftContent || "请查看我上传的附件。", role: "user" }]
       : [];
-  const messageTokens = estimateContextMessagesTokens([
+  const contextMessages = [
     ...messages.map((message) => ({ content: message.content, role: message.role })),
     ...draftMessage,
-  ]);
+  ];
+  const messageTokens =
+    contextMessages.length > 0 ? estimateContextMessagesTokens(contextMessages) : 0;
   const storedAttachments = messages.flatMap((message) => message.attachments || []);
   const attachmentTokens = [...storedAttachments, ...attachments].reduce(
     (total, file) => total + estimateAttachmentTokens(file),

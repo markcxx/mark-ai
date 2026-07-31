@@ -74,6 +74,9 @@ export const createStreamAssistantMessage =
       });
     };
 
+    const getResolvedOutputTokens = (estimatedOutputTokens: number) =>
+      tokenUsageSource === "provider" ? outputTokens : outputTokens || estimatedOutputTokens;
+
     const finishCurrentReasoning = () => {
       const seg = currentThinkingSegment;
       if (seg && seg.isActive) {
@@ -138,6 +141,12 @@ export const createStreamAssistantMessage =
       }
       if (!response.body) throw new Error("模型服务未返回可读取的响应");
 
+      const serverContextInputHeader = response.headers.get("X-MarkAI-Context-Input");
+      const serverContextInputTokens =
+        serverContextInputHeader === null ? Number.NaN : Number(serverContextInputHeader);
+      if (Number.isFinite(serverContextInputTokens) && serverContextInputTokens >= 0) {
+        inputTokens = Math.round(serverContextInputTokens);
+      }
       const removedContextMessages = Number(response.headers.get("X-MarkAI-Context-Removed"));
       const contextContentTruncated = response.headers.get("X-MarkAI-Context-Truncated") === "1";
       if (removedContextMessages > 0 || contextContentTruncated) {
@@ -165,7 +174,7 @@ export const createStreamAssistantMessage =
         const eventReasoning = getAllReasoning();
         const reasoning = `${eventReasoning}${extracted.reasoning}`;
         const estimatedOutputTokens = estimateGeneratedOutputTokens();
-        const nextOutputTokens = outputTokens || estimatedOutputTokens;
+        const nextOutputTokens = getResolvedOutputTokens(estimatedOutputTokens);
         const nextTotalTokens = getTotalTokens(inputTokens, nextOutputTokens, totalTokens);
         const anyActive = isAnyThinkingActive() || extracted.hasOpenThinking;
         set((s) => ({
@@ -186,6 +195,8 @@ export const createStreamAssistantMessage =
           ),
         }));
       };
+
+      updateStreamingMessage();
 
       const commitContent = (chunk: string) => {
         plainContent += chunk;
@@ -286,7 +297,22 @@ export const createStreamAssistantMessage =
               segment.generatedFile.callId === generatedFile.callId,
           );
           if (existingIdx >= 0) {
-            segments[existingIdx] = { generatedFile, type: "generated-file" };
+            const previous = (
+              segments[existingIdx] as Extract<MessageSegment, { type: "generated-file" }>
+            ).generatedFile;
+            segments[existingIdx] = {
+              generatedFile: {
+                ...previous,
+                ...generatedFile,
+                file: generatedFile.file || previous.file,
+                preview: generatedFile.preview || previous.preview,
+                progress:
+                  generatedFile.status === "running"
+                    ? undefined
+                    : generatedFile.progress || previous.progress,
+              },
+              type: "generated-file",
+            };
           } else {
             segments.push({ generatedFile, type: "generated-file" });
           }
@@ -341,7 +367,7 @@ export const createStreamAssistantMessage =
           .filter((s): s is Extract<MessageSegment, { type: "thinking" }> => s.type === "thinking")
           .reduce((sum, s) => sum + (s.duration || 0), 0) || undefined;
       const estimatedOutputTokens = estimateGeneratedOutputTokens();
-      const finalOutputTokens = outputTokens || estimatedOutputTokens;
+      const finalOutputTokens = getResolvedOutputTokens(estimatedOutputTokens);
       const finalTotalTokens = getTotalTokens(inputTokens, finalOutputTokens, totalTokens);
       return {
         content: extracted.content,
@@ -376,7 +402,7 @@ export const createStreamAssistantMessage =
             )
             .reduce((sum, s) => sum + (s.duration || 0), 0) || undefined;
         const estimatedOutputTokens = estimateGeneratedOutputTokens();
-        const finalOutputTokens = outputTokens || estimatedOutputTokens;
+        const finalOutputTokens = getResolvedOutputTokens(estimatedOutputTokens);
         const finalTotalTokens = getTotalTokens(inputTokens, finalOutputTokens, totalTokens);
         return {
           content: extracted.content || plainContent,

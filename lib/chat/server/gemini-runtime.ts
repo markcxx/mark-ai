@@ -9,7 +9,12 @@ import {
   getContextHeaders,
 } from "@/lib/chat/server/stream-protocol";
 import type { ChatMessage } from "@/lib/chat/server/types";
-import { getUsageNumber, resolveTokenUsage, type TokenUsage } from "@/lib/chat/token-usage";
+import {
+  getUsageNumber,
+  resolveTokenUsage,
+  type ResolvedTokenUsage,
+  type TokenUsage,
+} from "@/lib/chat/token-usage";
 import { executeBuiltinTool } from "@/lib/tools/executors";
 import { getBuiltinToolByFunction, getToolFunctions } from "@/lib/tools/registry";
 
@@ -65,12 +70,18 @@ export const createGeminiStream = async ({
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
+        const toolRuntimeState = new Map<string, unknown>();
         const toolContents = [...contents] as any[];
         let outputText = "";
-        let providerUsage: TokenUsage | undefined;
+        let latestUsage: ResolvedTokenUsage | undefined;
 
         try {
-          for (let round = 0; round < 5; round += 1) {
+          const maxToolRounds = builtinFunctions.some(
+            (toolFunction) => toolFunction.name === "word_document_begin",
+          )
+            ? 16
+            : 5;
+          for (let round = 0; round < maxToolRounds; round += 1) {
             const response = await ai.models.generateContent({
               config: {
                 abortSignal: signal,
@@ -88,24 +99,35 @@ export const createGeminiStream = async ({
               model,
             });
             const usageMetadata = response.usageMetadata;
+            let providerUsage: TokenUsage | undefined;
             if (usageMetadata) {
               const inputTokens = getUsageNumber(usageMetadata.promptTokenCount);
               const candidateTokens = getUsageNumber(usageMetadata.candidatesTokenCount);
               const reasoningTokens = getUsageNumber(usageMetadata.thoughtsTokenCount) || 0;
               const totalTokens = getUsageNumber(usageMetadata.totalTokenCount);
               providerUsage = {
-                inputTokens: inputTokens ?? providerUsage?.inputTokens,
+                inputTokens,
                 outputTokens:
                   (totalTokens !== undefined && inputTokens !== undefined
                     ? Math.max(totalTokens - inputTokens, 0)
                     : candidateTokens !== undefined
                       ? candidateTokens + reasoningTokens
-                      : undefined) ?? providerUsage?.outputTokens,
-                totalTokens: totalTokens ?? providerUsage?.totalTokens,
+                      : undefined),
+                totalTokens,
               };
             }
 
             const functionCalls = response.functionCalls || [];
+            const passUsage = resolveTokenUsage({
+              estimatedInputTokens: estimateTextTokens(
+                JSON.stringify({ contents: toolContents, tools: builtinFunctions }),
+              ),
+              estimatedOutputTokens: estimateTextTokens(
+                JSON.stringify({ functionCalls, text: response.text || "" }),
+              ),
+              providerUsage,
+            });
+            latestUsage = passUsage;
             if (functionCalls.length === 0) {
               outputText = response.text || "";
               if (outputText) controller.enqueue(encodeStreamEvent(encoder, "content", outputText));
@@ -121,8 +143,13 @@ export const createGeminiStream = async ({
               const builtinTool = getBuiltinToolByFunction(name);
               const callId = functionCall.id || `gemini-tool-${round}-${index}`;
               if (!builtinTool) continue;
+              const functionArgs = functionCall.args || {};
 
               const runningState = {
+                artifactId:
+                  typeof functionArgs.documentId === "string"
+                    ? functionArgs.documentId
+                    : undefined,
                 callId,
                 status: "running" as const,
                 toolId: builtinTool.id,
@@ -131,14 +158,18 @@ export const createGeminiStream = async ({
               controller.enqueue(encodeGeneratedFileEvent(encoder, runningState));
 
               try {
-                const result = await executeBuiltinTool(name, functionCall.args || {}, {
+                const result = await executeBuiltinTool(name, functionArgs, {
+                  runtimeState: toolRuntimeState,
                   sessionId: toolRuntime.sessionId,
                   userId: toolRuntime.userId,
                 });
                 controller.enqueue(
                   encodeGeneratedFileEvent(encoder, {
                     ...runningState,
+                    artifactId: result.preview?.documentId || runningState.artifactId,
                     file: result.file,
+                    preview: result.preview,
+                    progress: result.progress,
                     status: "done",
                   }),
                 );
@@ -172,18 +203,9 @@ export const createGeminiStream = async ({
             toolContents.push({ parts: responseParts, role: "user" });
           }
 
-          controller.enqueue(
-            encodeUsageEvent(
-              encoder,
-              resolveTokenUsage({
-                estimatedInputTokens: estimateTextTokens(
-                  JSON.stringify({ contents: toolContents, tools: builtinFunctions }),
-                ),
-                estimatedOutputTokens: estimateTextTokens(outputText),
-                providerUsage,
-              }),
-            ),
-          );
+          if (latestUsage) {
+            controller.enqueue(encodeUsageEvent(encoder, latestUsage));
+          }
           controller.close();
         } catch (error) {
           controller.error(error);
@@ -236,15 +258,13 @@ export const createGeminiStream = async ({
           };
         }
       }
+      const resolvedUsage = resolveTokenUsage({
+        estimatedInputTokens: estimateTextTokens(JSON.stringify(contents)),
+        estimatedOutputTokens: estimateTextTokens(outputText),
+        providerUsage,
+      });
       controller.enqueue(
-        encodeUsageEvent(
-          encoder,
-          resolveTokenUsage({
-            estimatedInputTokens: estimateTextTokens(JSON.stringify(contents)),
-            estimatedOutputTokens: estimateTextTokens(outputText),
-            providerUsage,
-          }),
-        ),
+        encodeUsageEvent(encoder, resolvedUsage),
       );
       controller.close();
     },

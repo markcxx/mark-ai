@@ -1,6 +1,7 @@
 import { Check, ChevronRight, Download, Eye, FileOutput, Loader2, X } from "lucide-react";
 
 import { isFilePreviewable } from "@/components/chat/FilePreviewDialog";
+import { useHtmlPreview } from "@/components/chat/HtmlPreviewContext";
 import type { GeneratedFileState } from "@/lib/chat/types";
 import { getBuiltinTool } from "@/lib/tools/registry";
 import { cn } from "@/lib/utils";
@@ -10,6 +11,16 @@ const formatSize = (size: number) =>
     ? `${Math.max(1, Math.ceil(size / 1024))} KB`
     : `${(size / 1024 / 1024).toFixed(1)} MB`;
 
+const WORD_RUNNING_LABELS: Record<string, string> = {
+  word_document_append: "正在构建下一个章节",
+  word_document_begin: "正在规划文档结构",
+  word_document_finalize: "正在打包 Word 文档",
+  word_document_inspect: "正在检查文档结构与格式",
+  word_document_open: "正在打开上一份可编辑 Word",
+  word_document_restyle: "正在修改整份文档的样式",
+  word_document_revise: "正在修改文档内容或格式",
+};
+
 export function GeneratedFileToolBlock({
   generatedFile,
   onPreview,
@@ -17,15 +28,18 @@ export function GeneratedFileToolBlock({
   generatedFile: GeneratedFileState;
   onPreview?: (file: NonNullable<GeneratedFileState["file"]>) => void;
 }) {
+  const htmlPreview = useHtmlPreview();
   const running = generatedFile.status === "running";
   const failed = generatedFile.status === "error";
   const file = generatedFile.file;
+  const progress = generatedFile.progress;
+  const livePreview = generatedFile.preview;
   const toolLabel = getBuiltinTool(generatedFile.toolId)?.name || "文件生成";
   const summaryLabel = running
-    ? `正在调用${toolLabel}`
+    ? WORD_RUNNING_LABELS[generatedFile.toolName] || `正在调用${toolLabel}`
     : failed
       ? `${toolLabel}调用失败`
-      : `已调用${toolLabel}`;
+      : progress?.label || `已调用${toolLabel}`;
 
   return (
     <details className="group/file-tool mb-2.5 overflow-hidden rounded-lg border border-gray-200 bg-white transition-colors open:border-gray-300 dark:border-white/10 dark:bg-white/[0.025] dark:open:border-white/15">
@@ -76,16 +90,66 @@ export function GeneratedFileToolBlock({
           )}
         </div>
 
+        {progress && !failed && (
+          <div className="mt-2.5 space-y-1.5">
+            <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400">
+              <span>{progress.detail || progress.label}</span>
+              <span className="shrink-0 pl-3">
+                {progress.current}/{progress.total}
+              </span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-white/[0.08]">
+              <div
+                className="h-full rounded-full bg-primary transition-[width] duration-300"
+                style={{
+                  width: `${Math.max(
+                    progress.total > 0 ? (progress.current / progress.total) * 100 : 0,
+                    progress.phase === "plan" ? 4 : 0,
+                  )}%`,
+                }}
+              />
+            </div>
+          </div>
+        )}
+
         {running && (
           <div className="mt-2 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
             <Loader2 className="animate-spin" size={13} />
-            正在生成文件，请稍候…
+            {WORD_RUNNING_LABELS[generatedFile.toolName] || "正在执行，请稍候…"}
           </div>
         )}
 
         {failed && (
           <div className="mt-2 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-400/20 dark:bg-red-500/10 dark:text-red-300">
             {generatedFile.error || "文件生成失败，请稍后重试"}
+          </div>
+        )}
+
+        {livePreview && !file && !failed && (
+          <div className="mt-2.5 flex items-center justify-between gap-3">
+            <span className="flex min-w-0 items-center gap-1.5 text-xs text-primary">
+              {running ? <Loader2 className="animate-spin" size={13} /> : <Check size={14} />}
+              {running ? "正在刷新右侧实时预览" : "右侧实时预览已更新"}
+            </span>
+            {htmlPreview && (
+              <button
+                className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-primary dark:text-gray-300 dark:hover:bg-white/[0.06] dark:hover:text-primary"
+                onClick={() =>
+                  htmlPreview.openPreview({
+                    document: livePreview,
+                    id: `word-live-${livePreview.documentId}-${livePreview.revision}`,
+                    kind: "word-document",
+                    progress,
+                    status: generatedFile.status,
+                    title: livePreview.title,
+                  })
+                }
+                type="button"
+              >
+                <Eye size={14} />
+                查看
+              </button>
+            )}
           </div>
         )}
 

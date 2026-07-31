@@ -4,7 +4,15 @@ import {
   executeSummarizeNumbers,
 } from "./calculator";
 import { executeCreateExcel } from "./excel";
-import { executeCreateWord } from "./word";
+import {
+  executeAppendWordDocument,
+  executeBeginWordDocument,
+  executeFinalizeWordDocument,
+  executeInspectWordDocument,
+  executeOpenWordDocument,
+  executeRestyleWordDocument,
+  executeReviseWordDocument,
+} from "./word";
 
 import type { ToolExecutionContext, ToolExecutionResult } from "../types";
 
@@ -14,8 +22,20 @@ export const executeBuiltinTool = async (
   context: ToolExecutionContext,
 ): Promise<ToolExecutionResult> => {
   switch (name) {
-    case "create_word_document":
-      return executeCreateWord(args, context);
+    case "word_document_begin":
+      return executeBeginWordDocument(args, context);
+    case "word_document_open":
+      return executeOpenWordDocument(args, context);
+    case "word_document_append":
+      return executeAppendWordDocument(args, context);
+    case "word_document_revise":
+      return executeReviseWordDocument(args, context);
+    case "word_document_restyle":
+      return executeRestyleWordDocument(args, context);
+    case "word_document_inspect":
+      return executeInspectWordDocument(args, context);
+    case "word_document_finalize":
+      return executeFinalizeWordDocument(args, context);
     case "create_excel_workbook":
       return executeCreateExcel(args, context);
     case "calculate_expression":

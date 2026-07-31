@@ -57,6 +57,13 @@
       "when": 1785083601830,
       "tag": "0007_true_daimon_hellstrom",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785465407553,
+      "tag": "0008_rare_giant_man",
+      "breakpoints": true
     }
   ]
 }

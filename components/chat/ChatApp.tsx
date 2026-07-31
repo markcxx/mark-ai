@@ -146,6 +146,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const splitPanelRef = useRef<HTMLDivElement>(null);
   const dragDepthRef = useRef(0);
+  const autoPreviewSignatureRef = useRef("");
   const [selectionLayoutMode, setSelectionLayoutMode] = useState(false);
   const [activeHtmlPreview, setActiveHtmlPreview] = useState<HtmlPreviewPayload | null>(null);
   const [htmlPreviewFullscreen, setHtmlPreviewFullscreen] = useState(false);
@@ -456,6 +457,51 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
     setHtmlPreviewFullscreen(false);
     useUIStore.getState().setSidebarOpen(false);
   }, []);
+
+  useEffect(() => {
+    const generatedFile = messages
+      .flatMap((message) => message.segments || [])
+      .filter((segment) => segment.type === "generated-file")
+      .map((segment) => segment.generatedFile)
+      .filter((item) => item.preview?.kind === "word-document")
+      .at(-1);
+    const document = generatedFile?.preview;
+    if (!generatedFile || !document) return;
+
+    const signature = [
+      generatedFile.callId,
+      generatedFile.status,
+      document.documentId,
+      document.revision,
+      generatedFile.file?.id || "live",
+    ].join(":");
+    if (signature === autoPreviewSignatureRef.current) return;
+
+    autoPreviewSignatureRef.current = signature;
+    if (!isLoading) return;
+
+    if (generatedFile.file) {
+      openHtmlPreview({
+        contentType: generatedFile.file.contentType,
+        dataUrl: `/api/files/${generatedFile.file.id}/preview?raw=1`,
+        downloadUrl: generatedFile.file.url,
+        id: `file-${generatedFile.file.id}`,
+        kind: "file",
+        sourceUrl: `/api/files/${generatedFile.file.id}/preview`,
+        title: generatedFile.file.name,
+      });
+      return;
+    }
+
+    openHtmlPreview({
+      document,
+      id: `word-live-${document.documentId}-${document.revision}`,
+      kind: "word-document",
+      progress: generatedFile.progress,
+      status: generatedFile.status,
+      title: document.title,
+    });
+  }, [isLoading, messages, openHtmlPreview]);
 
   const closeHtmlPreview = useCallback(() => {
     setActiveHtmlPreview(null);

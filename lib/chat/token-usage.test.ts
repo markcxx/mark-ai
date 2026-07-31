@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { addTokenUsage, resolveTokenUsage } from "./token-usage";
+import { getUsageNumber, resolveTokenUsage } from "./token-usage";
 
 describe("token usage", () => {
   it("derives a missing provider field from the total", () => {
@@ -18,13 +18,31 @@ describe("token usage", () => {
     });
   });
 
-  it("marks mixed accumulated usage as estimated", () => {
-    const provider = resolveTokenUsage({
-      estimatedInputTokens: 0,
-      estimatedOutputTokens: 0,
-      providerUsage: { inputTokens: 10, outputTokens: 5 },
+  it("preserves the exact usage returned by an OpenAI-compatible provider", () => {
+    expect(
+      resolveTokenUsage({
+        estimatedInputTokens: 400,
+        estimatedOutputTokens: 200,
+        providerUsage: { inputTokens: 1234, outputTokens: 567, totalTokens: 1801 },
+      }),
+    ).toEqual({
+      inputTokens: 1234,
+      outputTokens: 567,
+      tokenUsageSource: "provider",
+      totalTokens: 1801,
     });
-    const estimated = resolveTokenUsage({ estimatedInputTokens: 4, estimatedOutputTokens: 2 });
-    expect(addTokenUsage(provider, estimated).tokenUsageSource).toBe("estimated");
+  });
+
+  it("uses estimates only when provider usage is absent", () => {
+    expect(resolveTokenUsage({ estimatedInputTokens: 400, estimatedOutputTokens: 200 })).toEqual({
+      inputTokens: 400,
+      outputTokens: 200,
+      tokenUsageSource: "estimated",
+      totalTokens: 600,
+    });
+  });
+
+  it("accepts numeric usage fields from compatible proxies", () => {
+    expect(getUsageNumber(undefined, "1234")).toBe(1234);
   });
 });

@@ -1,4 +1,6 @@
 import type { ComponentType } from "react";
+import type { ToolProgress } from "@/lib/tools/types";
+import type { WordDocumentPreviewState } from "@/lib/tools/word/types";
 
 export type ThinkingSegment = {
   type: "thinking";
@@ -18,9 +20,12 @@ export type ContentSegment = {
 };
 
 export type GeneratedFileState = {
+  artifactId?: string;
   callId: string;
   error?: string;
   file?: FileAttachment & { url: string };
+  preview?: WordDocumentPreviewState;
+  progress?: ToolProgress;
   status: "running" | "done" | "error";
   toolId: string;
   toolName: string;

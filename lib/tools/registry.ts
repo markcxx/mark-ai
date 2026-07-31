@@ -1,27 +1,199 @@
-import type { BuiltinToolDefinition } from "./types";
+import type { BuiltinToolDefinition, ToolJsonSchema } from "./types";
+
+const WORD_FORMAT_SCHEMA: ToolJsonSchema = {
+  additionalProperties: false,
+  properties: {
+    alignment: { enum: ["left", "center", "right", "justified"], type: "string" },
+    firstLineIndentChars: { maximum: 4, minimum: 0, type: "number" },
+    keepNext: { type: "boolean" },
+    lineSpacing: { maximum: 3, minimum: 1, type: "number" },
+    spacingAfter: { maximum: 72, minimum: 0, type: "number" },
+    spacingBefore: { maximum: 72, minimum: 0, type: "number" },
+  },
+  type: "object",
+};
+
+const WORD_RUN_SCHEMA: ToolJsonSchema = {
+  additionalProperties: false,
+  properties: {
+    bold: { type: "boolean" },
+    color: { description: "Optional six-digit hex color, for example 2563EB.", type: "string" },
+    font: { maxLength: 80, type: "string" },
+    highlight: {
+      enum: ["yellow", "green", "cyan", "magenta", "red", "lightGray"],
+      type: "string",
+    },
+    italics: { type: "boolean" },
+    size: {
+      description:
+        "Exceptional inline font size in points, only when the user explicitly requests it. Normally omit this to inherit the preset.",
+      maximum: 16,
+      minimum: 8,
+      type: "number",
+    },
+    strike: { type: "boolean" },
+    text: { maxLength: 10000, type: "string" },
+    underline: { type: "boolean" },
+  },
+  required: ["text"],
+  type: "object",
+};
+
+const WORD_BLOCK_SCHEMA: ToolJsonSchema = {
+  additionalProperties: false,
+  description:
+    "One semantic document block. Use preset defaults and include format or runs only for intentional exceptions.",
+  properties: {
+    format: WORD_FORMAT_SCHEMA,
+    header: { description: "Whether the first table row is a header.", type: "boolean" },
+    id: {
+      description: "Stable unique block ID used by later revision steps, for example s1-p1.",
+      maxLength: 60,
+      type: "string",
+    },
+    items: {
+      description: "List item text. Used only by list blocks.",
+      items: { maxLength: 2000, type: "string" },
+      maxItems: 100,
+      type: "array",
+    },
+    level: {
+      description: "Heading level 1-3 or list nesting level 0-4.",
+      maximum: 4,
+      minimum: 0,
+      type: "integer",
+    },
+    ordered: { type: "boolean" },
+    rows: {
+      description: "Table cells as rows of strings. Used only by table blocks.",
+      items: {
+        items: { maxLength: 5000, type: "string" },
+        maxItems: 20,
+        type: "array",
+      },
+      maxItems: 100,
+      type: "array",
+    },
+    runs: {
+      description: "Inline formatted text. Omit when plain text is sufficient.",
+      items: WORD_RUN_SCHEMA,
+      maxItems: 100,
+      type: "array",
+    },
+    style: { enum: ["body", "caption", "note"], type: "string" },
+    text: { maxLength: 20000, type: "string" },
+    type: {
+      enum: ["heading", "paragraph", "quote", "list", "table", "page-break"],
+      type: "string",
+    },
+  },
+  required: ["id", "type"],
+  type: "object",
+};
 
 const WORD_TOOL: BuiltinToolDefinition = {
   accent: "blue",
   category: "documents",
-  description: "把结构化内容整理为排版清晰的 Word 文档，适合报告、方案、纪要与正式材料。",
-  features: ["DOCX 原生文件", "标题与段落层级", "列表和基础排版"],
+  description: "分步骤生成并可跨消息继续编辑 Word 文档，支持丰富格式与原生 DOCX 输出。",
+  features: ["10 类差异化文档家族", "分章节流式构建", "打开并局部修改"],
   functions: [
     {
       description:
-        "Create a downloadable Microsoft Word DOCX document. Use it when the user explicitly asks for a Word file, DOCX file, report, proposal, meeting notes, or another document that should be delivered as an editable Word file.",
-      name: "create_word_document",
+        "Open an editable Word document previously finalized in this conversation. Omit both selectors to open the most recently updated Word document. Use this before revising or restyling an existing document; do not call begin for an edit request.",
+      name: "word_document_open",
       parameters: {
         additionalProperties: false,
         properties: {
-          content: {
+          documentId: {
             description:
-              "The complete document content in Markdown. Use # headings, paragraphs, bullet lists, and numbered lists to express structure.",
-            maxLength: 60000,
+              "Optional editable Word document ID returned by an earlier Word tool call.",
+            maxLength: 80,
             type: "string",
+          },
+          fileId: {
+            description: "Optional generated file ID when the user refers to a specific Word file.",
+            maxLength: 256,
+            type: "string",
+          },
+        },
+        type: "object",
+      },
+    },
+    {
+      description:
+        "Start a stateful Word document job by choosing one formatting preset and planning its outline. This must be the first Word step. Do not include body content yet.",
+      name: "word_document_begin",
+      parameters: {
+        additionalProperties: false,
+        properties: {
+          documentType: {
+            description:
+              "Semantic document family. Choose the closest real-world archetype; use general-clean only when none of the specialized families fits.",
+            enum: [
+              "general-clean",
+              "contract",
+              "business-proposal",
+              "formal-report",
+              "academic-paper",
+              "meeting-minutes",
+              "official-notice",
+              "operations-manual",
+              "resume",
+              "product-spec",
+            ],
+            type: "string",
+          },
+          features: {
+            description:
+              "Optional global Word features. Normally omit so the selected document family supplies appropriate defaults.",
+            items: { enum: ["header", "page-number", "table-of-contents"], type: "string" },
+            maxItems: 3,
+            type: "array",
           },
           filename: {
             description: "Output filename without a path. The .docx extension is optional.",
             maxLength: 100,
+            type: "string",
+          },
+          metadata: {
+            description:
+              "Optional compact first-page metadata appropriate to the family, such as parties, date, meeting time, author, version, contact, or product status. Do not put body prose here.",
+            items: {
+              additionalProperties: false,
+              properties: {
+                label: { maxLength: 40, type: "string" },
+                value: { maxLength: 300, type: "string" },
+              },
+              required: ["label", "value"],
+              type: "object",
+            },
+            maxItems: 8,
+            type: "array",
+          },
+          outline: {
+            description:
+              "Ordered document outline. Keep it focused; each item is written in a later step.",
+            items: {
+              additionalProperties: false,
+              properties: {
+                id: {
+                  description: "Short stable ID such as s1 or s2-1.",
+                  maxLength: 40,
+                  type: "string",
+                },
+                level: { maximum: 3, minimum: 1, type: "integer" },
+                title: { maxLength: 160, type: "string" },
+              },
+              required: ["id", "title", "level"],
+              type: "object",
+            },
+            maxItems: 8,
+            type: "array",
+          },
+          subtitle: {
+            description:
+              "Optional concise subtitle for covers, proposals, manuals, resumes, or product specifications.",
+            maxLength: 300,
             type: "string",
           },
           title: {
@@ -30,7 +202,101 @@ const WORD_TOOL: BuiltinToolDefinition = {
             type: "string",
           },
         },
-        required: ["title", "content"],
+        required: ["title", "documentType", "outline"],
+        type: "object",
+      },
+    },
+    {
+      description:
+        "Append one small batch of semantic blocks to exactly one outline section. Complete sections in outline order. Use global preset styles by default and sparse format overrides only when they add meaning.",
+      name: "word_document_append",
+      parameters: {
+        additionalProperties: false,
+        properties: {
+          blocks: { items: WORD_BLOCK_SCHEMA, maxItems: 40, type: "array" },
+          complete: {
+            description:
+              "True when this step completes the section; false when another batch is needed.",
+            type: "boolean",
+          },
+          documentId: { maxLength: 80, type: "string" },
+          sectionId: { maxLength: 40, type: "string" },
+        },
+        required: ["documentId", "sectionId", "blocks", "complete"],
+        type: "object",
+      },
+    },
+    {
+      description:
+        "Revise one existing block after writing or inspection. Replace a block to change its text, semantic style, paragraph format, or inline font formatting; remove it only when it is no longer needed.",
+      name: "word_document_revise",
+      parameters: {
+        additionalProperties: false,
+        properties: {
+          action: { enum: ["replace", "remove"], type: "string" },
+          blockId: { maxLength: 60, type: "string" },
+          documentId: { maxLength: 80, type: "string" },
+          replacement: WORD_BLOCK_SCHEMA,
+        },
+        required: ["documentId", "blockId", "action"],
+        type: "object",
+      },
+    },
+    {
+      description:
+        "Change typography across an existing Word document without resending or regenerating its content blocks. Use all-text for requests such as changing every font color, or a narrower scope for body, headings, title, or tables. Preset defaults change first; explicit block-level formatting remains authoritative.",
+      name: "word_document_restyle",
+      parameters: {
+        additionalProperties: false,
+        properties: {
+          color: {
+            description: "Optional six-digit hex font color, for example 008000 for green.",
+            maxLength: 7,
+            type: "string",
+          },
+          documentId: { maxLength: 80, type: "string" },
+          font: {
+            description: "Optional font family name. Omit unless the user requests a font change.",
+            maxLength: 80,
+            type: "string",
+          },
+          scope: {
+            description:
+              "Typography target. all-text changes title, headings, body, lists, quotes, notes, tables, headers, and footers.",
+            enum: ["all-text", "body", "headings", "title", "tables"],
+            type: "string",
+          },
+          size: {
+            description:
+              "Optional font size in points. Use only when explicitly requested; color or font-only changes preserve the polished type scale.",
+            maximum: 32,
+            minimum: 8,
+            type: "number",
+          },
+        },
+        required: ["documentId", "scope"],
+        type: "object",
+      },
+    },
+    {
+      description:
+        "Inspect the current Word document structure and formatting plan. This step is mandatory after the last append or revision and before finalization. Follow the returned nextAction.",
+      name: "word_document_inspect",
+      parameters: {
+        additionalProperties: false,
+        properties: { documentId: { maxLength: 80, type: "string" } },
+        required: ["documentId"],
+        type: "object",
+      },
+    },
+    {
+      description:
+        "Render and save the final editable DOCX. Call only after word_document_inspect reports canFinalize=true and no subsequent changes were made.",
+      name: "word_document_finalize",
+      parameters: {
+        additionalProperties: false,
+        properties: { documentId: { maxLength: 80, type: "string" } },
+        required: ["documentId"],
         type: "object",
       },
     },
@@ -40,7 +306,30 @@ const WORD_TOOL: BuiltinToolDefinition = {
   name: "Word 文档生成",
   shortName: "Word",
   status: "available",
-  version: "1.0.0",
+  systemPrompt: `The stepwise, editable Word document tool is enabled for this conversation.
+First classify the request as CREATE NEW or EDIT EXISTING.
+
+EDIT EXISTING workflow (including follow-ups such as "make the font green", "change the title font", or "edit the table"):
+1. Call word_document_open. Omit selectors to open the most recently updated editable Word document in this conversation, or pass a known documentId/fileId when the user identifies one.
+2. Never call word_document_begin or word_document_append for a style-only edit. The existing content and structure must be preserved.
+3. For document-wide typography, call word_document_restyle once with the narrowest correct scope. Example: "change the font color to green" means scope=all-text and color=008000. Do not replace every block individually.
+4. For one existing content block, call word_document_revise using the stable block ID returned by open.
+5. Call word_document_inspect after the edit, then word_document_finalize. This renders a new file version while preserving the editable source for later follow-ups.
+If word_document_open reports that editable-source storage is not initialized, do not ask the user to re-upload the generated file and do not restart document generation. Explain that database migration 0008 must be applied by the operator; uploading the DOCX cannot restore the missing MarkAI editing source.
+
+CREATE NEW workflow:
+1. Call word_document_begin with a concise outline and exactly one semantic documentType. Do not include body content in this step. Choose contract for agreements, business-proposal for persuasive proposals, formal-report for formal Chinese reports, academic-paper for papers, meeting-minutes for meeting records, official-notice for notices and official correspondence, operations-manual for SOPs and manuals, resume for CVs, product-spec for product/technical specifications, and general-clean only as a true fallback.
+Use an archetype-specific information architecture; never reuse a generic “overview + table + next steps” skeleton across document families. Contract outlines normally cover parties/definitions, subject matter, payment and term, rights and duties, breach, termination, disputes, and signatures. Business proposals normally cover executive summary, current situation, goals, proposed solution, delivery plan, budget/ROI, risks, and next decision. Formal reports normally cover executive summary, background, progress and evidence, issues, analysis, recommendations, and conclusion. Academic papers normally cover abstract/keywords, introduction, related work, methods, results, discussion, conclusion, and references. Meeting minutes normally capture meeting facts, agenda, discussion, decisions, action owners/deadlines, and unresolved items. Official notices normally cover basis/purpose, audience/scope, arrangements, requirements, deadlines, and contact. Operations manuals normally cover scope, roles, prerequisites, numbered procedures, warnings, exception handling, checks, and revision history. Resumes normally cover summary, experience with outcomes, projects, skills, and education. Product specifications normally cover background, goals/non-goals, users/scenarios, requirements, acceptance criteria, data/permissions, risks, and release plan. General-clean should use the lightest structure suitable for the actual information.
+2. Use subtitle and up to eight short metadata items when they materially support the selected opening layout. Examples: contract parties/date; proposal client/version; meeting time/location/attendees; notice issuer/date; resume contact details; product owner/status/version. Do not place ordinary body prose in metadata.
+3. Follow the returned nextAction and make exactly one Word tool call per model turn so every phase is validated before the next begins. Call word_document_append repeatedly, handling exactly one outline section per call. Normally begin the section with a heading block matching its outline level. Keep each batch small and mark complete=true only when that section is finished.
+4. Every family has its own deterministic opening, typography, numbering, page furniture, and table treatment. Do not imitate another family with local formatting. For contract, academic-paper, operations-manual, and product-spec, omit manual numbers from heading text because the renderer supplies family-appropriate heading numbering.
+5. Use semantic block types and family defaults. Never choose raw font, size, color, indentation, spacing, or table geometry merely to make the document look better; the renderer owns those decisions. Add format or runs only when the user explicitly requests a local exception or the content has clear semantic emphasis. Inline size is limited to 8-16pt.
+6. Each block ID must be unique and stable. If a written block needs content or formatting changes, call word_document_revise rather than starting over.
+7. After all sections are complete, call word_document_inspect. Resolve missing sections and warnings, then inspect again after every revision.
+8. Call word_document_finalize only when inspection returns canFinalize=true. Never skip inspect or finalize, and never claim that a file exists before finalize succeeds.
+When finalize returns editableSourceSaved=false, the DOCX file is still valid and downloadable. Provide its file result normally, but accurately explain that later cross-message editing requires the database migration and one new generation after migration.
+Use the same language as the requested document. Keep headings consistent with the outline and use tables, lists, quotes, notes, page breaks, and sparse inline formatting where they materially improve the document.`,
+  version: "3.0.0",
 };
 
 const EXCEL_TOOL: BuiltinToolDefinition = {

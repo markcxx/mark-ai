@@ -1,3 +1,6 @@
+import type { ToolProgress } from "@/lib/tools/types";
+import type { WordDocumentPreviewState } from "@/lib/tools/word/types";
+
 export type HtmlPreviewPayload =
   | {
       content: string;
@@ -12,6 +15,14 @@ export type HtmlPreviewPayload =
       id: string;
       kind: "file";
       sourceUrl: string;
+      title: string;
+    }
+  | {
+      document: WordDocumentPreviewState;
+      id: string;
+      kind: "word-document";
+      progress?: ToolProgress;
+      status: "running" | "done" | "error";
       title: string;
     };
 

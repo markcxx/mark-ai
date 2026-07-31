@@ -51,10 +51,23 @@ export function ContextWindowIndicator({
       }),
     [attachments, draft, messages, toolContextTokens, webSearchEnabled],
   );
+  const latestConversationTokens = useMemo(
+    () =>
+      messages
+        .filter(
+          (message) =>
+            message.role === "model" &&
+            typeof message.totalTokens === "number" &&
+            message.totalTokens > 0,
+        )
+        .at(-1)?.totalTokens,
+    [messages],
+  );
 
   if (!hasKnownContextWindow(metadata)) return null;
 
-  const percentage = Math.min(100, (estimatedTokens / metadata.contextWindowTokens) * 100);
+  const occupiedTokens = latestConversationTokens ?? estimatedTokens;
+  const percentage = Math.min(100, (occupiedTokens / metadata.contextWindowTokens) * 100);
   const tone = percentage >= 90 ? "danger" : percentage >= 70 ? "warning" : "normal";
 
   return (
@@ -105,9 +118,9 @@ export function ContextWindowIndicator({
           {metadata.displayName}
         </div>
         <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1.5 text-xs">
-          <dt className="text-gray-400 dark:text-gray-500">当前估算</dt>
+          <dt className="text-gray-400 dark:text-gray-500">会话已用</dt>
           <dd className="text-gray-700 dark:text-gray-300">
-            {formatTokenCount(estimatedTokens)} tokens
+            {formatTokenCount(occupiedTokens)} tokens
           </dd>
           <dt className="text-gray-400 dark:text-gray-500">上下文上限</dt>
           <dd className="text-gray-700 dark:text-gray-300">
@@ -125,7 +138,9 @@ export function ContextWindowIndicator({
           )}
         </dl>
         <p className="mt-2 border-t border-gray-100 pt-2 text-[11px] leading-4 text-gray-400 dark:border-white/[0.06] dark:text-gray-500">
-          发送前估算，服务端会按附件解析结果重新计算
+          {latestConversationTokens
+            ? "按当前会话最后一条模型消息的总 token 统计"
+            : "尚无模型回复，暂按当前内容与已启用工具估算"}
         </p>
       </div>
     </div>

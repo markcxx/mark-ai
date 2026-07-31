@@ -41,8 +41,17 @@ export type BuiltinToolCatalogItem = Omit<BuiltinToolDefinition, "systemPrompt">
 };
 
 export type ToolExecutionContext = {
+  runtimeState: Map<string, unknown>;
   sessionId: string;
   userId: string;
+};
+
+export type ToolProgress = {
+  current: number;
+  detail?: string;
+  label: string;
+  phase: "finalize" | "inspect" | "plan" | "revise" | "write";
+  total: number;
 };
 
 export type GeneratedFile = {
@@ -56,4 +65,6 @@ export type GeneratedFile = {
 export type ToolExecutionResult = {
   content: Record<string, unknown>;
   file?: GeneratedFile;
+  preview?: import("./word/types").WordDocumentPreviewState;
+  progress?: ToolProgress;
 };

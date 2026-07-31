@@ -12,8 +12,16 @@ export type ResolvedTokenUsage = Required<Omit<TokenUsage, "tokenUsageSource">> 
 };
 
 export const getUsageNumber = (...values: unknown[]) => {
-  const value = values.find((item) => typeof item === "number" && Number.isFinite(item));
-  return typeof value === "number" ? Math.max(0, Math.round(value)) : undefined;
+  for (const value of values) {
+    const parsed =
+      typeof value === "number"
+        ? value
+        : typeof value === "string" && value.trim()
+          ? Number(value)
+          : Number.NaN;
+    if (Number.isFinite(parsed)) return Math.max(0, Math.round(parsed));
+  }
+  return undefined;
 };
 
 export const resolveTokenUsage = ({
@@ -55,16 +63,3 @@ export const resolveTokenUsage = ({
     totalTokens: providerTotalTokens ?? resolvedInputTokens + resolvedOutputTokens,
   };
 };
-
-export const addTokenUsage = (
-  current: ResolvedTokenUsage | undefined,
-  next: ResolvedTokenUsage,
-): ResolvedTokenUsage => ({
-  inputTokens: (current?.inputTokens || 0) + next.inputTokens,
-  outputTokens: (current?.outputTokens || 0) + next.outputTokens,
-  tokenUsageSource:
-    !current || (current.tokenUsageSource === "provider" && next.tokenUsageSource === "provider")
-      ? next.tokenUsageSource
-      : "estimated",
-  totalTokens: (current?.totalTokens || 0) + next.totalTokens,
-});

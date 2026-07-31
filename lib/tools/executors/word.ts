@@ -1,161 +1,344 @@
-import {
-  AlignmentType,
-  Document,
-  HeadingLevel,
-  LevelFormat,
-  Packer,
-  Paragraph,
-  TextRun,
-} from "docx";
-
 import { saveGeneratedFile } from "../generated-file";
-import type { ToolExecutionContext, ToolExecutionResult } from "../types";
+import type { ToolExecutionContext, ToolExecutionResult, ToolProgress } from "../types";
+import {
+  appendWordDocumentBlocks,
+  cacheWordDocumentJob,
+  createWordDocumentJob,
+  getWordDocumentJob,
+  getWordDocumentPreview,
+  inspectWordDocumentJob,
+  restyleWordDocument,
+  reviseWordDocumentBlock,
+} from "../word/job-store";
+import { openWordDocumentSource, saveWordDocumentSource } from "../word/persistence";
+import { getWordDocumentPreset } from "../word/presets";
+import { renderWordDocument } from "../word/renderer";
+import {
+  parseRequiredString,
+  parseWordBlock,
+  parseWordBlocks,
+  parseWordDocumentPreset,
+  parseWordDocumentStyleScope,
+  parseWordDocumentTextStyleOverride,
+  parseWordDocumentType,
+  parseWordFeatures,
+  parseWordMetadata,
+  parseWordOutline,
+} from "../word/validation";
 
-const MAX_CONTENT_CHARS = 60_000;
+const getDocumentId = (args: Record<string, unknown>) =>
+  parseRequiredString(args.documentId, "Word 任务 ID", 80);
 
-const inlineRuns = (value: string) => {
-  const parts = value.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
-  return parts.map((part) => {
-    const bold = part.startsWith("**") && part.endsWith("**");
-    return new TextRun({
-      bold,
-      size: 22,
-      text: bold ? part.slice(2, -2) : part,
-    });
-  });
-};
+const getOptionalId = (value: unknown, label: string) =>
+  value === undefined ? undefined : parseRequiredString(value, label, 256);
 
-const markdownParagraphs = (content: string, title: string) => {
-  const paragraphs: Paragraph[] = [];
-  for (const rawLine of content.replaceAll("\r\n", "\n").split("\n")) {
-    const line = rawLine.trimEnd();
-    const trimmed = line.trim();
-    if (!trimmed) {
-      paragraphs.push(new Paragraph({ spacing: { after: 80 } }));
-      continue;
-    }
+const getProgress = (
+  phase: ToolProgress["phase"],
+  label: string,
+  current: number,
+  total: number,
+  detail?: string,
+): ToolProgress => ({ current, detail, label, phase, total });
 
-    const heading = trimmed.match(/^(#{1,3})\s+(.+)$/);
-    if (heading) {
-      if (heading[1].length === 1 && heading[2].trim() === title.trim()) continue;
-      const level =
-        heading[1].length === 1
-          ? HeadingLevel.HEADING_1
-          : heading[1].length === 2
-            ? HeadingLevel.HEADING_2
-            : HeadingLevel.HEADING_3;
-      paragraphs.push(
-        new Paragraph({
-          heading: level,
-          spacing: { after: 160, before: 240 },
-          text: heading[2].trim(),
-        }),
-      );
-      continue;
-    }
-
-    const bullet = trimmed.match(/^[-*+]\s+(.+)$/);
-    if (bullet) {
-      paragraphs.push(
-        new Paragraph({
-          bullet: { level: 0 },
-          children: inlineRuns(bullet[1]),
-          spacing: { after: 80, line: 340 },
-        }),
-      );
-      continue;
-    }
-
-    const numbered = trimmed.match(/^\d+[.)]\s+(.+)$/);
-    if (numbered) {
-      paragraphs.push(
-        new Paragraph({
-          children: inlineRuns(numbered[1]),
-          numbering: { level: 0, reference: "markai-numbering" },
-          spacing: { after: 80, line: 340 },
-        }),
-      );
-      continue;
-    }
-
-    paragraphs.push(
-      new Paragraph({
-        children: inlineRuns(trimmed),
-        spacing: { after: 140, line: 360 },
-      }),
-    );
-  }
-  return paragraphs;
-};
-
-export const executeCreateWord = async (
+export const executeBeginWordDocument = async (
   args: Record<string, unknown>,
   context: ToolExecutionContext,
 ): Promise<ToolExecutionResult> => {
-  const title = typeof args.title === "string" ? args.title.trim().slice(0, 160) : "";
-  const content = typeof args.content === "string" ? args.content.trim() : "";
-  const filename = typeof args.filename === "string" ? args.filename : undefined;
-  if (!title || !content) throw new Error("Word 文档标题和内容不能为空");
-  if (content.length > MAX_CONTENT_CHARS) throw new Error("Word 文档内容过长");
-
-  const document = new Document({
-    numbering: {
-      config: [
-        {
-          levels: [
-            {
-              alignment: AlignmentType.START,
-              format: LevelFormat.DECIMAL,
-              level: 0,
-              style: { paragraph: { indent: { hanging: 360, left: 720 } } },
-              text: "%1.",
-            },
-          ],
-          reference: "markai-numbering",
-        },
-      ],
-    },
-    sections: [
-      {
-        children: [
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            children: [new TextRun({ bold: true, size: 36, text: title })],
-            spacing: { after: 420 },
-          }),
-          ...markdownParagraphs(content, title),
-        ],
-        properties: {
-          page: {
-            margin: { bottom: 1280, left: 1440, right: 1440, top: 1280 },
-          },
-        },
-      },
-    ],
-    styles: {
-      default: {
-        document: {
-          run: { font: "Microsoft YaHei", size: 22 },
-        },
-      },
-    },
-  });
-  const buffer = await Packer.toBuffer(document);
-  const file = await saveGeneratedFile({
-    bytes: new Uint8Array(buffer),
-    contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    extension: ".docx",
-    fallbackName: title,
+  const title = parseRequiredString(args.title, "Word 文档标题", 160);
+  const filename =
+    typeof args.filename === "string" && args.filename.trim()
+      ? args.filename.trim().slice(0, 100)
+      : undefined;
+  const presetDefinition = getWordDocumentPreset(
+    args.documentType !== undefined
+      ? parseWordDocumentType(args.documentType)
+      : parseWordDocumentPreset(args.preset),
+  );
+  const outline = parseWordOutline(args.outline);
+  const features = parseWordFeatures(args.features, presetDefinition.defaultFeatures);
+  const metadata = parseWordMetadata(args.metadata);
+  const subtitle =
+    args.subtitle === undefined
+      ? undefined
+      : parseRequiredString(args.subtitle, "Word 文档副标题", 300);
+  const job = createWordDocumentJob(context.runtimeState, {
+    documentType: presetDefinition.documentType,
+    features,
     filename,
-    userId: context.userId,
+    metadata,
+    outline,
+    preset: presetDefinition.documentType,
+    subtitle,
+    title,
   });
 
   return {
     content: {
+      documentType: job.documentType,
+      documentId: job.id,
+      message: `已创建 Word 构建任务，使用“${presetDefinition.name}”预设。请从目录的第一个章节开始追加内容，每次只提交一个章节或一小批内容块。`,
+      nextAction: {
+        name: "word_document_append",
+        sectionId: outline[0].id,
+      },
+      outline,
+      revision: job.revision,
+    },
+    preview: getWordDocumentPreview(job),
+    progress: getProgress(
+      "plan",
+      "文档结构已规划",
+      0,
+      outline.length,
+      `${outline.length} 个章节待生成`,
+    ),
+  };
+};
+
+export const executeOpenWordDocument = async (
+  args: Record<string, unknown>,
+  context: ToolExecutionContext,
+): Promise<ToolExecutionResult> => {
+  const requestedDocumentId = getOptionalId(args.documentId, "Word 任务 ID");
+  const requestedFileId = getOptionalId(args.fileId, "Word 文件 ID");
+  const job = await openWordDocumentSource({
+    documentId: requestedDocumentId,
+    generatedFileId: requestedFileId,
+    sessionId: context.sessionId,
+    userId: context.userId,
+  });
+  if (!job) {
+    throw new Error(
+      requestedDocumentId || requestedFileId
+        ? "当前会话中找不到对应的可编辑 Word 文档"
+        : "当前会话还没有可编辑的 Word 文档，请先生成一份文档",
+    );
+  }
+  cacheWordDocumentJob(context.runtimeState, job);
+  const inspection = inspectWordDocumentJob(job);
+
+  return {
+    content: {
+      ...inspection,
+      generatedFileId: job.generatedFileId,
+      message:
+        "已打开现有 Word 的可编辑结构。请直接执行局部修订或文档级样式修改，不要重新规划和生成正文。",
+      nextActions: ["word_document_restyle", "word_document_revise"],
+      styleOverrides: job.styleOverrides || {},
+      documentType: job.documentType,
+      title: job.title,
+    },
+    preview: getWordDocumentPreview(job),
+    progress: getProgress(
+      "revise",
+      "已打开现有 Word 文档",
+      inspection.blockCount,
+      inspection.blockCount,
+      `${inspection.blockCount} 个原始内容块保持不变`,
+    ),
+  };
+};
+
+export const executeAppendWordDocument = async (
+  args: Record<string, unknown>,
+  context: ToolExecutionContext,
+): Promise<ToolExecutionResult> => {
+  const job = getWordDocumentJob(context.runtimeState, getDocumentId(args));
+  const sectionId = parseRequiredString(args.sectionId, "章节 ID", 40);
+  const blocks = parseWordBlocks(args.blocks);
+  const complete = args.complete === true;
+  appendWordDocumentBlocks(job, sectionId, blocks, complete);
+
+  const completed = new Set(job.completedSectionIds);
+  const nextSection = job.outline.find((section) => !completed.has(section.id));
+  const detail = complete
+    ? `章节已完成，本步新增 ${blocks.length} 个内容块`
+    : `已新增 ${blocks.length} 个内容块，请继续完成当前章节`;
+
+  return {
+    content: {
+      addedBlockIds: blocks.map((block) => block.id),
+      completedSections: job.completedSectionIds.length,
+      documentId: job.id,
+      message: detail,
+      nextAction: nextSection
+        ? { name: "word_document_append", sectionId: nextSection.id }
+        : { name: "word_document_inspect" },
+      outlineSections: job.outline.length,
+      revision: job.revision,
+    },
+    preview: getWordDocumentPreview(job),
+    progress: getProgress(
+      "write",
+      `已构建章节：${job.outline.find((section) => section.id === sectionId)?.title || sectionId}`,
+      job.completedSectionIds.length,
+      job.outline.length,
+      detail,
+    ),
+  };
+};
+
+export const executeReviseWordDocument = async (
+  args: Record<string, unknown>,
+  context: ToolExecutionContext,
+): Promise<ToolExecutionResult> => {
+  const job = getWordDocumentJob(context.runtimeState, getDocumentId(args));
+  const blockId = parseRequiredString(args.blockId, "文档块 ID", 60);
+  const action = args.action;
+  if (action !== "remove" && action !== "replace")
+    throw new Error("修订操作必须是 remove 或 replace");
+  const replacement = action === "replace" ? parseWordBlock(args.replacement) : undefined;
+  reviseWordDocumentBlock(job, blockId, action, replacement);
+
+  return {
+    content: {
+      documentId: job.id,
+      message:
+        action === "remove"
+          ? `已删除文档块 ${blockId}`
+          : `已替换文档块 ${blockId}；可以借此修改文字、段落格式或行内格式`,
+      nextAction: { name: "word_document_inspect" },
+      revision: job.revision,
+    },
+    preview: getWordDocumentPreview(job),
+    progress: getProgress(
+      "revise",
+      "已完成局部修订",
+      job.completedSectionIds.length,
+      job.outline.length,
+      action === "remove" ? `删除 ${blockId}` : `替换 ${blockId}`,
+    ),
+  };
+};
+
+export const executeRestyleWordDocument = async (
+  args: Record<string, unknown>,
+  context: ToolExecutionContext,
+): Promise<ToolExecutionResult> => {
+  const job = getWordDocumentJob(context.runtimeState, getDocumentId(args));
+  const scope = parseWordDocumentStyleScope(args.scope);
+  const override = parseWordDocumentTextStyleOverride(args);
+  restyleWordDocument(job, scope, override);
+  const changed = [
+    override.color ? `颜色 #${override.color}` : undefined,
+    override.font ? `字体 ${override.font}` : undefined,
+    override.size ? `字号 ${override.size}pt` : undefined,
+  ].filter(Boolean);
+
+  return {
+    content: {
+      documentId: job.id,
+      message: `已修改${scope}范围的${changed.join("、")}；原始正文和结构未重新生成。`,
+      nextAction: { name: "word_document_inspect" },
+      revision: job.revision,
+      scope,
+      styleOverride: override,
+    },
+    preview: getWordDocumentPreview(job),
+    progress: getProgress(
+      "revise",
+      "已完成文档级样式修改",
+      job.blocks.length,
+      job.blocks.length,
+      changed.join("、"),
+    ),
+  };
+};
+
+export const executeInspectWordDocument = async (
+  args: Record<string, unknown>,
+  context: ToolExecutionContext,
+): Promise<ToolExecutionResult> => {
+  const job = getWordDocumentJob(context.runtimeState, getDocumentId(args));
+  const inspection = inspectWordDocumentJob(job);
+  const nextAction = inspection.canFinalize
+    ? { name: "word_document_finalize" }
+    : inspection.missingSections.length > 0
+      ? { name: "word_document_append", sectionId: inspection.missingSections[0].id }
+      : { name: "word_document_revise" };
+
+  return {
+    content: {
+      ...inspection,
+      message: inspection.canFinalize
+        ? "结构检查已通过。若无需进一步调整，请完成 DOCX 打包。"
+        : "检查发现未完成项或警告，请先追加或修订对应内容，再重新检查。",
+      nextAction,
+    },
+    preview: getWordDocumentPreview(job),
+    progress: getProgress(
+      "inspect",
+      inspection.canFinalize ? "文档检查通过" : "文档需要继续完善",
+      inspection.completedSections,
+      inspection.outlineSections,
+      inspection.warnings[0] ||
+        (inspection.missingSections.length > 0
+          ? `${inspection.missingSections.length} 个章节尚未完成`
+          : `${inspection.blockCount} 个内容块`),
+    ),
+  };
+};
+
+export const executeFinalizeWordDocument = async (
+  args: Record<string, unknown>,
+  context: ToolExecutionContext,
+): Promise<ToolExecutionResult> => {
+  const job = getWordDocumentJob(context.runtimeState, getDocumentId(args));
+  if (job.inspectedRevision !== job.revision) {
+    throw new Error("文档在最近一次修改后尚未检查，请先调用 word_document_inspect");
+  }
+  const inspection = inspectWordDocumentJob(job);
+  if (!inspection.canFinalize) {
+    const missing = inspection.missingSections.map((section) => section.title).join("、");
+    throw new Error(
+      missing ? `以下章节尚未完成：${missing}` : inspection.warnings[0] || "文档尚未达到可完成状态",
+    );
+  }
+
+  const bytes = await renderWordDocument(job);
+  const file = await saveGeneratedFile({
+    bytes,
+    contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    extension: ".docx",
+    fallbackName: job.title,
+    filename: job.filename,
+    userId: context.userId,
+  });
+  job.generatedFileId = file.id;
+  let editableSourceSaved = true;
+  try {
+    await saveWordDocumentSource(job, {
+      generatedFileId: file.id,
+      sessionId: context.sessionId,
+      userId: context.userId,
+    });
+  } catch (error) {
+    editableSourceSaved = false;
+    console.error("Word editable source persistence failed:", error);
+  }
+
+  return {
+    content: {
+      blockCount: inspection.blockCount,
+      documentId: job.id,
       downloadUrl: file.url,
+      editableSourceSaved,
       filename: file.name,
-      message: "Word document created successfully.",
+      message: editableSourceSaved
+        ? "Word 文档已完成渲染，并保存了可供后续局部修改的编辑结构。"
+        : "Word 文档已生成并可下载，但可编辑结构未能持久化；请应用数据库迁移后重新生成一次，以启用后续局部修改。",
+      success: true,
     },
     file,
+    preview: getWordDocumentPreview(job),
+    progress: getProgress(
+      "finalize",
+      "Word 文档已生成",
+      inspection.outlineSections,
+      inspection.outlineSections,
+      editableSourceSaved
+        ? `${inspection.blockCount} 个内容块，可继续编辑`
+        : `${inspection.blockCount} 个内容块；DOCX 可下载，编辑结构保存失败`,
+    ),
   };
 };
