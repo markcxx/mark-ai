@@ -23,8 +23,17 @@ export type ExportMode = "image" | "json";
 
 const PREVIEW_ID = "markai-export-preview";
 
+const getGeneratedImages = (message: Message) =>
+  message.segments
+    ?.filter((segment) => segment.type === "generated-image")
+    .map((segment) => segment.generatedImage) || [];
+
+const hasExportableContent = (message: Message) =>
+  Boolean(message.content.trim() || getGeneratedImages(message).length > 0);
+
 function ExportPreviewMessage({ message }: { message: Message }) {
   const isUser = message.role === "user";
+  const generatedImages = getGeneratedImages(message);
 
   if (isUser) {
     return (
@@ -55,9 +64,26 @@ function ExportPreviewMessage({ message }: { message: Message }) {
             {message.reasoning}
           </div>
         )}
-        <div className="markdown-body text-[15px] leading-relaxed text-gray-900 dark:text-gray-100">
-          <MarkdownContent>{message.content}</MarkdownContent>
-        </div>
+        {message.content.trim() && (
+          <div className="markdown-body text-[15px] leading-relaxed text-gray-900 dark:text-gray-100">
+            <MarkdownContent>{message.content}</MarkdownContent>
+          </div>
+        )}
+        {generatedImages.map((generatedImage) => (
+          <div
+            className="my-2 w-fit max-w-full overflow-hidden rounded-xl"
+            key={generatedImage.file.id}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              alt={
+                generatedImage.revisedPrompt || generatedImage.prompt || generatedImage.file.name
+              }
+              className="block h-auto max-h-[720px] max-w-full object-contain"
+              src={`/api/files/${generatedImage.file.id}/preview?raw=1`}
+            />
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -71,7 +97,7 @@ function ExportImagePreview({
   session?: ChatSession | null;
 }) {
   const title = getExportTitle(session);
-  const visibleMessages = messages.filter((message) => message.content.trim());
+  const visibleMessages = messages.filter(hasExportableContent);
   const modelLabel = session?.model
     ? `${session.provider || "model"} / ${session.model}`
     : "MARKAI conversation";
