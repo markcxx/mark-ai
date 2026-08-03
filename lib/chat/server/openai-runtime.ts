@@ -37,6 +37,7 @@ import { fetchWithDevelopmentProxy } from "@/lib/server/development-proxy";
 import { readWebpage } from "@/lib/search/webpage";
 import { executeBuiltinTool } from "@/lib/tools/executors";
 import { getBuiltinToolByFunction, getToolFunctions } from "@/lib/tools/registry";
+import { getWordContinuationPrompt, getWordContinuationToolNames } from "@/lib/tools/word/workflow";
 
 const unsupportedStreamUsage = new Set<string>();
 
@@ -96,23 +97,39 @@ export const createOpenAICompatibleStream = async (
           return { ...result, citationId };
         });
 
-      const requestUpstream = async (requestMessages: OpenAIChatMessage[], allowTools: boolean) => {
+      const requestUpstream = async (
+        requestMessages: OpenAIChatMessage[],
+        allowTools: boolean,
+        requiredToolNames: string[] = [],
+      ) => {
         const usageCapabilityKey = `${endpoint}\n${model}`;
-        const createRequestBody = (includeUsage: boolean) => ({
+        const requiredToolNameSet = new Set(requiredToolNames);
+        const requestTools = requiredToolNames.length
+          ? availableTools.filter((tool) => requiredToolNameSet.has(tool.function.name))
+          : availableTools;
+        const createRequestBody = (includeUsage: boolean, enforceRequiredTools = true) => ({
           messages: requestMessages,
           model,
           stream: true,
           ...(includeUsage ? { stream_options: { include_usage: true } } : {}),
           ...(allowTools
             ? {
-                tool_choice: "auto",
-                tools: availableTools,
+                tool_choice:
+                  enforceRequiredTools && requiredToolNames.length === 1
+                    ? {
+                        function: { name: requiredToolNames[0] },
+                        type: "function",
+                      }
+                    : enforceRequiredTools && requiredToolNames.length > 1
+                      ? "required"
+                      : "auto",
+                tools: requestTools,
               }
             : {}),
         });
-        const sendRequest = (includeUsage: boolean) =>
+        const sendRequest = (includeUsage: boolean, enforceRequiredTools = true) =>
           fetchWithDevelopmentProxy(endpoint, {
-            body: JSON.stringify(createRequestBody(includeUsage)),
+            body: JSON.stringify(createRequestBody(includeUsage, enforceRequiredTools)),
             headers: {
               Authorization: `Bearer ${apiKey}`,
               "Content-Type": "application/json",
@@ -121,21 +138,28 @@ export const createOpenAICompatibleStream = async (
             signal,
           });
 
-        const includeUsage = !unsupportedStreamUsage.has(usageCapabilityKey);
-        let upstream = await sendRequest(includeUsage);
+        let includeUsage = !unsupportedStreamUsage.has(usageCapabilityKey);
+        let enforceRequiredTools = true;
+        let upstream = await sendRequest(includeUsage, enforceRequiredTools);
 
-        if (!upstream.ok) {
+        while (!upstream.ok) {
           const detail = await upstream.text();
           if (includeUsage && isUnsupportedStreamUsageError(upstream.status, detail)) {
             unsupportedStreamUsage.add(usageCapabilityKey);
-            upstream = await sendRequest(false);
-          } else {
-            throw new Error(detail || "Upstream model request failed");
+            includeUsage = false;
+            upstream = await sendRequest(includeUsage, enforceRequiredTools);
+            continue;
           }
-        }
-
-        if (!upstream.ok) {
-          const detail = await upstream.text();
+          if (
+            enforceRequiredTools &&
+            requiredToolNames.length > 0 &&
+            [400, 404, 422].includes(upstream.status) &&
+            /tool[_ ]choice|function[_ ]call/i.test(detail)
+          ) {
+            enforceRequiredTools = false;
+            upstream = await sendRequest(includeUsage, enforceRequiredTools);
+            continue;
+          }
           throw new Error(detail || "Upstream model request failed");
         }
 
@@ -149,14 +173,19 @@ export const createOpenAICompatibleStream = async (
       const estimateOpenAIInputTokens = (
         requestMessages: OpenAIChatMessage[],
         allowTools: boolean,
+        requiredToolNames: string[] = [],
       ) =>
         estimateTextTokens(
           JSON.stringify({
             messages: requestMessages,
             ...(allowTools
               ? {
-                  tool_choice: "auto",
-                  tools: availableTools,
+                  tool_choice: requiredToolNames.length ? "required" : "auto",
+                  tools: requiredToolNames.length
+                    ? availableTools.filter((tool) =>
+                        requiredToolNames.includes(tool.function.name),
+                      )
+                    : availableTools,
                 }
               : {}),
           }),
@@ -165,8 +194,9 @@ export const createOpenAICompatibleStream = async (
       const streamModelResponse = async (
         requestMessages: OpenAIChatMessage[],
         allowTools: boolean,
+        requiredToolNames: string[] = [],
       ) => {
-        const reader = await requestUpstream(requestMessages, allowTools);
+        const reader = await requestUpstream(requestMessages, allowTools, requiredToolNames);
         const decoder = new TextDecoder();
         const toolCallsByIndex = new Map<number, OpenAIToolCall>();
         let assistantContent = "";
@@ -180,7 +210,9 @@ export const createOpenAICompatibleStream = async (
           if (!event.text) return;
           if (event.type === "reasoning") assistantReasoning += event.text;
           else assistantContent += event.text;
-          controller.enqueue(encodeStreamEvent(encoder, event.type, event.text));
+          if (requiredToolNames.length === 0) {
+            controller.enqueue(encodeStreamEvent(encoder, event.type, event.text));
+          }
         };
 
         const finishThinkingParsers = () => {
@@ -266,7 +298,11 @@ export const createOpenAICompatibleStream = async (
             assistantContent,
             toolCalls,
             usage: resolveTokenUsage({
-              estimatedInputTokens: estimateOpenAIInputTokens(requestMessages, allowTools),
+              estimatedInputTokens: estimateOpenAIInputTokens(
+                requestMessages,
+                allowTools,
+                requiredToolNames,
+              ),
               estimatedOutputTokens: estimateTextTokens(
                 [
                   assistantContent,
@@ -324,19 +360,48 @@ export const createOpenAICompatibleStream = async (
         const MAX_TOOL_ROUNDS = builtinFunctions.some(
           (toolFunction) => toolFunction.name === "word_document_begin",
         )
-          ? 16
+          ? 32
           : 5;
         let currentMessages = openAIMessages;
         let latestUsage: ResolvedTokenUsage | undefined;
+        let requiredWordToolNames: string[] = [];
+        let wordProtocolRetries = 0;
 
         for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-          const pass = await streamModelResponse(currentMessages, availableTools.length > 0);
+          const pass = await streamModelResponse(
+            currentMessages,
+            availableTools.length > 0,
+            requiredWordToolNames,
+          );
           latestUsage = pass.usage;
-          const executableToolCalls = pass.toolCalls.filter((toolCall) =>
-            allowedToolNames.has(toolCall.function.name),
+          const executableToolCalls = pass.toolCalls.filter(
+            (toolCall) =>
+              allowedToolNames.has(toolCall.function.name) &&
+              (requiredWordToolNames.length === 0 ||
+                requiredWordToolNames.includes(toolCall.function.name)),
           );
 
-          if (executableToolCalls.length === 0) break;
+          if (executableToolCalls.length === 0) {
+            if (requiredWordToolNames.length === 0) break;
+            wordProtocolRetries += 1;
+            if (wordProtocolRetries > 2) {
+              throw new Error(
+                `模型未按 Word 工作流调用 ${requiredWordToolNames.join(" 或 ")}，文档尚未生成`,
+              );
+            }
+            currentMessages = [
+              ...currentMessages,
+              ...(pass.assistantContent
+                ? ([{ content: pass.assistantContent, role: "assistant" }] as OpenAIChatMessage[])
+                : []),
+              {
+                content: getWordContinuationPrompt(requiredWordToolNames),
+                role: "user",
+              },
+            ];
+            continue;
+          }
+          wordProtocolRetries = 0;
 
           const assistantToolMessage: OpenAIChatMessage = {
             content: pass.assistantContent || null,
@@ -382,6 +447,10 @@ export const createOpenAICompatibleStream = async (
                     status: "done",
                   }),
                 );
+                if (builtinTool.id === "word-document") {
+                  requiredWordToolNames =
+                    getWordContinuationToolNames(toolCall.function.name, result.content) || [];
+                }
                 toolResultMessages.push({
                   content: JSON.stringify(result.content),
                   role: "tool",
@@ -396,6 +465,7 @@ export const createOpenAICompatibleStream = async (
                     status: "error",
                   }),
                 );
+                if (builtinTool.id === "word-document") requiredWordToolNames = [];
                 toolResultMessages.push({
                   content: JSON.stringify({ error: message, success: false }),
                   role: "tool",
@@ -509,6 +579,12 @@ export const createOpenAICompatibleStream = async (
           }
 
           currentMessages = [...currentMessages, assistantToolMessage, ...toolResultMessages];
+        }
+
+        if (requiredWordToolNames.length > 0) {
+          throw new Error(
+            `Word 文档生成超过最大步骤数，尚待执行 ${requiredWordToolNames.join(" 或 ")}`,
+          );
         }
 
         if (latestUsage) {

@@ -7,14 +7,12 @@ import { useEffect, useRef, useState } from "react";
 
 import { FluentEmoji } from "@/components/FluentEmoji";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { AppDialog } from "@/components/ui/AppDialog";
 import { useUIStore } from "@/stores/useUIStore";
 
 const GUEST_EMOJIS = ["🙂", "😊", "😄", "😁", "🤗", "🤩", "😎", "🫡", "😉"];
 
 export function GuestChatApp() {
   const [draft, setDraft] = useState("");
-  const [promptOpen, setPromptOpen] = useState(false);
   const [emoji, setEmoji] = useState("🙂");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -33,7 +31,7 @@ export function GuestChatApp() {
 
   const requestSignIn = () => {
     if (draft.trim()) window.localStorage.setItem("markai:guest-draft", draft.trim());
-    setPromptOpen(true);
+    window.location.assign("/login?callbackUrl=%2F");
   };
 
   const handleDraftChange = (value: string) => {
@@ -159,33 +157,6 @@ export function GuestChatApp() {
           </div>
         </div>
       </main>
-
-      <AppDialog
-        onClose={() => setPromptOpen(false)}
-        open={promptOpen}
-        title="登录后继续"
-        width={420}
-      >
-        <div className="p-5 sm:p-6">
-          <p className="text-sm leading-6 text-gray-500 dark:text-gray-400">
-            登录后即可发送消息，并同步你的会话、文件和模型设置。刚才输入的内容会为你保留。
-          </p>
-          <div className="mt-6 grid grid-cols-2 gap-3">
-            <Link
-              className="flex h-11 items-center justify-center rounded-lg border border-gray-200 text-sm font-medium hover:bg-gray-50 dark:border-white/10 dark:hover:bg-white/[0.06]"
-              href="/register"
-            >
-              创建账户
-            </Link>
-            <Link
-              className="flex h-11 items-center justify-center rounded-lg bg-gray-950 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-gray-950 dark:hover:bg-gray-200"
-              href="/login?callbackUrl=%2F"
-            >
-              登录
-            </Link>
-          </div>
-        </div>
-      </AppDialog>
     </div>
   );
 }

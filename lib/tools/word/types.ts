@@ -180,6 +180,7 @@ export type WordDocumentInspection = {
   summary: Array<{
     id: string;
     preview: string;
+    sectionId?: string;
     type: WordDocumentBlock["type"];
   }>;
   warnings: string[];

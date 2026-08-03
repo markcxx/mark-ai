@@ -18,6 +18,7 @@ import {
   getWordDocumentJob,
   inspectWordDocumentJob,
   reviseWordDocumentBlock,
+  reviseWordDocumentBlocks,
 } from "./job-store";
 import * as wordPersistence from "./persistence";
 import { getWordDocumentPreset } from "./presets";
@@ -148,6 +149,42 @@ describe("stepwise Word document jobs", () => {
     expect(job.sectionBlockIds.s1).toEqual(["s1-p1"]);
     expect(job.inspectedRevision).toBeUndefined();
     expect(job.blocks[0]).toMatchObject({ format: { alignment: "center" }, id: "s1-p1" });
+  });
+
+  it("can split one inspected block into multiple blocks without losing section ownership", () => {
+    const job = createJob();
+    appendWordDocumentBlocks(
+      job,
+      "s1",
+      [{ id: "s1-long", text: "很长的正文", type: "paragraph" }],
+      true,
+    );
+
+    reviseWordDocumentBlocks(job, "s1-long", "replace", [
+      { id: "s1-p1", text: "第一段", type: "paragraph" },
+      { id: "s1-p2", text: "第二段", type: "paragraph" },
+    ]);
+
+    expect(job.blocks.map((block) => block.id)).toEqual(["s1-p1", "s1-p2"]);
+    expect(job.sectionBlockIds.s1).toEqual(["s1-p1", "s1-p2"]);
+  });
+
+  it("can insert a missing heading into an already completed section", () => {
+    const job = createJob();
+    appendWordDocumentBlocks(job, "s1", [{ id: "s1-p1", text: "正文", type: "paragraph" }], true);
+
+    reviseWordDocumentBlocks(job, "s1-p1", "insert-before", [
+      { id: "s1-h1", level: 1, text: "概述", type: "heading" },
+    ]);
+    appendWordDocumentBlocks(
+      job,
+      "s2",
+      [{ id: "s2-h1", level: 1, text: "方案", type: "heading" }],
+      true,
+    );
+
+    expect(job.blocks.map((block) => block.id)).toEqual(["s1-h1", "s1-p1", "s2-h1"]);
+    expect(inspectWordDocumentJob(job).canFinalize).toBe(true);
   });
 
   it("enforces outline order so the model advances one section at a time", () => {

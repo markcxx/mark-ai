@@ -130,36 +130,69 @@ export const appendWordDocumentBlocks = (
   return job;
 };
 
-export const reviseWordDocumentBlock = (
+export type WordDocumentRevisionAction = "insert-after" | "insert-before" | "remove" | "replace";
+
+export const reviseWordDocumentBlocks = (
   job: WordDocumentJob,
   blockId: string,
-  action: "remove" | "replace",
-  replacement?: WordDocumentBlock,
+  action: WordDocumentRevisionAction,
+  replacements: WordDocumentBlock[] = [],
 ) => {
   const index = job.blocks.findIndex((block) => block.id === blockId);
   if (index < 0) throw new Error(`找不到文档块 ${blockId}`);
 
+  if (action !== "remove" && replacements.length === 0) {
+    throw new Error("替换或插入操作必须提供至少一个文档块");
+  }
+
+  const replacementIds = new Set(replacements.map((block) => block.id));
+  if (replacementIds.size !== replacements.length) throw new Error("新文档块 ID 不能重复");
+  const existingIds = new Set(
+    job.blocks
+      .filter((block) => action !== "replace" || block.id !== blockId)
+      .map((block) => block.id),
+  );
+  const conflicting = replacements.find((block) => existingIds.has(block.id));
+  if (conflicting) throw new Error(`块 ID ${conflicting.id} 已存在`);
+
+  const owningSection = Object.entries(job.sectionBlockIds).find(([, blockIds]) =>
+    blockIds.includes(blockId),
+  );
+  if (!owningSection) throw new Error(`文档块 ${blockId} 缺少章节归属`);
+  const [sectionId, sectionBlockIds] = owningSection;
+  const sectionIndex = sectionBlockIds.indexOf(blockId);
+
   if (action === "remove") {
     job.blocks.splice(index, 1);
-    for (const [sectionId, blockIds] of Object.entries(job.sectionBlockIds)) {
-      job.sectionBlockIds[sectionId] = blockIds.filter((id) => id !== blockId);
-    }
+    job.sectionBlockIds[sectionId] = sectionBlockIds.filter((id) => id !== blockId);
+  } else if (action === "replace") {
+    job.blocks.splice(index, 1, ...replacements);
+    job.sectionBlockIds[sectionId] = [
+      ...sectionBlockIds.slice(0, sectionIndex),
+      ...replacements.map((block) => block.id),
+      ...sectionBlockIds.slice(sectionIndex + 1),
+    ];
   } else {
-    if (!replacement) throw new Error("替换操作必须提供 replacement");
-    const conflicting = job.blocks.some(
-      (block, blockIndex) => blockIndex !== index && block.id === replacement.id,
-    );
-    if (conflicting) throw new Error(`块 ID ${replacement.id} 已存在`);
-    job.blocks[index] = replacement;
-    for (const [sectionId, blockIds] of Object.entries(job.sectionBlockIds)) {
-      job.sectionBlockIds[sectionId] = blockIds.map((id) => (id === blockId ? replacement.id : id));
-    }
+    const offset = action === "insert-after" ? 1 : 0;
+    job.blocks.splice(index + offset, 0, ...replacements);
+    job.sectionBlockIds[sectionId] = [
+      ...sectionBlockIds.slice(0, sectionIndex + offset),
+      ...replacements.map((block) => block.id),
+      ...sectionBlockIds.slice(sectionIndex + offset),
+    ];
   }
 
   job.revision += 1;
   job.inspectedRevision = undefined;
   return job;
 };
+
+export const reviseWordDocumentBlock = (
+  job: WordDocumentJob,
+  blockId: string,
+  action: "remove" | "replace",
+  replacement?: WordDocumentBlock,
+) => reviseWordDocumentBlocks(job, blockId, action, replacement ? [replacement] : []);
 
 const getBlockPreview = (block: WordDocumentBlock) => {
   if (block.type === "page-break") return "分页";
@@ -218,6 +251,9 @@ export const inspectWordDocumentJob = (job: WordDocumentJob): WordDocumentInspec
     summary: job.blocks.map((block) => ({
       id: block.id,
       preview: getBlockPreview(block),
+      sectionId: Object.entries(job.sectionBlockIds).find(([, blockIds]) =>
+        blockIds.includes(block.id),
+      )?.[0],
       type: block.type,
     })),
     warnings,

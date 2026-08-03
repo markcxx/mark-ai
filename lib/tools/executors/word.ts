@@ -8,7 +8,8 @@ import {
   getWordDocumentPreview,
   inspectWordDocumentJob,
   restyleWordDocument,
-  reviseWordDocumentBlock,
+  reviseWordDocumentBlocks,
+  type WordDocumentRevisionAction,
 } from "../word/job-store";
 import { openWordDocumentSource, saveWordDocumentSource } from "../word/persistence";
 import { getWordDocumentPreset } from "../word/presets";
@@ -185,18 +186,38 @@ export const executeReviseWordDocument = async (
   const job = getWordDocumentJob(context.runtimeState, getDocumentId(args));
   const blockId = parseRequiredString(args.blockId, "文档块 ID", 60);
   const action = args.action;
-  if (action !== "remove" && action !== "replace")
-    throw new Error("修订操作必须是 remove 或 replace");
-  const replacement = action === "replace" ? parseWordBlock(args.replacement) : undefined;
-  reviseWordDocumentBlock(job, blockId, action, replacement);
+  if (
+    action !== "remove" &&
+    action !== "replace" &&
+    action !== "insert-before" &&
+    action !== "insert-after"
+  ) {
+    throw new Error("修订操作必须是 replace、remove、insert-before 或 insert-after");
+  }
+  const replacements =
+    action === "remove"
+      ? []
+      : args.blocks !== undefined
+        ? parseWordBlocks(args.blocks)
+        : action === "replace"
+          ? [parseWordBlock(args.replacement)]
+          : (() => {
+              throw new Error("插入操作必须提供 blocks");
+            })();
+  reviseWordDocumentBlocks(job, blockId, action as WordDocumentRevisionAction, replacements);
+
+  const actionMessage =
+    action === "remove"
+      ? `已删除文档块 ${blockId}`
+      : action === "replace"
+        ? `已将文档块 ${blockId} 替换为 ${replacements.length} 个内容块`
+        : `已在文档块 ${blockId}${action === "insert-before" ? "之前" : "之后"}插入 ${replacements.length} 个内容块`;
 
   return {
     content: {
+      addedBlockIds: replacements.map((block) => block.id),
       documentId: job.id,
-      message:
-        action === "remove"
-          ? `已删除文档块 ${blockId}`
-          : `已替换文档块 ${blockId}；可以借此修改文字、段落格式或行内格式`,
+      message: actionMessage,
       nextAction: { name: "word_document_inspect" },
       revision: job.revision,
     },
@@ -206,7 +227,7 @@ export const executeReviseWordDocument = async (
       "已完成局部修订",
       job.completedSectionIds.length,
       job.outline.length,
-      action === "remove" ? `删除 ${blockId}` : `替换 ${blockId}`,
+      actionMessage,
     ),
   };
 };

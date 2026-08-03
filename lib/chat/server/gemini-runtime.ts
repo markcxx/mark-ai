@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { FunctionCallingConfigMode, GoogleGenAI } from "@google/genai";
 
 import type { ContextPreparation } from "@/lib/chat/context-window";
 import { estimateTextTokens } from "@/lib/chat/metrics";
@@ -17,6 +17,7 @@ import {
 } from "@/lib/chat/token-usage";
 import { executeBuiltinTool } from "@/lib/tools/executors";
 import { getBuiltinToolByFunction, getToolFunctions } from "@/lib/tools/registry";
+import { getWordContinuationPrompt, getWordContinuationToolNames } from "@/lib/tools/word/workflow";
 
 export const createGeminiStream = async ({
   apiKey,
@@ -74,17 +75,29 @@ export const createGeminiStream = async ({
         const toolContents = [...contents] as any[];
         let outputText = "";
         let latestUsage: ResolvedTokenUsage | undefined;
+        let requiredWordToolNames: string[] = [];
+        let wordProtocolRetries = 0;
 
         try {
           const maxToolRounds = builtinFunctions.some(
             (toolFunction) => toolFunction.name === "word_document_begin",
           )
-            ? 16
+            ? 32
             : 5;
           for (let round = 0; round < maxToolRounds; round += 1) {
             const response = await ai.models.generateContent({
               config: {
                 abortSignal: signal,
+                ...(requiredWordToolNames.length
+                  ? {
+                      toolConfig: {
+                        functionCallingConfig: {
+                          allowedFunctionNames: requiredWordToolNames,
+                          mode: FunctionCallingConfigMode.ANY,
+                        },
+                      },
+                    }
+                  : {}),
                 tools: [
                   {
                     functionDeclarations: builtinFunctions.map((toolFunction) => ({
@@ -108,16 +121,20 @@ export const createGeminiStream = async ({
               providerUsage = {
                 inputTokens,
                 outputTokens:
-                  (totalTokens !== undefined && inputTokens !== undefined
+                  totalTokens !== undefined && inputTokens !== undefined
                     ? Math.max(totalTokens - inputTokens, 0)
                     : candidateTokens !== undefined
                       ? candidateTokens + reasoningTokens
-                      : undefined),
+                      : undefined,
                 totalTokens,
               };
             }
 
-            const functionCalls = response.functionCalls || [];
+            const functionCalls = (response.functionCalls || []).filter(
+              (functionCall) =>
+                requiredWordToolNames.length === 0 ||
+                requiredWordToolNames.includes(functionCall.name || ""),
+            );
             const passUsage = resolveTokenUsage({
               estimatedInputTokens: estimateTextTokens(
                 JSON.stringify({ contents: toolContents, tools: builtinFunctions }),
@@ -129,10 +146,30 @@ export const createGeminiStream = async ({
             });
             latestUsage = passUsage;
             if (functionCalls.length === 0) {
-              outputText = response.text || "";
-              if (outputText) controller.enqueue(encodeStreamEvent(encoder, "content", outputText));
-              break;
+              if (requiredWordToolNames.length === 0) {
+                outputText = response.text || "";
+                if (outputText) {
+                  controller.enqueue(encodeStreamEvent(encoder, "content", outputText));
+                }
+                break;
+              }
+              wordProtocolRetries += 1;
+              if (wordProtocolRetries > 2) {
+                throw new Error(
+                  `模型未按 Word 工作流调用 ${requiredWordToolNames.join(" 或 ")}，文档尚未生成`,
+                );
+              }
+              toolContents.push({
+                parts: [{ text: response.text || "我需要继续完成 Word 文档工作流。" }],
+                role: "model",
+              });
+              toolContents.push({
+                parts: [{ text: getWordContinuationPrompt(requiredWordToolNames) }],
+                role: "user",
+              });
+              continue;
             }
+            wordProtocolRetries = 0;
 
             const modelContent = response.candidates?.[0]?.content;
             if (modelContent) toolContents.push(modelContent);
@@ -147,9 +184,7 @@ export const createGeminiStream = async ({
 
               const runningState = {
                 artifactId:
-                  typeof functionArgs.documentId === "string"
-                    ? functionArgs.documentId
-                    : undefined,
+                  typeof functionArgs.documentId === "string" ? functionArgs.documentId : undefined,
                 callId,
                 status: "running" as const,
                 toolId: builtinTool.id,
@@ -173,6 +208,9 @@ export const createGeminiStream = async ({
                     status: "done",
                   }),
                 );
+                if (builtinTool.id === "word-document") {
+                  requiredWordToolNames = getWordContinuationToolNames(name, result.content) || [];
+                }
                 responseParts.push({
                   functionResponse: {
                     id: functionCall.id,
@@ -189,6 +227,7 @@ export const createGeminiStream = async ({
                     status: "error",
                   }),
                 );
+                if (builtinTool.id === "word-document") requiredWordToolNames = [];
                 responseParts.push({
                   functionResponse: {
                     id: functionCall.id,
@@ -201,6 +240,12 @@ export const createGeminiStream = async ({
 
             if (responseParts.length === 0) break;
             toolContents.push({ parts: responseParts, role: "user" });
+          }
+
+          if (requiredWordToolNames.length > 0) {
+            throw new Error(
+              `Word 文档生成超过最大步骤数，尚待执行 ${requiredWordToolNames.join(" 或 ")}`,
+            );
           }
 
           if (latestUsage) {
@@ -263,9 +308,7 @@ export const createGeminiStream = async ({
         estimatedOutputTokens: estimateTextTokens(outputText),
         providerUsage,
       });
-      controller.enqueue(
-        encodeUsageEvent(encoder, resolvedUsage),
-      );
+      controller.enqueue(encodeUsageEvent(encoder, resolvedUsage));
       controller.close();
     },
   });

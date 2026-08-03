@@ -228,13 +228,23 @@ const WORD_TOOL: BuiltinToolDefinition = {
     },
     {
       description:
-        "Revise one existing block after writing or inspection. Replace a block to change its text, semantic style, paragraph format, or inline font formatting; remove it only when it is no longer needed.",
+        "Revise blocks after writing or inspection. Replace one block with one or more blocks, insert blocks before or after a target, or remove a block. Use multi-block replacement to split an overlong paragraph and insertion to add a missing heading.",
       name: "word_document_revise",
       parameters: {
         additionalProperties: false,
         properties: {
-          action: { enum: ["replace", "remove"], type: "string" },
+          action: {
+            enum: ["replace", "remove", "insert-before", "insert-after"],
+            type: "string",
+          },
           blockId: { maxLength: 60, type: "string" },
+          blocks: {
+            description:
+              "One or more blocks for replace/insert actions. For backward compatibility, replacement may be used for a single-block replacement.",
+            items: WORD_BLOCK_SCHEMA,
+            maxItems: 12,
+            type: "array",
+          },
           documentId: { maxLength: 80, type: "string" },
           replacement: WORD_BLOCK_SCHEMA,
         },
@@ -324,12 +334,12 @@ Use an archetype-specific information architecture; never reuse a generic “ove
 3. Follow the returned nextAction and make exactly one Word tool call per model turn so every phase is validated before the next begins. Call word_document_append repeatedly, handling exactly one outline section per call. Normally begin the section with a heading block matching its outline level. Keep each batch small and mark complete=true only when that section is finished.
 4. Every family has its own deterministic opening, typography, numbering, page furniture, and table treatment. Do not imitate another family with local formatting. For contract, academic-paper, operations-manual, and product-spec, omit manual numbers from heading text because the renderer supplies family-appropriate heading numbering.
 5. Use semantic block types and family defaults. Never choose raw font, size, color, indentation, spacing, or table geometry merely to make the document look better; the renderer owns those decisions. Add format or runs only when the user explicitly requests a local exception or the content has clear semantic emphasis. Inline size is limited to 8-16pt.
-6. Each block ID must be unique and stable. If a written block needs content or formatting changes, call word_document_revise rather than starting over.
+6. Each block ID must be unique and stable. If written content needs changes, call word_document_revise rather than starting over. It can insert blocks before/after a target or replace one block with multiple blocks, which must be used to add a missing heading or split an overlong block reported by inspection.
 7. After all sections are complete, call word_document_inspect. Resolve missing sections and warnings, then inspect again after every revision.
 8. Call word_document_finalize only when inspection returns canFinalize=true. Never skip inspect or finalize, and never claim that a file exists before finalize succeeds.
 When finalize returns editableSourceSaved=false, the DOCX file is still valid and downloadable. Provide its file result normally, but accurately explain that later cross-message editing requires the database migration and one new generation after migration.
 Use the same language as the requested document. Keep headings consistent with the outline and use tables, lists, quotes, notes, page breaks, and sparse inline formatting where they materially improve the document.`,
-  version: "3.0.0",
+  version: "3.0.1",
 };
 
 const EXCEL_TOOL: BuiltinToolDefinition = {
