@@ -2,35 +2,27 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 
-import { FluentEmoji } from "@/components/FluentEmoji";
+import { useSettingsStore } from "@/stores/useSettingsStore";
 
-const WELCOME_EMOJIS = ["🙂", "😊", "😄", "😁", "🤗", "🤩", "😎", "🫡", "😉"];
+import { AgentAvatar } from "./AgentAvatar";
+
 const WELCOME_TEXT = "你好，我是 MarkAI。今天想聊点什么？";
 
-const pickWelcomeEmoji = () => WELCOME_EMOJIS[Math.floor(Math.random() * WELCOME_EMOJIS.length)];
-
-function AnimatedEmojiLogo() {
-  const [emoji, setEmoji] = useState("🙂");
-
-  useEffect(() => {
-    const frame = window.requestAnimationFrame(() => setEmoji(pickWelcomeEmoji()));
-    return () => window.cancelAnimationFrame(frame);
-  }, []);
-
+function AnimatedAgentLogo() {
+  const reduceMotion = useSettingsStore((state) => state.general.reduceMotion);
   return (
-    <div className="markai-logo-face flex h-16 w-16 shrink-0 items-center justify-center md:h-20 md:w-20">
-      <FluentEmoji emoji={emoji} size={64} />
-      <style>{`
-        @keyframes markai-logo-float {
-          0%, 100% { transform: translateY(0) rotate(-2deg); }
-          50% { transform: translateY(-5px) rotate(2deg); }
-        }
-
-        .markai-logo-face {
-          animation: markai-logo-float 4.2s ease-in-out infinite;
-          transform-origin: center bottom;
-        }
-      `}</style>
+    <div className="flex h-16 w-16 shrink-0 items-center justify-center md:h-20 md:w-20">
+      <AgentAvatar
+        ambient
+        animate
+        expression="mefiant"
+        followPointer
+        interactive
+        playful
+        reduceMotion={reduceMotion}
+        size={72}
+        state="idle"
+      />
     </div>
   );
 }
@@ -68,7 +60,7 @@ export function WelcomePanel({ children }: { children: ReactNode }) {
   return (
     <div className="flex w-full max-w-[840px] flex-col items-center px-0 md:px-4">
       <div className="mb-6 flex items-center gap-3 md:mb-8 md:gap-4">
-        <AnimatedEmojiLogo />
+        <AnimatedAgentLogo />
         <div className="min-w-0">
           <h1 className="font-jakarta text-2xl font-semibold text-gray-950 dark:text-gray-50 md:text-3xl">
             MARKAI

@@ -177,14 +177,7 @@ export function Sidebar({
         <div className="flex h-full w-full flex-col">
           <div className="mb-2 flex items-center justify-between p-3">
             <div className="ml-2 mt-1 flex items-center gap-3">
-              <Image
-                alt="MarkAI"
-                className="h-8 w-8"
-                height={32}
-                priority
-                src="/images/markai.svg"
-                width={32}
-              />
+              <Image alt="MarkAI" height={32} priority src="/images/markai.svg" width={32} />
               <div>
                 <h1 className="text-lg font-bold leading-tight text-gray-900 dark:text-gray-100">
                   MarkAI

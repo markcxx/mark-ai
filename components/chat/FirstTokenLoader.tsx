@@ -1,18 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSettingsStore } from "@/stores/useSettingsStore";
 
-type LoaderMode = "bounce" | "orbit";
+import { AgentAvatar } from "./AgentAvatar";
 
 export function FirstTokenLoader() {
-  const [mode, setMode] = useState<LoaderMode>("bounce");
-
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      setMode((current) => (current === "bounce" ? "orbit" : "bounce"));
-    }, 4400);
-    return () => window.clearInterval(interval);
-  }, []);
+  const reduceMotion = useSettingsStore((state) => state.general.reduceMotion);
 
   return (
     <div
@@ -20,15 +13,14 @@ export function FirstTokenLoader() {
       className="flex h-8 w-10 items-center justify-center"
       role="status"
     >
-      <span
-        aria-hidden="true"
-        className={`first-token-loader first-token-loader-${mode}`}
-        key={mode}
-      >
-        <span />
-        <span />
-        <span />
-      </span>
+      <AgentAvatar
+        ambient={false}
+        animate
+        className="text-gray-400 dark:text-[#2496e8]"
+        reduceMotion={reduceMotion}
+        size={40}
+        state="thinking"
+      />
     </div>
   );
 }

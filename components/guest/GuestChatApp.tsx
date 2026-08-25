@@ -5,28 +5,20 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-import { FluentEmoji } from "@/components/FluentEmoji";
+import { AgentAvatar } from "@/components/chat/AgentAvatar";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useUIStore } from "@/stores/useUIStore";
-
-const GUEST_EMOJIS = ["🙂", "😊", "😄", "😁", "🤗", "🤩", "😎", "🫡", "😉"];
 
 export function GuestChatApp() {
   const [draft, setDraft] = useState("");
-  const [emoji, setEmoji] = useState("🙂");
+  const reduceMotion = useSettingsStore((state) => state.general.reduceMotion);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const uiStore = useUIStore.getState();
     uiStore.setBootProgress(100, "加载完成");
     uiStore.setAppReady(true);
-  }, []);
-
-  useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      setEmoji(GUEST_EMOJIS[Math.floor(Math.random() * GUEST_EMOJIS.length)]);
-    });
-    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   const requestSignIn = () => {
@@ -76,6 +68,10 @@ export function GuestChatApp() {
             <Link
               className="inline-flex h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium hover:bg-gray-100 dark:hover:bg-white/[0.07]"
               href="/login?callbackUrl=%2F"
+              onClick={(event) => {
+                event.preventDefault();
+                requestSignIn();
+              }}
             >
               <LogIn size={17} />
               登录
@@ -86,10 +82,18 @@ export function GuestChatApp() {
         <div className="flex flex-1 items-center justify-center overflow-y-auto px-3 pb-6 md:px-8 md:pb-8">
           <div className="flex w-full max-w-[840px] flex-col items-center">
             <div className="mb-6 flex items-center gap-3 md:mb-8 md:gap-4">
-              <div className="auth-emoji-float flex h-16 w-16 shrink-0 items-center justify-center md:h-20 md:w-20">
-                <span className="auth-emoji-swap" key={emoji}>
-                  <FluentEmoji emoji={emoji} size={64} />
-                </span>
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center md:h-20 md:w-20">
+                <AgentAvatar
+                  ambient
+                  animate
+                  expression="mefiant"
+                  followPointer
+                  interactive
+                  playful
+                  reduceMotion={reduceMotion}
+                  size={72}
+                  state="idle"
+                />
               </div>
               <div className="min-w-0">
                 <h1 className="text-2xl font-semibold md:text-3xl">MARKAI</h1>

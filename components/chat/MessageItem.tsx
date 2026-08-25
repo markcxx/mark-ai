@@ -39,7 +39,9 @@ import { useSettingsStore } from "@/stores/useSettingsStore";
 import { AppTextArea } from "@/components/ui/AppInput";
 import { useSpeechPlayback } from "@/hooks/useSpeechPlayback";
 import { getSpeechVoiceLabel, SYSTEM_SPEECH_VOICE } from "@/lib/chat/speech-voices";
+import { resolveAgentAvatarMode } from "@/lib/chat/agent-avatar";
 
+import { AgentAvatar } from "./AgentAvatar";
 import { CollapsibleContent } from "./CollapsibleContent";
 import { FloatingMenu } from "./FloatingMenu";
 import { FilePreviewDialog } from "./FilePreviewDialog";
@@ -50,7 +52,6 @@ import { MarkdownContent } from "./MarkdownContent";
 import { MessageAudioPlayer } from "./MessageAudioPlayer";
 import { MessageActionButton } from "./MessageActionButton";
 import { MessageSelectionWrapper } from "./MessageSelectionWrapper";
-import { ModelAvatar } from "./ModelAvatar";
 import { ThinkingPanel } from "./ThinkingPanel";
 import { GeneratedFileToolBlock } from "./message/GeneratedFileToolBlock";
 import { GeneratedImageBlock } from "./message/GeneratedImageBlock";
@@ -327,6 +328,7 @@ export function MessageItem({
   editingMessageId,
   enableMultiSelect,
   getMessageModel,
+  isConversationTail,
   isSelected,
   loadingText,
   menuUnavailable,
@@ -354,6 +356,7 @@ export function MessageItem({
   editingMessageId: string | null;
   enableMultiSelect: (id: string) => void;
   getMessageModel: (message: Message) => ConfiguredModel | undefined;
+  isConversationTail: boolean;
   isSelected: boolean;
   loadingText: string;
   menuUnavailable: () => void;
@@ -375,6 +378,7 @@ export function MessageItem({
   const generalSettings = useSettingsStore((state) => state.general);
   const speechSettings = useSettingsStore((state) => state.speech);
   const [previewFile, setPreviewFile] = useState<FileAttachment | null>(null);
+  const [showInterruptedAlert, setShowInterruptedAlert] = useState(Boolean(message.interrupted));
   const [translating, setTranslating] = useState(false);
   const speechToastIdRef = useRef<string | undefined>(undefined);
   const dismissSpeechToast = useCallback(() => {
@@ -415,9 +419,24 @@ export function MessageItem({
   );
   const waitingForFirstOutput = Boolean(message.isStreaming && !hasStreamingOutput);
   const waitingForImage = waitingForFirstOutput && isImageGenerationModel(message.model);
+  const avatarMode = resolveAgentAvatarMode(
+    message,
+    isConversationTail,
+    waitingForImage,
+    showInterruptedAlert,
+  );
   const regenerateMode: RegenerateMode = generalSettings.overwriteRegeneratedResponse
     ? "replace"
     : "preserve";
+  useEffect(() => {
+    if (!message.interrupted) {
+      setShowInterruptedAlert(false);
+      return;
+    }
+    setShowInterruptedAlert(true);
+    const timer = window.setTimeout(() => setShowInterruptedAlert(false), 2400);
+    return () => window.clearTimeout(timer);
+  }, [message.id, message.interrupted]);
   const handleTranslate = useCallback(
     async (language: TranslationLanguage) => {
       setTranslating(true);
@@ -655,7 +674,13 @@ export function MessageItem({
     ) : (
       <div className="group group/message relative w-full" data-message-id={message.id}>
         <div className="message-header mb-3 flex items-center gap-2.5">
-          <ModelAvatar model={message.model} provider={message.provider} />
+          <AgentAvatar
+            ambient={avatarMode.ambient}
+            animate={avatarMode.animate}
+            expression={avatarMode.expression}
+            reduceMotion={generalSettings.reduceMotion}
+            state={avatarMode.state}
+          />
           <div className="flex min-w-0 flex-col">
             <div className="flex min-w-0 items-center gap-2">
               <span className="truncate font-jakarta text-[15px] font-bold text-gray-900 dark:text-gray-100">

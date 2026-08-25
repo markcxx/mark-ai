@@ -787,7 +787,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                           : "gap-8",
                   )}
                 >
-                  {messages.map((message) => (
+                  {messages.map((message, index) => (
                     <MessageItem
                       cancelEditingMessage={() => useChatStore.getState().cancelEditing()}
                       collapsed={collapsedMessageIds.includes(message.id)}
@@ -803,6 +803,9 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                         });
                       }}
                       getMessageModel={getMessageModel}
+                      isConversationTail={
+                        index === messages.length - 1 && message.role === "model"
+                      }
                       isSelected={selectedMessageIds.includes(message.id)}
                       key={message.id}
                       loadingText={loadingText}

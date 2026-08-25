@@ -3,33 +3,43 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
-import { FluentEmoji } from "@/components/FluentEmoji";
+import { AgentAvatar } from "@/components/chat/AgentAvatar";
 import { ThemeToggle } from "@/components/ThemeToggle";
-
-const AUTH_EMOJIS = ["🙂", "😊", "😄", "😁", "🤗", "🤩", "😎", "🫡", "😉"];
+import { useSettingsStore } from "@/stores/useSettingsStore";
 
 function AuthGuide({ compact = false }: { compact?: boolean }) {
-  const [emoji, setEmoji] = useState("🙂");
+  const reduceMotion = useSettingsStore((state) => state.general.reduceMotion);
+  const [arriving, setArriving] = useState(true);
 
   useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      setEmoji(AUTH_EMOJIS[Math.floor(Math.random() * AUTH_EMOJIS.length)]);
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, []);
+    if (reduceMotion) {
+      setArriving(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setArriving(false), 1300);
+    return () => window.clearTimeout(timer);
+  }, [reduceMotion]);
 
   return (
     <div className={compact ? "mb-7 flex items-center gap-3 md:hidden" : "max-w-sm"}>
       <div
         className={
           compact
-            ? "auth-emoji-float flex h-14 w-14 shrink-0 items-center justify-center"
-            : "auth-emoji-float flex h-28 w-28 items-center justify-center"
+            ? "flex h-14 w-14 shrink-0 items-center justify-center"
+            : "flex h-28 w-28 items-center justify-center"
         }
       >
-        <span className="auth-emoji-swap" key={emoji}>
-          <FluentEmoji emoji={emoji} size={compact ? 52 : 96} />
-        </span>
+        <AgentAvatar
+          ambient={!arriving}
+          animate
+          expression="mefiant"
+          followPointer
+          interactive
+          playful
+          reduceMotion={reduceMotion}
+          size={compact ? 52 : 104}
+          state={arriving ? "swirl" : "idle"}
+        />
       </div>
       <div>
         <p className={compact ? "text-sm font-semibold" : "text-2xl font-semibold"}>很高兴见到你</p>
