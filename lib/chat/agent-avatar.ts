@@ -1,6 +1,6 @@
 import type { Message } from "@/lib/chat/types";
-import type { ExpressionId } from "@/lib/agent-avatar/bloub/expressions";
-import type { StateId } from "@/lib/agent-avatar/bloub/states";
+import type { ExpressionId } from "@/lib/agent-avatar/core/expressions";
+import type { StateId } from "@/lib/agent-avatar/core/states";
 
 export type AgentAvatarMode = {
   animate: boolean;

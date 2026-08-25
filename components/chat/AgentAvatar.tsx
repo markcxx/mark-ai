@@ -2,14 +2,14 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
-import { NOTIF_BLUE } from "@/lib/agent-avatar/bloub/decor";
-import { BotEngine, type BotFrame } from "@/lib/agent-avatar/bloub/engine";
+import { NOTIF_BLUE } from "@/lib/agent-avatar/core/decor";
+import { BotEngine, type BotFrame } from "@/lib/agent-avatar/core/engine";
 import {
   EXPRESSION_BY_ID,
   type ExpressionId,
-} from "@/lib/agent-avatar/bloub/expressions";
-import { DEMI_VIEWBOX, RAYON } from "@/lib/agent-avatar/bloub/repere";
-import { STATE_BY_ID, type StateId } from "@/lib/agent-avatar/bloub/states";
+} from "@/lib/agent-avatar/core/expressions";
+import { DEMI_VIEWBOX, RAYON } from "@/lib/agent-avatar/core/repere";
+import { STATE_BY_ID, type StateId } from "@/lib/agent-avatar/core/states";
 import { cn } from "@/lib/utils";
 
 const AMBIENT_STATES: StateId[] = [
