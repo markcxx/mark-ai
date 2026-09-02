@@ -10,7 +10,11 @@ import {
   getStoredFileUsage,
   isStoredFileQuotaUnlimited,
 } from "@/lib/storage/file-storage";
-import { isAllowedUploadType, storageLimits } from "@/lib/storage/limits";
+import {
+  formatStorageLimitMb,
+  isAllowedUploadType,
+  storageLimits,
+} from "@/lib/storage/limits";
 
 export const runtime = "nodejs";
 
@@ -40,7 +44,7 @@ export async function POST(request: Request) {
   const maxBytes = kind === "avatar" ? storageLimits.maxAvatarBytes : storageLimits.maxFileBytes;
   if (size > maxBytes) {
     return NextResponse.json(
-      { error: `文件不能超过 ${Math.ceil(maxBytes / 1024 / 1024)} MB` },
+      { error: `单个文件不能超过 ${formatStorageLimitMb(maxBytes)} MB` },
       { status: 413 },
     );
   }
@@ -57,11 +61,13 @@ export async function POST(request: Request) {
 
   if (!unlimited && kind !== "avatar") {
     const usage = await getStoredFileUsage(userId);
-    if (usage.count >= storageLimits.maxFileCount) {
-      return NextResponse.json({ error: "文件数量已达到上限" }, { status: 413 });
-    }
     if (usage.size + size > storageLimits.maxStorageBytes) {
-      return NextResponse.json({ error: "存储空间不足，请删除旧文件后重试" }, { status: 413 });
+      return NextResponse.json(
+        {
+          error: `附件总容量不能超过 ${formatStorageLimitMb(storageLimits.maxStorageBytes)} MB，请删除旧文件后重试`,
+        },
+        { status: 413 },
+      );
     }
   }
 

@@ -285,7 +285,8 @@ export const useSessionStore = create<SessionStore>()(
       try {
         const deletingActiveSession = get().activeSessionId === sessionId;
         const response = await fetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
-        if (!response.ok) throw new Error("删除会话失败");
+        const body = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(body?.error || "删除会话失败");
 
         get().setSessionLoading(sessionId, false);
         set((s) => ({
@@ -304,7 +305,7 @@ export const useSessionStore = create<SessionStore>()(
         return deletingActiveSession;
       } catch (error) {
         console.error("Session delete error:", error);
-        toast.error("删除会话失败");
+        toast.error(error instanceof Error ? error.message : "删除会话失败");
         return false;
       }
     },

@@ -36,6 +36,12 @@ export const getChatSession = (sessionId: string, userId?: string) =>
 export const getChatMessages = (sessionId: string, userId?: string) =>
   getStorage().getChatMessages(sessionId, userId);
 
+export const findReferencedChatFileIds = (
+  fileIds: string[],
+  excludingSessionId: string,
+  userId?: string,
+) => getStorage().findReferencedFileIds(fileIds, excludingSessionId, userId);
+
 export const updateChatSessionTitle = (sessionId: string, title: string, userId?: string) =>
   getStorage().updateChatSessionTitle(sessionId, title, userId);
 

@@ -1,18 +1,63 @@
-export const storageLimits = {
-  maxAvatarBytes: Number(
-    process.env.MARKAI_MAX_AVATAR_BYTES || process.env.R2_USER_MAX_AVATAR_BYTES || 2 * 1024 * 1024,
-  ),
-  maxFileBytes: Number(
-    process.env.MARKAI_MAX_FILE_BYTES || process.env.R2_USER_MAX_FILE_BYTES || 20 * 1024 * 1024,
-  ),
-  maxFileCount: Number(
-    process.env.MARKAI_MAX_FILE_COUNT || process.env.R2_USER_MAX_FILE_COUNT || 50,
-  ),
-  maxStorageBytes: Number(
-    process.env.MARKAI_MAX_STORAGE_BYTES ||
-      process.env.R2_USER_MAX_STORAGE_BYTES ||
-      200 * 1024 * 1024,
-  ),
+const BYTES_PER_MB = 1024 * 1024;
+type StorageLimitEnvironment = Record<string, string | undefined>;
+
+const parsePositiveLimit = (name: string, value: string | undefined) => {
+  if (!value?.trim()) return undefined;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`${name} 必须是大于 0 的数字`);
+  }
+  return parsed;
+};
+
+const resolveByteLimit = ({
+  byteNames,
+  defaultMb,
+  env,
+  mbNames,
+}: {
+  byteNames: string[];
+  defaultMb: number;
+  env: StorageLimitEnvironment;
+  mbNames: string[];
+}) => {
+  for (const name of mbNames) {
+    const value = parsePositiveLimit(name, env[name]);
+    if (value !== undefined) return Math.floor(value * BYTES_PER_MB);
+  }
+  for (const name of byteNames) {
+    const value = parsePositiveLimit(name, env[name]);
+    if (value !== undefined) return Math.floor(value);
+  }
+  return defaultMb * BYTES_PER_MB;
+};
+
+export const resolveStorageLimits = (env: StorageLimitEnvironment = process.env) => ({
+  maxAvatarBytes: resolveByteLimit({
+    byteNames: ["MARKAI_MAX_AVATAR_BYTES", "R2_USER_MAX_AVATAR_BYTES"],
+    defaultMb: 5,
+    env,
+    mbNames: ["MARKAI_MAX_AVATAR_MB", "R2_USER_MAX_AVATAR_MB"],
+  }),
+  maxFileBytes: resolveByteLimit({
+    byteNames: ["MARKAI_MAX_FILE_BYTES", "R2_USER_MAX_FILE_BYTES"],
+    defaultMb: 30,
+    env,
+    mbNames: ["MARKAI_MAX_FILE_MB", "R2_USER_MAX_FILE_MB"],
+  }),
+  maxStorageBytes: resolveByteLimit({
+    byteNames: ["MARKAI_MAX_STORAGE_BYTES", "R2_USER_MAX_STORAGE_BYTES"],
+    defaultMb: 500,
+    env,
+    mbNames: ["MARKAI_MAX_STORAGE_MB", "R2_USER_MAX_STORAGE_MB"],
+  }),
+});
+
+export const storageLimits = resolveStorageLimits();
+
+export const formatStorageLimitMb = (bytes: number) => {
+  const value = bytes / BYTES_PER_MB;
+  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.?0+$/, "");
 };
 
 const ALLOWED_ATTACHMENT_TYPES = new Set([

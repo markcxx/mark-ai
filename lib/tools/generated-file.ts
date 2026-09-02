@@ -10,7 +10,7 @@ import {
   markStoredFileReady,
   writeStoredFileObject,
 } from "@/lib/storage/file-storage";
-import { storageLimits } from "@/lib/storage/limits";
+import { formatStorageLimitMb, storageLimits } from "@/lib/storage/limits";
 import type { StoredFileRecord } from "@/lib/storage/local-file-storage";
 import { putR2Object } from "@/lib/storage/r2";
 import { isCloudMode } from "@/lib/env";
@@ -48,15 +48,16 @@ export const saveGeneratedFile = async ({
 }): Promise<GeneratedFile> => {
   if (bytes.byteLength === 0) throw new Error("生成的文件为空");
   if (bytes.byteLength > storageLimits.maxFileBytes) {
-    throw new Error("生成的文件超过当前大小限制");
+    throw new Error(`生成的文件不能超过 ${formatStorageLimitMb(storageLimits.maxFileBytes)} MB`);
   }
 
   const unlimited = await isStoredFileQuotaUnlimited(userId);
   if (!unlimited) {
     const usage = await getStoredFileUsage(userId);
-    if (usage.count >= storageLimits.maxFileCount) throw new Error("文件数量已达到上限");
     if (usage.size + bytes.byteLength > storageLimits.maxStorageBytes) {
-      throw new Error("存储空间不足，请删除旧文件后重试");
+      throw new Error(
+        `附件总容量不能超过 ${formatStorageLimitMb(storageLimits.maxStorageBytes)} MB，请删除旧文件后重试`,
+      );
     }
   }
 

@@ -41,6 +41,11 @@ export interface StorageAdapter {
     userId?: string,
   ): ChatSession | undefined | Promise<ChatSession | undefined>;
   getChatMessages(sessionId: string, userId?: string): Message[] | Promise<Message[]>;
+  findReferencedFileIds(
+    fileIds: string[],
+    excludingSessionId: string,
+    userId?: string,
+  ): Set<string> | Promise<Set<string>>;
   updateChatSessionTitle(
     sessionId: string,
     title: string,

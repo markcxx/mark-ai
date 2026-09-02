@@ -42,7 +42,7 @@ export async function GET() {
     })),
     limits: {
       maxFileBytes: storageLimits.maxFileBytes,
-      maxFileCount: unlimited ? null : storageLimits.maxFileCount,
+      maxFileCount: null,
       maxStorageBytes: unlimited ? null : storageLimits.maxStorageBytes,
     },
     usage,

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, asc, count, desc, eq, notInArray, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ne, notInArray, sql } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
 import { chatMessages, chatSessions } from "@/lib/db/schema";
@@ -11,6 +11,7 @@ import {
   type SessionListOptions,
   type StorageAdapter,
 } from "./storage-adapter";
+import { collectMessageFileIds } from "./message-file-references";
 import type {
   ChatSession,
   FileAttachment,
@@ -281,6 +282,25 @@ export class PostgresStorage implements StorageAdapter {
       .orderBy(asc(chatMessages.position), asc(chatMessages.createdAt));
 
     return rows.map(toMessage);
+  }
+
+  async findReferencedFileIds(fileIds: string[], excludingSessionId: string, userId?: string) {
+    if (!userId) throw new Error("userId is required in cloud mode");
+    if (fileIds.length === 0) return new Set<string>();
+
+    const rows = await getDb()
+      .select({
+        attachments: chatMessages.attachments,
+        segments: chatMessages.segments,
+        variants: chatMessages.variants,
+      })
+      .from(chatMessages)
+      .innerJoin(chatSessions, eq(chatMessages.sessionId, chatSessions.id))
+      .where(and(eq(chatSessions.userId, userId), ne(chatSessions.id, excludingSessionId)));
+    const candidates = new Set(fileIds);
+    return new Set(
+      [...collectMessageFileIds(rows as Message[])].filter((fileId) => candidates.has(fileId)),
+    );
   }
 
   async updateChatSessionTitle(sessionId: string, title: string, userId?: string) {

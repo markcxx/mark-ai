@@ -143,11 +143,11 @@ export const markStoredFileReady = async (file: StoredFileRecord) => {
 
 export const deleteStoredFile = async (file: StoredFileRecord) => {
   if (isLocalMode()) {
-    await deleteLocalObject(file).catch(() => undefined);
+    await deleteLocalObject(file);
     deleteLocalFileRecord(file.id, file.userId);
     return;
   }
-  await deleteR2Object(file.bucket, file.objectKey).catch(() => undefined);
+  await deleteR2Object(file.bucket, file.objectKey);
   await getDb()
     .delete(storageFiles)
     .where(and(eq(storageFiles.id, file.id), eq(storageFiles.userId, file.userId)));

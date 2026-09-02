@@ -117,7 +117,7 @@ MarkAI 将正文、推理、工具调用、生成文件和翻译保存为带类�
 
 - 支持 PDF、DOCX、XLSX/CSV 和常见文本格式的内容提取。
 - 支持图片、文档、表格和演示文稿附件。
-- 单文件大小、文件数量和总存储容量均可配置。
+- 单文件大小和总存储容量均可使用 MB 数字配置，附件数量不设上限。
 - 生成的 Word 和 Excel 文件也进入统一文件存储和下载流程。
 
 ![MarkAI 文件管理](public/images/readme/file-manager.png)
@@ -322,9 +322,9 @@ npm start
 | `AUTH_SSO_PROVIDERS`                    | 启用 `google`、`github` SSO                 |
 | `SMTP_*`                                | 验证码、邀请和密码重置邮件                  |
 | `CREDENTIAL_ENCRYPTION_KEY`             | 加密用户保存的供应商 API Key                |
-| `MARKAI_MAX_FILE_BYTES`                 | 单文件大小限制                              |
-| `MARKAI_MAX_FILE_COUNT`                 | 云端用户文件数量限制                        |
-| `MARKAI_MAX_STORAGE_BYTES`              | 云端用户存储容量限制                        |
+| `MARKAI_MAX_FILE_MB`                    | 普通附件单文件大小限制（MB）                |
+| `MARKAI_MAX_AVATAR_MB`                  | 头像单文件大小限制（MB）                    |
+| `MARKAI_MAX_STORAGE_MB`                 | 云端普通用户附件总容量限制（MB）            |
 
 `CREDENTIAL_ENCRYPTION_KEY` 和 `AUTH_SECRET` 在生产环境中必须妥善保管。更换加密密钥后，已有的用户模型 API Key 将无法解密。
 

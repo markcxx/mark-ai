@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
 
-import { getCurrentUserId } from "@/lib/auth-helpers";
+import { getCurrentUserId, LOCAL_STORAGE_OWNER_ID } from "@/lib/auth-helpers";
 import {
   deleteChatSession,
+  findReferencedChatFileIds,
   getChatMessages,
   getChatSession,
   updateChatSessionFavorite,
   updateChatSessionTitle,
 } from "@/lib/chat/storage";
+import { collectMessageFileIds } from "@/lib/chat/message-file-references";
+import { deleteStoredFile, getStoredFilesByIds } from "@/lib/storage/file-storage";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -42,8 +45,30 @@ export async function DELETE(_req: Request, context: { params: Promise<{ session
     return NextResponse.json({ error: "会话不存在或无权访问" }, { status: 404 });
   }
 
-  await deleteChatSession(sessionId, userId);
-  return NextResponse.json({ ok: true });
+  try {
+    const storageOwnerId = userId || LOCAL_STORAGE_OWNER_ID;
+    const messages = await getChatMessages(sessionId, userId);
+    const candidateFileIds = [...collectMessageFileIds(messages)];
+    const referencedElsewhere = await findReferencedChatFileIds(
+      candidateFileIds,
+      sessionId,
+      userId,
+    );
+    const exclusiveFileIds = candidateFileIds.filter((fileId) => !referencedElsewhere.has(fileId));
+    const files = (await getStoredFilesByIds(exclusiveFileIds, storageOwnerId)).filter(
+      (file) => file.kind === "attachment",
+    );
+
+    for (const file of files) await deleteStoredFile(file);
+    await deleteChatSession(sessionId, userId);
+    return NextResponse.json({ deletedFileCount: files.length, ok: true });
+  } catch (error) {
+    console.error("Session file cleanup error:", error);
+    return NextResponse.json(
+      { error: "会话文件清理失败，请稍后重试删除" },
+      { status: 502 },
+    );
+  }
 }
 
 export async function PATCH(req: Request, context: { params: Promise<{ sessionId: string }> }) {

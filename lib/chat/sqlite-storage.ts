@@ -9,6 +9,7 @@ import {
   type SessionListOptions,
   type StorageAdapter,
 } from "./storage-adapter";
+import { collectMessageFileIds } from "./message-file-references";
 import type { ChatSession, Message } from "./types";
 
 type PreparedStatementLike = {
@@ -438,6 +439,24 @@ export class SqliteStorage implements StorageAdapter {
       .all(sessionId);
 
     return rows.map(toMessage);
+  }
+
+  findReferencedFileIds(fileIds: string[], excludingSessionId: string) {
+    if (fileIds.length === 0) return new Set<string>();
+    const rows = ensureDatabase()
+      .prepare(
+        `SELECT messages.attachments, messages.segments, messages.variants
+         FROM chat_messages messages
+         WHERE messages.session_id <> ?`,
+      )
+      .all(excludingSessionId)
+      .map((row: any) => ({
+        attachments: parseJsonValue<Message["attachments"]>(row.attachments),
+        segments: parseJsonValue<Message["segments"]>(row.segments),
+        variants: parseJsonValue<Message["variants"]>(row.variants),
+      }));
+    const candidates = new Set(fileIds);
+    return new Set([...collectMessageFileIds(rows)].filter((fileId) => candidates.has(fileId)));
   }
 
   updateChatSessionTitle(sessionId: string, title: string) {
