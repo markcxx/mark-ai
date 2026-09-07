@@ -1,10 +1,11 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { authorizeAdminApi } from "@/lib/admin/api";
 import { writeAdminAudit } from "@/lib/admin/auth";
 import { getDb } from "@/lib/db";
-import { chatMessages, chatSessions } from "@/lib/db/schema";
+import { getChatMessages } from "@/lib/chat/storage";
+import { chatSessions } from "@/lib/db/schema";
 
 const findSession = async (sessionId: string, userId: string) => {
   const [session] = await getDb()
@@ -24,11 +25,7 @@ export async function GET(
   const { sessionId, userId } = await context.params;
   const session = await findSession(sessionId, userId);
   if (!session) return NextResponse.json({ error: "会话不存在" }, { status: 404 });
-  const messages = await getDb()
-    .select()
-    .from(chatMessages)
-    .where(eq(chatMessages.sessionId, sessionId))
-    .orderBy(asc(chatMessages.position));
+  const messages = await getChatMessages(sessionId, userId);
   await writeAdminAudit({
     action: "conversation.view",
     actorUserId: admin.id,

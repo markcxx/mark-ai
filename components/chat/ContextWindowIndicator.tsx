@@ -1,15 +1,12 @@
 "use client";
 
-import { useId, useMemo } from "react";
+import React, { useMemo } from "react";
+import { Popover } from "@base-ui/react/popover";
 
 import { estimateDraftContextTokens } from "@/lib/chat/context-window";
 import { estimateTextTokens } from "@/lib/chat/metrics";
 import type { FileAttachment, Message } from "@/lib/chat/types";
-import {
-  formatTokenCount,
-  getModelMetadata,
-  hasKnownContextWindow,
-} from "@/lib/model-metadata";
+import { formatTokenCount, getModelMetadata, hasKnownContextWindow } from "@/lib/model-metadata";
 import { cn } from "@/lib/utils";
 import { getToolFunctions, getToolSystemPrompt } from "@/lib/tools/registry";
 import { useToolStore } from "@/stores/useToolStore";
@@ -27,7 +24,6 @@ export function ContextWindowIndicator({
   modelId?: string;
   webSearchEnabled: boolean;
 }) {
-  const tooltipId = useId();
   const enabledToolIds = useToolStore((state) => state.enabledToolIds);
   const metadata = getModelMetadata(modelId);
   const toolContextTokens = useMemo(
@@ -51,32 +47,26 @@ export function ContextWindowIndicator({
       }),
     [attachments, draft, messages, toolContextTokens, webSearchEnabled],
   );
-  const latestConversationTokens = useMemo(
-    () =>
-      messages
-        .filter(
-          (message) =>
-            message.role === "model" &&
-            typeof message.totalTokens === "number" &&
-            message.totalTokens > 0,
-        )
-        .at(-1)?.totalTokens,
-    [messages],
-  );
-
-  if (!hasKnownContextWindow(metadata)) return null;
-
-  const occupiedTokens = latestConversationTokens ?? estimatedTokens;
-  const percentage = Math.min(100, (occupiedTokens / metadata.contextWindowTokens) * 100);
-  const tone = percentage >= 90 ? "danger" : percentage >= 70 ? "warning" : "normal";
+  // Request usage includes reasoning and transient tool passes; it is not the
+  // retained conversation. Re-estimate the current payload after every edit.
+  const occupiedTokens = estimatedTokens;
+  const limit = hasKnownContextWindow(metadata) ? metadata.contextWindowTokens : undefined;
+  const percentage = limit ? (occupiedTokens / limit) * 100 : undefined;
+  const percentageLabel =
+    percentage === undefined
+      ? "上限未知"
+      : percentage > 0 && percentage < 1
+        ? "<1%"
+        : `${percentage.toFixed(0)}%`;
+  const tone = (percentage ?? 0) >= 90 ? "danger" : (percentage ?? 0) >= 70 ? "warning" : "normal";
 
   return (
-    <div className="group/context relative shrink-0 tabular-nums">
-      <button
-        aria-describedby={tooltipId}
-        aria-label={`查看上下文占用，当前约 ${percentage.toFixed(0)}%`}
+    <Popover.Root>
+      <Popover.Trigger
+        aria-label={`查看上下文占用，约 ${formatTokenCount(occupiedTokens)} tokens，${percentageLabel}`}
+        data-markai-tooltip={`上下文占用 ${percentageLabel}，点击查看详情`}
         className={cn(
-          "relative block size-7 rounded-full outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-primary/30",
+          "relative flex size-11 shrink-0 items-center justify-center md:size-8 rounded-full outline-none transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-primary/30",
           tone === "danger"
             ? "text-red-600 dark:text-red-400"
             : tone === "warning"
@@ -85,7 +75,7 @@ export function ContextWindowIndicator({
         )}
         type="button"
       >
-        <svg aria-hidden="true" className="absolute inset-0 -rotate-90" viewBox="0 0 28 28">
+        <svg aria-hidden="true" className="size-7 -rotate-90" viewBox="0 0 28 28">
           <circle
             className="stroke-gray-200 dark:stroke-white/10"
             cx="14"
@@ -102,47 +92,53 @@ export function ContextWindowIndicator({
             pathLength="100"
             r="11"
             strokeDasharray="100"
-            strokeDashoffset={100 - percentage}
+            strokeDashoffset={100 - Math.min(100, percentage ?? 0)}
             strokeLinecap="round"
             strokeWidth="2.5"
           />
         </svg>
-      </button>
+      </Popover.Trigger>
 
-      <div
-        className="pointer-events-none absolute bottom-full right-0 z-30 mb-2 w-64 translate-y-1 rounded-lg border border-gray-200 bg-white p-3 text-left opacity-0 shadow-lg transition-[opacity,transform] duration-150 group-hover/context:translate-y-0 group-hover/context:opacity-100 group-focus-within/context:translate-y-0 group-focus-within/context:opacity-100 dark:border-white/10 dark:bg-[#242424]"
-        id={tooltipId}
-        role="tooltip"
-      >
-        <div className="mb-2 truncate text-xs font-medium text-gray-900 dark:text-gray-100">
-          {metadata.displayName}
-        </div>
-        <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1.5 text-xs">
-          <dt className="text-gray-400 dark:text-gray-500">会话已用</dt>
-          <dd className="text-gray-700 dark:text-gray-300">
-            {formatTokenCount(occupiedTokens)} tokens
-          </dd>
-          <dt className="text-gray-400 dark:text-gray-500">上下文上限</dt>
-          <dd className="text-gray-700 dark:text-gray-300">
-            {formatTokenCount(metadata.contextWindowTokens)} tokens
-          </dd>
-          <dt className="text-gray-400 dark:text-gray-500">占用比例</dt>
-          <dd className="text-gray-700 dark:text-gray-300">{percentage.toFixed(1)}%</dd>
-          {metadata.maxOutputTokens && (
-            <>
-              <dt className="text-gray-400 dark:text-gray-500">最大输出</dt>
+      <Popover.Portal>
+        <Popover.Positioner
+          side="top"
+          align="end"
+          sideOffset={8}
+          collisionPadding={12}
+          className="z-50"
+        >
+          <Popover.Popup className="w-64 max-w-[calc(100vw-24px)] rounded-xl border border-gray-200 bg-[var(--chat-popover-bg)] p-3 text-left tabular-nums shadow-lg outline-none dark:border-white/10">
+            <div className="mb-2 truncate text-xs font-medium text-gray-900 dark:text-gray-100">
+              {metadata?.displayName || modelId || "当前会话"}
+            </div>
+            <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1.5 text-xs">
+              <dt className="text-gray-400 dark:text-gray-500">预计上下文</dt>
               <dd className="text-gray-700 dark:text-gray-300">
-                {formatTokenCount(metadata.maxOutputTokens)} tokens
+                {formatTokenCount(occupiedTokens)} tokens
               </dd>
-            </>
-          )}
-        </dl>
-        <p className="mt-2 border-t border-gray-100 pt-2 text-[11px] leading-4 text-gray-400 dark:border-white/[0.06] dark:text-gray-500">
-          {latestConversationTokens
-            ? "按当前会话最后一条模型消息的总 token 统计"
-            : "尚无模型回复，暂按当前内容与已启用工具估算"}
-        </p>
-      </div>
-    </div>
+              <dt className="text-gray-400 dark:text-gray-500">上下文上限</dt>
+              <dd className="text-gray-700 dark:text-gray-300">
+                {limit ? `${formatTokenCount(limit)} tokens` : "尚未公布"}
+              </dd>
+              <dt className="text-gray-400 dark:text-gray-500">占用比例</dt>
+              <dd className="text-gray-700 dark:text-gray-300">
+                {percentage === undefined ? "无法计算" : `${percentage.toFixed(1)}%`}
+              </dd>
+              {metadata?.maxOutputTokens && (
+                <>
+                  <dt className="text-gray-400 dark:text-gray-500">最大输出</dt>
+                  <dd className="text-gray-700 dark:text-gray-300">
+                    {formatTokenCount(metadata.maxOutputTokens)} tokens
+                  </dd>
+                </>
+              )}
+            </dl>
+            <p className="mt-2 border-t border-gray-100 pt-2 text-[11px] leading-4 text-gray-400 dark:border-white/[0.06] dark:text-gray-500">
+              按当前会话、草稿、附件和已启用工具估算，不是累计消耗。图片、系统提示与工具结果可能存在偏差；超出预算时服务端会裁剪较早内容。
+            </p>
+          </Popover.Popup>
+        </Popover.Positioner>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }

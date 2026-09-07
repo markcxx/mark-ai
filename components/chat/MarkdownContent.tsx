@@ -12,6 +12,7 @@ import { Pre, PreSingleLine } from "@/components/CodeBlock";
 import type { WebCitation } from "@/lib/chat/citations";
 import type { GeneralSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
+import { remarkLatexDelimiters } from "@/lib/markdown/remark-latex-delimiters";
 import { rehypeStreamAnimated } from "@/lib/markdown/rehype-stream-animated";
 
 import { HtmlPreviewBlock } from "./HtmlPreviewBlock";
@@ -301,7 +302,7 @@ export function MarkdownContent({
               ]
             : [[rehypeKatex, { strict: "ignore", throwOnError: false }]]
         }
-        remarkPlugins={[remarkGfm, remarkMath, citationPlugin]}
+        remarkPlugins={[remarkGfm, remarkMath, remarkLatexDelimiters, citationPlugin]}
       >
         {children}
       </ReactMarkdown>

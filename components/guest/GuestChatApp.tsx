@@ -103,7 +103,17 @@ export function GuestChatApp() {
               </div>
             </div>
 
-            <div className="w-full max-w-[760px] rounded-xl border border-gray-200 bg-[var(--chat-input-bg)] shadow-[0_12px_32px_rgba(0,0,0,0.06)] focus-within:border-gray-400 focus-within:ring-2 focus-within:ring-gray-950/10 dark:border-white/10 dark:focus-within:border-white/25 dark:focus-within:ring-white/[0.07]">
+            <div
+              onDragOver={(event) => {
+                if (event.dataTransfer.types.includes("Files")) event.preventDefault();
+              }}
+              onDrop={(event) => {
+                if (!event.dataTransfer.types.includes("Files")) return;
+                event.preventDefault();
+                requestSignIn();
+              }}
+              className="w-full max-w-[760px] rounded-xl border border-gray-200 bg-[var(--chat-input-bg)] shadow-[0_12px_32px_rgba(0,0,0,0.06)] focus-within:border-gray-400 focus-within:ring-2 focus-within:ring-gray-950/10 dark:border-white/10 dark:focus-within:border-white/25 dark:focus-within:ring-white/[0.07]"
+            >
               <textarea
                 aria-label="输入消息"
                 className="max-h-[36dvh] min-h-24 w-full resize-none bg-transparent px-4 py-4 text-[16px] outline-none placeholder:text-gray-400 md:min-h-28 md:text-[15px] dark:placeholder:text-gray-500"

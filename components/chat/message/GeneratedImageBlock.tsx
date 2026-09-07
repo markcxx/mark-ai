@@ -1,5 +1,6 @@
 "use client";
 
+import { useFileUrl } from "../FileAccessContext";
 import type { GeneratedImageState } from "@/lib/chat/types";
 
 export function GeneratedImageBlock({
@@ -10,6 +11,7 @@ export function GeneratedImageBlock({
   onPreview: (file: GeneratedImageState["file"]) => void;
 }) {
   const { file } = generatedImage;
+  const fileUrl = useFileUrl();
 
   return (
     <button
@@ -22,7 +24,7 @@ export function GeneratedImageBlock({
       <img
         alt={generatedImage.revisedPrompt || generatedImage.prompt || file.name}
         className="block h-auto max-h-[72dvh] max-w-full object-contain transition-transform duration-300 hover:scale-[1.01]"
-        src={`/api/files/${file.id}/preview`}
+        src={fileUrl(file.id, "preview")}
       />
     </button>
   );

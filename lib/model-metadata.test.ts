@@ -83,3 +83,10 @@ describe("model metadata", () => {
     expect(getModelMetadata("zai-org/GLM-4.7-Flash")?.displayName).toBe("GLM-4.7 Flash");
   });
 });
+
+it("recognizes Astra without assigning its limits to unverified GPT-6 identifiers", () => {
+  expect(getModelMetadata("openai/gpt-6-astra")?.contextWindowTokens).toBe(1_050_000);
+  expect(getModelMetadata("gpt-6-astra-高")?.maxOutputTokens).toBe(128_000);
+  expect(getModelMetadata("gpt-6")?.contextWindowTokens).toBeUndefined();
+  expect(getModelMetadata("gpt-6-mini")).toBeUndefined();
+});

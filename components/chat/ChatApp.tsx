@@ -136,6 +136,9 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   } = useConversationScroll(generalSettings.autoScroll);
   const {
     attachmentUploading,
+    uploads,
+    cancelUpload,
+    retryUpload,
     fileInputRef,
     handleAttachmentFiles,
     removeAttachment,
@@ -145,7 +148,6 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const splitPanelRef = useRef<HTMLDivElement>(null);
-  const dragDepthRef = useRef(0);
   const autoPreviewSignatureRef = useRef("");
   const [selectionLayoutMode, setSelectionLayoutMode] = useState(false);
   const [activeHtmlPreview, setActiveHtmlPreview] = useState<HtmlPreviewPayload | null>(null);
@@ -153,7 +155,6 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exportDialogMode, setExportDialogMode] = useState<ExportMode>("image");
-  const [attachmentDragActive, setAttachmentDragActive] = useState(false);
 
   useEffect(() => {
     const guestDraft = window.localStorage.getItem("markai:guest-draft")?.trim();
@@ -427,6 +428,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   };
 
   const handleSend = () => {
+    if (attachmentUploading) return;
     if (isLoading && !input.trim() && pendingAttachments.length === 0) {
       useChatStore.getState().abortStreaming();
       return;
@@ -620,34 +622,15 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                 ? "pointer-events-none border-transparent opacity-0"
                 : "opacity-100",
             )}
-            onDragEnter={(event) => {
-              if (!event.dataTransfer.types.includes("Files")) return;
-              dragDepthRef.current += 1;
-              setAttachmentDragActive(true);
-            }}
-            onDragLeave={(event) => {
-              if (!event.dataTransfer.types.includes("Files")) return;
-              dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
-              if (dragDepthRef.current === 0) setAttachmentDragActive(false);
-            }}
             onDragOver={(event) => {
               if (!event.dataTransfer.types.includes("Files")) return;
               event.preventDefault();
-              event.dataTransfer.dropEffect = "copy";
+              event.dataTransfer.dropEffect = "none";
             }}
             onDrop={(event) => {
-              if (!event.dataTransfer.files.length) return;
-              event.preventDefault();
-              dragDepthRef.current = 0;
-              setAttachmentDragActive(false);
-              void uploadAttachmentFiles(event.dataTransfer.files);
+              if (event.dataTransfer.types.includes("Files")) event.preventDefault();
             }}
           >
-            {attachmentDragActive && (
-              <div className="pointer-events-none absolute inset-3 z-50 flex items-center justify-center rounded-xl border-2 border-dashed border-primary/60 bg-[var(--chat-panel-bg)]/90 text-sm font-medium text-gray-700 backdrop-blur-sm dark:text-gray-200">
-                松开即可添加附件
-              </div>
-            )}
             {isSidebarOpen && (
               <div
                 aria-label="调整侧栏宽度"
@@ -666,6 +649,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
 
             <TopHeader
               activeSession={activeSession}
+              shareBusy={isLoading}
               copyConversation={() => useChatStore.getState().copyConversation()}
               copySessionId={() => {
                 if (!activeSessionId) {
@@ -735,12 +719,16 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                     availableModels={availableModels}
                     attachments={pendingAttachments}
                     attachmentUploading={attachmentUploading}
+                    uploads={uploads}
+                    onCancelUpload={cancelUpload}
+                    onRetryUpload={retryUpload}
                     input={input}
                     isLoading={isLoading}
                     isLoadingModels={isLoadingModels}
                     modelSearchKeyword={modelSearchKeyword}
                     messages={messages}
                     onAttachment={() => fileInputRef.current?.click()}
+                    onDropFiles={uploadAttachmentFiles}
                     onCancelQueuedMessage={() => useChatStore.getState().cancelQueuedMessage()}
                     onInput={handleInput}
                     onKeyDown={handleKeyDown}
@@ -803,9 +791,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                         });
                       }}
                       getMessageModel={getMessageModel}
-                      isConversationTail={
-                        index === messages.length - 1 && message.role === "model"
-                      }
+                      isConversationTail={index === messages.length - 1 && message.role === "model"}
                       isSelected={selectedMessageIds.includes(message.id)}
                       key={message.id}
                       loadingText={loadingText}
@@ -869,12 +855,16 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                 availableModels={availableModels}
                 attachments={pendingAttachments}
                 attachmentUploading={attachmentUploading}
+                uploads={uploads}
+                onCancelUpload={cancelUpload}
+                onRetryUpload={retryUpload}
                 input={input}
                 isLoading={isLoading}
                 isLoadingModels={isLoadingModels}
                 modelSearchKeyword={modelSearchKeyword}
                 messages={messages}
                 onAttachment={() => fileInputRef.current?.click()}
+                onDropFiles={uploadAttachmentFiles}
                 onCancelQueuedMessage={() => useChatStore.getState().cancelQueuedMessage()}
                 onInput={handleInput}
                 onKeyDown={handleKeyDown}

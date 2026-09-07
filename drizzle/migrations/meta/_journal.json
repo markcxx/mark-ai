@@ -64,6 +64,13 @@
       "when": 1785465407553,
       "tag": "0008_rare_giant_man",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788751573293,
+      "tag": "0009_wonderful_ultimatum",
+      "breakpoints": true
     }
   ]
 }

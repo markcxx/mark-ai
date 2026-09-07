@@ -2,7 +2,8 @@
 
 import { Select } from "@base-ui/react/select";
 import { Check, ChevronDown } from "lucide-react";
-import type { CSSProperties, ReactNode } from "react";
+import { useContext, type CSSProperties, type ReactNode } from "react";
+import { OverlayLayerContext } from "./OverlayLayerContext";
 
 import { cn } from "@/lib/utils";
 
@@ -60,6 +61,7 @@ export function AppSelect<Value extends string | number = string>({
   style,
   value,
 }: AppSelectProps<Value>) {
+  const overlayLayer = useContext(OverlayLayerContext);
   return (
     <Select.Root
       defaultOpen={defaultOpen}
@@ -104,6 +106,7 @@ export function AppSelect<Value extends string | number = string>({
           align="start"
           alignItemWithTrigger={false}
           className={cn("z-[1100] outline-none", classNames?.positioner)}
+          style={{ zIndex: overlayLayer }}
           sideOffset={6}
         >
           <Select.Popup
@@ -118,7 +121,10 @@ export function AppSelect<Value extends string | number = string>({
             }}
           >
             <Select.List
-              className={cn("max-h-[min(504px,var(--available-height))] overflow-y-auto", classNames?.list)}
+              className={cn(
+                "max-h-[min(504px,var(--available-height))] overflow-y-auto",
+                classNames?.list,
+              )}
             >
               {options.map((option) => (
                 <Select.Item

@@ -27,6 +27,28 @@ const DOUBAO_SOURCE_URL = "https://www.volcengine.com/docs/82379/1330310";
 // inheriting an unsafe context limit from a similarly named model.
 export const MODEL_METADATA: ModelMetadata[] = [
   {
+    aliases: ["gpt-6-astra-低", "gpt-6-astra-中", "gpt-6-astra-高"],
+    contextWindowTokens: 1_050_000,
+    description: "OpenAI 旗舰推理模型，面向复杂推理、编码、计算机使用、研究和文档创作。",
+    displayName: "GPT-6 Astra",
+    family: "GPT-6",
+    id: "gpt-6-astra",
+    knowledgeCutoff: "2026-04-30",
+    maxOutputTokens: 128_000,
+    sourceUrl: "https://developers.openai.com/api/docs/models/gpt-6-astra",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVision: true,
+  },
+  {
+    description:
+      "GPT-6 配置标识；官方已公布 GPT-6 Astra，尚未核实此独立标识的规格，请以服务商配置为准。",
+    displayName: "GPT-6",
+    family: "GPT-6",
+    id: "gpt-6",
+    sourceUrl: "https://developers.openai.com/api/docs/models",
+  },
+  {
     aliases: ["gpt-5.6-sol-低", "gpt-5.6-sol-中", "gpt-5.6-sol-高"],
     contextWindowTokens: 1_050_000,
     description: "OpenAI GPT-5.6 系列旗舰推理模型，面向复杂专业工作、编码、研究和高级 Agent 工作流。",

@@ -44,6 +44,19 @@ export async function GET(
   }
 
   if (action === "content") {
+    if (new URL(request.url).searchParams.get("raw") === "1") {
+      const bytes = await getStoredFileBytes(file);
+      const body = new ArrayBuffer(bytes.byteLength);
+      new Uint8Array(body).set(bytes);
+      return new Response(body, {
+        headers: {
+          "Content-Type": file.contentType,
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff",
+          "Content-Security-Policy": "sandbox; default-src 'none'",
+        },
+      });
+    }
     if (getOfficePreviewKind(file)) {
       const bytes = await getStoredFileBytes(file);
       const preview = await createOfficePreviewResponse(file, bytes);

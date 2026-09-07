@@ -47,3 +47,32 @@ describe("context window preparation", () => {
     ).toBe(4512);
   });
 });
+
+it("updates retained context after edits and excludes auxiliary output", () => {
+  const base = { attachments: [], draft: "", webSearchEnabled: false };
+  const message = { id: "u", role: "user" as const, content: "问题" };
+  const initial = estimateDraftContextTokens({ ...base, messages: [message] });
+  expect(
+    estimateDraftContextTokens({ ...base, draft: "追加内容".repeat(100), messages: [message] }),
+  ).toBeGreaterThan(initial);
+  expect(estimateDraftContextTokens({ ...base, messages: [] })).toBe(0);
+  expect(
+    estimateDraftContextTokens({
+      ...base,
+      messages: [
+        {
+          ...message,
+          totalTokens: 999999,
+          reasoning: "思考".repeat(1000),
+          segments: [{ type: "translation", language: "en", content: "translation".repeat(1000) }],
+        },
+      ],
+    }),
+  ).toBe(initial);
+  expect(
+    estimateDraftContextTokens({
+      ...base,
+      messages: [{ ...message, segments: [{ type: "quote", content: "引用".repeat(1000) }] }],
+    }),
+  ).toBeGreaterThan(initial);
+});

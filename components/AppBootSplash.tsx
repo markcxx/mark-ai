@@ -9,6 +9,7 @@ import { MarkAILoadingScreen } from "./MarkAILoadingScreen";
 
 const ROUTES_WITHOUT_CHAT_INITIALIZATION = [
   "/admin",
+  "/share/",
   "/login",
   "/onboarding",
   "/plugins",

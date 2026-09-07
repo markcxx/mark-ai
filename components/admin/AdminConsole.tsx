@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowLeft, ClipboardList, LayoutDashboard, ScrollText, UsersRound } from "lucide-react";
+import {
+  ArrowLeft,
+  ClipboardList,
+  LayoutDashboard,
+  RefreshCw,
+  ScrollText,
+  UsersRound,
+} from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -12,6 +19,8 @@ import { OverviewPanel } from "@/components/admin/OverviewPanel";
 import { UsersPanel } from "@/components/admin/UsersPanel";
 import { WaitlistPanel } from "@/components/admin/WaitlistPanel";
 import { SidebarNavItem } from "@/components/chat/SidebarNavItem";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { IconButton } from "@/components/ui/IconButton";
 import { PRIMARY_COLOR_VALUES } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/useSettingsStore";
@@ -19,10 +28,30 @@ import { useSettingsStore } from "@/stores/useSettingsStore";
 type AdminView = "audit" | "overview" | "users" | "waitlist";
 
 const views = [
-  { icon: LayoutDashboard, id: "overview" as const, label: "管理概览" },
-  { icon: ClipboardList, id: "waitlist" as const, label: "等候名单" },
-  { icon: UsersRound, id: "users" as const, label: "用户管理" },
-  { icon: ScrollText, id: "audit" as const, label: "审计日志" },
+  {
+    description: "查看用户与系统运行情况",
+    icon: LayoutDashboard,
+    id: "overview" as const,
+    label: "管理概览",
+  },
+  {
+    description: "审核注册申请与邀请状态",
+    icon: ClipboardList,
+    id: "waitlist" as const,
+    label: "等候名单",
+  },
+  {
+    description: "管理账户、角色与使用状态",
+    icon: UsersRound,
+    id: "users" as const,
+    label: "用户管理",
+  },
+  {
+    description: "查看后台操作与安全记录",
+    icon: ScrollText,
+    id: "audit" as const,
+    label: "审计日志",
+  },
 ];
 
 export function AdminConsole() {
@@ -31,6 +60,8 @@ export function AdminConsole() {
   const general = useSettingsStore((state) => state.general);
   const settingsLoaded = useSettingsStore((state) => state.isLoaded);
   const [view, setView] = useState<AdminView>("overview");
+  const [overviewRangeDays, setOverviewRangeDays] = useState(14);
+  const [overviewRefreshToken, setOverviewRefreshToken] = useState(0);
   const current = views.find((item) => item.id === view)!;
 
   useEffect(() => {
@@ -86,12 +117,38 @@ export function AdminConsole() {
       </aside>
 
       <main className="min-w-0 flex-1 overflow-y-auto border-0 bg-[var(--chat-panel-bg)] md:rounded-xl md:border md:border-[#e5e5e5] dark:md:border-gray-700">
-        <header className="sticky top-0 z-20 border-b border-gray-200/70 bg-[var(--chat-header-bg)] px-3 py-3 backdrop-blur-md md:border-b-0 md:px-6 md:py-4 dark:border-white/[0.07]">
+        <header className="sticky top-0 z-20 border-b border-gray-200/70 bg-[var(--chat-header-bg)] px-3 py-3 backdrop-blur-md md:px-6 dark:border-white/[0.07]">
           <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-3">
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-medium text-gray-400 md:hidden">MarkAI 管理中心</p>
-              <h2 className="text-lg font-bold md:text-2xl">{current.label}</h2>
+              <h2 className="truncate text-[17px] font-semibold leading-6">{current.label}</h2>
+              <p className="mt-0.5 hidden truncate text-xs text-gray-400 md:block">
+                {current.description}
+              </p>
             </div>
+            {view === "overview" && (
+              <div className="hidden shrink-0 items-center gap-2 md:flex">
+                <SegmentedControl
+                  onChange={(value) => setOverviewRangeDays(Number(value))}
+                  options={[
+                    { label: "7 天", value: 7 },
+                    { label: "14 天", value: 14 },
+                    { label: "30 天", value: 30 },
+                  ]}
+                  padding={3}
+                  value={overviewRangeDays}
+                />
+                <IconButton
+                  aria-label="刷新概览数据"
+                  data-markai-tooltip="刷新概览数据"
+                  onClick={() => setOverviewRefreshToken((value) => value + 1)}
+                  shape="rounded"
+                  size="sm"
+                >
+                  <RefreshCw size={16} />
+                </IconButton>
+              </div>
+            )}
             <button
               className="rounded-lg px-3 py-2 text-sm hover:bg-gray-100 md:hidden dark:hover:bg-white/[0.07]"
               onClick={() => router.push("/")}
@@ -122,8 +179,19 @@ export function AdminConsole() {
             })}
           </div>
         </header>
-        <div className="mx-auto max-w-[1440px] px-3 py-4 md:p-8">
-          {view === "overview" && <OverviewPanel />}
+        <div
+          className={cn(
+            "mx-auto max-w-[1440px] px-3 py-4",
+            view === "overview" ? "md:px-6 md:py-6" : "md:p-8",
+          )}
+        >
+          {view === "overview" && (
+            <OverviewPanel
+              onRangeDaysChange={setOverviewRangeDays}
+              rangeDays={overviewRangeDays}
+              refreshToken={overviewRefreshToken}
+            />
+          )}
           {view === "waitlist" && <WaitlistPanel />}
           {view === "users" && <UsersPanel />}
           {view === "audit" && <AuditPanel />}

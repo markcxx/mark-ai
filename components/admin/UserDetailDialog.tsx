@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowLeft,
@@ -8,7 +8,6 @@ import {
   Eye,
   FileText,
   Loader2,
-  MessageSquareText,
   Save,
   Shield,
   Trash2,
@@ -28,6 +27,8 @@ import {
   formatDateTime,
   StatusBadge,
 } from "@/components/admin/AdminPrimitives";
+import dynamic from "next/dynamic";
+import type { Message } from "@/lib/chat/types";
 import { FilePreviewDialog } from "@/components/chat/FilePreviewDialog";
 import { AppDialog } from "@/components/ui/AppDialog";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -80,7 +81,11 @@ type Conversation = {
   updatedAt: string;
 };
 
-type ConversationMessage = { content: string; createdAt?: string; id: string; role: string };
+const ReadonlyConversation = dynamic(
+  () =>
+    import("@/components/chat/ReadonlyConversation").then((module) => module.ReadonlyConversation),
+  { loading: () => <AdminLoading /> },
+);
 type Tab = "conversations" | "files" | "profile" | "security";
 
 const tabs = [
@@ -113,8 +118,10 @@ export function UserManagementView({
   const [conversationsLoading, setConversationsLoading] = useState(false);
   const [selectedConversationIds, setSelectedConversationIds] = useState<string[]>([]);
   const [activeConversation, setActiveConversation] = useState<Conversation>();
+  const conversationRequest = useRef(0);
+  const [conversationError, setConversationError] = useState("");
   const [conversationDetailLoading, setConversationDetailLoading] = useState(false);
-  const [messages, setMessages] = useState<ConversationMessage[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string;
     kind: "conversation" | "conversations" | "file" | "files" | "user";
@@ -228,19 +235,23 @@ export function UserManagementView({
   };
 
   const openConversation = async (conversation: Conversation) => {
+    const requestId = ++conversationRequest.current;
     setActiveConversation(conversation);
     setMessages([]);
+    setConversationError("");
     setConversationDetailLoading(true);
     try {
-      const response = await fetch(`/api/admin/users/${userId}/conversations/${conversation.id}`);
+      const response = await fetch(`/api/admin/users/${userId}/conversations/${conversation.id}`, {
+        cache: "no-store",
+      });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "对话加载失败");
-      setMessages(data.messages || []);
-    } catch (openError) {
-      setActiveConversation(undefined);
-      toast.error(openError instanceof Error ? openError.message : "对话加载失败");
+      if (requestId === conversationRequest.current) setMessages(data.messages || []);
+    } catch (error) {
+      if (requestId === conversationRequest.current)
+        setConversationError(error instanceof Error ? error.message : "对话加载失败，请重试");
     } finally {
-      setConversationDetailLoading(false);
+      if (requestId === conversationRequest.current) setConversationDetailLoading(false);
     }
   };
 
@@ -573,6 +584,7 @@ export function UserManagementView({
         bodyClassName="min-h-0 overflow-y-auto"
         height="min(88dvh, 880px)"
         onClose={() => {
+          conversationRequest.current += 1;
           setActiveConversation(undefined);
           setMessages([]);
         }}
@@ -582,20 +594,25 @@ export function UserManagementView({
         width="min(94vw, 1080px)"
         zIndex={95}
       >
-        <div className="min-h-full px-3 py-4 sm:px-5 md:px-8 md:py-6">
+        <div className="min-h-full bg-[var(--chat-panel-bg)]">
           {conversationDetailLoading ? (
-            <div className="flex min-h-[520px] items-center justify-center text-gray-400">
-              <Loader2 className="animate-spin" size={20} />
+            <div className="mx-auto max-w-[840px] space-y-8 p-6" aria-label="正在加载对话">
+              <div className="ml-auto h-20 w-2/3 animate-pulse rounded-xl bg-gray-100 dark:bg-white/5" />
+              <div className="h-48 animate-pulse rounded-xl bg-gray-100 dark:bg-white/5" />
+            </div>
+          ) : conversationError ? (
+            <div className="p-6 text-center text-sm">
+              <p>{conversationError}</p>
+              <AdminButton
+                onClick={() => activeConversation && void openConversation(activeConversation)}
+              >
+                重新加载
+              </AdminButton>
             </div>
           ) : activeConversation ? (
             <>
-              <div className="mb-4 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-xs text-gray-400">
-                    {activeConversation.provider || "未知服务商"} ·{" "}
-                    {activeConversation.model || "未知模型"} · {messages.length} 条消息
-                  </p>
-                </div>
+              <div className="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 text-xs text-gray-400 dark:border-white/10">
+                <span>只读预览 · {messages.length} 条消息</span>
                 <AdminButton
                   danger
                   onClick={() =>
@@ -609,35 +626,7 @@ export function UserManagementView({
                   <Trash2 size={14} /> 删除对话
                 </AdminButton>
               </div>
-              <div className="mx-auto max-w-4xl space-y-2">
-                {messages.map((message) => (
-                  <div
-                    className="flex items-start gap-2.5 py-3 text-sm leading-6 sm:gap-3"
-                    key={message.id}
-                  >
-                    <span
-                      className={cn(
-                        "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
-                        message.role === "user"
-                          ? "bg-primary/10 text-primary"
-                          : "bg-gray-100 text-gray-500 dark:bg-white/[0.07]",
-                      )}
-                    >
-                      {message.role === "user" ? (
-                        <UserRound size={14} />
-                      ) : (
-                        <MessageSquareText size={14} />
-                      )}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="mb-1 text-xs font-medium text-gray-400">
-                        {message.role === "user" ? "用户" : "模型"}
-                      </p>
-                      <p className="whitespace-pre-wrap break-words">{message.content}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <ReadonlyConversation messages={messages} adminUserId={userId} />
             </>
           ) : null}
         </div>

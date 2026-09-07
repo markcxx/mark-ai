@@ -1,5 +1,7 @@
 "use client";
 
+import { useFileUrl } from "./FileAccessContext";
+
 import { Download, ExternalLink, FileQuestion, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
@@ -181,16 +183,17 @@ export function FilePreviewDialog({
   onClose: () => void;
   previewUrl?: string;
 }) {
+  const fileUrl = useFileUrl();
   const kind = file ? getPreviewKind(file) : "unsupported";
   const htmlPreview = useHtmlPreview();
   const [loading, setLoading] = useState(kind !== "unsupported");
   useEffect(() => setLoading(kind !== "unsupported"), [file?.id, kind]);
 
   const resolvedPreviewUrl = file
-    ? previewUrl || `/api/files/${file.id}/preview`
+    ? previewUrl || fileUrl(file.id, "preview")
     : previewUrl || "";
   const resolvedDownloadUrl = file
-    ? downloadUrl || `/api/files/${file.id}/download`
+    ? downloadUrl || fileUrl(file.id, "download")
     : downloadUrl || "";
 
   useEffect(() => {
@@ -198,7 +201,7 @@ export function FilePreviewDialog({
 
     htmlPreview.openPreview({
       contentType: file.contentType,
-      dataUrl: `/api/files/${file.id}/preview?raw=1`,
+      dataUrl: `${resolvedPreviewUrl}${resolvedPreviewUrl.includes("?") ? "&" : "?"}raw=1`,
       downloadUrl: resolvedDownloadUrl,
       id: `file-${file.id}`,
       kind: "file",

@@ -336,6 +336,7 @@ export function MessageItem({
   multiSelectMode,
   openMenuMessageId,
   regenerateMessage,
+  readOnly = false,
   saveEditingMessage,
   selectMessageVariant,
   selectedModel,
@@ -363,6 +364,7 @@ export function MessageItem({
   message: Message;
   multiSelectMode: boolean;
   openMenuMessageId: string | null;
+  readOnly?: boolean;
   regenerateMessage: (message: Message, mode?: RegenerateMode) => Promise<void>;
   saveEditingMessage: () => void;
   selectMessageVariant: (messageId: string, variantId: string) => Promise<void>;
@@ -647,7 +649,7 @@ export function MessageItem({
             </div>
           </>
         )}
-        {!multiSelectMode && (
+        {!readOnly && !multiSelectMode && (
           <div className="mr-1 mt-2 flex items-center gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
             <MessageActionButton
               icon={Pencil}
@@ -684,7 +686,7 @@ export function MessageItem({
           <div className="flex min-w-0 flex-col">
             <div className="flex min-w-0 items-center gap-2">
               <span className="truncate font-jakarta text-[15px] font-bold text-gray-900 dark:text-gray-100">
-                {message.model || selectedModel?.id}
+                {message.model || selectedModel?.id || "MarkAI"}
               </span>
               {relativeTime && (
                 <time
@@ -833,18 +835,21 @@ export function MessageItem({
                 />
               )}
               {!message.isStreaming && <MessageSources citations={citations} />}
-              {message.interrupted && (
+              {message.interrupted && !readOnly && (
                 <InterruptedHint
                   onContinue={() => continueMessage(message)}
                   onRegenerate={() => void regenerateMessage(message, "replace")}
                 />
+              )}
+              {readOnly && message.interrupted && (
+                <p className="mt-3 text-xs text-gray-400">本条回复已中断</p>
               )}
               {generalSettings.showMessageStats && <MessageStats message={message} />}
             </>
           )}
         </div>
 
-        {!message.isStreaming && !multiSelectMode && (
+        {!readOnly && !message.isStreaming && !multiSelectMode && (
           <div className="ml-10 mt-2 flex items-center gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
             <MessageActionButton icon={Copy} onClick={() => copyMessage(message)} title="复制" />
             <MessageActionButton

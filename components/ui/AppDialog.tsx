@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
+import { OverlayLayerContext } from "./OverlayLayerContext";
 
 export function AppDialog({
   bodyClassName,
@@ -122,7 +123,9 @@ export function AppDialog({
                 bodyClassName,
               )}
             >
-              {children}
+              <OverlayLayerContext.Provider value={zIndex + 2}>
+                {children}
+              </OverlayLayerContext.Provider>
             </div>
           </Dialog.Popup>
         </Dialog.Viewport>

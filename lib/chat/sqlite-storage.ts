@@ -36,7 +36,7 @@ let db: DatabaseLike | undefined;
 const getDatabasePath = () =>
   process.env.MARKAI_SQLITE_PATH?.trim() || path.join(process.cwd(), ".data", "markai.sqlite");
 
-const ensureDatabase = () => {
+export const ensureDatabase = () => {
   if (db) return db;
 
   const dbPath = getDatabasePath();
@@ -85,6 +85,15 @@ const ensureDatabase = () => {
       position INTEGER NOT NULL,
       created_at INTEGER NOT NULL,
       FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS conversation_shares (
+      token TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL UNIQUE REFERENCES chat_sessions(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL,
+      snapshot TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL
     );
 
     CREATE INDEX IF NOT EXISTS idx_chat_messages_session_position

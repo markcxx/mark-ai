@@ -5,6 +5,7 @@ import { isCloudMode } from "@/lib/env";
 const PUBLIC_PATHS = [
   "/api/auth",
   "/api/public",
+  "/share/",
   "/api/waitlist",
   "/login",
   "/register",

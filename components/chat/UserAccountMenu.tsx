@@ -59,7 +59,7 @@ export function UserAccountMenu() {
     <>
       <div className="relative" ref={rootRef}>
         {open && (
-          <div className="absolute bottom-[calc(100%+10px)] left-0 right-0 origin-bottom animate-[menu-in_180ms_cubic-bezier(0.22,1,0.36,1)] overflow-hidden rounded-2xl border border-black/[0.06] bg-white/95 p-1.5 shadow-[0_18px_55px_rgba(15,23,42,0.18)] backdrop-blur-xl dark:border-white/10 dark:bg-[#171717]/95">
+          <div className="absolute bottom-[calc(100%+10px)] left-0 right-0 origin-bottom animate-[menu-in_180ms_cubic-bezier(0.22,1,0.36,1)] overflow-hidden rounded-lg border border-black/[0.06] bg-white/95 p-1.5 shadow-[0_18px_55px_rgba(15,23,42,0.18)] backdrop-blur-xl dark:border-white/10 dark:bg-[#171717]/95">
             <div className="border-b border-gray-100 px-3 py-2.5 dark:border-white/[0.07]">
               <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
                 {name}
@@ -68,7 +68,7 @@ export function UserAccountMenu() {
             </div>
             <div className="py-1">
               <button
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-gray-700 transition-all hover:bg-gray-100 active:scale-[0.98] dark:text-gray-200 dark:hover:bg-white/[0.07]"
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-gray-700 transition-all hover:bg-gray-100 active:scale-[0.98] dark:text-gray-200 dark:hover:bg-white/[0.07]"
                 onClick={() => {
                   setOpen(false);
                   useUIStore.getState().setFileManagerOpen(true);
@@ -79,7 +79,7 @@ export function UserAccountMenu() {
                 文件管理
               </button>
               <button
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-gray-700 transition-all hover:bg-gray-100 active:scale-[0.98] dark:text-gray-200 dark:hover:bg-white/[0.07]"
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-gray-700 transition-all hover:bg-gray-100 active:scale-[0.98] dark:text-gray-200 dark:hover:bg-white/[0.07]"
                 onClick={() => {
                   setOpen(false);
                   setProfileOpen(true);
@@ -90,7 +90,7 @@ export function UserAccountMenu() {
                 个人资料
               </button>
               <button
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-gray-700 transition-all hover:bg-gray-100 active:scale-[0.98] dark:text-gray-200 dark:hover:bg-white/[0.07]"
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-gray-700 transition-all hover:bg-gray-100 active:scale-[0.98] dark:text-gray-200 dark:hover:bg-white/[0.07]"
                 onClick={() => {
                   setOpen(false);
                   useUIStore.getState().setSettingsOpen(true);
@@ -102,7 +102,7 @@ export function UserAccountMenu() {
               </button>
               {isAdmin && (
                 <button
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-gray-700 transition-all hover:bg-gray-100 active:scale-[0.98] dark:text-gray-200 dark:hover:bg-white/[0.07]"
+                  className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-gray-700 transition-all hover:bg-gray-100 active:scale-[0.98] dark:text-gray-200 dark:hover:bg-white/[0.07]"
                   onClick={() => {
                     setOpen(false);
                     window.location.href = "/admin";
@@ -116,7 +116,7 @@ export function UserAccountMenu() {
             </div>
             <div className="border-t border-gray-100 pt-1 dark:border-white/[0.07]">
               <button
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-red-600 transition-all hover:bg-red-50 active:scale-[0.98] dark:text-red-400 dark:hover:bg-red-500/10"
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-red-600 transition-all hover:bg-red-50 active:scale-[0.98] dark:text-red-400 dark:hover:bg-red-500/10"
                 onClick={async () => {
                   setOpen(false);
                   await signOut();
@@ -133,7 +133,7 @@ export function UserAccountMenu() {
 
         <button
           aria-expanded={open}
-          className="group flex w-full items-center gap-3 rounded-2xl p-2 text-left transition-all hover:bg-black/[0.045] active:scale-[0.985] dark:hover:bg-white/[0.07]"
+          className="group flex w-full items-center gap-3 rounded-lg p-2 text-left transition-all hover:bg-black/[0.045] active:scale-[0.985] dark:hover:bg-white/[0.07]"
           onClick={() => setOpen((value) => !value)}
           type="button"
         >

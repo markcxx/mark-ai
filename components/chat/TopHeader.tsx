@@ -6,6 +6,7 @@ import {
   Expand,
   FileJson,
   ImageDown,
+  Link2,
   MoreVertical,
   PanelLeftOpen,
   PencilLine,
@@ -22,10 +23,16 @@ import { DropdownSurface } from "@/components/ui/DropdownSurface";
 import { IconButton } from "@/components/ui/IconButton";
 import { InlineTextEdit } from "@/components/ui/InlineTextEdit";
 import { MenuAction, MenuSwitchAction } from "@/components/ui/MenuAction";
+import dynamic from "next/dynamic";
 import type { ChatSession } from "@/lib/chat/types";
+
+const ShareConversationDialog = dynamic(() =>
+  import("./ShareConversationDialog").then((module) => module.ShareConversationDialog),
+);
 
 export function TopHeader({
   activeSession,
+  shareBusy = false,
   copyConversation,
   copySessionId,
   deleteSession,
@@ -41,6 +48,7 @@ export function TopHeader({
   updateSessionTitle,
 }: {
   activeSession?: ChatSession;
+  shareBusy?: boolean;
   copyConversation: () => void;
   copySessionId: () => void;
   deleteSession: () => void;
@@ -55,6 +63,7 @@ export function TopHeader({
   toggleWideChatMode: () => void;
   updateSessionTitle: (title: string) => void;
 }) {
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [shareMenuOpen, setShareMenuOpen] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -201,6 +210,16 @@ export function TopHeader({
 
             {shareMenuOpen && (
               <DropdownSurface className="absolute right-0 top-11 w-48">
+                {activeSession && (
+                  <MenuAction
+                    icon={Link2}
+                    label="分享链接"
+                    onClick={() => {
+                      setShareMenuOpen(false);
+                      setShareDialogOpen(true);
+                    }}
+                  />
+                )}
                 <MenuAction
                   icon={Copy}
                   label="复制对话"
@@ -231,6 +250,14 @@ export function TopHeader({
         </div>
       </header>
 
+      {shareDialogOpen && activeSession && (
+        <ShareConversationDialog
+          key={activeSession.id}
+          sessionId={activeSession.id}
+          busy={shareBusy}
+          onClose={() => setShareDialogOpen(false)}
+        />
+      )}
       <ConfirmDialog
         confirmText="删除"
         description="该会话和其中的消息会被永久删除，此操作无法撤销。"

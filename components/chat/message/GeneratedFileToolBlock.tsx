@@ -1,6 +1,7 @@
 import { Check, ChevronRight, Download, Eye, FileOutput, Loader2, X } from "lucide-react";
 
 import { isFilePreviewable } from "@/components/chat/FilePreviewDialog";
+import { useFileUrl } from "../FileAccessContext";
 import { useHtmlPreview } from "@/components/chat/HtmlPreviewContext";
 import type { GeneratedFileState } from "@/lib/chat/types";
 import { getBuiltinTool } from "@/lib/tools/registry";
@@ -29,6 +30,7 @@ export function GeneratedFileToolBlock({
   onPreview?: (file: NonNullable<GeneratedFileState["file"]>) => void;
 }) {
   const htmlPreview = useHtmlPreview();
+  const fileUrl = useFileUrl();
   const running = generatedFile.status === "running";
   const failed = generatedFile.status === "error";
   const file = generatedFile.file;
@@ -173,7 +175,7 @@ export function GeneratedFileToolBlock({
               <a
                 className="flex h-8 items-center gap-1.5 rounded-lg bg-primary/10 px-2.5 text-xs font-medium text-primary transition-colors hover:bg-primary/15"
                 download
-                href={file.url}
+                href={fileUrl(file.id, "download")}
               >
                 <Download size={14} />
                 下载

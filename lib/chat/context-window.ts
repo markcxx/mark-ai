@@ -1,5 +1,6 @@
 import type { FileAttachment, Message } from "@/lib/chat/types";
 import type { ModelMetadataWithContext } from "@/lib/model-metadata";
+import { getMessageContentForModel } from "./helpers";
 import { estimateTextTokens } from "./metrics";
 
 const MIN_OUTPUT_RESERVE_TOKENS = 2048;
@@ -140,12 +141,20 @@ export const estimateDraftContextTokens = ({
       ? [{ content: draftContent || "请查看我上传的附件。", role: "user" }]
       : [];
   const contextMessages = [
-    ...messages.map((message) => ({ content: message.content, role: message.role })),
+    ...messages.map((message) => ({
+      content: getMessageContentForModel(message),
+      role: message.role,
+    })),
     ...draftMessage,
   ];
   const messageTokens =
     contextMessages.length > 0 ? estimateContextMessagesTokens(contextMessages) : 0;
-  const storedAttachments = messages.flatMap((message) => message.attachments || []);
+  const storedAttachments = messages.flatMap((message) => [
+    ...(message.attachments || []),
+    ...(message.segments || []).flatMap((segment) =>
+      segment.type === "generated-image" ? [segment.generatedImage.file] : [],
+    ),
+  ]);
   const attachmentTokens = [...storedAttachments, ...attachments].reduce(
     (total, file) => total + estimateAttachmentTokens(file),
     0,

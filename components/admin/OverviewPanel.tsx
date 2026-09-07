@@ -2,28 +2,31 @@
 
 import type { EChartsOption } from "echarts";
 import {
-  BadgeCheck,
-  ClipboardClock,
+  Ban,
+  Clock3,
   Files,
+  HardDrive,
+  MailWarning,
   MessageCircleMore,
   MessageSquareText,
-  ShieldBan,
-  UserPlus,
+  Send,
   Users,
+  UserPlus,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 
 import { AdminChart } from "@/components/admin/AdminChart";
 import { AdminError, formatBytes } from "@/components/admin/AdminPrimitives";
-import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { cn } from "@/lib/utils";
 
 type OverviewData = {
   fileTypes: Array<{ name: string; value: number }>;
   providerTypes: Array<{ name: string; value: number }>;
   rangeDays: number;
-  roleTypes: Array<{ name: string; value: number }>;
+  refreshToken?: number;
   stats: {
     bannedUsers: number;
+    emailDeliveryRate: number | null;
     failedEmails: number;
     fileBytes: number;
     files: number;
@@ -34,6 +37,7 @@ type OverviewData = {
     users: number;
     verifiedUsers: number;
   };
+  activityTrend: Array<{ date: string; sessions: number }>;
   trend: Array<{
     date: string;
     files: number;
@@ -41,15 +45,12 @@ type OverviewData = {
     sessions: number;
     users: number;
   }>;
-  waitlistStatuses: Array<{ name: string; value: number }>;
 };
 
-const waitlistLabels: Record<string, string> = {
-  approved: "已批准",
-  invited: "已邀请",
-  pending: "待审批",
-  registered: "已注册",
-  rejected: "已拒绝",
+type OverviewPanelProps = {
+  onRangeDaysChange?: (value: number) => void;
+  rangeDays: number;
+  refreshToken?: number;
 };
 
 const fileTypeLabels: Record<string, string> = {
@@ -60,375 +61,402 @@ const fileTypeLabels: Record<string, string> = {
   video: "视频",
 };
 
-export function OverviewPanel() {
+const formatCount = (value: number) => new Intl.NumberFormat("zh-CN").format(Number(value) || 0);
+
+const formatPercent = (value: number, total: number) =>
+  total > 0 ? `${((value / total) * 100).toFixed(1)}%` : "0%";
+
+function SectionHeading({ description, title }: { description?: string; title: string }) {
+  return (
+    <div className="mb-3">
+      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
+      {description && <p className="mt-1 text-xs text-gray-400">{description}</p>}
+    </div>
+  );
+}
+
+const weekdayLabels = ["一", "二", "三", "四", "五", "六", "日"];
+
+function dateKey(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function ActivityHeatmap({ trend }: { trend: OverviewData["activityTrend"] }) {
+  const values = new Map(trend.map((item) => [item.date, item.sessions]));
+  const firstDate = trend[0]?.date
+    ? new Date(`${trend[0].date}T00:00:00Z`)
+    : new Date();
+  const lastDate = trend.at(-1)?.date
+    ? new Date(`${trend.at(-1)?.date}T00:00:00Z`)
+    : firstDate;
+
+  const start = new Date(firstDate);
+  start.setUTCDate(start.getUTCDate() - ((start.getUTCDay() + 6) % 7));
+  const end = new Date(lastDate);
+  end.setUTCDate(end.getUTCDate() + (6 - ((end.getUTCDay() + 6) % 7)));
+  const weekCount = Math.max(
+    1,
+    Math.floor((end.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1,
+  );
+  const weeks = Array.from({ length: weekCount }, (_, weekIndex) =>
+    Array.from({ length: 7 }, (_, dayIndex) => {
+      const date = new Date(start);
+      date.setUTCDate(start.getUTCDate() + weekIndex * 7 + dayIndex);
+      return date;
+    }),
+  );
+  const maxValue = Math.max(1, ...trend.map((item) => item.sessions));
+  const gridStyle = { gridTemplateColumns: `22px repeat(${weekCount}, 14px)` };
+
+  return (
+    <div className="w-full overflow-x-auto">
+      <div className="grid w-max gap-1" style={gridStyle}>
+        <span aria-hidden="true" />
+        {weeks.map((week, index) => {
+          const monthChanged = index === 0 || week[0].getUTCMonth() !== weeks[index - 1][0].getUTCMonth();
+          return (
+            <span className="truncate text-[10px] text-gray-400" key={dateKey(week[0])}>
+              {monthChanged ? `${week[0].getUTCMonth() + 1}月` : ""}
+            </span>
+          );
+        })}
+        {weekdayLabels.map((label, rowIndex) => (
+          <Fragment key={label}>
+            <span className="self-center text-[10px] text-gray-400">{label}</span>
+            {weeks.map((week) => {
+              const key = dateKey(week[rowIndex]);
+              const value = values.get(key);
+              const intensity =
+                typeof value === "number" && value > 0 ? 0.12 + 0.88 * (value / maxValue) : 0;
+              const description =
+                typeof value === "number" && value > 0 ? `${formatCount(value)} 个新对话` : "暂无数据";
+              return (
+                <span
+                  aria-label={`${key}：${description}`}
+                  className={cn(
+                    "h-3.5 w-3.5 rounded-[2px] border",
+                    intensity > 0
+                      ? "border-transparent"
+                      : "border-gray-100 bg-gray-50 dark:border-white/[0.06] dark:bg-white/[0.025]",
+                  )}
+                  key={key}
+                  style={intensity > 0 ? { backgroundColor: `rgba(37, 99, 235, ${intensity})` } : undefined}
+                  title={`${key}：${description}`}
+                />
+              );
+            })}
+          </Fragment>
+        ))}
+      </div>
+      <div className="mt-3 flex w-max items-center gap-1.5 text-[10px] text-gray-400">
+        <span>低活跃</span>
+        {["bg-gray-100 dark:bg-white/[0.06]", "bg-blue-100", "bg-blue-300", "bg-blue-600"].map((color) => (
+          <span className={cn("h-2.5 w-2.5 rounded-[2px]", color)} key={color} />
+        ))}
+        <span>高活跃</span>
+      </div>
+    </div>
+  );
+}
+
+export function OverviewPanel({ onRangeDaysChange, rangeDays, refreshToken = 0 }: OverviewPanelProps) {
   const [data, setData] = useState<OverviewData>();
   const [error, setError] = useState("");
-  const [rangeDays, setRangeDays] = useState(14);
 
   const load = useCallback(async () => {
     setError("");
     try {
-      const response = await fetch(`/api/admin/overview?days=${rangeDays}`, { cache: "no-store" });
+      const response = await fetch(
+        `/api/admin/overview?days=${rangeDays}&refresh=${refreshToken}`,
+        { cache: "no-store" },
+      );
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "概览数据加载失败");
       setData(result);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "概览数据加载失败");
     }
-  }, [rangeDays]);
+  }, [rangeDays, refreshToken]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const userTrendOption = useMemo<EChartsOption>(
+  const trendOption = useMemo<EChartsOption>(
     () => ({
+      animationDuration: 260,
       dataZoom: [{ end: 100, start: rangeDays === 30 ? 20 : 0, type: "inside" }],
-      grid: { bottom: 26, left: 42, right: 18, top: 20 },
+      grid: { bottom: 28, containLabel: true, left: 8, right: 8, top: 30 },
+      legend: {
+        data: ["新增用户", "对话", "消息"],
+        left: 0,
+        itemHeight: 7,
+        itemWidth: 18,
+        itemGap: 18,
+        textStyle: { color: "#9ca3af", fontSize: 11 },
+        top: 0,
+      },
       series: [
         {
-          areaStyle: { opacity: 0.16 },
           data: data?.trend.map((item) => item.users) || [],
           emphasis: { focus: "series" },
+          itemStyle: { color: "#2563eb" },
+          lineStyle: { color: "#2563eb", width: 1.6 },
           name: "新增用户",
           showSymbol: rangeDays <= 14,
-          smooth: true,
+          smooth: 0.18,
+          symbol: "circle",
+          symbolSize: 4,
           type: "line",
         },
-      ],
-      tooltip: { axisPointer: { type: "line" }, trigger: "axis" },
-      xAxis: {
-        axisLine: { show: false },
-        axisTick: { show: false },
-        data: data?.trend.map((item) => item.date.slice(5)) || [],
-        type: "category",
-      },
-      yAxis: [{ minInterval: 1, type: "value" }],
-    }),
-    [data, rangeDays],
-  );
-
-  const usageTrendOption = useMemo<EChartsOption>(
-    () => ({
-      dataZoom: [{ end: 100, start: rangeDays === 30 ? 20 : 0, type: "inside" }],
-      grid: { bottom: 28, left: 42, right: 24, top: 45 },
-      legend: { left: 0, selectedMode: true, top: 0 },
-      series: [
         {
           data: data?.trend.map((item) => item.sessions) || [],
           emphasis: { focus: "series" },
-          name: "新增对话",
-          stack: "使用量",
-          type: "bar",
+          itemStyle: { color: "#6b7280" },
+          lineStyle: { color: "#6b7280", width: 1.4 },
+          name: "对话",
+          showSymbol: rangeDays <= 14,
+          smooth: 0.18,
+          symbol: "circle",
+          symbolSize: 4,
+          type: "line",
         },
         {
           data: data?.trend.map((item) => item.messages) || [],
           emphasis: { focus: "series" },
-          markLine: {
-            data: [[{ type: "min" }, { type: "max" }]],
-            lineStyle: { type: "dashed" },
-            symbol: ["none", "none"],
-          },
-          name: "新增消息",
-          stack: "使用量",
-          type: "bar",
-        },
-        {
-          data: data?.trend.map((item) => item.files) || [],
-          emphasis: { focus: "series" },
-          name: "新增文件",
-          stack: "使用量",
-          type: "bar",
+          itemStyle: { color: "#c1c7d0" },
+          lineStyle: { color: "#c1c7d0", width: 1.4 },
+          name: "消息",
+          showSymbol: rangeDays <= 14,
+          smooth: 0.18,
+          symbol: "circle",
+          symbolSize: 4,
+          type: "line",
+          yAxisIndex: 1,
         },
       ],
-      toolbox: {
-        feature: { restore: { title: "还原" }, saveAsImage: { title: "保存图片" } },
-        right: 0,
-        top: 0,
+      tooltip: {
+        axisPointer: { type: "line" },
+        backgroundColor: "rgba(255,255,255,0.96)",
+        borderColor: "#e5e7eb",
+        textStyle: { color: "#111827", fontSize: 12 },
+        trigger: "axis",
       },
-      tooltip: { axisPointer: { type: "shadow" }, trigger: "axis" },
       xAxis: {
-        axisLine: { show: false },
+        axisLabel: { color: "#9ca3af", fontSize: 11 },
+        axisLine: { lineStyle: { color: "#e5e7eb" } },
         axisTick: { show: false },
         data: data?.trend.map((item) => item.date.slice(5)) || [],
         type: "category",
       },
-      yAxis: [{ minInterval: 1, type: "value" }],
+      yAxis: [
+        {
+          axisLabel: { color: "#9ca3af", fontSize: 11 },
+          axisLine: { show: false },
+          axisTick: { show: false },
+          minInterval: 1,
+          splitLine: { lineStyle: { color: "#eef0f2", type: "dashed" } },
+          type: "value",
+        },
+        {
+          axisLabel: { color: "#c1c7d0", fontSize: 11 },
+          axisLine: { show: false },
+          axisTick: { show: false },
+          minInterval: 1,
+          splitLine: { show: false },
+          type: "value",
+        },
+      ],
     }),
     [data, rangeDays],
   );
-  const waitlistOption = useMemo<EChartsOption>(
-    () => ({
-      legend: { bottom: 0, left: "center" },
-      series: [
-        {
-          center: ["50%", "43%"],
-          data: (data?.waitlistStatuses || []).map((item) => ({
-            name: waitlistLabels[item.name] || item.name,
-            value: item.value,
-          })),
-          emphasis: { label: { fontSize: 14, fontWeight: "bold", show: true }, scale: true },
-          label: { formatter: "{b}\n{c}" },
-          radius: ["46%", "70%"],
-          selectedMode: "single",
-          type: "pie",
-        },
-      ],
-      tooltip: { trigger: "item" },
-    }),
-    [data],
-  );
-  const fileOption = useMemo<EChartsOption>(
-    () => ({
-      grid: { bottom: 18, left: 88, right: 18, top: 12 },
-      series: [
-        {
-          colorBy: "data",
-          data: (data?.fileTypes || []).map((item) => item.value),
-          emphasis: { focus: "series" },
-          type: "bar",
-        },
-      ],
-      tooltip: { trigger: "axis", valueFormatter: (value) => formatBytes(Number(value)) },
-      xAxis: {
-        axisLabel: { formatter: (value: number) => formatBytes(value) },
-        splitLine: { lineStyle: { opacity: 0.12 } },
-        type: "value",
-      },
-      yAxis: {
-        axisLine: { show: false },
-        axisTick: { show: false },
-        data: (data?.fileTypes || []).map((item) => fileTypeLabels[item.name] || item.name),
-        type: "category",
-      },
-    }),
-    [data],
-  );
 
-  const providerOption = useMemo<EChartsOption>(
-    () => ({
-      legend: { bottom: 0, left: "center", type: "scroll" },
-      series: [
+  const metrics = data
+    ? [
+        { icon: Users, label: "全部用户", value: formatCount(data.stats.users) },
         {
-          center: ["50%", "43%"],
-          data: data?.providerTypes || [],
-          emphasis: { label: { fontSize: 14, fontWeight: "bold", show: true } },
-          label: { formatter: "{b}\n{d}%" },
-          radius: [28, "70%"],
-          roseType: "radius",
-          type: "pie",
+          icon: UserPlus,
+          label: `近 ${rangeDays} 天新增`,
+          value: formatCount(data.stats.newUsers),
         },
-      ],
-      tooltip: { formatter: "{b}<br/>对话 {c} · {d}%", trigger: "item" },
-    }),
-    [data],
-  );
+        { icon: MessageCircleMore, label: "全部对话", value: formatCount(data.stats.sessions) },
+        { icon: MessageSquareText, label: "全部消息", value: formatCount(data.stats.messages) },
+        { icon: Files, label: "存储文件", value: formatCount(data.stats.files) },
+        { icon: HardDrive, label: "已用空间", value: formatBytes(data.stats.fileBytes) },
+      ]
+    : [];
 
-  const roleOption = useMemo<EChartsOption>(
-    () => ({
-      series: [
+  const providerTotal = (data?.providerTypes || []).reduce(
+    (total, item) => total + Number(item.value || 0),
+    0,
+  );
+  const fileTotal = (data?.fileTypes || []).reduce((total, item) => total + Number(item.value || 0), 0);
+  const providers = (data?.providerTypes || []).slice(0, 5);
+  const fileTypes = (data?.fileTypes || []).slice().sort((a, b) => b.value - a.value);
+  const reminders = data
+    ? [
         {
-          center: ["50%", "50%"],
-          data: (data?.roleTypes || []).map((item) => ({
-            name: item.name === "admin" ? "管理员" : "普通用户",
-            value: item.value,
-          })),
-          emphasis: { label: { fontSize: 15, fontWeight: "bold", show: true } },
-          label: { formatter: "{b}\n{c} 人" },
-          radius: ["44%", "72%"],
-          selectedMode: "single",
-          type: "pie",
+          icon: Clock3,
+          label: "待审批",
+          tone: "text-amber-500",
+          value: formatCount(data.stats.pendingWaitlist),
         },
-      ],
-      tooltip: { formatter: "{b}<br/>{c} 人 · {d}%", trigger: "item" },
-    }),
-    [data],
-  );
-
-  const heatmapOption = useMemo<EChartsOption>(() => {
-    const calendarData = (data?.trend || []).map((item) => [item.date, item.sessions]);
-    const firstDate = data?.trend[0]?.date;
-    const lastDate = data?.trend.at(-1)?.date;
-    return {
-      calendar: {
-        cellSize: ["auto", 18],
-        dayLabel: { firstDay: 1, nameMap: "ZH" },
-        itemStyle: { borderWidth: 0.5 },
-        left: 36,
-        monthLabel: { nameMap: "ZH" },
-        range: firstDate && lastDate ? [firstDate, lastDate] : undefined,
-        right: 24,
-        top: 64,
-        yearLabel: { show: false },
-      },
-      series: {
-        coordinateSystem: "calendar",
-        data: calendarData,
-        type: "heatmap",
-      },
-      tooltip: {
-        formatter: (params: unknown) => {
-          const item = params as { data?: [string, number] };
-          return `${item.data?.[0] || ""}<br/>${item.data?.[1] || 0} 个新对话`;
+        {
+          icon: MailWarning,
+          label: "失败邮件",
+          tone: "text-red-500",
+          value: formatCount(data.stats.failedEmails),
         },
-      },
-      visualMap: {
-        left: "center",
-        max: Math.max(1, ...calendarData.map((item) => Number(item[1]))),
-        min: 0,
-        orient: "horizontal",
-        top: 8,
-        type: "piecewise",
-      },
-    } satisfies EChartsOption;
-  }, [data]);
-
-  const items = [
-    {
-      icon: Users,
-      label: "全部用户",
-      tone: "bg-gray-100 text-gray-600 dark:bg-white/[0.07] dark:text-gray-300",
-      value: data?.stats.users ?? "—",
-    },
-    {
-      icon: UserPlus,
-      label: `近 ${rangeDays} 天新增`,
-      tone: "bg-gray-100 text-gray-600 dark:bg-white/[0.07] dark:text-gray-300",
-      value: data?.stats.newUsers ?? "—",
-    },
-    {
-      icon: BadgeCheck,
-      label: "已验证用户",
-      tone: "bg-gray-100 text-gray-600 dark:bg-white/[0.07] dark:text-gray-300",
-      value: data?.stats.verifiedUsers ?? "—",
-    },
-    {
-      icon: ShieldBan,
-      label: "已封禁用户",
-      tone: "bg-gray-100 text-gray-600 dark:bg-white/[0.07] dark:text-gray-300",
-      value: data?.stats.bannedUsers ?? "—",
-    },
-    {
-      icon: MessageSquareText,
-      label: "全部对话",
-      tone: "bg-gray-100 text-gray-600 dark:bg-white/[0.07] dark:text-gray-300",
-      value: data?.stats.sessions ?? "—",
-    },
-    {
-      icon: MessageCircleMore,
-      label: "全部消息",
-      tone: "bg-gray-100 text-gray-600 dark:bg-white/[0.07] dark:text-gray-300",
-      value: data?.stats.messages ?? "—",
-    },
-    {
-      icon: Files,
-      label: "存储文件",
-      tone: "bg-gray-100 text-gray-600 dark:bg-white/[0.07] dark:text-gray-300",
-      value: data ? `${data.stats.files} · ${formatBytes(data.stats.fileBytes)}` : "—",
-    },
-    {
-      icon: ClipboardClock,
-      label: "待审批申请",
-      tone: "bg-gray-100 text-gray-600 dark:bg-white/[0.07] dark:text-gray-300",
-      value: data?.stats.pendingWaitlist ?? "—",
-    },
-  ];
+        {
+          icon: Ban,
+          label: "已封禁用户",
+          tone: "text-gray-500",
+          value: formatCount(data.stats.bannedUsers),
+        },
+        {
+          icon: Send,
+          label: "邮件投递",
+          tone: "text-emerald-500",
+          value:
+            data.stats.emailDeliveryRate === null
+              ? "暂无记录"
+              : `${data.stats.emailDeliveryRate.toFixed(1)}%`,
+        },
+      ]
+    : [];
 
   if (error) return <AdminError message={error} onRetry={() => void load()} />;
 
   if (!data) {
     return (
-      <div className="space-y-4 animate-pulse">
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, index) => (
-            <div className="h-[66px] rounded-lg bg-gray-50 dark:bg-white/[0.035]" key={index} />
-          ))}
+      <div className="animate-pulse space-y-6">
+        <div className="h-5 w-28 rounded bg-gray-100 dark:bg-white/[0.06]" />
+        <div className="h-[74px] rounded-lg bg-gray-50 dark:bg-white/[0.035]" />
+        <div className="grid gap-6 xl:grid-cols-[1.7fr_1fr]">
+          <div className="h-[330px] rounded-lg bg-gray-50 dark:bg-white/[0.035]" />
+          <div className="h-[330px] rounded-lg bg-gray-50 dark:bg-white/[0.035]" />
         </div>
-        <div className="grid gap-4 xl:grid-cols-[1.7fr_1fr]">
-          <div className="h-[340px] rounded-lg bg-gray-50 dark:bg-white/[0.035]" />
-          <div className="h-[340px] rounded-lg bg-gray-50 dark:bg-white/[0.035]" />
-        </div>
+        <div className="h-[250px] rounded-lg bg-gray-50 dark:bg-white/[0.035]" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-7 md:space-y-9">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="mx-auto max-w-[1180px] space-y-7 md:space-y-8">
+      <div className="flex items-center justify-between gap-3 md:hidden">
         <div>
           <h3 className="text-sm font-semibold">运营数据</h3>
-          <p className="mt-1 text-xs text-gray-400">点击图例可隐藏维度，滚轮可缩放趋势图</p>
+          <p className="mt-1 text-xs text-gray-400">查看用户与系统运行情况</p>
         </div>
-        <SegmentedControl
-          onChange={(value) => setRangeDays(Number(value))}
-          options={[
-            { label: "7 天", value: 7 },
-            { label: "14 天", value: 14 },
-            { label: "30 天", value: 30 },
-          ]}
-          padding={4}
-          value={rangeDays}
-        />
+        <div className="shrink-0">
+          <select
+            aria-label="概览时间范围"
+            className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-xs text-gray-700 outline-none dark:border-white/10 dark:bg-[#191919] dark:text-gray-200"
+            onChange={(event) => onRangeDaysChange?.(Number(event.target.value))}
+            value={rangeDays}
+          >
+            <option value={7}>7 天</option>
+            <option value={14}>14 天</option>
+            <option value={30}>30 天</option>
+          </select>
+        </div>
       </div>
-      <div className="grid grid-cols-2 gap-x-3 gap-y-4 sm:gap-x-7 sm:gap-y-5 lg:grid-cols-4">
-        {items.map((item) => {
-          const Icon = item.icon;
-          return (
+
+      <section>
+        <SectionHeading description="关键指标总览，了解平台整体运营状况" title="运营数据" />
+        <div className="grid grid-cols-2 border-y border-gray-200/80 sm:grid-cols-3 xl:grid-cols-6 dark:border-white/[0.09]">
+          {metrics.map(({ icon: Icon, label, value }) => (
             <div
-              className="flex min-w-0 items-center gap-2.5 py-1 sm:gap-3 sm:py-2"
-              key={item.label}
+              className="flex min-w-0 items-center gap-2.5 px-2 py-3.5 sm:px-3.5 xl:border-l xl:border-gray-200/60 xl:first:border-l-0 dark:border-white/[0.09]"
+              key={label}
             >
-              <span
-                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${item.tone}`}
-              >
-                <Icon size={16} />
-              </span>
+              <Icon className="shrink-0 text-gray-400" size={16} strokeWidth={1.7} />
               <div className="min-w-0">
-                <p className="text-xs text-gray-400">{item.label}</p>
-                <p className="mt-0.5 truncate text-base font-semibold sm:text-lg">{item.value}</p>
+                <p className="truncate text-xs text-gray-400">{label}</p>
+                <p className="mt-0.5 truncate font-jakarta text-[18px] font-semibold leading-6 text-gray-900 dark:text-gray-100">
+                  {value}
+                </p>
               </div>
             </div>
-          );
-        })}
-      </div>
-      <div className="grid gap-7 md:gap-10 xl:grid-cols-[0.85fr_1.35fr]">
-        <section className="min-w-0">
-          <h3 className="text-sm font-semibold">用户增长趋势</h3>
-          <AdminChart height={330} mobileHeight={260} option={userTrendOption} />
-        </section>
-        <section className="min-w-0">
-          <h3 className="text-sm font-semibold">对话、消息与文件使用量</h3>
-          <AdminChart height={330} mobileHeight={280} option={usageTrendOption} />
-        </section>
-      </div>
-      <div className="grid gap-7 md:gap-10 xl:grid-cols-3">
-        <section className="min-w-0">
-          <h3 className="text-sm font-semibold">模型服务商使用分布</h3>
-          <AdminChart height={300} mobileHeight={260} option={providerOption} />
-        </section>
-        <section className="min-w-0">
-          <h3 className="text-sm font-semibold">用户角色构成</h3>
-          <AdminChart height={300} mobileHeight={250} option={roleOption} />
-        </section>
-        <section className="min-w-0">
-          <h3 className="text-sm font-semibold">等候名单状态</h3>
-          <AdminChart height={300} mobileHeight={260} option={waitlistOption} />
-        </section>
-      </div>
-      <div className="grid gap-7 md:gap-10 xl:grid-cols-[1.6fr_1fr]">
-        <section className="min-w-0">
-          <h3 className="text-sm font-semibold">每日对话活跃日历</h3>
-          <div className="overflow-x-auto">
-            <div className="min-w-[540px] sm:min-w-0">
-              <AdminChart height={220} mobileHeight={190} option={heatmapOption} />
-            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="grid gap-7 border-b border-gray-200/80 pb-7 xl:grid-cols-[1.7fr_1fr] dark:border-white/[0.09]">
+        <div className="min-w-0">
+          <SectionHeading description="新增用户数、对话数与消息数的趋势对比" title="用户与使用趋势" />
+          <AdminChart height={286} mobileHeight={250} option={trendOption} />
+        </div>
+        <div className="min-w-0">
+          <SectionHeading description="需要关注的关键事项" title="运营提醒" />
+          <div className="overflow-hidden rounded-lg border border-gray-200/80 dark:border-white/[0.1]">
+            {reminders.map(({ icon: Icon, label, tone, value }) => (
+              <div
+                className="flex h-[58px] items-center gap-3 border-b border-gray-200/80 px-3.5 last:border-b-0 dark:border-white/[0.09]"
+                key={label}
+              >
+                <Icon className={tone} size={17} strokeWidth={1.7} />
+                <span className="min-w-0 flex-1 truncate text-sm text-gray-700 dark:text-gray-200">
+                  {label}
+                </span>
+                <span className={`shrink-0 font-jakarta text-sm font-medium ${tone}`}>{value}</span>
+              </div>
+            ))}
           </div>
-        </section>
-        <section className="min-w-0">
-          <h3 className="text-sm font-semibold">文件存储分布</h3>
-          <AdminChart height={300} mobileHeight={250} option={fileOption} />
-        </section>
-      </div>
+        </div>
+      </section>
+
+      <section className="grid gap-7 xl:grid-cols-3 xl:gap-0">
+        <div className="min-w-0 xl:pr-7">
+          <SectionHeading description="按对话数统计 Top 5" title="模型服务商" />
+          <div className="space-y-3">
+            {providers.map((item, index) => (
+              <div className="flex items-center gap-2 text-xs" key={item.name || index}>
+                <span className="w-4 shrink-0 text-gray-400">{index + 1}</span>
+                <span className="w-20 shrink-0 truncate text-gray-700 dark:text-gray-300">
+                  {item.name || "未知"}
+                </span>
+                <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100 dark:bg-white/[0.1]">
+                  <div
+                    className={`h-full rounded-full ${index < 3 ? "bg-blue-600" : "bg-gray-400 dark:bg-gray-500"}`}
+                    style={{ width: `${providerTotal ? (item.value / Math.max(...providers.map((entry) => entry.value))) * 100 : 0}%` }}
+                  />
+                </div>
+                <span className="w-10 shrink-0 text-right tabular-nums text-gray-400">
+                  {formatPercent(item.value, providerTotal)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="min-w-0 border-t border-gray-200/80 pt-7 xl:border-l xl:border-t-0 xl:px-7 xl:pt-0 dark:border-white/[0.09]">
+          <SectionHeading description="按存储容量统计" title="文件存储" />
+          <div className="space-y-3">
+            {fileTypes.map((item) => (
+              <div className="flex items-center gap-3 text-xs" key={item.name}>
+                <span className="w-16 shrink-0 truncate text-gray-700 dark:text-gray-300">
+                  {fileTypeLabels[item.name] || item.name}
+                </span>
+                <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100 dark:bg-white/[0.1]">
+                  <div
+                    className="h-full rounded-full bg-blue-600"
+                    style={{ width: `${fileTotal ? (item.value / Math.max(...fileTypes.map((entry) => entry.value))) * 100 : 0}%` }}
+                  />
+                </div>
+                <span className="w-10 shrink-0 text-right tabular-nums text-gray-400">
+                  {formatPercent(item.value, fileTotal)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="min-w-0 border-t border-gray-200/80 pt-7 xl:border-l xl:border-t-0 xl:pl-7 xl:pt-0 dark:border-white/[0.09]">
+          <SectionHeading description="过去 3 个月活跃用户热力图" title="每日活跃" />
+          <ActivityHeatmap trend={data.activityTrend} />
+        </div>
+      </section>
     </div>
   );
 }

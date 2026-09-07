@@ -5,3 +5,4 @@ export * from "./files";
 export * from "./tools";
 export * from "./word";
 export * from "./admin";
+export * from "./shares";

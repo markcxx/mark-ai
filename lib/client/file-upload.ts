@@ -9,7 +9,10 @@ export type UploadedFile = {
   url?: string;
 };
 
+export type UploadStage = "preparing" | "uploading" | "processing";
+
 type UploadOptions = {
+  onStage?: (stage: UploadStage) => void;
   contentType?: string;
   kind: UploadKind;
   signal?: AbortSignal;
@@ -62,12 +65,13 @@ export const resolveFileContentType = (file: File) => {
 
 export async function uploadFile(
   file: File,
-  { contentType = resolveFileContentType(file), kind, signal }: UploadOptions,
+  { contentType = resolveFileContentType(file), kind, signal, onStage }: UploadOptions,
 ): Promise<UploadedFile> {
   let uploadId: string | undefined;
   let completed = false;
 
   try {
+    onStage?.("preparing");
     const presign = await fetch("/api/files/presign", {
       body: JSON.stringify({ contentType, kind, name: file.name, size: file.size }),
       headers: { "Content-Type": "application/json" },
@@ -80,6 +84,7 @@ export async function uploadFile(
     }
 
     uploadId = task.file.id;
+    onStage?.("uploading");
     const storageUpload = await fetch(task.uploadUrl, {
       body: file,
       headers: { "Content-Type": contentType },
@@ -88,6 +93,7 @@ export async function uploadFile(
     });
     if (!storageUpload.ok) throw new Error(kind === "avatar" ? "头像上传失败" : "文件上传失败");
 
+    onStage?.("processing");
     const complete = await fetch("/api/files/complete", {
       body: JSON.stringify({ id: uploadId }),
       headers: { "Content-Type": "application/json" },

@@ -1,7 +1,8 @@
 "use client";
 
 import type { RefObject } from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import toast from "react-hot-toast";
 import {
   ArrowDown,
   ChevronRight,
@@ -32,8 +33,8 @@ import { FilePreviewDialog } from "./FilePreviewDialog";
 import { ModelSelectorDialog } from "./ModelSelectorDialog";
 import { ModelBrandIcon } from "./ModelBrandIcon";
 import { ToolMenu } from "./ToolMenu";
-import { FileTypeIcon } from "./files/FileTypeIcon";
-import { formatBytes } from "./files/ManagedFileRow";
+import { ComposerAttachments } from "./ComposerAttachments";
+import type { AttachmentUpload } from "@/hooks/use-chat-attachments";
 
 export function ChatInput({
   availableModels,
@@ -43,8 +44,12 @@ export function ChatInput({
   modelSearchKeyword,
   messages,
   onAttachment,
+  onDropFiles,
   attachments,
   attachmentUploading,
+  uploads,
+  onCancelUpload,
+  onRetryUpload,
   onRemoveAttachment,
   onInput,
   onKeyDown,
@@ -71,12 +76,16 @@ export function ChatInput({
   availableModels: ConfiguredModel[];
   attachments: FileAttachment[];
   attachmentUploading: boolean;
+  uploads: AttachmentUpload[];
+  onCancelUpload: (id: string) => void;
+  onRetryUpload: (id: string) => void;
   input: string;
   isLoading: boolean;
   isLoadingModels: boolean;
   modelSearchKeyword: string;
   messages: Message[];
   onAttachment: () => void;
+  onDropFiles: (files: File[] | FileList) => Promise<void>;
   onRemoveAttachment: (id: string) => void;
   onInput: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
@@ -100,6 +109,8 @@ export function ChatInput({
   webSearchEnabled: boolean;
   onToggleWebSearch: () => void;
 }) {
+  const dragDepthRef = useRef(0);
+  const [attachmentDragActive, setAttachmentDragActive] = useState(false);
   const [isModelDialogOpen, setIsModelDialogOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<FileAttachment | null>(null);
   const hasDraft = Boolean(input.trim() || attachments.length > 0);
@@ -170,7 +181,50 @@ export function ChatInput({
               </button>
             </div>
           )}
-          <div className="relative z-20 flex flex-col rounded-xl border border-gray-200 bg-[var(--chat-input-bg)] shadow-[0_12px_32px_rgba(0,0,0,0.06)] transition-all duration-300 focus-within:border-primary/30 focus-within:ring-2 focus-within:ring-primary/20 dark:border-white/10 dark:shadow-[0_14px_40px_rgba(0,0,0,0.35)] dark:focus-within:border-white/20 dark:focus-within:ring-white/[0.06]">
+          <div
+            className="relative z-20 flex flex-col rounded-xl border border-gray-200 bg-[var(--chat-input-bg)] shadow-[0_12px_32px_rgba(0,0,0,0.06)] transition-all duration-300 focus-within:border-primary/30 focus-within:ring-2 focus-within:ring-primary/20 dark:border-white/10 dark:shadow-[0_14px_40px_rgba(0,0,0,0.35)] dark:focus-within:border-white/20 dark:focus-within:ring-white/[0.06]"
+            onDragEnter={(event) => {
+              if (!event.dataTransfer.types.includes("Files")) return;
+              event.preventDefault();
+              dragDepthRef.current += 1;
+              setAttachmentDragActive(true);
+            }}
+            onDragLeave={(event) => {
+              if (!event.dataTransfer.types.includes("Files")) return;
+              dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+              if (dragDepthRef.current === 0) setAttachmentDragActive(false);
+            }}
+            onDragOver={(event) => {
+              if (!event.dataTransfer.types.includes("Files")) return;
+              event.preventDefault();
+              event.stopPropagation();
+              event.dataTransfer.dropEffect = "copy";
+            }}
+            onDrop={(event) => {
+              if (!event.dataTransfer.types.includes("Files")) return;
+              event.preventDefault();
+              event.stopPropagation();
+              dragDepthRef.current = 0;
+              setAttachmentDragActive(false);
+              const files = Array.from(event.dataTransfer.items)
+                .filter((item) => item.kind === "file" && !item.webkitGetAsEntry?.()?.isDirectory)
+                .map((item) => item.getAsFile())
+                .filter((file): file is File => file !== null);
+              if (event.dataTransfer.items.length && !files.length) {
+                toast.error("暂不支持上传文件夹，请拖入具体文件");
+                return;
+              }
+              void onDropFiles(event.dataTransfer.items.length ? files : event.dataTransfer.files);
+            }}
+          >
+            {attachmentDragActive && (
+              <div
+                role="status"
+                className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center rounded-xl border-2 border-dashed border-primary/60 bg-[var(--chat-input-bg)] text-sm font-medium text-gray-700 dark:text-gray-200"
+              >
+                松开即可添加附件
+              </div>
+            )}
             {pendingQuote && (
               <div className="mx-3 mt-3 flex min-w-0 items-start gap-2 rounded-lg bg-gray-50 px-3 py-2.5 text-xs leading-5 text-gray-500 dark:bg-white/[0.05] dark:text-gray-400 md:mx-4">
                 <CornerDownRight className="mt-0.5 shrink-0 text-gray-400" size={15} />
@@ -186,82 +240,14 @@ export function ChatInput({
                 </button>
               </div>
             )}
-            {(attachments.length > 0 || attachmentUploading) && (
-              <div className="flex gap-2 overflow-x-auto px-3 pt-3 md:px-4">
-                {attachments.map((file) => {
-                  const image = file.contentType.startsWith("image/");
-                  return image ? (
-                    <div
-                      className="group/file relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-gray-100 dark:border-white/10 dark:bg-white/[0.05]"
-                      key={file.id}
-                    >
-                      <button
-                        aria-label={`预览 ${file.name}`}
-                        className="h-full w-full"
-                        onClick={() => setPreviewFile(file)}
-                        type="button"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          alt={file.name}
-                          className="h-full w-full object-cover transition-transform duration-200 group-hover/file:scale-105"
-                          src={`/api/files/${file.id}/preview`}
-                        />
-                      </button>
-                      <button
-                        aria-label={`移除 ${file.name}`}
-                        className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-md bg-black/60 text-white opacity-100 backdrop-blur-sm transition-opacity md:opacity-0 md:group-hover/file:opacity-100"
-                        onClick={() => onRemoveAttachment(file.id)}
-                        type="button"
-                      >
-                        <X size={13} />
-                      </button>
-                    </div>
-                  ) : (
-                    <div
-                      className="group/file flex h-16 w-[220px] shrink-0 items-center gap-2 rounded-lg border border-gray-200 bg-gray-50/80 px-2.5 dark:border-white/10 dark:bg-white/[0.05]"
-                      key={file.id}
-                    >
-                      <button
-                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                        onClick={() => setPreviewFile(file)}
-                        title={`预览 ${file.name}`}
-                        type="button"
-                      >
-                        <FileTypeIcon
-                          contentType={file.contentType}
-                          name={file.name}
-                          tile
-                          tileClassName="h-9 w-9"
-                        />
-                        <span className="min-w-0">
-                          <span className="block truncate text-xs font-medium text-gray-700 dark:text-gray-200">
-                            {file.name}
-                          </span>
-                          <span className="block text-[10px] text-gray-400">
-                            {formatBytes(file.size)}
-                          </span>
-                        </span>
-                      </button>
-                      <button
-                        aria-label="移除附件"
-                        className="ml-1 rounded-full p-1 text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-white"
-                        onClick={() => onRemoveAttachment(file.id)}
-                        type="button"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  );
-                })}
-                {attachmentUploading && (
-                  <div className="flex h-16 shrink-0 items-center gap-2 rounded-lg border border-dashed border-blue-300 bg-blue-50/70 px-3 text-xs text-blue-600 dark:border-blue-400/30 dark:bg-blue-500/10 dark:text-blue-300">
-                    <LoaderCircle className="animate-spin" size={16} />
-                    正在安全上传…
-                  </div>
-                )}
-              </div>
-            )}
+            <ComposerAttachments
+              attachments={attachments}
+              uploads={uploads}
+              onPreview={setPreviewFile}
+              onRemove={onRemoveAttachment}
+              onCancel={onCancelUpload}
+              onRetry={onRetryUpload}
+            />
 
             <textarea
               data-markai-composer
@@ -282,12 +268,12 @@ export function ChatInput({
               value={input}
             />
 
-            <div className="flex items-center justify-between px-2.5 pb-2.5 pt-1 md:px-3 md:pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-y-1 px-2.5 pb-2.5 pt-1 md:px-3 md:pb-3">
               <div className="flex items-center gap-1">
                 <button
                   className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-200 md:h-9 md:w-9"
                   onClick={onAttachment}
-                  disabled={attachmentUploading || attachments.length >= 4}
+                  disabled={attachmentUploading || attachments.length + uploads.length >= 4}
                   title="添加附件"
                   type="button"
                 >
@@ -331,9 +317,9 @@ export function ChatInput({
                   </span>
                 </button>
               </div>
-              <div className="flex items-center gap-2">
-                {!imageGenerationModel && (
-                  <span className="hidden sm:block">
+              <div className="ml-auto flex min-w-0 items-center gap-0.5 sm:gap-2">
+                {messages.length > 0 && (
+                  <span className="shrink-0">
                     <ContextWindowIndicator
                       attachments={attachments}
                       draft={pendingQuote ? `${pendingQuote.content}\n\n${input}` : input}
