@@ -1,0 +1,450 @@
+[
+  {
+    "language": "javascript",
+    "code": "const answer = 42; // 注释\nconsole.log(\"你好\", answer);",
+    "tokens": [
+      {
+        "text": "const",
+        "classes": [
+          "keyword"
+        ]
+      },
+      {
+        "text": " answer ",
+        "classes": []
+      },
+      {
+        "text": "=",
+        "classes": [
+          "operator"
+        ]
+      },
+      {
+        "text": " ",
+        "classes": []
+      },
+      {
+        "text": "42",
+        "classes": [
+          "number"
+        ]
+      },
+      {
+        "text": ";",
+        "classes": [
+          "punctuation"
+        ]
+      },
+      {
+        "text": " ",
+        "classes": []
+      },
+      {
+        "text": "// 注释",
+        "classes": [
+          "comment"
+        ]
+      },
+      {
+        "text": "\n",
+        "classes": []
+      },
+      {
+        "text": "console",
+        "classes": [
+          "console",
+          "class-name"
+        ]
+      },
+      {
+        "text": ".",
+        "classes": [
+          "punctuation"
+        ]
+      },
+      {
+        "text": "log",
+        "classes": [
+          "method",
+          "function",
+          "property-access"
+        ]
+      },
+      {
+        "text": "(",
+        "classes": [
+          "punctuation"
+        ]
+      },
+      {
+        "text": "\"你好\"",
+        "classes": [
+          "string"
+        ]
+      },
+      {
+        "text": ",",
+        "classes": [
+          "punctuation"
+        ]
+      },
+      {
+        "text": " answer",
+        "classes": []
+      },
+      {
+        "text": ")",
+        "classes": [
+          "punctuation"
+        ]
+      },
+      {
+        "text": ";",
+        "classes": [
+          "punctuation"
+        ]
+      }
+    ]
+  },
+  {
+    "language": "python",
+    "code": "def greet(name):\n    return f\"Hello {name}\"\n",
+    "tokens": [
+      {
+        "text": "def",
+        "classes": [
+          "keyword"
+        ]
+      },
+      {
+        "text": " ",
+        "classes": []
+      },
+      {
+        "text": "greet",
+        "classes": [
+          "function"
+        ]
+      },
+      {
+        "text": "(",
+        "classes": [
+          "punctuation"
+        ]
+      },
+      {
+        "text": "name",
+        "classes": []
+      },
+      {
+        "text": ")",
+        "classes": [
+          "punctuation"
+        ]
+      },
+      {
+        "text": ":",
+        "classes": [
+          "punctuation"
+        ]
+      },
+      {
+        "text": "\n    ",
+        "classes": []
+      },
+      {
+        "text": "return",
+        "classes": [
+          "keyword"
+        ]
+      },
+      {
+        "text": " ",
+        "classes": []
+      },
+      {
+        "text": "f\"Hello ",
+        "classes": [
+          "string-interpolation",
+          "string"
+        ]
+      },
+      {
+        "text": "{",
+        "classes": [
+          "string-interpolation",
+          "interpolation",
+          "punctuation"
+        ]
+      },
+      {
+        "text": "name",
+        "classes": [
+          "string-interpolation",
+          "interpolation"
+        ]
+      },
+      {
+        "text": "}",
+        "classes": [
+          "string-interpolation",
+          "interpolation",
+          "punctuation"
+        ]
+      },
+      {
+        "text": "\"",
+        "classes": [
+          "string-interpolation",
+          "string"
+        ]
+      },
+      {
+        "text": "\n",
+        "classes": []
+      }
+    ]
+  },
+  {
+    "language": "html",
+    "code": "<div class=\"card\">Hello &amp; world</div>",
+    "tokens": [
+      {
+        "text": "<",
+        "classes": [
+          "tag",
+          "tag",
+          "punctuation"
+        ]
+      },
+      {
+        "text": "div",
+        "classes": [
+          "tag",
+          "tag"
+        ]
+      },
+      {
+        "text": " ",
+        "classes": [
+          "tag"
+        ]
+      },
+      {
+        "text": "class",
+        "classes": [
+          "tag",
+          "attr-name"
+        ]
+      },
+      {
+        "text": "=",
+        "classes": [
+          "tag",
+          "attr-value",
+          "punctuation",
+          "attr-equals"
+        ]
+      },
+      {
+        "text": "\"",
+        "classes": [
+          "tag",
+          "attr-value",
+          "punctuation"
+        ]
+      },
+      {
+        "text": "card",
+        "classes": [
+          "tag",
+          "attr-value"
+        ]
+      },
+      {
+        "text": "\"",
+        "classes": [
+          "tag",
+          "attr-value",
+          "punctuation"
+        ]
+      },
+      {
+        "text": ">",
+        "classes": [
+          "tag",
+          "punctuation"
+        ]
+      },
+      {
+        "text": "Hello ",
+        "classes": []
+      },
+      {
+        "text": "&amp;",
+        "classes": [
+          "entity",
+          "named-entity"
+        ]
+      },
+      {
+        "text": " world",
+        "classes": []
+      },
+      {
+        "text": "</",
+        "classes": [
+          "tag",
+          "tag",
+          "punctuation"
+        ]
+      },
+      {
+        "text": "div",
+        "classes": [
+          "tag",
+          "tag"
+        ]
+      },
+      {
+        "text": ">",
+        "classes": [
+          "tag",
+          "punctuation"
+        ]
+      }
+    ]
+  },
+  {
+    "language": "sql",
+    "code": "SELECT name FROM users WHERE id = 1;",
+    "tokens": [
+      {
+        "text": "SELECT",
+        "classes": [
+          "keyword"
+        ]
+      },
+      {
+        "text": " name ",
+        "classes": []
+      },
+      {
+        "text": "FROM",
+        "classes": [
+          "keyword"
+        ]
+      },
+      {
+        "text": " users ",
+        "classes": []
+      },
+      {
+        "text": "WHERE",
+        "classes": [
+          "keyword"
+        ]
+      },
+      {
+        "text": " id ",
+        "classes": []
+      },
+      {
+        "text": "=",
+        "classes": [
+          "operator"
+        ]
+      },
+      {
+        "text": " ",
+        "classes": []
+      },
+      {
+        "text": "1",
+        "classes": [
+          "number"
+        ]
+      },
+      {
+        "text": ";",
+        "classes": [
+          "punctuation"
+        ]
+      }
+    ]
+  },
+  {
+    "language": "javascript",
+    "code": "\"); globalThis.secret = true; //",
+    "tokens": [
+      {
+        "text": "\"",
+        "classes": []
+      },
+      {
+        "text": ")",
+        "classes": [
+          "punctuation"
+        ]
+      },
+      {
+        "text": ";",
+        "classes": [
+          "punctuation"
+        ]
+      },
+      {
+        "text": " globalThis",
+        "classes": []
+      },
+      {
+        "text": ".",
+        "classes": [
+          "punctuation"
+        ]
+      },
+      {
+        "text": "secret",
+        "classes": [
+          "property-access"
+        ]
+      },
+      {
+        "text": " ",
+        "classes": []
+      },
+      {
+        "text": "=",
+        "classes": [
+          "operator"
+        ]
+      },
+      {
+        "text": " ",
+        "classes": []
+      },
+      {
+        "text": "true",
+        "classes": [
+          "boolean"
+        ]
+      },
+      {
+        "text": ";",
+        "classes": [
+          "punctuation"
+        ]
+      },
+      {
+        "text": " ",
+        "classes": []
+      },
+      {
+        "text": "//",
+        "classes": [
+          "comment"
+        ]
+      }
+    ]
+  }
+]

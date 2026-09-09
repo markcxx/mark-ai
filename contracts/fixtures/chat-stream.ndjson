@@ -1,0 +1,7 @@
+{"type":"reasoning","text":"先检查条件。"}
+{"type":"tool","webSearch":{"tool":"web_search","query":"MarkAI","status":"searching","results":[]}}
+{"type":"tool","webSearch":{"tool":"web_search","query":"MarkAI","status":"done","results":[{"title":"示例来源","url":"https://example.com","citationId":1}]}}
+{"type":"content","text":"你好，**MarkAI** 😀\n\n支持流式回复。"}
+{"type":"file","generatedFile":{"callId":"call-1","toolId":"word","toolName":"文档生成","status":"running"}}
+{"type":"file","generatedFile":{"callId":"call-1","toolId":"word","toolName":"文档生成","status":"done","file":{"id":"file-1","name":"文档.docx","size":1024,"contentType":"application/vnd.openxmlformats-officedocument.wordprocessingml.document","url":"/api/files/file-1/download"}}}
+{"type":"usage","inputTokens":12,"outputTokens":20,"totalTokens":32,"tokenUsageSource":"provider"}

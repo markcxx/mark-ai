@@ -1,0 +1,97 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:markai_mobile/core/network/api_client.dart';
+
+import 'support/fake_workspace.dart';
+
+void main() {
+  test(
+    'emulator loopback keeps the canonical development auth origin',
+    () async {
+      final api = ApiClient(MemoryStore());
+      await api.configure('http://10.0.2.2:3000');
+      expect(api.baseUrl, 'http://10.0.2.2:3000');
+      expect(api.headers['Origin'], 'http://localhost:3000');
+      await api.configure('https://markai.example');
+      expect(api.headers['Origin'], 'https://markai.example');
+    },
+  );
+
+  test(
+    'real HTTP login cookie survives session verification and client restart',
+    () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final origin = 'http://127.0.0.1:${server.port}';
+      final storage = MemoryStore();
+      final paths = <String>[];
+      server.listen((request) async {
+        paths.add(request.uri.path);
+        request.response.headers.contentType = ContentType.json;
+        if (request.headers.value('origin') != origin) {
+          request.response.statusCode = 403;
+          request.response.write(jsonEncode({'code': 'INVALID_ORIGIN'}));
+        } else if (request.uri.path == '/api/auth/sign-in/email') {
+          final body = jsonDecode(await utf8.decoder.bind(request).join());
+          expect(body['email'], 'fixture@example.invalid');
+          request.response.cookies.add(
+            Cookie('better-auth.session_token', 'test-session')
+              ..httpOnly = true
+              ..path = '/',
+          );
+          request.response.write(
+            jsonEncode({
+              'user': {'id': 'fixture'},
+            }),
+          );
+        } else if (request.cookies.any(
+          (c) =>
+              c.name == 'better-auth.session_token' &&
+              c.value == 'test-session',
+        )) {
+          request.response.write(
+            jsonEncode({
+              'user': {'id': 'fixture'},
+            }),
+          );
+        } else {
+          request.response.statusCode = 401;
+          request.response.write(jsonEncode({'error': '请先登录'}));
+        }
+        await request.response.close();
+      });
+      final api = ApiClient(storage);
+      final restarted = ApiClient(storage);
+      try {
+        await api.configure(origin);
+        await api.request(
+          'POST',
+          '/api/auth/sign-in/email',
+          body: {
+            'email': 'fixture@example.invalid',
+            'password': 'fixture-only',
+          },
+        );
+        expect(
+          (await api.request('GET', '/api/auth/get-session'))['user']['id'],
+          'fixture',
+        );
+        await restarted.configure(origin);
+        expect(
+          (await restarted.request('GET', '/api/models'))['user']['id'],
+          'fixture',
+        );
+        expect(paths, [
+          '/api/auth/sign-in/email',
+          '/api/auth/get-session',
+          '/api/models',
+        ]);
+      } finally {
+        api.dio.close(force: true);
+        restarted.dio.close(force: true);
+        await server.close(force: true);
+      }
+    },
+  );
+}

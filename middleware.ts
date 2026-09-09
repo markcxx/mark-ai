@@ -33,6 +33,9 @@ export async function middleware(req: NextRequest) {
     req.cookies.get("__Secure-better-auth.session_token");
 
   if (!sessionCookie?.value) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "请先登录" }, { status: 401 });
+    }
     const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);

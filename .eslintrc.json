@@ -1,4 +1,4 @@
 {
   "extends": "next",
-  "ignorePatterns": [".data/**", "lobehub/**", "bloub/**"]
+  "ignorePatterns": [".data/**", "lobehub/**", "bloub/**", "mobile/**"]
 }
