@@ -12,8 +12,35 @@ import '../../shared/widgets/app_toast.dart';
 import 'file_service.dart';
 
 bool supportsNativeFilePreview(Json file) {
-  final type = file['contentType'] as String? ?? '';
+  final type = (file['contentType'] as String? ?? '').toLowerCase();
   final name = (file['name'] as String? ?? '').toLowerCase();
+  if ([
+        '.pdf',
+        '.doc',
+        '.docx',
+        '.docm',
+        '.dotx',
+        '.dotm',
+        '.xls',
+        '.xlsx',
+        '.xlsm',
+        '.xlsb',
+        '.ppt',
+        '.pptx',
+        '.pptm',
+        '.rtf',
+        '.odt',
+        '.ods',
+        '.odp',
+      ].any(name.endsWith) ||
+      type.contains('pdf') ||
+      type.contains('officedocument') ||
+      type.contains('msword') ||
+      type.contains('ms-excel') ||
+      type.contains('ms-powerpoint') ||
+      type.contains('opendocument')) {
+    return false;
+  }
   return type.startsWith('image/') ||
       type.startsWith('text/') ||
       [
@@ -27,19 +54,28 @@ bool supportsNativeFilePreview(Json file) {
       ].any(name.endsWith);
 }
 
-Future<void> showFilePreview(BuildContext context, ApiClient api, Json file) =>
-    Navigator.push(
-      context,
-      PageRouteBuilder<void>(
-        opaque: !(file['contentType'] as String? ?? '').startsWith('image/'),
-        pageBuilder: (_, _, _) => FilePreview(api: api, file: file),
-        transitionDuration: MediaQuery.disableAnimationsOf(context)
-            ? Duration.zero
-            : const Duration(milliseconds: 300),
-        transitionsBuilder: (_, animation, _, child) =>
-            FadeTransition(opacity: animation, child: child),
-      ),
-    );
+Future<void> showFilePreview(
+  BuildContext context,
+  ApiClient api,
+  Json file,
+) async {
+  if (!supportsNativeFilePreview(file)) {
+    AppToastHost.show(context, '安卓端不支持此文件预览，请下载后打开');
+    return;
+  }
+  await Navigator.push(
+    context,
+    PageRouteBuilder<void>(
+      opaque: !(file['contentType'] as String? ?? '').startsWith('image/'),
+      pageBuilder: (_, _, _) => FilePreview(api: api, file: file),
+      transitionDuration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 300),
+      transitionsBuilder: (_, animation, _, child) =>
+          FadeTransition(opacity: animation, child: child),
+    ),
+  );
+}
 
 class FilePreview extends StatefulWidget {
   final ApiClient api;

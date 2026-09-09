@@ -48,20 +48,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
   Future<void> load() async {
     try {
-      var html = widget.html;
-      final source = jsonEncode(widget.html).replaceAll('<', r'\u003c');
-      if (widget.language == 'mermaid' || widget.language == 'echarts') {
-        final library = await rootBundle.loadString(
-          'assets/web/${widget.language}.min.js',
-        );
-        final run = widget.language == 'mermaid'
-            ? "mermaid.initialize({startOnLoad:false,securityLevel:'strict'});document.getElementById('view').textContent=$source;mermaid.run({nodes:[document.getElementById('view')]});"
-            : "const chart=echarts.init(document.getElementById('view'));chart.setOption(JSON.parse($source));window.onresize=()=>chart.resize();";
-        html =
-            '<div id="view" style="width:100%;height:85vh"></div><script>${library.replaceAll('</script', r'<\/script')}</script><script>try{$run}catch(e){document.getElementById("view").textContent="预览失败，请检查代码格式";}</script>';
-      }
       await web.loadHtmlString(
-        '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'unsafe-inline\'; style-src \'unsafe-inline\'; img-src data: https:; connect-src \'none\'; frame-src \'none\'; form-action \'none\'"><style>body{font-family:sans-serif;margin:16px;overflow-wrap:anywhere}img{max-width:100%}</style>$html',
+        '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'unsafe-inline\'; style-src \'unsafe-inline\'; img-src data: https:; connect-src \'none\'; frame-src \'none\'; form-action \'none\'"><style>body{font-family:sans-serif;margin:16px;overflow-wrap:anywhere}img{max-width:100%}</style>${widget.html}',
       );
     } catch (_) {
       if (mounted) setState(() => error = '预览加载失败，请返回后重试');

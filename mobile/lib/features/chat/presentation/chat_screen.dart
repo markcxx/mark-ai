@@ -1,13 +1,13 @@
+import 'export_dialog.dart';
+
 import 'package:markai_mobile/shared/widgets/ui_icon.dart';
 
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../../shared/widgets/common.dart';
 import '../../../shared/widgets/app_menu.dart';
@@ -913,17 +913,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           ClipboardData(text: c.messages.map((m) => m.content).join('\n\n')),
         );
       case 'export':
-        await SharePlus.instance.share(
-          ShareParams(
-            text: const JsonEncoder.withIndent('  ').convert({
-              'session': s.data,
-              'messages': c.messages.map((m) => m.toJson()).toList(),
-            }),
-            title: s.title,
-          ),
+        await showAppDialog(
+          context,
+          (_) => ExportDialog(controller: c, session: s, initialMode: 'json'),
         );
       case 'image':
-        c.message('图片导出尚未接入');
+        await showAppDialog(
+          context,
+          (_) => ExportDialog(controller: c, session: s),
+        );
       case 'delete':
         if (await confirmAction(context, '删除会话', '会话及其专属文件将被删除。')) {
           await c.deleteSession(s);

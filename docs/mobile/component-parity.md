@@ -11,14 +11,14 @@ Every row requires matching native rendering, interaction, data contract, light/
 | `components/MarkAILoadingScreen.tsx` | Pending source/native/state comparison | Not accepted |
 | `components/ThemeProvider.tsx` | Pending source/native/state comparison | Not accepted |
 | `components/ThemeToggle.tsx` | Pending source/native/state comparison | Not accepted |
-| `components/admin/AdminChart.tsx` | Pending source/native/state comparison | Not accepted |
-| `components/admin/AdminConsole.tsx` | Pending source/native/state comparison | Not accepted |
-| `components/admin/AdminPrimitives.tsx` | Pending source/native/state comparison | Not accepted |
-| `components/admin/AuditPanel.tsx` | Pending source/native/state comparison | Not accepted |
-| `components/admin/OverviewPanel.tsx` | Pending source/native/state comparison | Not accepted |
-| `components/admin/UserDetailDialog.tsx` | Pending source/native/state comparison | Not accepted |
-| `components/admin/UsersPanel.tsx` | Pending source/native/state comparison | Not accepted |
-| `components/admin/WaitlistPanel.tsx` | Pending source/native/state comparison | Not accepted |
+| `components/admin/AdminChart.tsx` | Deferred at user request | Out of current scope |
+| `components/admin/AdminConsole.tsx` | Deferred at user request | Out of current scope |
+| `components/admin/AdminPrimitives.tsx` | Deferred at user request | Out of current scope |
+| `components/admin/AuditPanel.tsx` | Deferred at user request | Out of current scope |
+| `components/admin/OverviewPanel.tsx` | Deferred at user request | Out of current scope |
+| `components/admin/UserDetailDialog.tsx` | Deferred at user request | Out of current scope |
+| `components/admin/UsersPanel.tsx` | Deferred at user request | Out of current scope |
+| `components/admin/WaitlistPanel.tsx` | Deferred at user request | Out of current scope |
 | `components/chat/AgentAvatar.tsx` | Pending source/native/state comparison | Not accepted |
 | `components/chat/ChatApp.tsx` | Pending source/native/state comparison | Not accepted |
 | `components/chat/ChatInput.tsx` | Mobile spacing and Enter/Mod+Enter, image-model controls restored; attachment cards/desktop variants and full keyboard matrix pending | Not accepted |
@@ -27,22 +27,22 @@ Every row requires matching native rendering, interaction, data contract, light/
 | `components/chat/CommandCenter.tsx` | Pending source/native/state comparison | Not accepted |
 | `components/chat/ComposerAttachments.tsx` | Pending source/native/state comparison | Not accepted |
 | `components/chat/ContextWindowIndicator.tsx` | Pending source/native/state comparison | Not accepted |
-| `components/chat/EChartsPreviewBlock.tsx` | Pending source/native/state comparison | Not accepted |
-| `components/chat/ExportDialog.tsx` | Pending source/native/state comparison | Not accepted |
+| `components/chat/EChartsPreviewBlock.tsx` | Shared Web validation/themes; native controls, expansion and PNG export; Android light/dark fixtures pass | Not accepted |
+| `components/chat/ExportDialog.tsx` | Native image/JSON preview and save; complete conversation raster with chart snapshots verified | Not accepted |
 | `components/chat/FileAccessContext.tsx` | Pending source/native/state comparison | Not accepted |
-| `components/chat/FileManagerDrawer.tsx` | File API and upload/download/delete implemented; empty state restored; file previews, row icons and desktop table pending | Not accepted |
-| `components/chat/FilePreviewDialog.tsx` | Pending source/native/state comparison | Not accepted |
+| `components/chat/FileManagerDrawer.tsx` | Upload/download/delete and native rows retained; image/text preview policy centralized; Office/PDF disabled | Not accepted |
+| `components/chat/FilePreviewDialog.tsx` | Image/text preview retained; PDF/Office explicitly disabled, download retained | Not accepted |
 | `components/chat/FirstTokenLoader.tsx` | Pending source/native/state comparison | Not accepted |
 | `components/chat/FloatingMenu.tsx` | Pending source/native/state comparison | Not accepted |
 | `components/chat/HtmlPreviewBlock.tsx` | Native HTML card and preview/source header restored; desktop split layout and streaming handoff pending | Not accepted |
 | `components/chat/HtmlPreviewContext.tsx` | Pending source/native/state comparison | Not accepted |
 | `components/chat/HtmlPreviewPanel.tsx` | Pending source/native/state comparison | Not accepted |
 | `components/chat/ImageGenerationSkeleton.tsx` | Pending source/native/state comparison | Not accepted |
-| `components/chat/MarkdownContent.tsx` | Pending source/native/state comparison | Not accepted |
-| `components/chat/MarkmapPreviewBlock.tsx` | Pending source/native/state comparison | Not accepted |
-| `components/chat/MermaidPreviewBlock.tsx` | Pending source/native/state comparison | Not accepted |
+| `components/chat/MarkdownContent.tsx` | Native complex TeX, structured citations, tables/lists, admonitions/task lists and fade; tested fixtures pass | Not accepted |
+| `components/chat/MarkmapPreviewBlock.tsx` | Shared Web validation/styles/folding; pan, zoom, full-tree SVG/PNG export; Android fixtures pass | Not accepted |
+| `components/chat/MermaidPreviewBlock.tsx` | Shared Web validation/config; native controls, SVG/PNG export; Android fixtures pass | Not accepted |
 | `components/chat/MessageActionButton.tsx` | Pending source/native/state comparison | Not accepted |
-| `components/chat/MessageAudioPlayer.tsx` | Pending source/native/state comparison | Not accepted |
+| `components/chat/MessageAudioPlayer.tsx` | Native player/voice/progress/pause/replay; cancellation and real Android audio plugin verified | Not accepted |
 | `components/chat/MessageItem.tsx` | Timestamp, avatar, compact actions and inline edit restored; rich artifacts/menu geometry and all content fixtures pending | Not accepted |
 | `components/chat/MessageSelectionWrapper.tsx` | Pending source/native/state comparison | Not accepted |
 | `components/chat/ModelAvatar.tsx` | Pending source/native/state comparison | Not accepted |
@@ -67,12 +67,12 @@ Every row requires matching native rendering, interaction, data contract, light/
 | `components/chat/TopHeader.tsx` | Pending source/native/state comparison | Not accepted |
 | `components/chat/UserAccountMenu.tsx` | Pending source/native/state comparison | Not accepted |
 | `components/chat/WelcomePanel.tsx` | Pending source/native/state comparison | Not accepted |
-| `components/chat/WordDocumentLivePreview.tsx` | Pending source/native/state comparison | Not accepted |
+| `components/chat/WordDocumentLivePreview.tsx` | Disabled on Android at user request; generation and download remain available | Not accepted |
 | `components/chat/files/FileTypeIcon.tsx` | Pending source/native/state comparison | Not accepted |
 | `components/chat/files/ManagedFileRow.tsx` | Pending source/native/state comparison | Not accepted |
 | `components/chat/message/GeneratedFileToolBlock.tsx` | Pending source/native/state comparison | Not accepted |
-| `components/chat/message/GeneratedImageBlock.tsx` | Pending source/native/state comparison | Not accepted |
-| `components/chat/message/MessageSources.tsx` | Pending source/native/state comparison | Not accepted |
+| `components/chat/message/GeneratedImageBlock.tsx` | Native image-only block restored; unified image preview/download; redundant Material row removed | Not accepted |
+| `components/chat/message/MessageSources.tsx` | Native numbered references, URL deduplication, expandable sources and anchored preview; light/dark interaction tested | Not accepted |
 | `components/chat/message/WebSearchToolBlock.tsx` | Pending source/native/state comparison | Not accepted |
 | `components/chat/settings/GeneralSettingsSections.tsx` | Pending source/native/state comparison | Not accepted |
 | `components/guest/GuestChatApp.tsx` | Pending source/native/state comparison | Not accepted |

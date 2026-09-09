@@ -124,6 +124,9 @@ class ApiClient {
       }
       if ((response.statusCode ?? 500) >= 300) {
         dynamic data = response.data;
+        if (data is List<int>) {
+          data = utf8.decode(data, allowMalformed: true);
+        }
         if (data is ResponseBody) data = await utf8.decodeStream(data.stream);
         if (data is String) {
           try {

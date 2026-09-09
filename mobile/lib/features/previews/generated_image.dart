@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../core/network/api_client.dart';
 import '../../shared/models/chat.dart';
 import 'file_service.dart';
+import 'file_preview.dart';
 
 class GeneratedImage extends StatefulWidget {
   final Json file;
@@ -47,25 +48,23 @@ class _GeneratedImageState extends State<GeneratedImage> {
           child: const Center(child: Text('正在加载图片…')),
         );
       }
-      return GestureDetector(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute<void>(
-            builder: (context) => Scaffold(
-              appBar: AppBar(
-                title: Text(widget.file['name'] as String? ?? '图片'),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Semantics(
+          button: true,
+          label: '预览 ${widget.file['name'] ?? '图片'}',
+          child: GestureDetector(
+            onTap: () => showFilePreview(context, widget.api, widget.file),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * .72,
               ),
-              body: InteractiveViewer(
-                minScale: .5,
-                maxScale: 5,
-                child: Center(child: Image.memory(result.data!)),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.memory(result.data!, fit: BoxFit.contain),
               ),
             ),
           ),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Image.memory(result.data!, fit: BoxFit.contain),
         ),
       );
     },

@@ -48,10 +48,41 @@ class MarkdownListBuilder extends MarkdownElementBuilder {
                       ),
                     ),
                   ),
+                  if (_taskInput(items[i]) != null)
+                    Padding(
+                      padding: EdgeInsets.only(top: fontSize * .35, right: 4),
+                      child: Semantics(
+                        checked: _taskInput(items[i])!.attributes
+                            .containsKey('checked'),
+                        enabled: false,
+                        child: Container(
+                          width: 13,
+                          height: 13,
+                          decoration: BoxDecoration(
+                            color:
+                                _taskInput(items[i])!.attributes
+                                    .containsKey('checked')
+                                ? const Color(0xff9ca3af)
+                                : Colors.transparent,
+                            border: Border.all(color: const Color(0xff9ca3af)),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                          child:
+                              _taskInput(items[i])!.attributes
+                                  .containsKey('checked')
+                              ? const Icon(
+                                  Icons.check,
+                                  size: 11,
+                                  color: Colors.white,
+                                )
+                              : null,
+                        ),
+                      ),
+                    ),
                   Expanded(
                     child: render(
                       context,
-                      items[i].children?.map(markdownSource).join() ?? '',
+                      items[i].children?.map(_itemSource).join() ?? '',
                     ),
                   ),
                 ],
@@ -61,6 +92,24 @@ class MarkdownListBuilder extends MarkdownElementBuilder {
       ),
     );
   }
+}
+
+md.Element? _taskInput(md.Node node) {
+  if (node is! md.Element || node.tag == 'ul' || node.tag == 'ol') return null;
+  if (node.tag == 'input') return node;
+  for (final child in node.children ?? <md.Node>[]) {
+    final input = _taskInput(child);
+    if (input != null) return input;
+  }
+  return null;
+}
+
+String _itemSource(md.Node node) {
+  if (node is md.Element && node.tag == 'input') return '';
+  if (node is md.Element && node.tag == 'p') {
+    return '${(node.children ?? []).map(_itemSource).join()}\n\n';
+  }
+  return markdownSource(node);
 }
 
 // Round-trip Markdown's parsed inline/structural nodes for a list item's renderer.
@@ -75,6 +124,8 @@ String markdownSource(md.Node node) {
   final e = node as md.Element,
       body = (node.children ?? []).map(markdownSource).join();
   switch (e.tag) {
+    case 'citation':
+      return '[${e.textContent}]';
     case 'math-inline':
       return '\\(${e.textContent}\\)';
     case 'math-display':

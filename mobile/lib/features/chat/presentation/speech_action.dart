@@ -1,157 +1,188 @@
-import 'dart:async';
-import 'dart:typed_data';
-
-import 'package:audioplayers/audioplayers.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../../core/network/api_client.dart';
 import '../../../shared/widgets/common.dart';
 import '../../../shared/widgets/ui_icon.dart';
+import '../application/speech_playback.dart';
+import '../../settings/default_settings.dart';
+import 'tool_call_block.dart' show ToolSpinner;
 
-class SpeechAction extends StatefulWidget {
-  final ApiClient api;
-  final bool menu;
-  final String content;
-  final void Function(Object) onError;
-  final Widget Function(String label, IconData icon, VoidCallback onPressed)?
+class SpeechAction extends StatelessWidget {
+  final SpeechPlayback playback;
+  final VoidCallback onPressed;
+  final Widget Function(String label, IconData icon, VoidCallback onPressed)
   builder;
   const SpeechAction({
     super.key,
-    required this.api,
-    this.menu = false,
-    required this.content,
-    required this.onError,
-    this.builder,
+    required this.playback,
+    required this.onPressed,
+    required this.builder,
   });
   @override
-  State<SpeechAction> createState() => _SpeechActionState();
+  Widget build(BuildContext context) => builder(
+    switch (playback.state) {
+      SpeechState.loading => '停止生成语音',
+      SpeechState.playing => '暂停朗读',
+      SpeechState.paused => '继续朗读',
+      SpeechState.ended => '重新播放',
+      SpeechState.idle => '语音朗读',
+    },
+    switch (playback.state) {
+      SpeechState.playing => LucideIcons.pause,
+      SpeechState.paused || SpeechState.ended => LucideIcons.play,
+      _ => LucideIcons.volume2,
+    },
+    onPressed,
+  );
 }
 
-class _SpeechActionState extends State<SpeechAction> {
-  static _SpeechActionState? current;
-  AudioPlayer? _player;
-  AudioPlayer get player => _player ??= AudioPlayer();
-  CancelToken? cancel;
-  bool playing = false;
-  bool paused = false, loading = false, ended = false;
-  Future<void> stop() async {
-    cancel?.cancel();
-    await player.stop();
-    if (mounted) {
-      setState(() {
-        playing = false;
-        paused = false;
-        loading = false;
-      });
-    }
-  }
-
-  Future<void> play() async {
-    if (playing) {
-      if (loading) {
-        await stop();
-        return;
-      }
-      if (paused) {
-        await player.resume();
-      } else {
-        await player.pause();
-      }
-      if (mounted) setState(() => paused = !paused);
-      return;
-    }
-    await current?.stop();
-    current = this;
-    final token = CancelToken();
-    cancel = token;
-    if (!mounted) return;
-    setState(() {
-      playing = true;
-      loading = true;
-      ended = false;
-    });
-    try {
-      final text = widget.content
-          .replaceAll(RegExp(r'```[\s\S]*?```'), ' ')
-          .replaceAll(RegExp(r'[#*_>`]'), '');
-      final runes = text.runes.toList();
-      for (
-        var start = 0;
-        start < runes.length && !token.isCancelled;
-        start += 600
-      ) {
-        final chunk = String.fromCharCodes(
-          runes.sublist(start, (start + 600).clamp(0, runes.length)),
-        );
-        final audio = await widget.api.raw(
-          'POST',
-          '/api/speech',
-          body: {'content': chunk},
-          cancel: token,
-          type: ResponseType.bytes,
-        );
-        if (token.isCancelled) break;
-        if (mounted) setState(() => loading = false);
-        final done = player.onPlayerComplete.first;
-        await player.play(
-          BytesSource(Uint8List.fromList((audio.data as List).cast<int>())),
-        );
-        await Future.any([done, token.whenCancel]);
-        if (mounted && !token.isCancelled) setState(() => loading = true);
-      }
-    } catch (e) {
-      if (!token.isCancelled) widget.onError(e);
-    } finally {
-      if (mounted) {
-        setState(() {
-          playing = false;
-          loading = false;
-          paused = false;
-          ended = !token.isCancelled;
-        });
-      }
-    }
-  }
-
+class MessageAudioPlayer extends StatelessWidget {
+  final SpeechPlayback playback;
+  const MessageAudioPlayer({super.key, required this.playback});
+  String time(Duration d) =>
+      '${d.inSeconds ~/ 60}:${(d.inSeconds % 60).toString().padLeft(2, '0')}';
   @override
-  void dispose() {
-    if (identical(current, this)) current = null;
-    cancel?.cancel();
-    _player?.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => widget.builder != null
-      ? widget.builder!(
-          loading
-              ? '停止生成语音'
-              : playing
-              ? (paused ? '继续朗读' : '暂停朗读')
-              : ended
-              ? '重新播放'
-              : '语音朗读',
-          playing && !paused && !loading
-              ? LucideIcons.pause
-              : paused || ended
-              ? LucideIcons.play
-              : LucideIcons.volume2,
-          play,
-        )
-      : widget.menu
-      ? MenuItemButton(
-          onPressed: play,
-          leadingIcon: UiIcon(
-            markaiIcon(playing ? Icons.stop : Icons.volume_up_outlined),
-            size: 16,
+  Widget build(BuildContext context) {
+    final p = playback, dark = Theme.of(context).brightness == Brightness.dark;
+    if (p.state == SpeechState.idle) return const SizedBox.shrink();
+    final loading = p.state == SpeechState.loading;
+    final voice = p.voice == '__system__'
+        ? '系统默认音色'
+        : speechVoices
+                  .where((v) => v['value'] == p.voice)
+                  .firstOrNull?['label'] ??
+              p.voice;
+    return Container(
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      constraints: const BoxConstraints(maxWidth: 576),
+      decoration: BoxDecoration(
+        color: dark ? const Color(0x0affffff) : const Color(0xccf9fafb),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: dark ? const Color(0x1affffff) : const Color(0xffe5e7eb),
+        ),
+      ),
+      child: Row(
+        children: [
+          Tooltip(
+            message: loading
+                ? '正在生成语音'
+                : p.state == SpeechState.ended
+                ? '重新播放'
+                : p.state == SpeechState.playing
+                ? '暂停'
+                : '播放',
+            child: Material(
+              color: dark ? const Color(0xfff3f4f6) : const Color(0xff111827),
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: loading ? null : () => p.toggle(p.content, p.voice),
+                child: SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: Center(
+                    child: loading
+                        ? ToolSpinner(
+                            size: 16,
+                            color: dark
+                                ? const Color(0xff111827)
+                                : Colors.white,
+                          )
+                        : UiIcon(
+                            p.state == SpeechState.ended
+                                ? LucideIcons.rotateCcw
+                                : p.state == SpeechState.playing
+                                ? LucideIcons.pause
+                                : LucideIcons.play,
+                            size: 15,
+                            color: dark
+                                ? const Color(0xff111827)
+                                : Colors.white,
+                          ),
+                  ),
+                ),
+              ),
+            ),
           ),
-          child: Text(playing ? '停止朗读' : '朗读'),
-        )
-      : MessageAction(
-          playing ? '停止朗读' : '朗读',
-          playing ? Icons.stop : Icons.volume_up_outlined,
-          play,
-        );
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const UiIcon(
+                            LucideIcons.audioLines,
+                            size: 14,
+                            color: Color(0xff9ca3af),
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              loading ? '正在生成语音' : voice,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                height: 16 / 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      '${p.chunkCount > 1 ? '${p.chunkIndex}/${p.chunkCount} · ' : ''}${time(p.position)} / ${time(p.duration)}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        height: 16 / 12,
+                        color: Color(0xff9ca3af),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(100),
+                  child: LinearProgressIndicator(
+                    stopIndicatorColor: Colors.transparent,
+                    trackGap: 0,
+                    minHeight: 4,
+                    value: p.duration.inMilliseconds > 0
+                        ? (p.position.inMilliseconds /
+                                  p.duration.inMilliseconds)
+                              .clamp(0, 1)
+                        : 0,
+                    color: dark
+                        ? const Color(0xffd1d5db)
+                        : const Color(0xff374151),
+                    backgroundColor: dark
+                        ? const Color(0x1affffff)
+                        : const Color(0xffe5e7eb),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          ActionIcon(
+            '关闭语音播放器',
+            LucideIcons.x,
+            p.stop,
+            buttonWidth: 40,
+            buttonHeight: 40,
+            iconSize: 15,
+          ),
+        ],
+      ),
+    );
+  }
 }

@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:markai_mobile/main.dart';
+import 'package:markai_mobile/features/chat/presentation/message_item.dart';
 import 'package:markai_mobile/shared/models/chat.dart';
 
 import 'support/fake_workspace.dart';
@@ -121,6 +122,10 @@ void main() {
       await c.openSession('qa-session');
       await tester.pumpAndSettle();
       await screenshot('conversation');
+      await tester.tapAt(
+        tester.getTopLeft(find.byType(MessageItem).last) + const Offset(20, 20),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('更多').last);
       await tester.pumpAndSettle();
       await screenshot('message-menu');

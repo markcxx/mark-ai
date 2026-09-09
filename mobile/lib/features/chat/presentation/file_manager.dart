@@ -499,7 +499,13 @@ class _FileManagerState extends State<FileManager> {
                               file: entry.$2,
                               index: entry.$1,
                               selected: selected.contains(entry.$2['id']),
-                              onPreview: supportsNativeFilePreview(entry.$2) ? () => showFilePreview(context, c.api, entry.$2) : null,
+                              onPreview: supportsNativeFilePreview(entry.$2)
+                                  ? () => showFilePreview(
+                                      context,
+                                      c.api,
+                                      entry.$2,
+                                    )
+                                  : null,
                               onSelected: (checked) => setState(() {
                                 checked
                                     ? selected.add(entry.$2['id'] as String)

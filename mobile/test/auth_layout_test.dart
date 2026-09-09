@@ -21,7 +21,10 @@ void main() {
     c.setSetting('themeMode', 'dark');
     await Future<void>.delayed(const Duration(milliseconds: 450));
     expect(api.requests, isEmpty);
-    expect((await c.local.read('guest-settings:${api.baseUrl}'))['themeMode'], 'dark');
+    expect(
+      (await c.local.read('guest-settings:${api.baseUrl}'))['themeMode'],
+      'dark',
+    );
     c.dispose();
   });
   testWidgets('login geometry matches the 390 by 844 Web reference', (
@@ -96,6 +99,15 @@ void main() {
     expect(title.top, closeTo(254.40625, .25));
     expect(google.top, closeTo(357.59375, .25));
     await capture('login');
+    final input = find.byType(TextFormField).first;
+    final editable = find.descendant(
+      of: input,
+      matching: find.byType(EditableText),
+    );
+    final container = InputDecorator.containerOf(tester.element(editable))!;
+    // The focus ring wraps the field: its border must use the same bounds.
+    expect(container.size, tester.getSize(input));
+    expect(container.localToGlobal(Offset.zero), tester.getTopLeft(input));
     await tester.pumpWidget(const SizedBox());
     debugDisableShadows = true;
     c.dispose();

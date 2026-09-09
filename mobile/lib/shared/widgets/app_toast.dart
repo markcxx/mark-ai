@@ -7,6 +7,8 @@ import '../../features/chat/presentation/tool_call_block.dart' show ToolSpinner;
 class AppToastHost extends StatefulWidget {
   final Widget child;
   const AppToastHost({super.key, required this.child});
+  static void dismiss(BuildContext context, String id) =>
+      context.findAncestorStateOfType<AppToastHostState>()?.dismiss(id);
   static void show(
     BuildContext context,
     String text, {
@@ -25,12 +27,22 @@ class AppToastHostState extends State<AppToastHost> {
   final entries = <String, ({String text, String kind})>{};
   final timers = <String, Timer>{};
   int sequence = 0;
-  void show(String text, {String kind = 'blank', String? id}) {
+  void dismiss(String id) {
+    timers.remove(id)?.cancel();
+    if (mounted) setState(() => entries.remove(id));
+  }
+
+  void show(
+    String text, {
+    String kind = 'blank',
+    String? id,
+    Duration duration = const Duration(milliseconds: 2200),
+  }) {
     final key = id ?? 'toast-${sequence++}';
     timers.remove(key)?.cancel();
     setState(() => entries[key] = (text: text, kind: kind));
     if (kind != 'loading') {
-      timers[key] = Timer(const Duration(milliseconds: 2200), () {
+      timers[key] = Timer(duration, () {
         timers.remove(key);
         if (mounted) setState(() => entries.remove(key));
       });

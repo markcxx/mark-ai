@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:markai_mobile/main.dart';
+import 'package:markai_mobile/features/chat/presentation/message_item.dart';
 import 'package:markai_mobile/features/chat/presentation/code_highlighter.dart';
 import 'package:markai_mobile/shared/models/chat.dart';
 
@@ -77,6 +78,10 @@ void main() {
     await c.openSession('qa-session');
     await tester.pumpAndSettle();
     await screenshot('android-native-conversation');
+    await tester.tapAt(
+      tester.getTopLeft(find.byType(MessageItem).last) + const Offset(20, 20),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('更多').last);
     await tester.pumpAndSettle();
     await screenshot('android-native-message-menu');
@@ -84,6 +89,10 @@ void main() {
     await tester.pumpAndSettle();
     await screenshot('android-native-translation-menu');
     await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.tapAt(
+      tester.getTopLeft(find.byType(MessageItem).first) + const Offset(20, 20),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('编辑').first);
     await tester.pumpAndSettle();
@@ -110,6 +119,10 @@ void main() {
     await tester.pumpAndSettle();
     await screenshot('android-native-header-menu-dark');
     await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.tapAt(
+      tester.getTopLeft(find.byType(MessageItem).last) + const Offset(20, 20),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('更多').last);
     await tester.pumpAndSettle();

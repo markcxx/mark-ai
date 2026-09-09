@@ -28,6 +28,15 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   final email = TextEditingController(), password = TextEditingController();
+  final fieldFocus = <TextEditingController, FocusNode>{};
+  FocusNode focusFor(TextEditingController controller) =>
+      fieldFocus.putIfAbsent(
+        controller,
+        () => FocusNode()
+          ..addListener(() {
+            if (mounted) setState(() {});
+          }),
+      );
   final code = TextEditingController(),
       name = TextEditingController(),
       message = TextEditingController();
@@ -55,6 +64,9 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   void dispose() {
+    for (final focus in fieldFocus.values) {
+      focus.dispose();
+    }
     for (final controller in [email, password, code, name, message]) {
       controller.dispose();
     }
@@ -176,18 +188,23 @@ class _AuthScreenState extends State<AuthScreen> {
   }) => DecoratedBox(
     decoration: BoxDecoration(
       borderRadius: BorderRadius.circular(8),
-      boxShadow: secret && !dark
-          ? const [
-              BoxShadow(
-                color: Color(0x0d000000),
-                offset: Offset(0, 1),
-                blurRadius: 2,
-              ),
-            ]
-          : const [],
+      boxShadow: [
+        if (focusFor(controller).hasFocus)
+          BoxShadow(
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: .1),
+            spreadRadius: 2,
+          ),
+        if (secret && !dark)
+          const BoxShadow(
+            color: Color(0x0d000000),
+            offset: Offset(0, 1),
+            blurRadius: 2,
+          ),
+      ],
     ),
     child: TextFormField(
       controller: controller,
+      focusNode: focusFor(controller),
       obscureText: secret && !visible,
       autofillHints: secret
           ? const [AutofillHints.password]
@@ -220,20 +237,32 @@ class _AuthScreenState extends State<AuthScreen> {
       decoration: InputDecoration(
         constraints: const BoxConstraints(minHeight: 44),
         hintText: hint,
-        hintStyle: const TextStyle(
+        hintStyle: TextStyle(
           letterSpacing: 0,
-          color: Color(0xff9ca3af),
+          color: dark ? const Color(0xff6b7280) : const Color(0xff9ca3af),
           fontSize: 14,
         ),
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 12,
-          vertical: 11,
+          vertical: 12,
         ),
         fillColor: dark ? const Color(0x0affffff) : Colors.white,
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(
+            color: dark
+                ? Colors.white.withValues(alpha: .1)
+                : const Color(0xffe5e7eb),
+          ),
+        ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: ink.withValues(alpha: .45)),
+          borderSide: BorderSide(
+            color: dark
+                ? Colors.white.withValues(alpha: .3)
+                : Theme.of(context).colorScheme.primary.withValues(alpha: .45),
+          ),
         ),
         suffixIcon: secret
             ? IconButton(

@@ -1,12 +1,43 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:dio/dio.dart';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:markai_mobile/core/network/api_client.dart';
 
 import 'support/fake_workspace.dart';
 
 void main() {
+  test(
+    'binary speech and download requests preserve JSON error details',
+    () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final api = ApiClient(MemoryStore());
+      server.listen((request) async {
+        request.response.statusCode = 400;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(jsonEncode({'error': '所选音色不可用，请重新选择'}));
+        await request.response.close();
+      });
+      try {
+        await api.configure('http://127.0.0.1:${server.port}');
+        await expectLater(
+          api.raw('POST', '/api/speech', type: ResponseType.bytes),
+          throwsA(
+            isA<ApiFailure>().having(
+              (e) => e.message,
+              'message',
+              '所选音色不可用，请重新选择',
+            ),
+          ),
+        );
+      } finally {
+        api.dio.close(force: true);
+        await server.close(force: true);
+      }
+    },
+  );
   test(
     'emulator loopback keeps the canonical development auth origin',
     () async {

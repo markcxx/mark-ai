@@ -3,6 +3,8 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:markdown/markdown.dart' as md;
 
+import 'stream_fade.dart';
+
 class MathInlineSyntax extends md.InlineSyntax {
   MathInlineSyntax()
     : super(
@@ -76,16 +78,18 @@ class MathMarkdownBuilder extends MarkdownElementBuilder {
     TextStyle? preferredStyle,
     TextStyle? parentStyle,
   ) {
-    final formula = Math.tex(
-      element.textContent,
-      mathStyle: display ? MathStyle.display : MathStyle.text,
-      textStyle: TextStyle(
-        fontSize: fontSize * 1.21,
-        color: color ?? Theme.of(context).colorScheme.onSurface,
-      ),
-      onErrorFallback: (_) => Text(
+    final formula = StreamFadeExclusion(
+      child: Math.tex(
         element.textContent,
-        style: TextStyle(fontSize: fontSize, color: color),
+        mathStyle: display ? MathStyle.display : MathStyle.text,
+        textStyle: TextStyle(
+          fontSize: fontSize * 1.21,
+          color: color ?? Theme.of(context).colorScheme.onSurface,
+        ),
+        onErrorFallback: (_) => Text(
+          element.textContent,
+          style: TextStyle(fontSize: fontSize, color: color),
+        ),
       ),
     );
     if (!display) return formula;

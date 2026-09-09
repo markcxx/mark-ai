@@ -13,7 +13,9 @@ import '../../../shared/widgets/ui_icon.dart';
 import '../../../shared/models/chat.dart';
 import '../../../shared/models/code_themes.dart';
 import 'code_highlighter.dart';
+import 'stream_fade.dart';
 import '../../previews/html_preview_card.dart';
+import '../../previews/artifact_card.dart';
 
 class CodeBlockBuilder extends MarkdownElementBuilder {
   final int collapseLines;
@@ -35,16 +37,26 @@ class CodeBlockBuilder extends MarkdownElementBuilder {
         ? (child.attributes['class'] ?? '').replaceFirst('language-', '')
         : '';
     if (language == 'html' || language == 'htm') {
-      return HtmlPreviewCard(source: element.textContent);
+      return StreamFadeExclusion(
+        child: HtmlPreviewCard(source: element.textContent),
+      );
     }
-    return CodeBlock(
-      code: element.textContent,
-      language: language,
-      collapseLines: collapseLines,
-      theme: theme,
-      colorMode: colorMode,
-      wrap: wrap,
-      lineNumbers: lineNumbers,
+    final kind = artifactKind(language);
+    if (kind != null) {
+      return StreamFadeExclusion(
+        child: ArtifactCard(kind: kind, source: element.textContent),
+      );
+    }
+    return StreamFadeExclusion(
+      child: CodeBlock(
+        code: element.textContent,
+        language: language,
+        collapseLines: collapseLines,
+        theme: theme,
+        colorMode: colorMode,
+        wrap: wrap,
+        lineNumbers: lineNumbers,
+      ),
     );
   }
 }

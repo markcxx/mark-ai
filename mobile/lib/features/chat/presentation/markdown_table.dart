@@ -7,6 +7,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:markdown/markdown.dart' as md;
 
 import '../../../shared/widgets/common.dart';
+import 'stream_fade.dart';
+import 'markdown_list.dart';
 
 class MarkaiTableSyntax extends md.TableSyntax {
   const MarkaiTableSyntax();
@@ -53,23 +55,15 @@ class MarkdownTableBuilder extends MarkdownElementBuilder {
     }
 
     collect(element);
-    return _MarkdownTable(rows: rows, render: render);
+    return StreamFadeExclusion(
+      child: _MarkdownTable(rows: rows, render: render),
+    );
   }
 }
 
 String _source(md.Node node) {
-  if (node is md.Text) return node.text;
-  if (node is! md.Element) return node.textContent;
-  final content = (node.children ?? []).map(_source).join();
-  return switch (node.tag) {
-    'strong' => '**$content**',
-    'em' => '*$content*',
-    'code' => '`$content`',
-    'a' => '[$content](${node.attributes['href']})',
-    'br' => '\n',
-    'math-inline' => '\$$content\$',
-    _ => content,
-  };
+  if(node is md.Element && node.tag.startsWith('markai-'))return (node.children??[]).map(_source).join();
+  return markdownSource(node);
 }
 
 class _MarkdownTable extends StatefulWidget {

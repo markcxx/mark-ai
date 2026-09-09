@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../shared/models/chat.dart';
 import '../../../shared/widgets/ui_icon.dart';
 import '../../../shared/widgets/source_favicon.dart';
+import 'message_sources.dart';
 
 /// Native counterpart of WebSearchToolBlock and GeneratedFileToolBlock.
 class ToolCallBlock extends StatefulWidget {
@@ -343,7 +343,7 @@ class _ToolCallBlockState extends State<ToolCallBlock> {
                   ),
                 for (final entry in results.take(readPage ? 1 : 8).indexed)
                   resultRow(
-                    entry.$2,
+                    {...entry.$2, 'citationId': entry.$2['citationId'] ?? entry.$1 + 1},
                     last: entry.$1 == results.take(readPage ? 1 : 8).length - 1,
                   ),
                 if (readPage && results.isEmpty && data['url'] is String)
@@ -369,13 +369,8 @@ class _ToolCallBlockState extends State<ToolCallBlock> {
     );
   }
 
-  Widget resultRow(Json result, {bool last = false}) => InkWell(
-    onTap: () {
-      final uri = Uri.tryParse(result['url'] as String? ?? '');
-      if (uri != null && ['http', 'https'].contains(uri.scheme)) {
-        launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-    },
+  Widget resultRow(Json result, {bool last = false}) => SourcePopover(
+    citation: result,
     child: Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
@@ -599,6 +594,10 @@ class _ToolSpinnerState extends State<ToolSpinner>
   @override
   Widget build(BuildContext context) => RotationTransition(
     turns: controller,
-    child: UiIcon(LucideIcons.loaderCircle, size: widget.size, color: widget.color),
+    child: UiIcon(
+      LucideIcons.loaderCircle,
+      size: widget.size,
+      color: widget.color,
+    ),
   );
 }
