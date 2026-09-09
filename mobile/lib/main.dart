@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'core/network/api_client.dart';
 import 'core/storage/local_store.dart';
 import 'core/theme/markai_theme.dart';
-import 'features/auth/connection_screen.dart';
+import 'features/auth/startup_screen.dart';
 import 'features/chat/application/workspace_controller.dart';
 import 'features/chat/presentation/chat_screen.dart';
 import 'shared/widgets/app_toast.dart';
@@ -83,7 +83,7 @@ class _MarkAIAppState extends State<MarkAIApp> {
             : ThemeMode.system,
         home: c.connected
             ? ChatScreen(controller: c)
-            : ConnectionScreen(controller: c),
+            : StartupScreen(controller: c),
       );
     },
   );

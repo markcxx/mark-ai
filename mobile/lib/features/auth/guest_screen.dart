@@ -6,7 +6,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../shared/widgets/agent_avatar.dart';
 import '../../shared/widgets/common.dart';
 import '../chat/application/workspace_controller.dart';
-import 'connection_screen.dart';
+import 'auth_screen.dart';
 
 /// Native counterpart of components/guest/GuestChatApp.tsx.
 class GuestScreen extends StatefulWidget {

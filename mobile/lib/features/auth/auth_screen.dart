@@ -26,6 +26,12 @@ class AuthScreen extends StatefulWidget {
   State<AuthScreen> createState() => _AuthScreenState();
 }
 
+Future<void> showLogin(BuildContext context, WorkspaceController c) async {
+  FocusScope.of(context).unfocus();
+  await Navigator.of(context)
+      .push<void>(MaterialPageRoute(builder: (_) => AuthScreen(controller: c)));
+}
+
 class _AuthScreenState extends State<AuthScreen> {
   final email = TextEditingController(), password = TextEditingController();
   final fieldFocus = <TextEditingController, FocusNode>{};

@@ -12,11 +12,15 @@ Flutter 原生客户端，复用现有 Next.js API。当前为开发版本，尚
 | ------------------- | ---------------------------------------- |
 | `pnpm android`      | 启动安卓 App，默认连接本机 3000 端口后端 |
 | `pnpm android:test` | 静态分析及单元、Widget 测试              |
-| `pnpm android:apk`  | 打包可直接安装的调试 APK                 |
+| `pnpm android:apk`  | 打包正式签名的 Release APK，连接正式环境 |
 
 先启动模拟器或连接安卓设备；多设备时使用 `pnpm android -d <设备ID>`。后端单独运行 `pnpm dev`，已有后端运行时无需重复启动。Flutter 会自动获取依赖。
 
-APK 输出到 `mobile/build/app/outputs/flutter-apk/app-debug.apk`。打包不内置本地后端地址，安装后在连接页面设置服务地址。当前为调试包，正式发布前需配置发布签名。
+正式 APK 输出到 `mobile/build/app/outputs/flutter-apk/app-release.apk`，后端固定为 `https://chatai.markqq.com`。启动时显示品牌加载页，失败可重试，不显示服务地址配置表单，也不读取旧版本保存的开发地址。
+
+发布签名由 `mobile/android/key.properties` 配置，密钥位于 `mobile/android/keystore/markai-release.jks`。这两个文件均已被 Git 忽略；必须一同安全备份，后续版本需要同一把密钥才能覆盖升级。缺少签名配置时，正式构建会明确失败，不会退回调试签名。
+
+新机器恢复签名时，将备份放回上述位置。`key.properties` 使用 `storeFile=keystore/markai-release.jks`、`keyAlias=markai-release`，以及备份中的 `storePassword` 和 `keyPassword`。不要将真实密码写入文档或提交到仓库。
 
 ### Flutter 原生命令
 
@@ -28,7 +32,7 @@ flutter pub get
 flutter run -d emulator-5554 --dart-define=MARKAI_API_URL=http://10.0.2.2:3000
 ```
 
-模拟器用 `10.0.2.2` 访问 Mac；真机使用可访问的 HTTPS 域名。不传编译参数时，可在连接页面输入服务地址。后端需要本分支新增的 `/api/public/mobile-config`。仅 debug 允许 HTTP。
+模拟器用 `10.0.2.2` 访问 Mac；真机使用可访问的 HTTPS 域名。不传编译参数时，默认使用正式环境。后端需要 `/api/public/mobile-config`。仅 debug 允许 HTTP。
 
 本地 debug 连接 `http://10.0.2.2:<端口>` 时，认证 Origin 使用对应的 `http://localhost:<端口>`，与本项目默认 APP_URL 一致；正式部署应连接与网页相同的 HTTPS 服务地址。
 
@@ -38,10 +42,10 @@ flutter run -d emulator-5554 --dart-define=MARKAI_API_URL=http://10.0.2.2:3000
 flutter analyze
 flutter test
 flutter test integration_test/chat_test.dart -d emulator-5554
-flutter build apk --debug -t lib/main.dart
+flutter build apk --release -t lib/main.dart --dart-define=MARKAI_API_URL=https://chatai.markqq.com
 ```
 
-APK 位于 `build/app/outputs/flutter-apk/app-debug.apk`。不要分发 `tool/preview.dart` 或 integration_test 构建的测试包。发行前需要确定正式包名和签名；当前为开发包 `com.markai.markai_mobile`。
+APK 位于 `build/app/outputs/flutter-apk/app-release.apk`，包名为 `com.markai.markai_mobile`。不要分发 `tool/preview.dart` 或 integration_test 构建的测试包。正式签名和旧调试签名不同，正式包不能直接覆盖旧调试包；不要为测试覆盖安装而清除用户数据。
 
 ## 结构
 

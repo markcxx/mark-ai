@@ -25,7 +25,7 @@ import 'workspace_shell.dart';
 import 'model_selector.dart';
 import 'context_indicator.dart';
 import '../../../shared/models/model_metadata.dart';
-import '../../auth/connection_screen.dart';
+import '../../auth/auth_screen.dart';
 import '../../auth/guest_screen.dart';
 import '../../previews/file_service.dart';
 import '../../settings/settings_screen.dart';

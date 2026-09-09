@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/network/app_endpoint.dart';
 import '../../../core/storage/local_store.dart';
 import '../../../shared/models/chat.dart';
 import 'message_accumulator.dart';
@@ -23,6 +24,7 @@ class WorkspaceController extends ChangeNotifier {
       guest = false,
       loadingSession = false;
   bool generating = false, webSearch = false;
+  bool startupFailed = false;
   String? error, notice, activeSessionId, nextCursor;
   String noticeKind = 'blank';
   String? noticeId;
@@ -75,15 +77,13 @@ class WorkspaceController extends ChangeNotifier {
   }
 
   Future<void> start([String? address]) async {
+    if (booting) return;
     booting = true;
+    startupFailed = false;
+    connected = false;
     notifyListeners();
     try {
-      final config = await local.read('connection');
-      final url =
-          address ??
-          config['url'] as String? ??
-          const String.fromEnvironment('MARKAI_API_URL');
-      if (url.isEmpty) return;
+      final url = resolveAppEndpoint(address);
       await api.configure(url);
       final info = await api.request('GET', '/api/public/mobile-config');
       if (info['cloudMode'] is! bool || info['protocolVersion'] != 1) {
@@ -95,8 +95,6 @@ class WorkspaceController extends ChangeNotifier {
         user = jsonMap(session['user']);
         guest = user.isEmpty;
       }
-      connected = true;
-      await local.write('connection', {'url': api.baseUrl});
       if (guest) {
         final preferences = await local.read('guest-settings:${api.baseUrl}');
         settings = {
@@ -106,8 +104,10 @@ class WorkspaceController extends ChangeNotifier {
       }
       draft = (await local.read('draft:$accountKey'))['text'] as String? ?? '';
       if (!guest) await loadInitial();
-    } catch (e) {
-      report(e);
+      connected = true;
+    } catch (_) {
+      // Startup feedback must not expose endpoints or raw transport errors.
+      startupFailed = true;
     } finally {
       booting = false;
       notifyListeners();
