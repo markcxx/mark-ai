@@ -62,6 +62,18 @@ jobs:
           lock.write_text(lock.read_text().replace('https://pub.flutter-io.cn', 'https://pub.dev'))
           PY
           flutter pub get --enforce-lockfile
+          # flutter test does not bundle Linux plugin libraries as an app build does.
+          FLUTTER_JS_NATIVE_DIR="$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from urllib.parse import urljoin, urlparse, unquote
+          config = Path('.dart_tool/package_config.json').resolve()
+          package = next(p for p in json.loads(config.read_text())['packages'] if p['name'] == 'flutter_js')
+          root = Path(unquote(urlparse(urljoin(config.as_uri(), package['rootUri'])).path))
+          print(root / 'linux/shared')
+          PY
+          )"
+          export LD_LIBRARY_PATH="$FLUTTER_JS_NATIVE_DIR:${LD_LIBRARY_PATH:-}"
           flutter analyze
           flutter test
       - name: Restore existing release signing key
