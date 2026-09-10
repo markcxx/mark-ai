@@ -31,6 +31,7 @@ function fixture(fn) {
             VERSION_NAME: "1.0.2",
             ANDROID_DOWNLOAD_BASE_URL: "https://download.example.com",
             GITHUB_REPOSITORY: "test/repo",
+            GITHUB_ENV: join(root, "test-github-env"),
             ...extra,
           },
         }),
