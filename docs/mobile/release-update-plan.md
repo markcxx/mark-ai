@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-已实现只填写版本号的手动构建、GitHub Releases 发布、对象存储自动上传、GitHub API 直接检测、双下载渠道、文件校验和系统安装入口。已配置远端 `android-release` 环境的 6 个 Secrets、4 个 Variables，并限制默认分支发布；没有触发正式发布，也没有替用户提交或推送本地代码。
+已实现只填写版本号的手动构建、GitHub Releases 发布、对象存储自动上传、GitHub API 直接检测、双下载渠道、文件校验和系统安装入口。已配置远端 `android-release` 环境的 6 个 Secrets、4 个 Variables，并限制默认分支发布。代码已提交并推送，正式发布结果以 GitHub Actions 和 Releases 为准。
 
 现有公开仓库为 `markcxx/mark-ai`，公共存储桶为 `markai-public`，下载域名为 `https://markai-s3.mark79.cn`。使用独立的 `android/` 前缀，不改变用户附件的存储方式，也未实现多账号空间。
 
@@ -99,6 +99,6 @@ android/latest.json
 3. 在系统确认覆盖安装，启动后确认设置版本 1.0.3、登录和历史会话保持。
 4. 再检查更新，不应重复提示；断网检查应显示可重试提示。
 
-对象存储、多渠道代码和配置验证不等于已完成上述真实发布验收。本次不会自动触发用户计划的首次发布。
+对象存储、多渠道代码和配置验证不等于已完成上述两次真实版本的覆盖升级验收；该流程仍需在用户设备上验证。
 
 参考：[Android 版本字段](https://developer.android.com/studio/publish/versioning)、[GitHub Releases API](https://docs.github.com/en/rest/releases/releases)、[R2 公共域名](https://developers.cloudflare.com/r2/buckets/public-buckets/)。
