@@ -160,7 +160,9 @@ class _SessionRowState extends State<SessionRow> {
                           ),
                         )
                       : Text(
-                          widget.session.title.isEmpty
+                          c.namingSessions.contains(widget.session.id)
+                              ? '...'
+                              : widget.session.title.isEmpty
                               ? '新对话'
                               : widget.session.title,
                           maxLines: 1,
@@ -186,15 +188,26 @@ class _SessionRowState extends State<SessionRow> {
                   ),
                   const SizedBox(width: 8),
                 ],
-                if (busy)
-                  const SizedBox(
+                if (busy ||
+                    c.namingSessions.contains(widget.session.id) ||
+                    (c.generating && active))
+                  SizedBox(
                     width: 28,
                     height: 28,
                     child: Center(
                       child: SizedBox(
                         width: 14,
                         height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          value: c.general['reduceMotion'] == true ? .75 : null,
+                          color: const Color(0xff374151),
+                          backgroundColor: const Color(0xffd1d5db),
+                          semanticsLabel:
+                              c.namingSessions.contains(widget.session.id)
+                              ? '正在自动命名'
+                              : '正在生成回复',
+                        ),
                       ),
                     ),
                   )

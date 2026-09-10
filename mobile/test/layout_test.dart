@@ -35,7 +35,7 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.byTooltip('搜索会话'));
         await tester.pumpAndSettle();
-        await tester.enterText(find.byType(TextField).last, '新的');
+        await tester.enterText(find.byType(TextField).last, '自动生成');
         await tester.pump(const Duration(milliseconds: 300));
         await tester.pumpAndSettle();
         expect(
@@ -44,7 +44,7 @@ void main() {
           ),
           isTrue,
         );
-        await tester.tap(find.text('新的对话').last);
+        await tester.tap(find.text('自动生成的标题').last);
         await tester.pumpAndSettle();
         expect(find.byType(Drawer), findsNothing);
         expect(tester.takeException(), isNull);

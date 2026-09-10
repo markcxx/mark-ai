@@ -18,6 +18,55 @@ void main() {
   });
   tearDown(() => c.dispose());
   test(
+    'send immediately shows message and clears composer before network',
+    () async {
+      api.createGate = Completer<void>();
+      c.draft = '立即显示';
+      final sending = c.send();
+      expect(c.generating, isTrue);
+      expect(c.draft, isEmpty);
+      expect(c.messages.single.content, '立即显示');
+      expect(api.requests.last['body']['initialMessage'], '立即显示');
+      c.setDraft('保存过程中输入的新草稿');
+      api.createGate!.complete();
+      await sending;
+      expect(c.draft, '保存过程中输入的新草稿');
+    },
+  );
+  test(
+    'first reply names once after persistence and exposes pending state',
+    () async {
+      api.titleGate = Completer<void>();
+      c.draft = 'first';
+      final sending = c.send();
+      for (var i = 0; i < 100 && c.namingSessions.isEmpty; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      }
+      final id = c.activeSessionId!;
+      expect(c.namingSessions, contains(id));
+      expect(api.messages[id]!.last['role'], 'model');
+      api.titleGate!.complete();
+      await sending;
+      expect(c.namingSessions, isEmpty);
+      expect(c.activeSession!.title, '自动生成的标题');
+      c.draft = 'second';
+      await c.send();
+      expect(
+        api.requests.where((r) => r['path'] == '/api/sessions/$id/title'),
+        hasLength(1),
+      );
+    },
+  );
+  test('failed manual naming keeps title and clears loading state', () async {
+    c.draft = 'first';
+    await c.send();
+    final title = c.activeSession!.title;
+    api.failTitle = true;
+    await expectLater(c.smartRename(), throwsA(isA<ApiFailure>()));
+    expect(c.activeSession!.title, title);
+    expect(c.namingSessions, isEmpty);
+  });
+  test(
     'sidebar automatic naming reads the target without switching conversations',
     () async {
       c.draft = 'first';
@@ -58,6 +107,7 @@ void main() {
     expect(c.draft, '保留我');
     expect(c.attachments.single['id'], 'file');
     expect(c.generating, false);
+    expect(c.messages, isEmpty);
   });
   test(
     'switch while creating waits, saves user, does not launch old stream',

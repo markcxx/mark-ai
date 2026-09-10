@@ -12,7 +12,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "clean": "next clean",
-    "android": "cd mobile && flutter run -t lib/main.dart --dart-define=MARKAI_API_URL=http://10.0.2.2:3000",
+    "android": "node mobile/tool/android.mjs",
     "android:apk": "cd mobile && flutter build apk --release -t lib/main.dart --dart-define=MARKAI_API_URL=https://chatai.markqq.com",
     "android:test": "cd mobile && flutter analyze && flutter test",
     "db:generate": "drizzle-kit generate",

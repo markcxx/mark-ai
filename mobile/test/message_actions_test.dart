@@ -12,7 +12,12 @@ void main() {
     (tester) async {
       final c = await fixtureWorkspace();
       c.messages = [
-        ChatMessage({'id': 'one', 'role': 'user', 'content': '需要复制的消息'}),
+        ChatMessage({
+          'id': 'one',
+          'role': 'user',
+          'content': '需要复制的消息',
+          'createdAt': DateTime.now().millisecondsSinceEpoch,
+        }),
       ];
       c.settings['general']['reduceMotion'] = true;
       String? copied;
@@ -35,10 +40,12 @@ void main() {
       await tester.pumpAndSettle();
       final copy = find.byTooltip('复制');
       expect(copy.hitTestable(), findsNothing);
+      expect(find.text('刚刚').hitTestable(), findsNothing);
       final original = tester.getRect(find.text('需要复制的消息'));
       await tester.tap(find.text('需要复制的消息'));
       await tester.pumpAndSettle();
       expect(copy.hitTestable(), findsOneWidget);
+      expect(find.text('刚刚').hitTestable(), findsOneWidget);
       expect(tester.getRect(find.text('需要复制的消息')), original);
       await tester.tap(copy);
       await tester.pumpAndSettle();

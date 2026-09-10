@@ -26,6 +26,8 @@ class FakeApi extends ApiClient {
   final Map<String, List<Json>> messages = {};
   final List<Json> requests = [];
   Completer<void>? createGate;
+  Completer<void>? titleGate;
+  bool failTitle = false;
   bool failCreate = false, conflict = false, holdStream = false;
   FakeApi(super.store) {
     baseUrl = 'https://test.markai.invalid';
@@ -71,6 +73,12 @@ class FakeApi extends ApiClient {
     final parts = path.split('/');
     if (parts.length >= 4 && parts[2] == 'sessions') {
       final id = parts[3];
+      if (parts.length == 5 && parts[4] == 'title' && method == 'POST') {
+        await titleGate?.future;
+        if (failTitle) throw ApiFailure('自动命名失败');
+        sessions[id]!['title'] = '自动生成的标题';
+        return {'session': cloneJson(sessions[id]!)};
+      }
       if (parts.length == 5 && parts[4] == 'tools') return {'toolIds': []};
       if (method == 'GET') {
         return {'session': sessions[id], 'messages': messages[id]};

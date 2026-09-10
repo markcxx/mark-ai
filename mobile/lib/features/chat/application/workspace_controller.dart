@@ -52,6 +52,7 @@ class WorkspaceController extends ChangeNotifier {
   Future<void> _localWrites = Future.value();
   final Map<String, Future<void>> _saves = {};
   final Set<String> translating = {};
+  final Set<String> namingSessions = {};
   String get accountKey =>
       '${api.baseUrl}:${user['id'] ?? (guest ? 'guest' : 'local')}';
   String get recoveryKey => 'recovery:$accountKey';
@@ -286,13 +287,13 @@ class WorkspaceController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<ChatSession> ensureSession() async {
+  Future<ChatSession> ensureSession({String? initialMessage}) async {
     if (activeSession != null) return activeSession!;
     final result = await api.request(
       'POST',
       '/api/sessions',
       body: {
-        'initialMessage': draft,
+        'initialMessage': initialMessage ?? draft,
         'model': model?.id,
         'provider': model?.provider,
       },
@@ -371,35 +372,50 @@ class WorkspaceController extends ChangeNotifier {
     generating = true;
     _stopRequested = false;
     _operation = Completer<void>();
-    notifyListeners();
     final oldDraft = draft, oldAttachments = attachments, oldQuote = quote;
+    final previousMessages = messages;
+    final selectedModel = model!;
+    final userMessage = ChatMessage({
+      'id': newId(),
+      'role': 'user',
+      'content': oldDraft.trim(),
+      'createdAt': DateTime.now().millisecondsSinceEpoch,
+      'attachments': oldAttachments,
+      'segments': [
+        if (oldQuote != null) {'type': 'quote', ...oldQuote},
+      ],
+    });
+    final next = [...messages.map((m) => m.copy()), userMessage];
+    messages = next;
+    draft = '';
+    attachments = [];
+    quote = null;
+    notifyListeners();
     var userSaved = false;
     try {
-      final session = await ensureSession();
-      final userMessage = ChatMessage({
-        'id': newId(),
-        'role': 'user',
-        'content': oldDraft.trim(),
-        'createdAt': DateTime.now().millisecondsSinceEpoch,
-        'attachments': oldAttachments,
-        'segments': [
-          if (oldQuote != null) {'type': 'quote', ...oldQuote},
-        ],
-      });
-      final next = [...messages.map((m) => m.copy()), userMessage];
+      final createdSession = activeSession == null;
+      final session = await ensureSession(initialMessage: oldDraft);
       await persist(session.id, next);
       userSaved = true;
-      messages = next;
-      draft = '';
-      attachments = [];
-      quote = null;
-      await local.remove('draft:$accountKey');
+      if (draft.isEmpty) {
+        await local.remove('draft:$accountKey');
+      } else {
+        await local.write('draft:$accountKey', {'text': draft});
+      }
       if (!_stopRequested) {
-        _generation = generate(session.id, next, model!);
+        _generation = generate(session.id, next, selectedModel);
         await _generation;
+        if (createdSession) {
+          try {
+            await smartRename(sessionId: session.id);
+          } catch (_) {
+            message('自动命名失败，可在会话菜单中重试', kind: 'error');
+          }
+        }
       }
     } catch (e) {
       if (!userSaved) {
+        messages = previousMessages;
         if (draft.isEmpty) draft = oldDraft;
         if (attachments.isEmpty) attachments = oldAttachments;
         quote ??= oldQuote;
@@ -667,19 +683,31 @@ class WorkspaceController extends ChangeNotifier {
 
   Future<void> smartRename({String? sessionId}) async {
     final target = sessionId ?? activeSessionId;
-    if (target == null) return;
-    final source = target == activeSessionId
-        ? messages.map((m) => m.toJson()).toList()
-        : jsonList(
-            (await api.request('GET', '/api/sessions/$target'))['messages'],
-          );
-    if (source.isEmpty) throw ApiFailure('没有可命名的消息');
-    await api.request(
-      'POST',
-      '/api/sessions/$target/title',
-      body: {'messages': source},
-    );
-    await loadSessions();
+    if (target == null || !namingSessions.add(target)) return;
+    notifyListeners();
+    try {
+      final source = target == activeSessionId
+          ? messages.map((m) => m.toJson()).toList()
+          : jsonList(
+              (await api.request('GET', '/api/sessions/$target'))['messages'],
+            );
+      if (source.isEmpty) throw ApiFailure('没有可命名的消息');
+      final result = await api.request(
+        'POST',
+        '/api/sessions/$target/title',
+        body: {'messages': source},
+      );
+      final data = jsonMap(result['session']);
+      if (data['id'] != target) throw ApiFailure('自动命名失败，请重试');
+      final updated = ChatSession(data);
+      if (_sessionById.containsKey(target)) {
+        _sessionById[target] = updated;
+        sessions = sessions.map((s) => s.id == target ? updated : s).toList();
+      }
+    } finally {
+      namingSessions.remove(target);
+      notifyListeners();
+    }
   }
 
   Future<void> favorite(ChatSession s) async {

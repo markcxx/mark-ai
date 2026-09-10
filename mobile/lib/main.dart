@@ -7,6 +7,8 @@ import 'features/auth/startup_screen.dart';
 import 'features/chat/application/workspace_controller.dart';
 import 'features/chat/presentation/chat_screen.dart';
 import 'shared/widgets/app_toast.dart';
+import 'features/updates/update_widgets.dart';
+import 'features/updates/update_preview.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,6 +26,9 @@ class MarkAIApp extends StatefulWidget {
 
 class _MarkAIAppState extends State<MarkAIApp> {
   final messenger = GlobalKey<ScaffoldMessengerState>();
+  final navigator = GlobalKey<NavigatorState>();
+  final previewUpdates = updatePreviewEnabled ? PreviewUpdateService() : null;
+  final previewUpdateStore = updatePreviewEnabled ? PreviewUpdateStore() : null;
   final toasts = GlobalKey<AppToastHostState>();
   @override
   void initState() {
@@ -62,10 +67,17 @@ class _MarkAIAppState extends State<MarkAIApp> {
       return MaterialApp(
         title: 'MarkAI',
         debugShowCheckedModeBanner: false,
+        navigatorKey: navigator,
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(context)
               .copyWith(disableAnimations: c.general['reduceMotion'] == true),
-          child: AppToastHost(key: toasts, child: child!),
+          child: UpdateHost(
+            navigator: navigator,
+            local: previewUpdateStore ?? c.local,
+            service: previewUpdates,
+            enabled: widget.autoStart,
+            child: AppToastHost(key: toasts, child: child!),
+          ),
         ),
         scaffoldMessengerKey: messenger,
         theme: markaiTheme(

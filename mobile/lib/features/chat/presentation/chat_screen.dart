@@ -6,7 +6,9 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../../../shared/widgets/common.dart';
@@ -44,6 +46,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   void closeSidebar() => setState(() => sidebarOpen = false);
   final input = TextEditingController(), scroll = ScrollController();
   final composerFocus = FocusNode();
+  final imagePicker = ImagePicker();
+  bool pickingAttachment = false;
   final toolAnchor = GlobalKey(), titleAnchor = GlobalKey();
   final selected = <String>{};
   bool follow = true, uploading = false;
@@ -57,6 +61,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     c.addListener(changed);
     input.text = c.draft;
+    WidgetsBinding.instance.addPostFrameCallback((_) => recoverPickedImages());
   }
 
   @override
@@ -114,29 +119,78 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     await run(action);
   }
 
-  Future<void> attach() async {
-    await protected(() async {
-      final result = await FilePicker.pickFiles();
-      if (result.isEmpty) return;
-      if (result.length + c.attachments.length > 4) {
-        throw ApiFailureForUi('最多添加 4 个附件');
+  Future<void> sendMessage() async {
+    composerFocus.unfocus();
+    await protected(c.send);
+  }
+
+  Future<void> recoverPickedImages() async {
+    if (!mounted ||
+        c.guest ||
+        defaultTargetPlatform != TargetPlatform.android) {
+      return;
+    }
+    try {
+      final lost = await imagePicker.retrieveLostData();
+      if (!mounted || lost.isEmpty) return;
+      if (lost.files != null) {
+        await uploadPicked(lost.files!);
+      } else {
+        c.message('未能恢复上次选择的图片，请重新选择', kind: 'error');
       }
-      setState(() => uploading = true);
-      uploadCancel = CancelToken();
+    } on MissingPluginException {
+      // Widget tests and hosts without the Android picker have no recovery channel.
+    } catch (_) {
+      if (mounted) c.message('恢复图片失败，请重新选择', kind: 'error');
+    }
+  }
+
+  Future<void> attach(String source) async {
+    if (uploading || pickingAttachment) return;
+    composerFocus.unfocus();
+    await protected(() async {
+      if (c.attachments.length >= 4) throw ApiFailureForUi('最多添加 4 个附件');
+      setState(() => pickingAttachment = true);
       try {
-        for (final file in result) {
-          if (file.path == null) continue;
-          final attachment = await FileService(c.api)
-              .upload(file, uploadCancel!, (v) {
-                if (mounted) setState(() => uploadProgress = v);
-              });
-          c.attachments = [...c.attachments, attachment];
-          c.setDraft(c.draft);
+        final List<XFile> result;
+        if (source == 'camera') {
+          final file = await imagePicker.pickImage(source: ImageSource.camera);
+          result = file == null ? [] : [file];
+        } else if (source == 'images') {
+          result = await imagePicker.pickMultiImage();
+        } else {
+          result = (await FilePicker.pickFiles())
+              .map((file) => file.xFile)
+              .toList();
         }
+        if (!mounted || result.isEmpty) return;
+        await uploadPicked(result);
+      } on PlatformException {
+        throw ApiFailureForUi('无法打开相机或文件选择器，请检查系统权限后重试');
       } finally {
-        if (mounted) setState(() => uploading = false);
+        if (mounted) setState(() => pickingAttachment = false);
       }
     });
+  }
+
+  Future<void> uploadPicked(List<XFile> result) async {
+    if (result.length + c.attachments.length > 4) {
+      throw ApiFailureForUi('最多添加 4 个附件');
+    }
+    setState(() => uploading = true);
+    uploadCancel = CancelToken();
+    try {
+      for (final file in result) {
+        final attachment = await FileService(c.api)
+            .uploadPath(file.path, file.name, uploadCancel!, (v) {
+              if (mounted) setState(() => uploadProgress = v);
+            });
+        c.attachments = [...c.attachments, attachment];
+        c.setDraft(c.draft);
+      }
+    } finally {
+      if (mounted) setState(() => uploading = false);
+    }
   }
 
   Future<void> modelMenu() async {
@@ -173,6 +227,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         reduceMotion: c.general['reduceMotion'] == true,
         sidebarWidth: (c.general['sidebarWidth'] as num?)?.toDouble() ?? 260,
         onClose: closeSidebar,
+        onOpen: () {
+          composerFocus.unfocus();
+          setState(() => sidebarOpen = true);
+        },
         sidebar: drawer(context),
         child: Scaffold(
           appBar: AppBar(
@@ -191,7 +249,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               children: [
                 Flexible(
                   child: Text(
-                    c.activeSession?.title ?? '新对话',
+                    c.namingSessions.contains(c.activeSessionId)
+                        ? '...'
+                        : c.activeSession?.title ?? '新对话',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -541,6 +601,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Widget composer(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final hasDraft = c.draft.trim().isNotEmpty || c.attachments.isNotEmpty;
+    final stopping = c.generating && !hasDraft;
+    final sendDisabled =
+        uploading ||
+        c.model == null ||
+        (!hasDraft && !c.generating) ||
+        (c.generating && c.queued != null && hasDraft);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -656,13 +722,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       ? keyboard.isControlPressed || keyboard.isMetaPressed
                       : !keyboard.isShiftPressed;
                   if (!send) return KeyEventResult.ignored;
-                  if (!uploading && c.model != null) run(c.send);
+                  if (!uploading && c.model != null) sendMessage();
                   return KeyEventResult.handled;
                 },
                 child: TextField(
                   enabled: c.model != null,
                   controller: input,
                   focusNode: composerFocus,
+                  onTapOutside: (_) => composerFocus.unfocus(),
                   minLines: 1,
                   maxLines: 6,
                   style: const TextStyle(
@@ -699,12 +766,33 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 padding: const EdgeInsets.fromLTRB(10, 4, 10, 10),
                 child: Row(
                   children: [
-                    ActionIcon(
-                      '添加附件',
-                      Icons.attach_file,
-                      uploading ? null : attach,
-                      iconSize: 20,
-                      color: const Color(0xff9ca3af),
+                    AppMenuButton(
+                      width: 160,
+                      radius: 8,
+                      items: () => [
+                        AppMenuItem(
+                          '图片',
+                          icon: LucideIcons.image,
+                          onPressed: () => attach('images'),
+                        ),
+                        AppMenuItem(
+                          '文件',
+                          icon: LucideIcons.file,
+                          onPressed: () => attach('files'),
+                        ),
+                        AppMenuItem(
+                          '相机',
+                          icon: LucideIcons.camera,
+                          onPressed: () => attach('camera'),
+                        ),
+                      ],
+                      builder: (toggle) => ActionIcon(
+                        '添加附件',
+                        Icons.attach_file,
+                        uploading || pickingAttachment ? null : toggle,
+                        iconSize: 20,
+                        color: const Color(0xff9ca3af),
+                      ),
                     ),
                     const SizedBox(width: 4),
                     if (!c.guest)
@@ -817,19 +905,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           : c.generating
                           ? '加入待发送'
                           : '发送消息',
-                      onPressed: uploading || (!hasDraft && !c.generating)
-                          ? null
-                          : () => protected(c.send),
+                      onPressed: sendDisabled ? null : sendMessage,
                       constraints: const BoxConstraints.tightFor(
                         width: 44,
                         height: 44,
                       ),
                       style: IconButton.styleFrom(
-                        backgroundColor: scheme.primary,
-                        disabledBackgroundColor:
-                            Theme.of(context).brightness == Brightness.dark
-                            ? const Color(0xff374151)
-                            : const Color(0xffd1d5db),
+                        backgroundColor: Colors.transparent,
+                        disabledBackgroundColor: Colors.transparent,
                         disabledForegroundColor:
                             Theme.of(context).brightness == Brightness.dark
                             ? const Color(0xff9ca3af)
@@ -839,11 +922,49 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         foregroundColor: scheme.onPrimary,
                         minimumSize: const Size(44, 44),
                       ),
-                      icon: UiIcon(
-                        c.generating && !hasDraft
-                            ? LucideIcons.square
-                            : LucideIcons.sendHorizontal,
-                        size: 18,
+                      icon: Container(
+                        key: const ValueKey('chat-send-surface'),
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: sendDisabled
+                              ? (Theme.of(context).brightness == Brightness.dark
+                                    ? const Color(0xff374151)
+                                    : const Color(0xffd1d5db))
+                              : stopping
+                              ? const Color(0xffef4444)
+                              : scheme.primary,
+                        ),
+                        child: stopping
+                            ? Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: 28,
+                                    height: 28,
+                                    child: CircularProgressIndicator(
+                                      value: c.general['reduceMotion'] == true
+                                          ? .75
+                                          : null,
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                      backgroundColor: Colors.white30,
+                                    ),
+                                  ),
+                                  const Icon(
+                                    Icons.square,
+                                    size: 11,
+                                    color: Colors.white,
+                                  ),
+                                ],
+                              )
+                            : const Center(
+                                child: UiIcon(
+                                  LucideIcons.sendHorizontal,
+                                  size: 17,
+                                ),
+                              ),
                       ),
                     ),
                   ],
@@ -861,7 +982,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     onClose: closeSidebar,
     onFocusComposer: () {
       closeSidebar();
-      composerFocus.requestFocus();
+      composerFocus.unfocus();
     },
     onTools: () {
       closeSidebar();

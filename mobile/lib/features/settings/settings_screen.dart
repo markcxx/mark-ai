@@ -12,6 +12,7 @@ import '../chat/application/workspace_controller.dart';
 import 'default_settings.dart';
 import 'provider_settings.dart';
 import 'recovery_notice.dart';
+import '../updates/update_widgets.dart';
 
 class SettingsScreen extends StatefulWidget {
   final WorkspaceController controller;
@@ -35,6 +36,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     'chat': '对话',
     'speech': '语音',
     'providers': 'AI 提供商',
+    'updates': '应用更新',
   };
   Widget row(
     String title,
@@ -303,7 +305,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ),
                       Text(
-                        c.settingsSaveState == 'error'
+                        section == 'updates'
+                            ? '检查新版本并安装更新'
+                            : c.settingsSaveState == 'error'
                             ? '云端同步失败，本地设置已经生效'
                             : c.settingsSaveState == 'saving'
                             ? '正在恢复默认设置…'
@@ -383,6 +387,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   'appearance' => appearance(),
                   'chat' => chat(),
                   'providers' => ProviderSettings(controller: c),
+                  'updates' => const UpdateSettings(),
                   _ => row(
                     '默认音色',
                     AppSelect<String>(

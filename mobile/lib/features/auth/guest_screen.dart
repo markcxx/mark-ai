@@ -214,6 +214,8 @@ class _GuestScreenState extends State<GuestScreen> {
                                                     .clamp(96, 200),
                                           ),
                                           child: TextField(
+                                            onTapOutside: (_) =>
+                                                focus.unfocus(),
                                             controller: draft,
                                             focusNode: focus,
                                             minLines: 2,

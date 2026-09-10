@@ -1,0 +1,151 @@
+name: Android release (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: "版本号，例如 1.0.2（必须高于已发布版本）"
+        required: true
+        type: string
+      release_notes:
+        description: "用户可见的更新说明"
+        required: true
+        type: string
+
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: android-release
+    permissions:
+      contents: write
+    env:
+      VERSION_NAME: ${{ inputs.version_name }}
+      RELEASE_NOTES: ${{ inputs.release_notes }}
+      GH_TOKEN: ${{ github.token }}
+      ANDROID_DOWNLOAD_BASE_URL: ${{ vars.ANDROID_DOWNLOAD_BASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate version before building
+        run: node mobile/tool/android-release.mjs validate
+      - name: Install release upload dependencies
+        run: |
+          npm ci --ignore-scripts
+          node --test mobile/tool/android-release.test.mjs
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@v3
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.2"
+          channel: stable
+          cache: true
+      - name: Install dependencies and validate
+        working-directory: mobile
+        run: |
+          # Keep exact locked versions/checksums, using the canonical registry on GitHub runners.
+          python3 - <<'PY'
+          from pathlib import Path
+          lock = Path('pubspec.lock')
+          lock.write_text(lock.read_text().replace('https://pub.flutter-io.cn', 'https://pub.dev'))
+          PY
+          flutter pub get --enforce-lockfile
+          flutter analyze
+          flutter test
+      - name: Restore existing release signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          python3 - <<'PY'
+          import base64, os, pathlib
+          def prop(value):
+              return ''.join(('\\u%04x' % ord(c)) if ord(c) > 126 or c in '\\:=#! \n\r\t' else c for c in value)
+          for name in ('KEYSTORE_BASE64', 'STORE_PASSWORD', 'KEY_PASSWORD', 'KEY_ALIAS'):
+              if not os.environ.get(name): raise SystemExit('Missing signing secret: ' + name)
+          root = pathlib.Path('mobile/android')
+          (root / 'keystore').mkdir(exist_ok=True)
+          key = root / 'keystore/markai-release.jks'
+          key.write_bytes(base64.b64decode(os.environ['KEYSTORE_BASE64'], validate=True))
+          key.chmod(0o600)
+          props = root / 'key.properties'
+          props.write_text('storeFile=keystore/markai-release.jks\n' + '\n'.join(k + '=' + prop(os.environ[v]) for k,v in [('storePassword','STORE_PASSWORD'),('keyPassword','KEY_PASSWORD'),('keyAlias','KEY_ALIAS')]) + '\n')
+          props.chmod(0o600)
+          PY
+      - name: Build production APK
+        working-directory: mobile
+        run: >-
+          flutter build apk --release -t lib/main.dart
+          --build-name="$VERSION_NAME" --build-number="$VERSION_CODE"
+          --dart-define=MARKAI_API_URL=https://chatai.markqq.com
+          --dart-define=MARKAI_GITHUB_REPOSITORY=${{ github.repository }}
+          --dart-define=MARKAI_DOWNLOAD_BASE_URL="$ANDROID_DOWNLOAD_BASE_URL"
+      - name: Verify APK identity and create manifest
+        run: |
+          mkdir release
+          cp mobile/build/app/outputs/flutter-apk/app-release.apk "release/MarkAI-$VERSION_NAME.apk"
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/36.0.0"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'build-tools;36.0.0'
+          "$BUILD_TOOLS/apksigner" verify --print-certs "release/MarkAI-$VERSION_NAME.apk" > release/certificate.txt
+          grep -Fq '41aa77778a62ded4149d02fc51890e88b35bd31b0e80c41aade32465b90c32a6' release/certificate.txt
+          "$BUILD_TOOLS/aapt" dump badging "release/MarkAI-$VERSION_NAME.apk" > release/badging.txt
+          grep -Fq "package: name='com.markai.markai_mobile' versionCode='$VERSION_CODE' versionName='$VERSION_NAME'" release/badging.txt
+          grep -Fxq "sdkVersion:'24'" release/badging.txt
+          node mobile/tool/android-release.mjs manifest
+      - name: Upload and verify accelerated downloads
+        env:
+          ANDROID_STORAGE_ENDPOINT: ${{ vars.ANDROID_STORAGE_ENDPOINT }}
+          ANDROID_STORAGE_BUCKET: ${{ vars.ANDROID_STORAGE_BUCKET }}
+          ANDROID_STORAGE_REGION: ${{ vars.ANDROID_STORAGE_REGION }}
+          ANDROID_STORAGE_ACCESS_KEY_ID: ${{ secrets.ANDROID_STORAGE_ACCESS_KEY_ID }}
+          ANDROID_STORAGE_SECRET_ACCESS_KEY: ${{ secrets.ANDROID_STORAGE_SECRET_ACCESS_KEY }}
+        run: node mobile/tool/android-upload.mjs
+      - name: Publish complete release
+        run: |
+          TAG="android-v$VERSION_NAME"
+          gh release create "$TAG" "release/MarkAI-$VERSION_NAME.apk" release/android-update.json release/SHA256SUMS --draft --target "$GITHUB_SHA" --title "MarkAI Android $VERSION_NAME" --notes-file release/notes.md --latest=false
+          gh release edit "$TAG" --draft=false --latest=false
+      - name: Remove signing material
+        if: always()
+        run: rm -f mobile/android/key.properties mobile/android/keystore/markai-release.jks
+
+  sync-version:
+    name: Sync published GitHub version for network fallback
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: android-release
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION_NAME: ${{ inputs.version_name }}
+      ANDROID_DOWNLOAD_BASE_URL: ${{ vars.ANDROID_DOWNLOAD_BASE_URL }}
+      ANDROID_STORAGE_ENDPOINT: ${{ vars.ANDROID_STORAGE_ENDPOINT }}
+      ANDROID_STORAGE_BUCKET: ${{ vars.ANDROID_STORAGE_BUCKET }}
+      ANDROID_STORAGE_REGION: ${{ vars.ANDROID_STORAGE_REGION }}
+      ANDROID_STORAGE_ACCESS_KEY_ID: ${{ secrets.ANDROID_STORAGE_ACCESS_KEY_ID }}
+      ANDROID_STORAGE_SECRET_ACCESS_KEY: ${{ secrets.ANDROID_STORAGE_SECRET_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts
+      - name: Fetch published manifest and sync
+        run: |
+          mkdir release
+          gh release download "android-v$VERSION_NAME" --pattern android-update.json --dir release
+          node mobile/tool/android-upload.mjs sync

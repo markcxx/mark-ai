@@ -28,7 +28,6 @@ class _ModelSelectorState extends State<ModelSelector> {
       if (!mounted) return;
       final selected = selectedKey.currentContext;
       if (selected != null) Scrollable.ensureVisible(selected, alignment: .5);
-      focus.requestFocus();
     });
   }
 
@@ -179,7 +178,6 @@ class _ModelSelectorState extends State<ModelSelector> {
                               child: InkWell(
                                 onTap: () {
                                   setState(() => filter = item.$1);
-                                  focus.requestFocus();
                                 },
                                 borderRadius: BorderRadius.circular(6),
                                 child: Container(

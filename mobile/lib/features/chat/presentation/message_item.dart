@@ -277,12 +277,18 @@ class _MessageItemState extends State<MessageItem> {
                         ),
                         if (relativeTime() != null) ...[
                           const SizedBox(width: 8),
-                          Text(
-                            relativeTime()!,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              height: 16 / 12,
-                              color: Color(0xff9ca3af),
+                          Visibility(
+                            visible: showActions,
+                            maintainSize: true,
+                            maintainAnimation: true,
+                            maintainState: true,
+                            child: Text(
+                              relativeTime()!,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                height: 16 / 12,
+                                color: Color(0xff9ca3af),
+                              ),
                             ),
                           ),
                         ],
@@ -290,14 +296,20 @@ class _MessageItemState extends State<MessageItem> {
                     ),
                   ),
                 if (m.isUser && relativeTime() != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8, right: 4),
-                    child: Text(
-                      relativeTime()!,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        height: 16 / 12,
-                        color: Color(0xff9ca3af),
+                  Visibility(
+                    visible: showActions,
+                    maintainSize: true,
+                    maintainAnimation: true,
+                    maintainState: true,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 8, right: 4),
+                      child: Text(
+                        relativeTime()!,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          height: 16 / 12,
+                          color: Color(0xff9ca3af),
+                        ),
                       ),
                     ),
                   ),

@@ -18,18 +18,21 @@ class FileService {
     CancelToken cancel,
     void Function(double) progress, {
     String kind = 'attachment',
+  }) => uploadPath(file.path!, file.name, cancel, progress, kind: kind);
+
+  Future<Json> uploadPath(
+    String path,
+    String name,
+    CancelToken cancel,
+    void Function(double) progress, {
+    String kind = 'attachment',
   }) async {
-    final type = lookupMimeType(file.name) ?? 'application/octet-stream';
-    final size = await file.length();
+    final type = lookupMimeType(name) ?? 'application/octet-stream';
+    final size = await File(path).length();
     final task = await api.request(
       'POST',
       '/api/files/presign',
-      body: {
-        'name': file.name,
-        'size': size,
-        'contentType': type,
-        'kind': kind,
-      },
+      body: {'name': name, 'size': size, 'contentType': type, 'kind': kind},
       cancel: cancel,
     );
     final record = jsonMap(task['file']);
@@ -38,7 +41,7 @@ class FileService {
       if (!['http', 'https'].contains(url.scheme)) throw ApiFailure('上传地址无效');
       await Dio().put(
         url.toString(),
-        data: File(file.path!).openRead(),
+        data: File(path).openRead(),
         cancelToken: cancel,
         options: Options(
           headers: {'Content-Type': type, 'Content-Length': size},

@@ -5,6 +5,7 @@ class WorkspaceShell extends StatelessWidget {
   final bool open, reduceMotion;
   final double sidebarWidth;
   final VoidCallback onClose;
+  final VoidCallback onOpen;
   final Widget sidebar, child;
   const WorkspaceShell({
     super.key,
@@ -12,6 +13,7 @@ class WorkspaceShell extends StatelessWidget {
     required this.reduceMotion,
     required this.sidebarWidth,
     required this.onClose,
+    required this.onOpen,
     required this.sidebar,
     required this.child,
   });
@@ -62,7 +64,11 @@ class WorkspaceShell extends StatelessWidget {
                                     : const Color(0xffe5e5e5),
                               ),
                       ),
-                      child: child,
+                      child: _SidebarSwipe(
+                        enabled: mobile && !open,
+                        onOpen: onOpen,
+                        child: child,
+                      ),
                     ),
                   ),
                   if (progress > 0)
@@ -114,5 +120,38 @@ class WorkspaceShell extends StatelessWidget {
         ),
       );
     },
+  );
+}
+
+class _SidebarSwipe extends StatefulWidget {
+  final bool enabled;
+  final VoidCallback onOpen;
+  final Widget child;
+  const _SidebarSwipe({
+    required this.enabled,
+    required this.onOpen,
+    required this.child,
+  });
+  @override
+  State<_SidebarSwipe> createState() => _SidebarSwipeState();
+}
+
+class _SidebarSwipeState extends State<_SidebarSwipe> {
+  double distance = 0;
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    behavior: HitTestBehavior.translucent,
+    onHorizontalDragStart: widget.enabled ? (_) => distance = 0 : null,
+    onHorizontalDragUpdate: widget.enabled
+        ? (event) => distance += event.delta.dx
+        : null,
+    onHorizontalDragEnd: widget.enabled
+        ? (_) {
+            if (distance >= 60) widget.onOpen();
+            distance = 0;
+          }
+        : null,
+    onHorizontalDragCancel: widget.enabled ? () => distance = 0 : null,
+    child: widget.child,
   );
 }

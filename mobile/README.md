@@ -10,11 +10,11 @@ Flutter 原生客户端，复用现有 Next.js API。当前为开发版本，尚
 
 | 命令                | 用途                                     |
 | ------------------- | ---------------------------------------- |
-| `pnpm android`      | 启动安卓 App，默认连接本机 3000 端口后端 |
+| `pnpm android`      | 自动启动安卓模拟器并运行 App，默认连接本机 3000 端口后端 |
 | `pnpm android:test` | 静态分析及单元、Widget 测试              |
 | `pnpm android:apk`  | 打包正式签名的 Release APK，连接正式环境 |
 
-先启动模拟器或连接安卓设备；多设备时使用 `pnpm android -d <设备ID>`。后端单独运行 `pnpm dev`，已有后端运行时无需重复启动。Flutter 会自动获取依赖。
+直接执行 `pnpm android` 即可：先复用 3000 端口上已有的 MarkAI 后端，没有则自动启动并等待接口就绪；再复用或启动安卓模拟器（优先 Pixel_7_API_36），最后运行 App。退出命令时只停止本次自动启动的后端，不影响原先运行的服务。多设备时使用 `pnpm android -d <设备ID>`。真机或远程后端可通过环境变量 `MARKAI_API_URL` 指定服务地址，此时不会自动启动本地后端。Flutter 会自动获取依赖。
 
 正式 APK 输出到 `mobile/build/app/outputs/flutter-apk/app-release.apk`，后端固定为 `https://chatai.markqq.com`。启动时显示品牌加载页，失败可重试，不显示服务地址配置表单，也不读取旧版本保存的开发地址。
 
@@ -46,6 +46,12 @@ flutter build apk --release -t lib/main.dart --dart-define=MARKAI_API_URL=https:
 ```
 
 APK 位于 `build/app/outputs/flutter-apk/app-release.apk`，包名为 `com.markai.markai_mobile`。不要分发 `tool/preview.dart` 或 integration_test 构建的测试包。正式签名和旧调试签名不同，正式包不能直接覆盖旧调试包；不要为测试覆盖安装而清除用户数据。
+
+## 手动发布与应用内更新
+
+GitHub Actions 的 **Android release (manual)** 仅手动触发；只填写版本号和更新说明，Android 内部版本代码自动生成。构建后上传 GitHub Releases 和对象存储，公开下载校验通过后才发布。GitHub 的 `android-release` 环境已配置签名与存储参数，详见 [发布配置说明](../docs/mobile/release-update-plan.md)。
+
+正式 App 优先直接读取 GitHub Releases API；GitHub 网络故障时读取发布后同步到对象存储的清单。启动后台检查，也可通过“设置 → 应用更新”手动检查，下载前可选择“GitHub”或“加速下载”。大小、SHA-256 和签名校验后调起系统安装确认。调试包不走正式更新通道；旧版没有更新功能的 App 需先手动安装一次。
 
 ## 结构
 
