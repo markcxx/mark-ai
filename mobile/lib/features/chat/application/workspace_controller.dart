@@ -47,12 +47,30 @@ class WorkspaceController extends ChangeNotifier {
   Future<void>? _generation;
   Completer<void>? _operation;
   bool _stopRequested = false;
+  bool _disposed = false;
   int _navigation = 0, _searchRequest = 0;
   Timer? _draftTimer, _settingsTimer;
   Future<void> _localWrites = Future.value();
   final Map<String, Future<void>> _saves = {};
   final Set<String> translating = {};
   final Set<String> namingSessions = {};
+  // Text/tool/usage updates do not affect the shell, history or settings.
+  final streamingRevision = ValueNotifier<int>(0);
+
+  void _notifyStreaming() {
+    if (!_disposed) streamingRevision.value++;
+  }
+
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
+  final Map<String, Future<void>> _namingTasks = {};
+  Future<void> waitForSessionNaming(String id) async {
+    await _namingTasks[id];
+  }
+
   String get accountKey =>
       '${api.baseUrl}:${user['id'] ?? (guest ? 'guest' : 'local')}';
   String get recoveryKey => 'recovery:$accountKey';
@@ -66,11 +84,13 @@ class WorkspaceController extends ChangeNotifier {
     ...jsonMap(settings['general']),
   };
   void report(Object e) {
+    if (_disposed) return;
     error = e.toString();
     notifyListeners();
   }
 
   void message(String text, {String kind = 'blank', String? id}) {
+    if (_disposed) return;
     notice = text;
     noticeKind = kind;
     noticeId = id;
@@ -246,16 +266,13 @@ class WorkspaceController extends ChangeNotifier {
     loadingSession = true;
     notifyListeners();
     try {
-      final result = await api.request(
-        'GET',
-        '/api/sessions/$id',
-        cancel: cancel,
-      );
-      final toolResult = await api.request(
-        'GET',
-        '/api/sessions/$id/tools',
-        cancel: cancel,
-      );
+      await waitForSessionSave(id).catchError((_) {});
+      if (request != _navigation) return;
+      final results = await Future.wait([
+        api.request('GET', '/api/sessions/$id', cancel: cancel),
+        api.request('GET', '/api/sessions/$id/tools', cancel: cancel),
+      ]);
+      final result = results[0], toolResult = results[1];
       if (request != _navigation) return;
       final session = ChatSession(jsonMap(result['session']));
       _sessionById[id] = session;
@@ -317,11 +334,24 @@ class WorkspaceController extends ChangeNotifier {
     List<ChatMessage> values,
     int revision,
   ) {
+    return _writeCheckpoint(
+      sessionId,
+      values.map((m) => m.toJson()).toList(),
+      revision,
+    );
+  }
+
+  // The caller owns this detached snapshot; do not serialize/copy it again.
+  Future<void> _writeCheckpoint(
+    String sessionId,
+    List<Json> messages,
+    int revision,
+  ) {
     final key = recoveryKey;
     final snapshot = {
       'sessionId': sessionId,
       'revision': revision,
-      'messages': values.map((m) => m.toJson()).toList(),
+      'messages': messages,
     };
     final task = _localWrites.then((_) => local.write(key, snapshot));
     _localWrites = task.catchError(report);
@@ -333,14 +363,21 @@ class WorkspaceController extends ChangeNotifier {
     final task = (_saves[id] ?? Future<void>.value()).catchError((_) {}).then((
       _,
     ) async {
-      final revision = _sessionById[id]!.revision;
-      await checkpoint(id, snapshot.map(ChatMessage.new).toList(), revision);
+      final beforeSave = _sessionById[id]!;
+      final revision = beforeSave.revision;
+      await _writeCheckpoint(id, snapshot, revision);
       final data = await api.request(
         'PUT',
         '/api/sessions/$id/messages',
         body: {'messages': snapshot, 'revision': revision},
       );
-      final session = ChatSession(jsonMap(data['session']));
+      final returned = ChatSession(jsonMap(data['session']));
+      final current = _sessionById[id]!;
+      final session = ChatSession({
+        ...returned.data,
+        if (current.title != beforeSave.title) 'title': current.title,
+        'updatedAt': max(current.updatedAt, returned.updatedAt),
+      });
       _sessionById[id] = session;
       sessions = sessions.map((s) => s.id == id ? session : s).toList();
       await _localWrites;
@@ -353,26 +390,39 @@ class WorkspaceController extends ChangeNotifier {
     return task;
   }
 
-  Future<void> send() async {
+  Future<void> send() {
+    // A failed queued save can be retried without taking over a newer draft.
+    if (!generating && queued != null) {
+      final pending = queued;
+      queued = null;
+      return _send(pending: pending);
+    }
+    return _send();
+  }
+
+  Future<void> _send({Json? pending}) async {
     if (guest) throw ApiFailure('请先登录');
-    if (draft.trim().isEmpty && attachments.isEmpty) {
+    if (pending == null && draft.trim().isEmpty && attachments.isEmpty) {
       if (generating) await stop();
       return;
     }
     if (generating) {
       if (queued != null) throw ApiFailure('已有一条待发送消息');
       queued = {'content': draft, 'attachments': attachments, 'quote': quote};
-      draft = '';
       attachments = [];
       quote = null;
-      notifyListeners();
+      setDraft('');
       return;
     }
     if (model == null || loadingSession) throw ApiFailure('请先选择可用模型');
     generating = true;
     _stopRequested = false;
     _operation = Completer<void>();
-    final oldDraft = draft, oldAttachments = attachments, oldQuote = quote;
+    final oldDraft = pending?['content'] as String? ?? draft;
+    final oldAttachments = pending == null
+        ? attachments
+        : jsonList(pending['attachments']);
+    final oldQuote = pending == null ? quote : pending['quote'] as Json?;
     final previousMessages = messages;
     final selectedModel = model!;
     final userMessage = ChatMessage({
@@ -387,9 +437,12 @@ class WorkspaceController extends ChangeNotifier {
     });
     final next = [...messages.map((m) => m.copy()), userMessage];
     messages = next;
-    draft = '';
-    attachments = [];
-    quote = null;
+    if (pending == null) {
+      _draftTimer?.cancel();
+      draft = '';
+      attachments = [];
+      quote = null;
+    }
     notifyListeners();
     var userSaved = false;
     try {
@@ -406,19 +459,21 @@ class WorkspaceController extends ChangeNotifier {
         _generation = generate(session.id, next, selectedModel);
         await _generation;
         if (createdSession) {
-          try {
-            await smartRename(sessionId: session.id);
-          } catch (_) {
-            message('自动命名失败，可在会话菜单中重试', kind: 'error');
-          }
+          _nameInBackground(session.id);
         }
       }
     } catch (e) {
       if (!userSaved) {
         messages = previousMessages;
-        if (draft.isEmpty) draft = oldDraft;
-        if (attachments.isEmpty) attachments = oldAttachments;
-        quote ??= oldQuote;
+        if (pending != null &&
+            (draft.isNotEmpty || attachments.isNotEmpty || quote != null)) {
+          // Keep both the failed queued send and any newer composer draft.
+          queued = pending;
+        } else {
+          if (draft.isEmpty) setDraft(oldDraft);
+          if (attachments.isEmpty) attachments = oldAttachments;
+          quote ??= oldQuote;
+        }
       }
       rethrow;
     } finally {
@@ -428,14 +483,23 @@ class WorkspaceController extends ChangeNotifier {
       _operation = null;
       notifyListeners();
     }
-    final pending = queued;
+    final nextPending = queued;
     queued = null;
-    if (pending != null) {
-      draft = pending['content'] as String;
-      attachments = jsonList(pending['attachments']);
-      quote = pending['quote'] == null ? null : jsonMap(pending['quote']);
-      await send();
+    if (nextPending != null) {
+      await _send(pending: nextPending);
     }
+  }
+
+  void _nameInBackground(String id) {
+    final task = smartRename(sessionId: id).catchError((Object _) {
+      message('自动命名失败，可在会话菜单中重试', kind: 'error');
+    });
+    _namingTasks[id] = task;
+    unawaited(
+      task.whenComplete(() {
+        if (identical(_namingTasks[id], task)) _namingTasks.remove(id);
+      }),
+    );
   }
 
   Future<void> generate(
@@ -489,7 +553,7 @@ class WorkspaceController extends ChangeNotifier {
         general['reduceMotion'] != true;
     void commit(String type, String text) {
       accumulator.add({'type': type, 'text': text});
-      if (activeSessionId == sessionId) notifyListeners();
+      if (activeSessionId == sessionId) _notifyStreaming();
     }
 
     final contentBuffer = SmoothTextBuffer((text) => commit('content', text));
@@ -499,6 +563,8 @@ class WorkspaceController extends ChangeNotifier {
     var interrupted = false;
     final tick = Stopwatch()..start();
     int lastPaint = 0, lastSave = 0;
+    Future<void>? pendingCheckpoint;
+    Object? checkpointError;
     try {
       await for (final event in api.chat({
         'messages': (promptHistory ?? history)
@@ -509,6 +575,7 @@ class WorkspaceController extends ChangeNotifier {
         'sessionId': sessionId,
         'webSearchEnabled': webSearch,
       }, cancel)) {
+        if (checkpointError != null) throw checkpointError!;
         if (smooth && event['type'] == 'content') {
           reasoningBuffer.flush();
           contentBuffer.push(event['text'] as String? ?? '');
@@ -523,19 +590,25 @@ class WorkspaceController extends ChangeNotifier {
         if (tick.elapsedMilliseconds - lastPaint >= 32 &&
             activeSessionId == sessionId) {
           lastPaint = tick.elapsedMilliseconds;
-          notifyListeners();
+          _notifyStreaming();
         }
-        if (tick.elapsedMilliseconds - lastSave >= 1000) {
+        if (tick.elapsedMilliseconds - lastSave >= 1000 &&
+            pendingCheckpoint == null) {
           lastSave = tick.elapsedMilliseconds;
-          await checkpoint(
-            sessionId,
-            target,
-            _sessionById[sessionId]!.revision,
-          );
+          // Keep at most one periodic write in flight. Slow local storage must
+          // not stall incoming text or accumulate a queue of full histories.
+          pendingCheckpoint =
+              checkpoint(sessionId, target, _sessionById[sessionId]!.revision)
+                  .catchError((Object error) {
+                    checkpointError = error;
+                  })
+                  .whenComplete(() => pendingCheckpoint = null);
         }
       }
       await reasoningBuffer.finish();
       await contentBuffer.finish();
+      await pendingCheckpoint;
+      if (checkpointError != null) throw checkpointError!;
     } catch (e) {
       interrupted = true;
       if (e is! DioException || !CancelToken.isCancel(e)) report(e);
@@ -552,6 +625,7 @@ class WorkspaceController extends ChangeNotifier {
         assistant.data['activeVariantId'] = current['id'];
         assistant.data['variants'] = [...assistant.variants, current];
       }
+      await pendingCheckpoint;
       await persist(sessionId, target);
       if (identical(_generationCancel, cancel)) _generationCancel = null;
       if (activeSessionId == sessionId) notifyListeners();
@@ -625,7 +699,8 @@ class WorkspaceController extends ChangeNotifier {
   }
 
   Future<void> updateMessage(ChatMessage target, String text) async {
-    if (generating) return;
+    if (generating || activeSessionId == null) return;
+    final id = activeSessionId!, navigation = _navigation;
     final next = messages.map((m) {
       final c = m.copy();
       if (c.id == target.id) {
@@ -639,20 +714,25 @@ class WorkspaceController extends ChangeNotifier {
       }
       return c;
     }).toList();
-    await persist(activeSessionId!, next);
+    await persist(id, next);
+    if (_disposed || activeSessionId != id || _navigation != navigation) return;
     messages = next;
     notifyListeners();
   }
 
   Future<void> deleteMessages(Set<String> ids) async {
-    if (generating) return;
+    if (generating || activeSessionId == null) return;
+    final id = activeSessionId!, navigation = _navigation;
     final next = messages.where((m) => !ids.contains(m.id)).toList();
-    await persist(activeSessionId!, next);
+    await persist(id, next);
+    if (_disposed || activeSessionId != id || _navigation != navigation) return;
     messages = next;
     notifyListeners();
   }
 
   Future<void> selectVariant(ChatMessage target, Json variant) async {
+    if (generating || activeSessionId == null) return;
+    final id = activeSessionId!, navigation = _navigation;
     final next = messages
         .map(
           (m) => m.id == target.id
@@ -667,7 +747,8 @@ class WorkspaceController extends ChangeNotifier {
               : m,
         )
         .toList();
-    await persist(activeSessionId!, next);
+    await persist(id, next);
+    if (_disposed || activeSessionId != id || _navigation != navigation) return;
     messages = next;
     notifyListeners();
   }
@@ -683,7 +764,8 @@ class WorkspaceController extends ChangeNotifier {
 
   Future<void> smartRename({String? sessionId}) async {
     final target = sessionId ?? activeSessionId;
-    if (target == null || !namingSessions.add(target)) return;
+    if (_disposed || target == null || !namingSessions.add(target)) return;
+    final account = accountKey;
     notifyListeners();
     try {
       final source = target == activeSessionId
@@ -700,13 +782,22 @@ class WorkspaceController extends ChangeNotifier {
       final data = jsonMap(result['session']);
       if (data['id'] != target) throw ApiFailure('自动命名失败，请重试');
       final updated = ChatSession(data);
-      if (_sessionById.containsKey(target)) {
-        _sessionById[target] = updated;
-        sessions = sessions.map((s) => s.id == target ? updated : s).toList();
+      if (!_disposed &&
+          accountKey == account &&
+          _sessionById.containsKey(target)) {
+        // A title request may finish after a newer message revision was saved.
+        final current = _sessionById[target]!;
+        final merged = ChatSession({
+          ...current.data,
+          'title': updated.title,
+          'updatedAt': max(current.updatedAt, updated.updatedAt),
+        });
+        _sessionById[target] = merged;
+        sessions = sessions.map((s) => s.id == target ? merged : s).toList();
       }
     } finally {
       namingSessions.remove(target);
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     }
   }
 
@@ -884,10 +975,12 @@ class WorkspaceController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _draftTimer?.cancel();
     _settingsTimer?.cancel();
     _generationCancel?.cancel();
     _loadCancel?.cancel();
+    streamingRevision.dispose();
     super.dispose();
   }
 }

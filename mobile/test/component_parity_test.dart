@@ -96,6 +96,7 @@ void main() {
                     as RenderRepaintBoundary)
                 .toImage();
         final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+        await Directory('qa').create(recursive: true);
         await File('qa/native-profile-light-390.png')
             .writeAsBytes(bytes!.buffer.asUint8List());
         image.dispose();
@@ -158,6 +159,7 @@ void main() {
               final bytes = await image.toByteData(
                 format: ui.ImageByteFormat.png,
               );
+              await Directory('qa').create(recursive: true);
               await File('qa/native-settings-light-390.png')
                   .writeAsBytes(bytes!.buffer.asUint8List());
               image.dispose();

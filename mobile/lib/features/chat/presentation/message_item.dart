@@ -11,6 +11,7 @@ import 'speech_action.dart';
 import '../application/speech_playback.dart';
 import '../../../shared/widgets/app_toast.dart';
 import '../../../shared/widgets/agent_avatar.dart';
+import '../../../shared/widgets/selected_listenable_builder.dart';
 
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -194,6 +195,19 @@ class _MessageItemState extends State<MessageItem> {
     return '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
   }
 
+  Widget timestamp() => SelectedListenableBuilder(
+    listenable: controller.streamingRevision,
+    select: relativeTime,
+    builder: (context, value) => Text(
+      value ?? '',
+      style: const TextStyle(
+        fontSize: 12,
+        height: 16 / 12,
+        color: Color(0xff9ca3af),
+      ),
+    ),
+  );
+
   Future<void> run(Future<void> Function() action) async {
     try {
       await action();
@@ -282,14 +296,7 @@ class _MessageItemState extends State<MessageItem> {
                             maintainSize: true,
                             maintainAnimation: true,
                             maintainState: true,
-                            child: Text(
-                              relativeTime()!,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                height: 16 / 12,
-                                color: Color(0xff9ca3af),
-                              ),
-                            ),
+                            child: timestamp(),
                           ),
                         ],
                       ],
@@ -303,14 +310,7 @@ class _MessageItemState extends State<MessageItem> {
                     maintainState: true,
                     child: Padding(
                       padding: const EdgeInsets.only(bottom: 8, right: 4),
-                      child: Text(
-                        relativeTime()!,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          height: 16 / 12,
-                          color: Color(0xff9ca3af),
-                        ),
-                      ),
+                      child: timestamp(),
                     ),
                   ),
                 if (m.attachments.isNotEmpty)

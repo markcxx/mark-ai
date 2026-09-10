@@ -27,6 +27,7 @@ import 'workspace_shell.dart';
 import 'model_selector.dart';
 import 'context_indicator.dart';
 import '../../../shared/models/model_metadata.dart';
+import '../../../shared/models/chat.dart';
 import '../../auth/auth_screen.dart';
 import '../../auth/guest_screen.dart';
 import '../../previews/file_service.dart';
@@ -60,6 +61,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     c.addListener(changed);
+    c.streamingRevision.addListener(changed);
     input.text = c.draft;
     WidgetsBinding.instance.addPostFrameCallback((_) => recoverPickedImages());
   }
@@ -69,6 +71,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     composerFocus.dispose();
     WidgetsBinding.instance.removeObserver(this);
     c.removeListener(changed);
+    c.streamingRevision.removeListener(changed);
     input.dispose();
     scroll.dispose();
     searchDebounce?.cancel();
@@ -123,6 +126,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     composerFocus.unfocus();
     await protected(c.send);
   }
+
+  Widget messageItem(ChatMessage message) => MessageItem(
+    key: ValueKey(message.id),
+    message: message,
+    controller: c,
+    onSelect: (m) => setState(() => selected.add(m.id)),
+  );
 
   Future<void> recoverPickedImages() async {
     if (!mounted ||
@@ -518,13 +528,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                                     ),
                                                   ),
                                                 Expanded(
-                                                  child: MessageItem(
+                                                  child: ListenableBuilder(
                                                     key: ValueKey(m.id),
-                                                    message: m,
-                                                    controller: c,
-                                                    onSelect: (m) => setState(
-                                                      () => selected.add(m.id),
-                                                    ),
+                                                    listenable:
+                                                        c.streamingRevision,
+                                                    // Stable completed messages are reused on each stream tick.
+                                                    child: m.streaming
+                                                        ? null
+                                                        : messageItem(m),
+                                                    builder: (context, child) =>
+                                                        child ?? messageItem(m),
                                                   ),
                                                 ),
                                               ],
@@ -535,22 +548,29 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                     ),
                                   ),
                           ),
-                          if (!follow && c.messages.isNotEmpty)
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: ActionIcon(
-                                '回到底部',
-                                Icons.arrow_downward,
-                                () {
-                                  follow = true;
-                                  scroll.animateTo(
-                                    scroll.position.maxScrollExtent,
-                                    duration: const Duration(milliseconds: 200),
-                                    curve: Curves.easeOut,
-                                  );
-                                },
-                              ),
-                            ),
+                          ListenableBuilder(
+                            listenable: c.streamingRevision,
+                            builder: (context, _) =>
+                                !follow && c.messages.isNotEmpty
+                                ? Align(
+                                    alignment: Alignment.centerRight,
+                                    child: ActionIcon(
+                                      '回到底部',
+                                      Icons.arrow_downward,
+                                      () {
+                                        follow = true;
+                                        scroll.animateTo(
+                                          scroll.position.maxScrollExtent,
+                                          duration: const Duration(
+                                            milliseconds: 200,
+                                          ),
+                                          curve: Curves.easeOut,
+                                        );
+                                      },
+                                    ),
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
                           if (selected.isNotEmpty)
                             Container(
                               decoration: BoxDecoration(
@@ -896,7 +916,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           : const Color(0xff9ca3af),
                     ),
                     const Spacer(),
-                    if (c.messages.isNotEmpty) ContextIndicator(controller: c),
+                    if (c.messages.isNotEmpty)
+                      ListenableBuilder(
+                        listenable: c.streamingRevision,
+                        builder: (context, _) =>
+                            ContextIndicator(controller: c),
+                      ),
                     Tooltip(
                       message: c.model?.id ?? '选择模型',
                       child: TextButton(

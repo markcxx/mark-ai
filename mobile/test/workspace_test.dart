@@ -47,6 +47,7 @@ void main() {
       expect(api.messages[id]!.last['role'], 'model');
       api.titleGate!.complete();
       await sending;
+      await c.waitForSessionNaming(id);
       expect(c.namingSessions, isEmpty);
       expect(c.activeSession!.title, '自动生成的标题');
       c.draft = 'second';
@@ -60,6 +61,7 @@ void main() {
   test('failed manual naming keeps title and clears loading state', () async {
     c.draft = 'first';
     await c.send();
+    await c.waitForSessionNaming(c.activeSessionId!);
     final title = c.activeSession!.title;
     api.failTitle = true;
     await expectLater(c.smartRename(), throwsA(isA<ApiFailure>()));

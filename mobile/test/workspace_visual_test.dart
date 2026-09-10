@@ -58,7 +58,12 @@ void main() {
                       as RenderRepaintBoundary)
                   .toImage();
           final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-          await File('qa/native-$name-light-390.png')
+          const directory = String.fromEnvironment(
+            'SCREENSHOT_DIRECTORY',
+            defaultValue: 'qa',
+          );
+          await Directory(directory).create(recursive: true);
+          await File('$directory/native-$name-light-390.png')
               .writeAsBytes(bytes!.buffer.asUint8List());
           image.dispose();
         });

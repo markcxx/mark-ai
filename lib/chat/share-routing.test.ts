@@ -12,9 +12,15 @@ describe("anonymous share routing in cloud mode", () => {
     }
   });
   it("keeps management and other conversations protected", async () => {
-    for (const path of ["/admin", "/private-session", "/api/sessions/private/share"]) {
+    for (const path of ["/admin", "/private-session"]) {
       const response = await middleware(new NextRequest(`https://markai.example${path}`));
       expect(response.headers.get("location")).toContain("/login?");
     }
+    const response = await middleware(
+      new NextRequest("https://markai.example/api/sessions/private/share"),
+    );
+    expect(response.status).toBe(401);
+    expect(response.headers.get("location")).toBeNull();
+    expect(await response.json()).toEqual({ error: "请先登录" });
   });
 });

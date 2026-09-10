@@ -77,6 +77,7 @@ void main() {
                 as RenderRepaintBoundary;
         final image = await boundary.toImage();
         final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+        await Directory('qa').create(recursive: true);
         await File('qa/native-$page-light-390.png')
             .writeAsBytes(bytes!.buffer.asUint8List());
         image.dispose();

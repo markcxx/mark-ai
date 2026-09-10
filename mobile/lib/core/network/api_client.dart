@@ -23,6 +23,10 @@ class ApiClient {
   String baseUrl = '';
   String? _authOrigin;
   final Map<String, Cookie> _cookies = {};
+  bool _cookiesDirty = false;
+  Future<void> _cookieWrites = Future.value();
+  Future<void>? _pendingCookieWrite;
+  String? _pendingCookieValue;
   ApiClient(this.storage, {Dio? dio}) : dio = dio ?? Dio();
   Future<void> configure(String url) async {
     final uri = Uri.tryParse(url.trim());
@@ -50,6 +54,9 @@ class ApiClient {
       validateStatus: (_) => true,
     );
     _cookies.clear();
+    _cookiesDirty = false;
+    _pendingCookieWrite = null;
+    _pendingCookieValue = null;
     final saved = await storage.read('cookies:$baseUrl');
     for (final raw in (saved['values'] as List? ?? [])) {
       try {
@@ -78,20 +85,48 @@ class ApiClient {
   }
 
   Future<void> _receiveCookies(Response<dynamic> response) async {
+    var changed = false;
     for (final raw in response.headers['set-cookie'] ?? <String>[]) {
       final cookie = Cookie.fromSetCookieValue(raw);
       if (cookie.maxAge != null) {
         cookie.expires = DateTime.now().add(Duration(seconds: cookie.maxAge!));
       }
       if (cookie.maxAge == 0 || cookie.value.isEmpty) {
-        _cookies.remove(cookie.name);
+        changed = _cookies.remove(cookie.name) != null || changed;
       } else {
+        changed =
+            _cookies[cookie.name]?.toString() != cookie.toString() || changed;
         _cookies[cookie.name] = cookie;
       }
     }
-    await storage.write('cookies:$baseUrl', {
-      'values': _cookies.values.map((c) => c.toString()).toList(),
-    });
+    _cookiesDirty = _cookiesDirty || changed;
+    if (!_cookiesDirty) return;
+    final key = 'cookies:$baseUrl';
+    final values = _cookies.values.map((c) => c.toString()).toList();
+    final signature = jsonEncode(values);
+    if (_pendingCookieValue == signature && _pendingCookieWrite != null) {
+      return _pendingCookieWrite!;
+    }
+    // Initial requests may arrive together. Share identical writes and order
+    // changed snapshots so an older encryption write cannot win the race.
+    final task = _cookieWrites
+        .catchError((_) {})
+        .then((_) => storage.write(key, {'values': values}));
+    late final Future<void> saving;
+    saving = task
+        .then((_) {
+          if (identical(_pendingCookieWrite, saving)) _cookiesDirty = false;
+        })
+        .whenComplete(() {
+          if (identical(_pendingCookieWrite, saving)) {
+            _pendingCookieWrite = null;
+            _pendingCookieValue = null;
+          }
+        });
+    _pendingCookieValue = signature;
+    _pendingCookieWrite = saving;
+    _cookieWrites = saving;
+    return saving;
   }
 
   Future<Response<dynamic>> raw(
@@ -168,7 +203,15 @@ class ApiClient {
       jsonMap((await raw(method, path, body: body, cancel: cancel)).data);
   Future<void> clearLogin() async {
     _cookies.clear();
-    await storage.remove('cookies:$baseUrl');
+    _cookiesDirty = false;
+    _pendingCookieWrite = null;
+    _pendingCookieValue = null;
+    final key = 'cookies:$baseUrl';
+    final task = _cookieWrites
+        .catchError((_) {})
+        .then((_) => storage.remove(key));
+    _cookieWrites = task;
+    await task;
   }
 
   Stream<Json> chat(Json body, CancelToken cancel) async* {

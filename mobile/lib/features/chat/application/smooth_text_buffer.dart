@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:math';
 
 /// Uses the same adaptive rates as lib/chat/client/streaming.ts. Rune boundaries
@@ -6,7 +7,7 @@ import 'dart:math';
 class SmoothTextBuffer {
   final void Function(String) commit;
   SmoothTextBuffer(this.commit);
-  final List<int> _queue = [];
+  final _queue = ListQueue<int>();
   Timer? _timer;
   double _carry = 0;
   bool _finishing = false;
@@ -22,7 +23,9 @@ class SmoothTextBuffer {
       final count = min(_queue.length, _carry.floor());
       if (count > 0) {
         commit(String.fromCharCodes(_queue.take(count)));
-        _queue.removeRange(0, count);
+        for (var i = 0; i < count; i++) {
+          _queue.removeFirst();
+        }
         _carry -= count;
       }
       if (_queue.isEmpty) _settle();

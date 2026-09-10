@@ -7,6 +7,7 @@ import 'features/auth/startup_screen.dart';
 import 'features/chat/application/workspace_controller.dart';
 import 'features/chat/presentation/chat_screen.dart';
 import 'shared/widgets/app_toast.dart';
+import 'shared/widgets/selected_listenable_builder.dart';
 import 'features/updates/update_widgets.dart';
 import 'features/updates/update_preview.dart';
 
@@ -59,8 +60,19 @@ class _MarkAIAppState extends State<MarkAIApp> {
   }
 
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
+  Widget build(BuildContext context) => SelectedListenableBuilder(
     listenable: widget.controller,
+    select: () {
+      final c = widget.controller, general = c.general;
+      return (
+        c.connected,
+        c.booting,
+        c.startupFailed,
+        general['themeMode'],
+        general['primaryColor'],
+        general['reduceMotion'],
+      );
+    },
     builder: (context, _) {
       final c = widget.controller;
       final mode = c.general['themeMode'];

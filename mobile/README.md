@@ -73,6 +73,6 @@ flutter run -d emulator-5554 -t tool/preview.dart
 flutter run -d emulator-5554 -t tool/preview.dart --dart-define=PREVIEW_THEME=dark
 ```
 
-该入口仅使用合成测试数据。`qa/` 为模拟器截图，不代表已通过与 Web 的逐像素比较。
+该入口仅使用合成测试数据。`qa/` 是按需生成、由 Git 忽略的本地截图目录，历史截图已清理；截图不代表已通过与 Web 的逐像素比较。启用截图导出时会自动创建目录，无需保留旧图片。
 
 字体来自 Google Fonts OFL 源，许可证在 `assets/fonts`；Logo/模型 SVG 来自本仓库。ECharts/Mermaid 脚本来自仓库现有 npm 依赖，许可证在 `assets/web`。

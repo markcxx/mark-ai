@@ -36,4 +36,21 @@ void main() {
       ],
     );
   }, timeout: const Timeout(Duration(minutes: 1)));
+
+  test(
+    'concurrent blocks retain their own Unicode source and language',
+    () async {
+      final sources = List.generate(8, (i) => 'const message$i = "你好🌍 $i";');
+      final results = await Future.wait(
+        sources.map((source) => CodeHighlighter.tokenize(source, 'javascript')),
+      );
+      for (var i = 0; i < sources.length; i++) {
+        expect(results[i].map((t) => t['text']).join(), sources[i]);
+        expect(
+          await CodeHighlighter.tokenize(sources[i], 'javascript'),
+          results[i],
+        );
+      }
+    },
+  );
 }

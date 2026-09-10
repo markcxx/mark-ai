@@ -102,7 +102,6 @@ class FileService {
   }
 
   Future<void> shareFile(Json file) async {
-    final data = await bytes(file);
     final dir = await getTemporaryDirectory();
     final name = (file['name'] as String? ?? '文件').replaceAll(
       RegExp(r'[/\\]'),
@@ -111,9 +110,53 @@ class FileService {
     final output = File(
       '${dir.path}/${DateTime.now().microsecondsSinceEpoch}-$name',
     );
-    await output.writeAsBytes(data);
+    await downloadTo(file, output);
     await SharePlus.instance.share(
       ShareParams(files: [XFile(output.path)], title: name),
     );
+  }
+
+  /// Sharing needs a path, so stream directly to disk instead of retaining the
+  /// entire download and a second Uint8List copy in the UI isolate.
+  Future<void> downloadTo(Json file, File output) async {
+    Dio? remoteClient;
+    try {
+      final response = await api.raw(
+        'GET',
+        '/api/files/${file['id']}/download',
+        type: ResponseType.stream,
+        allowDownloadRedirect: true,
+      );
+      var body = response.data as ResponseBody;
+      final location = response.headers.value('location');
+      if (location != null) {
+        await body.stream.drain<void>();
+        final uri = Uri.parse(api.baseUrl).resolve(location);
+        if (!['https', 'http'].contains(uri.scheme) ||
+            uri.userInfo.isNotEmpty) {
+          throw ApiFailure('下载地址无效');
+        }
+        remoteClient = Dio();
+        final remote = await remoteClient.get<ResponseBody>(
+          uri.toString(),
+          options: Options(
+            responseType: ResponseType.stream,
+            followRedirects: false,
+          ),
+        );
+        body = remote.data!;
+      }
+      final sink = output.openWrite();
+      try {
+        await sink.addStream(body.stream);
+      } finally {
+        await sink.close();
+      }
+    } catch (_) {
+      if (await output.exists()) await output.delete();
+      rethrow;
+    } finally {
+      remoteClient?.close(force: true);
+    }
   }
 }

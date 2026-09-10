@@ -46,6 +46,6 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
-/qa/web-reference/
+/qa/
 
 /tool/generated/

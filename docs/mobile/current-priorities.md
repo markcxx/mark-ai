@@ -34,8 +34,8 @@
 
 - Flutter 单元/组件测试目前 55 项通过；新增输出契约及语音测试在 `mobile/test/output_contract_test.dart`、`speech_playback_test.dart`。
 - Android 整合回归入口：`mobile/integration_test/rendering_suite_test.dart`，覆盖生成物、会话图片导出、引用/翻译/语音、公式/思考/Toast、菜单/键盘/编辑；首轮 6 个场景全部通过；生成物放大弹层及不完整图表源码恢复另行回归通过。
-- 导出样本：`mobile/qa/android-conversation-export.png`、`android-echarts-*-export.png`、`android-mermaid-*-export.png`、`android-markmap-*-export.png`。
-- 原生截图：`mobile/qa/android-output-states-*.png`、`android-source-popover-*.png`；Web 对照工具继续复用原 React 组件，不修改当前 Next 开发服务器。
+- 导出验证覆盖会话、ECharts、Mermaid 和 Markmap；历史样本已清理，需要复查时重新运行导出集成测试。
+- 原生输出状态和来源浮层截图按需生成到 Git 忽略的 `mobile/qa/`；Web 对照工具继续复用原 React 组件，不修改当前 Next 开发服务器。
 - 测试使用虚构账号、固定响应和本地音频，没有读取或使用真实账号密码。以上不能宣称已验证所有远端模型、文件存储、翻译及语音服务的真实组合。
 - 长会话 PNG 为避免 GPU 超限，将最长边限制在 8192px，保留全部消息；极长会话会降低分辨率。
 - 像素级全应用验收仍按 `component-parity.md` 记录。本文“通过”指列明的测试范围，不代表所有可能的模型输出或全部界面已经逐像素一致。
