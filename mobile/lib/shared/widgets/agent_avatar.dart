@@ -9,14 +9,27 @@ import 'package:path_parsing/path_parsing.dart';
 
 /// Geometry is sampled from the same BotEngine as the Web avatar, then painted
 /// by Flutter Canvas. No browser, JavaScript runtime, or brand-logo recoloring.
+enum AvatarAnimation { idle, swirl, wink, wide, notify, egg, hexagon, play }
+
 class AgentAvatar extends StatefulWidget {
+  static bool get isPreloaded => _AgentAvatarState.cachedFrames != null;
   static Future<void> preload() async {
     _AgentAvatarState.cachedFrames = await _AgentAvatarState.data;
   }
 
   final double size;
   final bool arriving;
-  const AgentAvatar({super.key, this.size = 72, this.arriving = false});
+
+  /// When supplied, the parent owns playback; ambient animation and taps pause.
+  final AvatarAnimation? animation;
+  final double progress;
+  const AgentAvatar({
+    super.key,
+    this.size = 72,
+    this.arriving = false,
+    this.animation,
+    this.progress = 0,
+  }) : assert(progress >= 0 && progress <= 1);
   @override
   State<AgentAvatar> createState() => _AgentAvatarState();
 }
@@ -39,14 +52,19 @@ class _AgentAvatarState extends State<AgentAvatar>
   void initState() {
     super.initState();
     frames = cachedFrames;
-    data.then((value) {
-      cachedFrames = value;
-      if (!mounted) return;
-      setState(() => frames = value);
-      play(clip);
-    });
+    data.then(
+      (value) {
+        cachedFrames = value;
+        if (!mounted) return;
+        setState(() => frames = value);
+        if (widget.animation == null) play(clip);
+      },
+      onError: (Object _) {
+        /* The startup screen provides an asset fallback. */
+      },
+    );
     clock.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
+      if (status == AnimationStatus.completed && widget.animation == null) {
         play(
           clip == 'idle'
               ? [
@@ -78,10 +96,20 @@ class _AgentAvatarState extends State<AgentAvatar>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (MediaQuery.disableAnimationsOf(context)) {
+    if (MediaQuery.disableAnimationsOf(context) || widget.animation != null) {
       clock.stop();
     } else if (frames != null && !clock.isAnimating) {
       clock.forward();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant AgentAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.animation != null) {
+      clock.stop();
+    } else if (oldWidget.animation != null) {
+      play(widget.arriving ? 'swirl' : 'idle');
     }
   }
 
@@ -96,10 +124,10 @@ class _AgentAvatarState extends State<AgentAvatar>
     final reduce = MediaQuery.disableAnimationsOf(context);
     final dark = Theme.of(context).brightness == Brightness.dark;
     return Semantics(
-      label: '可互动的 MarkAI 助手',
-      button: true,
+      label: widget.animation == null ? '可互动的 MarkAI 助手' : 'MarkAI 机器人',
+      button: widget.animation == null,
       child: GestureDetector(
-        onTap: reduce ? null : () => play('swirl'),
+        onTap: reduce || widget.animation != null ? null : () => play('swirl'),
         child: SizedBox(
           width: widget.size,
           height: widget.size,
@@ -109,12 +137,19 @@ class _AgentAvatarState extends State<AgentAvatar>
                   animation: clock,
                   builder: (context, _) {
                     final list =
-                        frames!['clips'][reduce ? 'idle' : clip] as List;
+                        frames!['clips'][reduce
+                                ? 'idle'
+                                : widget.animation?.name ?? clip]
+                            as List;
                     final index = reduce
                         ? 0
                         : min(
                             list.length - 1,
-                            (clock.value * list.length).floor(),
+                            ((widget.animation == null
+                                        ? clock.value
+                                        : widget.progress) *
+                                    list.length)
+                                .floor(),
                           );
                     return CustomPaint(
                       painter: _AvatarPainter(

@@ -20,7 +20,15 @@ void main() {
 class MarkAIApp extends StatefulWidget {
   final WorkspaceController controller;
   final bool autoStart;
-  const MarkAIApp({super.key, required this.controller, this.autoStart = true});
+
+  /// Fixture hosts can opt into the greeting without starting network requests.
+  final bool? showStartupAnimation;
+  const MarkAIApp({
+    super.key,
+    required this.controller,
+    this.autoStart = true,
+    this.showStartupAnimation,
+  });
   @override
   State<MarkAIApp> createState() => _MarkAIAppState();
 }
@@ -31,9 +39,11 @@ class _MarkAIAppState extends State<MarkAIApp> {
   final previewUpdates = updatePreviewEnabled ? PreviewUpdateService() : null;
   final previewUpdateStore = updatePreviewEnabled ? PreviewUpdateStore() : null;
   final toasts = GlobalKey<AppToastHostState>();
+  late bool introComplete;
   @override
   void initState() {
     super.initState();
+    introComplete = !(widget.showStartupAnimation ?? widget.autoStart);
     widget.controller.addListener(feedback);
     if (widget.autoStart) widget.controller.start();
   }
@@ -81,14 +91,17 @@ class _MarkAIAppState extends State<MarkAIApp> {
         debugShowCheckedModeBanner: false,
         navigatorKey: navigator,
         builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context)
-              .copyWith(disableAnimations: c.general['reduceMotion'] == true),
+          data: MediaQuery.of(context).copyWith(
+            disableAnimations:
+                MediaQuery.disableAnimationsOf(context) ||
+                c.general['reduceMotion'] == true,
+          ),
           child: UpdateHost(
             navigator: navigator,
             local: previewUpdateStore ?? c.local,
             service: previewUpdates,
             enabled: widget.autoStart,
-            ready: !c.booting,
+            ready: introComplete && c.connected && !c.booting,
             child: AppToastHost(key: toasts, child: child!),
           ),
         ),
@@ -106,9 +119,24 @@ class _MarkAIAppState extends State<MarkAIApp> {
             : mode == 'light'
             ? ThemeMode.light
             : ThemeMode.system,
-        home: c.connected
-            ? ChatScreen(controller: c)
-            : StartupScreen(controller: c),
+        home: Builder(
+          builder: (context) => AnimatedSwitcher(
+            duration: MediaQuery.disableAnimationsOf(context)
+                ? Duration.zero
+                : const Duration(milliseconds: 280),
+            child: c.connected && introComplete
+                ? ChatScreen(key: const ValueKey('workspace'), controller: c)
+                : StartupScreen(
+                    key: const ValueKey('startup'),
+                    controller: c,
+                    onIntroComplete: () {
+                      if (mounted && !introComplete) {
+                        setState(() => introComplete = true);
+                      }
+                    },
+                  ),
+          ),
+        ),
       );
     },
   );

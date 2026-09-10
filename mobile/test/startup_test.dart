@@ -10,6 +10,7 @@ import 'package:markai_mobile/features/auth/startup_screen.dart';
 import 'package:markai_mobile/features/chat/application/workspace_controller.dart';
 import 'package:markai_mobile/main.dart';
 import 'package:markai_mobile/shared/models/chat.dart';
+import 'package:markai_mobile/shared/widgets/agent_avatar.dart';
 
 import 'support/fake_workspace.dart';
 
@@ -67,6 +68,7 @@ void main() {
   testWidgets(
     'startup never shows address form; failure retries without raw URL',
     (tester) async {
+      await tester.runAsync(AgentAvatar.preload);
       final store = MemoryStore();
       final api = StartupApi(store)..gate = Completer<void>();
       final c = WorkspaceController(api, store);
@@ -82,7 +84,9 @@ void main() {
       expect(c.error, isNull);
       api.fail = false;
       await tester.tap(find.text('重试'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pump();
       expect(find.byType(GuestScreen), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
       c.dispose();
