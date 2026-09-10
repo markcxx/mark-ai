@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
 
@@ -105,11 +106,18 @@ class UpdateService {
   );
 
   Future<AndroidUpdate?> check() async {
+    // GitHub can be unreachable on mobile networks. Bound the entire primary
+    // lookup so startup promptly reaches the published mirror snapshot.
+    final githubRequest = CancelToken();
+    final deadline = Timer(const Duration(seconds: 8), () {
+      githubRequest.cancel('GitHub update lookup timed out');
+    });
     try {
       final releases = <Map<String, dynamic>>[];
       for (var page = 1; page <= 10; page++) {
         final response = await dio.get<List<dynamic>>(
           'https://api.github.com/repos/$updateRepository/releases?per_page=100&page=$page',
+          cancelToken: githubRequest,
           options: Options(
             headers: {
               'Accept': 'application/vnd.github+json',
@@ -151,6 +159,8 @@ class UpdateService {
         throw const FormatException('更新来源无效');
       }
       return AndroidUpdate.fromJson(data);
+    } finally {
+      deadline.cancel();
     }
   }
 

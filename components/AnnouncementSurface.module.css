@@ -71,7 +71,14 @@
   outline: 2px solid currentColor;
   outline-offset: 2px;
 }
+.closable {
+  padding-inline: 56px;
+}
 .close {
+  position: absolute;
+  inset-inline-end: 4px;
+  top: 50%;
+  transform: translateY(-50%);
   display: grid;
   place-items: center;
   width: 40px;
@@ -112,6 +119,9 @@
     min-height: 44px;
     gap: 8px;
     padding-inline: 12px;
+  }
+  .closable {
+    padding-inline: 52px;
   }
   .action,
   .close {

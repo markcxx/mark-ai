@@ -11,6 +11,7 @@ import 'package:markai_mobile/features/auth/startup_screen.dart';
 import 'package:markai_mobile/features/chat/application/workspace_controller.dart';
 import 'package:markai_mobile/features/chat/presentation/chat_screen.dart';
 import 'package:markai_mobile/main.dart';
+import 'package:markai_mobile/features/updates/update_widgets.dart';
 import 'package:markai_mobile/shared/models/chat.dart';
 import 'package:markai_mobile/shared/widgets/agent_avatar.dart';
 
@@ -102,6 +103,7 @@ void main() {
     await tester.pump();
     expect(find.byType(ChatScreen), findsNothing);
     expect(find.text('正在连接你的工作空间…'), findsOneWidget);
+    expect(tester.widget<UpdateHost>(find.byType(UpdateHost)).ready, isTrue);
     api.modelsReady.complete();
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pump();

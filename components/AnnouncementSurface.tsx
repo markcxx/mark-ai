@@ -40,7 +40,7 @@ export function AnnouncementSurface({
     isAnnouncementUrl(announcement.actionUrl) &&
     announcement.actionLabel;
   return (
-    <aside aria-label={preview ? "公告显示预览" : "站点公告"} className={styles.bar}>
+    <aside aria-label={preview ? "公告显示预览" : "站点公告"} className={`${styles.bar} ${announcement.closable ? styles.closable : ""}`}>
       <div className={styles.glow} aria-hidden />
       <div className={`${styles.viewport} ${overflow ? styles.moving : ""}`} ref={viewport}>
         <div

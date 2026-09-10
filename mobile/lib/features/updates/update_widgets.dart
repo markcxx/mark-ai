@@ -55,9 +55,10 @@ class _UpdateHostState extends State<UpdateHost> with WidgetsBindingObserver {
   late final service = widget.service ?? UpdateService();
   bool checking = false, showing = false;
   String version = '';
-  Timer? reminder;
+  Timer? reminder, retry;
+  int retries = 0;
+  bool backgrounded = false;
   AndroidUpdate? pendingUpdate;
-  DateTime? lastCheck;
   final remindedVersions = <String>{};
   @override
   void initState() {
@@ -73,21 +74,38 @@ class _UpdateHostState extends State<UpdateHost> with WidgetsBindingObserver {
   @override
   void dispose() {
     reminder?.cancel();
+    retry?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
+  bool get automaticEnabled =>
+      widget.enabled &&
+      !kIsWeb &&
+      defaultTargetPlatform == TargetPlatform.android;
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed &&
-        widget.enabled &&
-        !kIsWeb &&
-        defaultTargetPlatform == TargetPlatform.android &&
-        (lastCheck == null ||
-            DateTime.now().difference(lastCheck!) >=
-                const Duration(minutes: 5))) {
-      unawaited(check(manual: false));
+    // Android also sends inactive/resumed for notification shade and permission
+    // dialogs. Only a real background visit starts a new reminder opportunity.
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      backgrounded = true;
+      retry?.cancel();
+    } else if (state == AppLifecycleState.resumed && backgrounded) {
+      backgrounded = false;
+      retries = 0;
+      remindedVersions.clear();
+      if (automaticEnabled) unawaited(check(manual: false));
     }
+  }
+
+  void retryAutomaticCheck() {
+    if (!automaticEnabled || backgrounded || retries >= 3) return;
+    retry?.cancel();
+    retry = Timer(Duration(seconds: 4 * (1 << retries++)), () {
+      if (mounted) unawaited(check(manual: false));
+    });
   }
 
   void queueReminder(AndroidUpdate update) {
@@ -142,6 +160,7 @@ class _UpdateHostState extends State<UpdateHost> with WidgetsBindingObserver {
 
   Future<void> check({bool manual = true}) async {
     if (checking || showing || !mounted) return;
+    retry?.cancel();
     setState(() => checking = true);
     AndroidUpdate? available;
     String? message;
@@ -153,7 +172,7 @@ class _UpdateHostState extends State<UpdateHost> with WidgetsBindingObserver {
         if (manual) message = '当前为调试版本，请使用正式安装包检查更新。';
       } else {
         final update = await service.check();
-        lastCheck = DateTime.now();
+        retries = 0;
         if (update != null &&
             compareUpdateVersions(
                   update.versionName,
@@ -171,7 +190,11 @@ class _UpdateHostState extends State<UpdateHost> with WidgetsBindingObserver {
         }
       }
     } catch (_) {
-      if (manual) message = '暂时无法检查更新，请检查网络后重试。';
+      if (manual) {
+        message = '暂时无法检查更新，请检查网络后重试。';
+      } else if (mounted) {
+        retryAutomaticCheck();
+      }
     } finally {
       if (mounted) setState(() => checking = false);
     }
@@ -189,6 +212,7 @@ class _UpdateHostState extends State<UpdateHost> with WidgetsBindingObserver {
     showing = true;
     try {
       if (available != null) {
+        remindedVersions.add(available.versionName);
         await showAppDialog(
           dialogContext,
           (_) => UpdateDialog(service: service, update: available!),

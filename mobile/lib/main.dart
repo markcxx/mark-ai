@@ -101,7 +101,9 @@ class _MarkAIAppState extends State<MarkAIApp> {
             local: previewUpdateStore ?? c.local,
             service: previewUpdates,
             enabled: widget.autoStart,
-            ready: introComplete && c.connected && !c.booting,
+            // Updates use their own endpoints and must remain reachable even
+            // when workspace initialization fails or is still waiting.
+            ready: introComplete,
             child: AppToastHost(key: toasts, child: child!),
           ),
         ),

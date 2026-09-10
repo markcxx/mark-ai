@@ -45,7 +45,7 @@ class BytesAdapter implements HttpClientAdapter {
 }
 
 class RouteAdapter implements HttpClientAdapter {
-  final ResponseBody Function(RequestOptions) respond;
+  final FutureOr<ResponseBody> Function(RequestOptions) respond;
   final List<RequestOptions> requests = [];
   RouteAdapter(this.respond);
   @override
@@ -210,6 +210,36 @@ void main() {
       );
     },
   );
+
+  testWidgets('slow GitHub lookup is cancelled before using the mirror', (
+    tester,
+  ) async {
+    final adapter = RouteAdapter((request) async {
+      if (request.uri.host == 'api.github.com') {
+        throw await request.cancelToken!.whenCancel;
+      }
+      return jsonResponse({
+        ...manifest([1, 2, 3]),
+        'repository': updateRepository,
+        'published': true,
+      });
+    });
+    AndroidUpdate? result;
+    final checking = UpdateService(dio: Dio()..httpClientAdapter = adapter)
+        .check()
+        .then((value) => result = value);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 7));
+    expect(result, isNull);
+    await tester.pump(const Duration(seconds: 1));
+    await checking;
+    expect(result!.versionName, '1.0.2');
+    expect(adapter.requests.first.cancelToken!.isCancelled, true);
+    expect(
+      adapter.requests.last.uri.toString(),
+      '$updateMirrorBase/android/latest.json',
+    );
+  });
 
   test(
     'mismatched GitHub APK digest fails instead of falling back to stale data',
@@ -482,6 +512,67 @@ void main() {
       expect(find.text('暂时无法检查更新，请检查网络后重试。'), findsOneWidget);
     },
   );
+
+  testWidgets('startup network failure retries and then offers the update', (
+    tester,
+  ) async {
+    final service = FakeUpdates()..offline = true;
+    await host(tester, service, MemoryStore());
+    expect(service.checks, 1);
+    service.offline = false;
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
+    expect(service.checks, 2);
+    expect(find.text('发现新版本 1.0.2'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('offline automatic retries are bounded', (tester) async {
+    final service = FakeUpdates()..offline = true;
+    await host(tester, service, MemoryStore());
+    for (final seconds in [4, 8, 16, 60]) {
+      await tester.pump(Duration(seconds: seconds));
+      await tester.pumpAndSettle();
+    }
+    expect(service.checks, 4);
+    expect(find.textContaining('暂时无法'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets(
+    'reopening checks immediately and reminds about a dismissed version',
+    (tester) async {
+      final service = FakeUpdates();
+      await host(tester, service, MemoryStore());
+      await tester.tap(find.text('稍后再说'));
+      await tester.pumpAndSettle();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(service.checks, 1);
+      expect(find.text('发现新版本 1.0.2'), findsNothing);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(service.checks, 2);
+      expect(find.text('发现新版本 1.0.2'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets('new release is found on return without waiting five minutes', (
+    tester,
+  ) async {
+    final service = FakeUpdates()..available = null;
+    await host(tester, service, MemoryStore());
+    service.available = AndroidUpdate.fromJson(manifest([1, 2, 3]));
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(service.checks, 2);
+    expect(find.text('发现新版本 1.0.2'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
 
   testWidgets('debug build skips release network checks', (tester) async {
     final service = FakeUpdates()..debug = true;
