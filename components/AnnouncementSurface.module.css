@@ -1,0 +1,142 @@
+.bar {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 40px;
+  overflow: hidden;
+  padding-inline: 16px;
+  color: #172033;
+  background: #f5f5f5;
+}
+/* CloudBanner + lobeStaticStylish.gradientAnimation in the reference project. */
+.glow {
+  position: absolute;
+  z-index: -1;
+  width: max(64%, 1280px);
+  height: 100%;
+  opacity: 0.8;
+  filter: blur(60px);
+  background-image: linear-gradient(-45deg, #faad14, #eb2f96, #2f54eb, #13c2c2);
+  background-size: 400% 400%;
+  animation: gradient 5s ease 5s infinite;
+}
+.viewport {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 24px;
+}
+.moving {
+  flex: 1;
+}
+.track {
+  display: flex;
+  width: max-content;
+  white-space: pre;
+}
+.moving .track {
+  animation: marquee var(--announcement-duration, 24s) linear infinite;
+}
+.moving .text {
+  padding-right: 48px;
+}
+.bar:hover .track,
+.bar:focus-within .track {
+  animation-play-state: paused;
+}
+.action {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  max-width: 45%;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #fff;
+  background: #111;
+}
+.action span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.action:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+.close {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 6px;
+}
+.close:hover {
+  background: #ffffff40;
+}
+:global(.dark) .bar {
+  background: #242424;
+  color: #fff;
+}
+:global(.dark) .glow {
+  opacity: 0.65;
+}
+:global(.dark) .action {
+  color: #111;
+  background: #fff;
+}
+@keyframes gradient {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+@media (max-width: 767px) {
+  .bar {
+    min-height: 44px;
+    gap: 8px;
+    padding-inline: 12px;
+  }
+  .action,
+  .close {
+    min-height: 40px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .glow,
+  .moving .track {
+    animation: none;
+  }
+  .viewport {
+    overflow-x: auto;
+  }
+  .duplicate {
+    display: none;
+  }
+}
+:global([data-reduce-motion="true"]) .glow,
+:global([data-reduce-motion="true"]) .moving .track {
+  animation: none;
+}
+:global([data-reduce-motion="true"]) .viewport {
+  overflow-x: auto;
+}
+:global([data-reduce-motion="true"]) .duplicate {
+  display: none;
+}

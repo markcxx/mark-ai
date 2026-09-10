@@ -7,8 +7,10 @@ import {
   LogOut,
   Settings,
   ShieldCheck,
+  Download,
 } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { signOut, useSession } from "@/lib/auth-client";
@@ -67,6 +69,14 @@ export function UserAccountMenu() {
               <p className="mt-0.5 truncate text-xs text-gray-400">{user.email}</p>
             </div>
             <div className="py-1">
+              <Link
+                href="/download"
+                onClick={() => setOpen(false)}
+                className="flex min-h-10 w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/[0.07]"
+              >
+                <Download className="text-gray-400" size={17} />
+                下载 App
+              </Link>
               <button
                 className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-gray-700 transition-all hover:bg-gray-100 active:scale-[0.98] dark:text-gray-200 dark:hover:bg-white/[0.07]"
                 onClick={() => {

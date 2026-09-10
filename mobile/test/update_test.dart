@@ -397,23 +397,79 @@ void main() {
   }
 
   testWidgets(
-    'startup finds update without blocking home; dismissal throttles automatic checks',
+    'automatic update waits for boot and an open route, then offers later',
     (tester) async {
-      final service = FakeUpdates(), local = MemoryStore();
-      await host(tester, service, local);
+      final navigator = GlobalKey<NavigatorState>();
+      final ready = ValueNotifier(false);
+      final service = FakeUpdates();
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: navigator,
+          theme: markaiTheme(Brightness.light),
+          builder: (context, child) => ValueListenableBuilder<bool>(
+            valueListenable: ready,
+            builder: (_, value, _) => UpdateHost(
+              navigator: navigator,
+              local: MemoryStore(),
+              enabled: true,
+              ready: value,
+              service: service,
+              child: child!,
+            ),
+          ),
+          home: const Scaffold(body: Text('工作空间')),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 1));
+      expect(service.checks, 1);
+      expect(find.text('发现新版本 1.0.2'), findsNothing);
+      navigator.currentState!.push(
+        MaterialPageRoute<void>(
+          builder: (_) => const Scaffold(body: Text('其他页面')),
+        ),
+      );
+      ready.value = true;
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('发现新版本 1.0.2'), findsNothing);
+      navigator.currentState!.pop();
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
       expect(find.text('发现新版本 1.0.2'), findsOneWidget);
-      expect(find.text('MarkAI'), findsOneWidget);
       await tester.tap(find.text('稍后再说'));
       await tester.pumpAndSettle();
+      expect(service.downloads, 0);
+      expect(find.text('工作空间'), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
-      await host(tester, service, local);
-      expect(service.checks, 1);
-      await tester.tap(find.text('检查更新'));
-      await tester.pumpAndSettle();
-      expect(service.checks, 2);
-      expect(find.text('发现新版本 1.0.2'), findsOneWidget);
+      ready.dispose();
     },
   );
+
+  testWidgets('every cold startup checks even after a recent dismissal', (
+    tester,
+  ) async {
+    final service = FakeUpdates(), local = MemoryStore();
+    await local.write('android-update-check', {
+      'at': DateTime.now().millisecondsSinceEpoch,
+    });
+    await host(tester, service, local);
+    expect(find.text('发现新版本 1.0.2'), findsOneWidget);
+    expect(find.text('MarkAI'), findsOneWidget);
+    await tester.tap(find.text('稍后再说'));
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox());
+    await host(tester, service, local);
+    expect(service.checks, 2);
+    expect(find.text('发现新版本 1.0.2'), findsOneWidget);
+    await tester.tap(find.text('稍后再说'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('检查更新'));
+    await tester.pumpAndSettle();
+    expect(service.checks, 3);
+    expect(find.text('发现新版本 1.0.2'), findsOneWidget);
+  });
 
   testWidgets(
     'offline startup stays quiet and manual check has actionable error',

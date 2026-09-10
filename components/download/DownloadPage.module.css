@@ -1,0 +1,116 @@
+.card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: 28px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: var(--chat-panel-bg);
+  transition:
+    border-color 200ms,
+    box-shadow 200ms,
+    transform 200ms;
+}
+.card:hover,
+.card:focus-within {
+  border-color: #9ca3af;
+  box-shadow: 0 10px 28px -20px rgb(0 0 0 / 30%);
+}
+@media (hover: hover) {
+  .card:hover {
+    transform: translateY(-3px);
+  }
+}
+.heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.heading > svg {
+  width: 30px;
+  height: 30px;
+  color: #6b7280;
+}
+.description {
+  font-size: 14px;
+  line-height: 28px;
+  color: #6b7280;
+}
+.features {
+  margin: 24px 0;
+  padding: 20px 0;
+  border-block: 1px solid #e5e7eb;
+  list-style: none;
+}
+.features li {
+  display: flex;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 26px;
+  color: #6b7280;
+}
+.features li + li {
+  margin-top: 8px;
+}
+.features li::before {
+  content: "✓";
+  flex-shrink: 0;
+  color: #9ca3af;
+}
+.bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-top: auto;
+}
+.card a {
+  transition:
+    background-color 150ms,
+    transform 150ms,
+    border-color 150ms;
+}
+.card a:active {
+  transform: scale(0.98);
+}
+.card a:focus-visible,
+.card summary:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 4px;
+}
+.card a > svg:last-child {
+  transition: transform 150ms;
+}
+.card a:hover > svg:last-child {
+  transform: translateX(2px);
+}
+:global(.dark) .card,
+:global(.dark) .features {
+  border-color: rgb(255 255 255 / 12%);
+}
+:global(.dark) .card:hover,
+:global(.dark) .card:focus-within {
+  border-color: rgb(255 255 255 / 30%);
+}
+:global(.dark) .description,
+:global(.dark) .features li {
+  color: #9ca3af;
+}
+@media (max-width: 767px) {
+  .card {
+    padding: 24px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .card a,
+  .card a > svg:last-child {
+    transition: none;
+    transform: none !important;
+  }
+}
+:global([data-reduce-motion="true"]) .card,
+:global([data-reduce-motion="true"]) .card a {
+  transition: none;
+  transform: none !important;
+}

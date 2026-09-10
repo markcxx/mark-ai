@@ -76,6 +76,7 @@ class _MarkAIAppState extends State<MarkAIApp> {
             local: previewUpdateStore ?? c.local,
             service: previewUpdates,
             enabled: widget.autoStart,
+            ready: !c.booting,
             child: AppToastHost(key: toasts, child: child!),
           ),
         ),

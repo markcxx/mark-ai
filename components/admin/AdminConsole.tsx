@@ -8,6 +8,7 @@ import {
   RefreshCw,
   ScrollText,
   UsersRound,
+  Megaphone,
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -15,6 +16,7 @@ import { useTheme } from "next-themes";
 import { Toaster } from "react-hot-toast";
 
 import { AuditPanel } from "@/components/admin/AuditPanel";
+import { AnnouncementPanel } from "@/components/admin/AnnouncementPanel";
 import { OverviewPanel } from "@/components/admin/OverviewPanel";
 import { UsersPanel } from "@/components/admin/UsersPanel";
 import { WaitlistPanel } from "@/components/admin/WaitlistPanel";
@@ -25,7 +27,7 @@ import { PRIMARY_COLOR_VALUES } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 
-type AdminView = "audit" | "overview" | "users" | "waitlist";
+type AdminView = "audit" | "overview" | "users" | "waitlist" | "announcement";
 
 const views = [
   {
@@ -52,6 +54,12 @@ const views = [
     id: "audit" as const,
     label: "审计日志",
   },
+  {
+    description: "编辑聊天页和下载页的公告文字",
+    icon: Megaphone,
+    id: "announcement" as const,
+    label: "站点公告",
+  },
 ];
 
 export function AdminConsole() {
@@ -77,7 +85,10 @@ export function AdminConsole() {
       root.style.removeProperty("--color-primary-container");
     } else {
       root.style.setProperty("--color-primary", PRIMARY_COLOR_VALUES[general.primaryColor]);
-      root.style.setProperty("--color-primary-container", PRIMARY_COLOR_VALUES[general.primaryColor]);
+      root.style.setProperty(
+        "--color-primary-container",
+        PRIMARY_COLOR_VALUES[general.primaryColor],
+      );
     }
     root.dataset.density = general.density;
     root.dataset.reduceMotion = general.reduceMotion ? "true" : "false";
@@ -157,7 +168,7 @@ export function AdminConsole() {
               返回
             </button>
           </div>
-          <div className="mx-auto mt-3 grid max-w-[1440px] grid-cols-4 gap-1 md:hidden">
+          <div className="mx-auto mt-3 grid max-w-[1440px] grid-cols-5 gap-1 md:hidden">
             {views.map((item) => {
               const Icon = item.icon;
               return (
@@ -195,6 +206,7 @@ export function AdminConsole() {
           {view === "waitlist" && <WaitlistPanel />}
           {view === "users" && <UsersPanel />}
           {view === "audit" && <AuditPanel />}
+          {view === "announcement" && <AnnouncementPanel />}
         </div>
       </main>
     </div>

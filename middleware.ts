@@ -10,6 +10,7 @@ const PUBLIC_PATHS = [
   "/login",
   "/register",
   "/reset-password",
+  "/download",
 ];
 
 const isPublicPath = (pathname: string) => PUBLIC_PATHS.some((p) => pathname.startsWith(p));

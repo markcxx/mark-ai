@@ -15,6 +15,7 @@ const ROUTES_WITHOUT_CHAT_INITIALIZATION = [
   "/plugins",
   "/register",
   "/reset-password",
+  "/download",
 ];
 
 export function AppBootSplash() {

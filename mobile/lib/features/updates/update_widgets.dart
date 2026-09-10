@@ -36,6 +36,7 @@ class UpdateHost extends StatefulWidget {
   final GlobalKey<NavigatorState> navigator;
   final LocalStore local;
   final bool enabled;
+  final bool ready;
   final UpdateService? service;
   const UpdateHost({
     super.key,
@@ -43,19 +44,25 @@ class UpdateHost extends StatefulWidget {
     required this.navigator,
     required this.local,
     required this.enabled,
+    this.ready = true,
     this.service,
   });
   @override
   State<UpdateHost> createState() => _UpdateHostState();
 }
 
-class _UpdateHostState extends State<UpdateHost> {
+class _UpdateHostState extends State<UpdateHost> with WidgetsBindingObserver {
   late final service = widget.service ?? UpdateService();
   bool checking = false, showing = false;
   String version = '';
+  Timer? reminder;
+  AndroidUpdate? pendingUpdate;
+  DateTime? lastCheck;
+  final remindedVersions = <String>{};
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (widget.enabled &&
         !kIsWeb &&
         defaultTargetPlatform == TargetPlatform.android) {
@@ -63,13 +70,74 @@ class _UpdateHostState extends State<UpdateHost> {
     }
   }
 
+  @override
+  void dispose() {
+    reminder?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        widget.enabled &&
+        !kIsWeb &&
+        defaultTargetPlatform == TargetPlatform.android &&
+        (lastCheck == null ||
+            DateTime.now().difference(lastCheck!) >=
+                const Duration(minutes: 5))) {
+      unawaited(check(manual: false));
+    }
+  }
+
+  void queueReminder(AndroidUpdate update) {
+    if (remindedVersions.contains(update.versionName)) return;
+    pendingUpdate = update;
+    reminder?.cancel();
+    void tryShow() {
+      final navigator = widget.navigator.currentState;
+      final context = navigator?.overlay?.context;
+      if (!mounted ||
+          !widget.ready ||
+          showing ||
+          checking ||
+          navigator == null ||
+          navigator.canPop() ||
+          context == null ||
+          !context.mounted ||
+          (WidgetsBinding.instance.lifecycleState != null &&
+              WidgetsBinding.instance.lifecycleState !=
+                  AppLifecycleState.resumed)) {
+        return;
+      }
+      final available = pendingUpdate;
+      if (available == null) return;
+      reminder?.cancel();
+      pendingUpdate = null;
+      showing = true;
+      remindedVersions.add(available.versionName);
+      showAppDialog(
+        context,
+        (_) => UpdateDialog(service: service, update: available),
+      ).whenComplete(() => showing = false);
+    }
+
+    tryShow();
+    if (pendingUpdate != null) {
+      reminder = Timer.periodic(
+        const Duration(milliseconds: 500),
+        (_) => tryShow(),
+      );
+    }
+  }
+
   Future<void> initialize() async {
     try {
       await service.cleanCache();
-      await check(manual: false);
     } catch (_) {
-      /* Background update failures never block startup. */
+      /* Cache cleanup failure must not suppress the update check. */
     }
+    await check(manual: false);
   }
 
   Future<void> check({bool manual = true}) async {
@@ -84,14 +152,8 @@ class _UpdateHostState extends State<UpdateHost> {
       if (info['debug'] == true) {
         if (manual) message = '当前为调试版本，请使用正式安装包检查更新。';
       } else {
-        final saved = await widget.local.read('android-update-check');
-        final checked = saved['at'] as int? ?? 0;
-        if (!manual &&
-            DateTime.now().millisecondsSinceEpoch - checked <
-                const Duration(hours: 12).inMilliseconds) {
-          return;
-        }
         final update = await service.check();
+        lastCheck = DateTime.now();
         if (update != null &&
             compareUpdateVersions(
                   update.versionName,
@@ -107,21 +169,20 @@ class _UpdateHostState extends State<UpdateHost> {
         } else if (manual) {
           message = '当前已是最新版本。';
         }
-        // If another route is open, leave the automatic reminder for the next launch.
-        if (manual || !(widget.navigator.currentState?.canPop() ?? true)) {
-          await widget.local.write('android-update-check', {
-            'at': DateTime.now().millisecondsSinceEpoch,
-          });
-        }
       }
     } catch (_) {
       if (manual) message = '暂时无法检查更新，请检查网络后重试。';
     } finally {
       if (mounted) setState(() => checking = false);
     }
-    if (!mounted ||
-        (!manual && (widget.navigator.currentState?.canPop() ?? true))) {
+    if (!mounted) return;
+    if (!manual && available != null) {
+      queueReminder(available);
       return;
+    }
+    if (manual) {
+      reminder?.cancel();
+      pendingUpdate = null;
     }
     final dialogContext = widget.navigator.currentState?.overlay?.context;
     if (dialogContext == null || !dialogContext.mounted) return;

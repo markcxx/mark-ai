@@ -71,6 +71,20 @@
       "when": 1788751573293,
       "tag": "0009_wonderful_ultimatum",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789017504080,
+      "tag": "0010_windy_omega_sentinel",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789018593718,
+      "tag": "0011_lively_wiccan",
+      "breakpoints": true
     }
   ]
 }
