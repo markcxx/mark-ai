@@ -5,10 +5,12 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/storage/local_store.dart';
 import '../../shared/widgets/app_dialog.dart';
 import '../../shared/widgets/app_select.dart';
+import '../../shared/widgets/ui_icon.dart';
 import 'update_service.dart';
 
 class UpdateScope extends InheritedWidget {
@@ -133,11 +135,42 @@ class _UpdateHostState extends State<UpdateHost> {
       } else if (message != null) {
         await showAppDialog(
           dialogContext,
-          (_) => AppDialog(
+          (context) => AppDialog(
             title: '检查更新',
             child: Padding(
               padding: const EdgeInsets.all(20),
-              child: Text(message!),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (message == '当前已是最新版本。') ...[
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: UiIcon(LucideIcons.circleCheck, size: 28),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  Text(
+                    message!,
+                    style: const TextStyle(fontSize: 14, height: 1.6),
+                  ),
+                  if (message == '当前已是最新版本。' && version.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'MarkAI $version',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('我知道了'),
+                  ),
+                ],
+              ),
             ),
           ),
         );

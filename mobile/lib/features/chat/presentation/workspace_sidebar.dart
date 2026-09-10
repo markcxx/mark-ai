@@ -17,6 +17,7 @@ class WorkspaceSidebar extends StatefulWidget {
   final WorkspaceController controller;
   final VoidCallback onSettings, onTools, onFocusComposer;
   final VoidCallback? onClose;
+  final VoidCallback? onSelectConversation;
   const WorkspaceSidebar({
     super.key,
     required this.controller,
@@ -24,6 +25,7 @@ class WorkspaceSidebar extends StatefulWidget {
     required this.onTools,
     required this.onFocusComposer,
     this.onClose,
+    this.onSelectConversation,
   });
   @override
   State<WorkspaceSidebar> createState() => _WorkspaceSidebarState();
@@ -60,6 +62,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
   }
 
   void select(String? id) {
+    widget.onSelectConversation?.call();
     close();
     run(() => c.openSession(id));
   }

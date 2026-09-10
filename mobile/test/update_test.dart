@@ -445,6 +445,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('当前已是最新版本。'), findsOneWidget);
     expect(find.text('下载更新'), findsNothing);
+    await tester.tap(find.text('我知道了'));
+    await tester.pumpAndSettle();
+    expect(find.text('当前已是最新版本。'), findsNothing);
   });
 
   testWidgets(

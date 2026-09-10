@@ -93,7 +93,12 @@ class WorkspaceShell extends StatelessWidget {
                                     ]
                                   : null,
                             ),
-                            child: sidebar,
+                            child: _SidebarSwipe(
+                              enabled: mobile && open,
+                              onOpen: onClose,
+                              closing: true,
+                              child: sidebar,
+                            ),
                           ),
                         ),
                       ),
@@ -107,9 +112,14 @@ class WorkspaceShell extends StatelessWidget {
                       child: Semantics(
                         button: true,
                         label: '收起历史会话',
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: onClose,
+                        child: _SidebarSwipe(
+                          enabled: true,
+                          closing: true,
+                          onOpen: onClose,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: onClose,
+                          ),
                         ),
                       ),
                     ),
@@ -125,10 +135,12 @@ class WorkspaceShell extends StatelessWidget {
 
 class _SidebarSwipe extends StatefulWidget {
   final bool enabled;
+  final bool closing;
   final VoidCallback onOpen;
   final Widget child;
   const _SidebarSwipe({
     required this.enabled,
+    this.closing = false,
     required this.onOpen,
     required this.child,
   });
@@ -147,7 +159,9 @@ class _SidebarSwipeState extends State<_SidebarSwipe> {
         : null,
     onHorizontalDragEnd: widget.enabled
         ? (_) {
-            if (distance >= 60) widget.onOpen();
+            if (widget.closing ? distance <= -60 : distance >= 60) {
+              widget.onOpen();
+            }
             distance = 0;
           }
         : null,

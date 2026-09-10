@@ -16,28 +16,30 @@ import '../updates/update_widgets.dart';
 
 class SettingsScreen extends StatefulWidget {
   final WorkspaceController controller;
-  const SettingsScreen({super.key, required this.controller});
+  final VoidCallback? onBack, onOpenSidebar;
+  final bool sidebarOpen;
+  const SettingsScreen({
+    super.key,
+    required this.controller,
+    this.onBack,
+    this.onOpenSidebar,
+    this.sidebarOpen = false,
+  });
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final scroll = ScrollController();
+  String section = '外观';
+  static const sections = ['外观', '对话', '语音', 'AI 提供商', '应用更新'];
   @override
   void dispose() {
     scroll.dispose();
     super.dispose();
   }
 
-  String section = 'appearance';
   WorkspaceController get c => widget.controller;
-  static const sections = {
-    'appearance': '外观',
-    'chat': '对话',
-    'speech': '语音',
-    'providers': 'AI 提供商',
-    'updates': '应用更新',
-  };
   Widget row(
     String title,
     Widget control, {
@@ -279,218 +281,190 @@ class _SettingsScreenState extends State<SettingsScreen> {
       toggle('默认宽屏对话', 'wideChatMode'),
     ],
   );
+  Widget sectionBlock(String title, Widget child) => Padding(
+    padding: const EdgeInsets.only(top: 28),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 4),
+        child,
+      ],
+    ),
+  );
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: c,
-    builder: (context, _) {
-      final mobile = MediaQuery.sizeOf(context).width < 640;
-      final main = Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            height: 63,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        sections[section]!,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Text(
-                        section == 'updates'
-                            ? '检查新版本并安装更新'
-                            : c.settingsSaveState == 'error'
-                            ? '云端同步失败，本地设置已经生效'
-                            : c.settingsSaveState == 'saving'
-                            ? '正在恢复默认设置…'
-                            : c.settingsSaveState == 'saved'
-                            ? '已应用 · 自动保存'
-                            : '修改会立即应用并自动保存',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xff9ca3af),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                ActionIcon('关闭设置', LucideIcons.x, () => Navigator.pop(context)),
-              ],
-            ),
+    builder: (context, _) => PopScope(
+      canPop: widget.onBack == null,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && !widget.sidebarOpen) widget.onBack?.call();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          leading: ActionIcon(
+            '展开侧栏',
+            LucideIcons.panelLeft,
+            widget.onOpenSidebar,
           ),
-          const Divider(),
-          if (mobile) ...[
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
-                children: [
-                  for (final entry in sections.entries)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 4),
-                      child: TextButton(
-                        onPressed: () => setState(() => section = entry.key),
-                        style: TextButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          backgroundColor: section == entry.key
-                              ? Theme.of(context)
-                                    .colorScheme
-                                    .surfaceContainerHighest
-                              : Colors.transparent,
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          textStyle: const TextStyle(
-                            fontFamily: 'Noto Sans SC',
-                            fontSize: 14,
-                            letterSpacing: 0,
-                            height: 20 / 14,
-                          ),
-                        ),
-                        child: Text(entry.value),
-                      ),
-                    ),
-                ],
-              ),
+          title: const Text('设置'),
+          actions: [
+            TextButton.icon(
+              onPressed: widget.onBack ?? () => Navigator.maybePop(context),
+              icon: const UiIcon(LucideIcons.arrowLeft, size: 16),
+              label: const Text('返回对话'),
             ),
-            const Divider(),
+            const SizedBox(width: 8),
           ],
-          RecoveryNotice(controller: c),
-          Expanded(
-            child: RawScrollbar(
-              controller: scroll,
-              thumbVisibility: true,
-              thickness: 6,
-              radius: const Radius.circular(3),
-              padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 2),
-              thumbColor: const Color(0xffbcbcc8),
-              child: SingleChildScrollView(
-                controller: scroll,
-                padding: EdgeInsets.only(
-                  left: mobile ? 20 : 32,
-                  right: mobile ? 31 : 32,
-                ),
-                child: switch (section) {
-                  'appearance' => appearance(),
-                  'chat' => chat(),
-                  'providers' => ProviderSettings(controller: c),
-                  'updates' => const UpdateSettings(),
-                  _ => row(
-                    '默认音色',
-                    AppSelect<String>(
-                      label: '默认音色',
-                      height: 40,
-                      value:
-                          jsonMap(c.settings['speech'])['voice'] as String? ??
-                          '__system__',
-                      options: {
-                        '__system__': '系统默认',
-                        for (final v in speechVoices)
-                          v['value']!: '${v['label']} · ${v['value']}',
-                      },
-                      onChanged: (value) =>
-                          c.setSectionSetting('speech', 'voice', value),
-                    ),
-                    description: '用于消息语音朗读，修改后会自动保存',
-                    last: true,
-                  ),
-                },
-              ),
-            ),
-          ),
-        ],
-      );
-      final content = Material(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? const Color(0xff151515)
-            : Colors.white,
-        child: Row(
-          children: [
-            if (!mobile)
+        ),
+        body: SafeArea(
+          top: false,
+          child: Column(
+            children: [
               Container(
-                width: 224,
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                padding: const EdgeInsets.all(12),
-                child: Column(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                child: Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
                   children: [
-                    const SizedBox(
-                      height: 48,
-                      child: Row(
-                        children: [
-                          UiIcon(LucideIcons.settings2, size: 18),
-                          SizedBox(width: 8),
-                          Text('设置'),
-                        ],
-                      ),
-                    ),
-                    for (final entry in sections.entries)
-                      Material(
-                        color: Colors.transparent,
-                        child: ListTile(
-                          dense: true,
-                          selected: entry.key == section,
-                          title: Text(entry.value),
-                          onTap: () => setState(() => section = entry.key),
+                    for (final title in sections)
+                      Semantics(
+                        selected: section == title,
+                        child: TextButton(
+                          key: ValueKey('settings-tab-$title'),
+                          onPressed: () {
+                            if (section == title) return;
+                            FocusManager.instance.primaryFocus?.unfocus();
+                            if (scroll.hasClients) scroll.jumpTo(0);
+                            setState(() => section = title);
+                          },
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size(44, 44),
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            foregroundColor: section == title
+                                ? Theme.of(context).colorScheme.onSurface
+                                : Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                            backgroundColor: section == title
+                                ? Theme.of(context)
+                                      .colorScheme
+                                      .surfaceContainerHighest
+                                : Colors.transparent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: Text(title),
                         ),
                       ),
-                    const Spacer(),
-                    TextButton.icon(
-                      onPressed: () async {
-                        if (await confirmAction(
-                          context,
-                          '恢复全部默认设置？',
-                          '外观、对话和语音设置会恢复为初始值，此操作会立即应用。',
-                        )) {
-                          await c.resetSettings();
-                        }
-                      },
-                      icon: const UiIcon(LucideIcons.rotateCcw, size: 14),
-                      label: const Text('恢复默认'),
-                    ),
                   ],
                 ),
               ),
-            Expanded(child: main),
-          ],
+              const Divider(height: 1),
+              Expanded(
+                child: RawScrollbar(
+                  controller: scroll,
+                  thumbVisibility: true,
+                  thickness: 4,
+                  radius: const Radius.circular(3),
+                  child: SingleChildScrollView(
+                    key: const ValueKey('settings-scroll'),
+                    controller: scroll,
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 840),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              c.settingsSaveState == 'error'
+                                  ? '云端同步失败，本地设置已经生效'
+                                  : c.settingsSaveState == 'saving'
+                                  ? '正在保存…'
+                                  : '修改会立即应用并自动保存',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xff9ca3af),
+                              ),
+                            ),
+                            RecoveryNotice(controller: c),
+                            if (section == '外观')
+                              sectionBlock('外观', appearance()),
+                            if (section == '对话') sectionBlock('对话', chat()),
+                            if (section == '语音')
+                              sectionBlock(
+                                '语音',
+                                row(
+                                  '默认音色',
+                                  AppSelect<String>(
+                                    label: '默认音色',
+                                    height: 40,
+                                    value:
+                                        jsonMap(c.settings['speech'])['voice']
+                                            as String? ??
+                                        '__system__',
+                                    options: {
+                                      '__system__': '系统默认',
+                                      for (final v in speechVoices)
+                                        v['value']!:
+                                            '${v['label']} · ${v['value']}',
+                                    },
+                                    onChanged: (value) => c.setSectionSetting(
+                                      'speech',
+                                      'voice',
+                                      value,
+                                    ),
+                                  ),
+                                  description: '用于消息语音朗读，修改后会自动保存',
+                                  last: true,
+                                ),
+                              ),
+                            if (section == 'AI 提供商')
+                              sectionBlock(
+                                'AI 提供商',
+                                ProviderSettings(controller: c),
+                              ),
+                            if (section == '应用更新')
+                              sectionBlock('应用更新', const UpdateSettings()),
+                            const Divider(height: 32),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton.icon(
+                                onPressed: () async {
+                                  if (await confirmAction(
+                                    context,
+                                    '恢复全部默认设置？',
+                                    '外观、对话和语音设置会恢复为初始值，此操作会立即应用。',
+                                  )) {
+                                    await c.resetSettings();
+                                  }
+                                },
+                                icon: const UiIcon(
+                                  LucideIcons.rotateCcw,
+                                  size: 16,
+                                ),
+                                label: const Text('恢复默认设置'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-      );
-      return mobile
-          ? SafeArea(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  12,
-                  0,
-                  12,
-                  MediaQuery.viewInsetsOf(context).bottom,
-                ),
-                child: Container(
-                  padding: const EdgeInsets.all(1),
-                  color: Theme.of(context).colorScheme.outline,
-                  child: content,
-                ),
-              ),
-            )
-          : Dialog(
-              insetPadding: const EdgeInsets.all(32),
-              child: SizedBox(
-                width: 1024,
-                height: (MediaQuery.sizeOf(context).height * .9).clamp(0, 760),
-                child: content,
-              ),
-            );
-    },
+      ),
+    ),
   );
 }

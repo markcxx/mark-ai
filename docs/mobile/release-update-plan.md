@@ -22,7 +22,7 @@
 
 Android 系统仍需要内部整数 versionCode 来防止降级。Gradle 和发布脚本自动按 `主版本 × 1000000 + 次版本 × 1000 + 修订号` 生成，例如 `1.0.3 → 1000003`。不在设置界面显示，也不需要手动维护。次版本、修订号范围为 0–999，内部总值不能超过 Android 支持上限。
 
-`mobile/pubspec.yaml` 只写 `version: 1.0.2`，本地 `pnpm android:apk` 自动生成对应整数；CI 的版本号输入通过 `--build-name` 写入 APK。CI 不自动提交版本变更，后续本地打包前应把 pubspec 更新为准备发布的版本。
+`mobile/pubspec.yaml` 只写 `version: 1.0.3`，本地 `pnpm android:apk` 自动生成对应整数；CI 的版本号输入通过 `--build-name` 写入 APK。CI 不自动提交版本变更，后续本地打包前应把 pubspec 更新为准备发布的版本。
 
 发布版本必须高于所有 GitHub Android 正式版本，不得低于 pubspec。已有 Release（含草稿）或同名 tag 不允许覆盖。安装前同时检查版本代码递增，兼容以前已经分发的低版本代码 APK。
 

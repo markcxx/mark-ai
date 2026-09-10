@@ -42,7 +42,7 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
-  bool sidebarOpen = false, toolMenuOpen = false;
+  bool sidebarOpen = false, toolMenuOpen = false, settingsOpen = false;
   void closeSidebar() => setState(() => sidebarOpen = false);
   final input = TextEditingController(), scroll = ScrollController();
   final composerFocus = FocusNode();
@@ -232,368 +232,404 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           setState(() => sidebarOpen = true);
         },
         sidebar: drawer(context),
-        child: Scaffold(
-          appBar: AppBar(
-            automaticallyImplyLeading: false,
-            leadingWidth: sidebarOpen ? 8 : 56,
-            leading: sidebarOpen
-                ? const SizedBox()
-                : ActionIcon(
-                    '展开侧栏',
-                    Icons.view_sidebar_outlined,
-                    () => setState(() => sidebarOpen = !sidebarOpen),
-                  ),
-            titleSpacing: 8,
-            title: Row(
-              key: titleAnchor,
-              children: [
-                Flexible(
-                  child: Text(
-                    c.namingSessions.contains(c.activeSessionId)
-                        ? '...'
-                        : c.activeSession?.title ?? '新对话',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                AppMenuButton(
-                  width: 224,
-                  positionAnchor: titleAnchor,
-                  horizontalOffset: -8,
-                  topOffset: 44,
-                  items: () => [
-                    AppMenuItem(
-                      '智能重命名',
-                      icon: LucideIcons.sparkles,
-                      onPressed: () => sessionAction('smart'),
-                    ),
-                    AppMenuItem(
-                      '重命名',
-                      icon: LucideIcons.pencilLine,
-                      onPressed: () => sessionAction('rename'),
-                    ),
-                    AppMenuItem(
-                      c.activeSession?.favorite == true ? '取消收藏' : '收藏',
-                      icon: LucideIcons.star,
-                      onPressed: () => sessionAction('favorite'),
-                    ),
-                    AppMenuItem(
-                      '复制会话 ID',
-                      icon: LucideIcons.copy,
-                      onPressed: () => sessionAction('id'),
-                    ),
-                    AppMenuItem(
-                      '全宽显示',
-                      icon: c.general['wideChatMode'] == true
-                          ? LucideIcons.shrink
-                          : LucideIcons.expand,
-                      checked: c.general['wideChatMode'] == true,
-                      keepOpen: true,
-                      onPressed: () => c.setSetting(
-                        'wideChatMode',
-                        c.general['wideChatMode'] != true,
+        child: IndexedStack(
+          index: settingsOpen ? 1 : 0,
+          children: [
+            Scaffold(
+              appBar: AppBar(
+                automaticallyImplyLeading: false,
+                leadingWidth: sidebarOpen ? 8 : 56,
+                leading: sidebarOpen
+                    ? const SizedBox()
+                    : ActionIcon(
+                        '展开侧栏',
+                        Icons.view_sidebar_outlined,
+                        () => setState(() => sidebarOpen = !sidebarOpen),
+                      ),
+                titleSpacing: 8,
+                title: Row(
+                  key: titleAnchor,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        c.namingSessions.contains(c.activeSessionId)
+                            ? '...'
+                            : c.activeSession?.title ?? '新对话',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const AppMenuItem.divider(),
-                    AppMenuItem(
-                      '删除会话',
-                      icon: LucideIcons.trash2,
-                      danger: true,
-                      onPressed: () => sessionAction('delete'),
+                    const SizedBox(width: 12),
+                    AppMenuButton(
+                      width: 224,
+                      positionAnchor: titleAnchor,
+                      horizontalOffset: -8,
+                      topOffset: 44,
+                      items: () => [
+                        AppMenuItem(
+                          '智能重命名',
+                          icon: LucideIcons.sparkles,
+                          onPressed: () => sessionAction('smart'),
+                        ),
+                        AppMenuItem(
+                          '重命名',
+                          icon: LucideIcons.pencilLine,
+                          onPressed: () => sessionAction('rename'),
+                        ),
+                        AppMenuItem(
+                          c.activeSession?.favorite == true ? '取消收藏' : '收藏',
+                          icon: LucideIcons.star,
+                          onPressed: () => sessionAction('favorite'),
+                        ),
+                        AppMenuItem(
+                          '复制会话 ID',
+                          icon: LucideIcons.copy,
+                          onPressed: () => sessionAction('id'),
+                        ),
+                        AppMenuItem(
+                          '全宽显示',
+                          icon: c.general['wideChatMode'] == true
+                              ? LucideIcons.shrink
+                              : LucideIcons.expand,
+                          checked: c.general['wideChatMode'] == true,
+                          keepOpen: true,
+                          onPressed: () => c.setSetting(
+                            'wideChatMode',
+                            c.general['wideChatMode'] != true,
+                          ),
+                        ),
+                        const AppMenuItem.divider(),
+                        AppMenuItem(
+                          '删除会话',
+                          icon: LucideIcons.trash2,
+                          danger: true,
+                          onPressed: () => sessionAction('delete'),
+                        ),
+                      ],
+                      builder: (toggle) => ActionIcon(
+                        '会话操作',
+                        LucideIcons.ellipsisVertical,
+                        toggle,
+                        iconSize: 17,
+                        buttonWidth: 40,
+                        buttonHeight: 40,
+                      ),
                     ),
                   ],
-                  builder: (toggle) => ActionIcon(
-                    '会话操作',
-                    LucideIcons.ellipsisVertical,
-                    toggle,
-                    iconSize: 17,
+                ),
+                actions: [
+                  ActionIcon(
+                    '切换主题',
+                    Theme.of(context).brightness == Brightness.dark
+                        ? Icons.light_mode_outlined
+                        : Icons.dark_mode_outlined,
+                    () => c.setSetting(
+                      'themeMode',
+                      Theme.of(context).brightness == Brightness.dark
+                          ? 'light'
+                          : 'dark',
+                    ),
                     buttonWidth: 40,
                     buttonHeight: 40,
                   ),
-                ),
-              ],
-            ),
-            actions: [
-              ActionIcon(
-                '切换主题',
-                Theme.of(context).brightness == Brightness.dark
-                    ? Icons.light_mode_outlined
-                    : Icons.dark_mode_outlined,
-                () => c.setSetting(
-                  'themeMode',
-                  Theme.of(context).brightness == Brightness.dark
-                      ? 'light'
-                      : 'dark',
-                ),
-                buttonWidth: 40,
-                buttonHeight: 40,
-              ),
-              const SizedBox(width: 4),
-              AppMenuButton(
-                width: 192,
-                alignRight: true,
-                topOffset: 44,
-                items: () => [
-                  if (c.activeSession != null)
-                    AppMenuItem(
-                      '分享链接',
-                      icon: LucideIcons.link2,
-                      onPressed: () => sessionAction('share'),
+                  const SizedBox(width: 4),
+                  AppMenuButton(
+                    width: 192,
+                    alignRight: true,
+                    topOffset: 44,
+                    items: () => [
+                      if (c.activeSession != null)
+                        AppMenuItem(
+                          '分享链接',
+                          icon: LucideIcons.link2,
+                          onPressed: () => sessionAction('share'),
+                        ),
+                      AppMenuItem(
+                        '复制对话',
+                        icon: LucideIcons.copy,
+                        onPressed: () => sessionAction('copy'),
+                      ),
+                      AppMenuItem(
+                        '导出 JSON',
+                        icon: LucideIcons.fileJson,
+                        onPressed: () => sessionAction('export'),
+                      ),
+                      AppMenuItem(
+                        '导出图片',
+                        icon: LucideIcons.imageDown,
+                        onPressed: () => sessionAction('image'),
+                      ),
+                    ],
+                    builder: (toggle) => ActionIcon(
+                      '分享与导出',
+                      LucideIcons.share2,
+                      toggle,
+                      iconSize: 20,
+                      buttonWidth: 40,
+                      buttonHeight: 40,
                     ),
-                  AppMenuItem(
-                    '复制对话',
-                    icon: LucideIcons.copy,
-                    onPressed: () => sessionAction('copy'),
                   ),
-                  AppMenuItem(
-                    '导出 JSON',
-                    icon: LucideIcons.fileJson,
-                    onPressed: () => sessionAction('export'),
-                  ),
-                  AppMenuItem(
-                    '导出图片',
-                    icon: LucideIcons.imageDown,
-                    onPressed: () => sessionAction('image'),
-                  ),
+                  const SizedBox(width: 8),
                 ],
-                builder: (toggle) => ActionIcon(
-                  '分享与导出',
-                  LucideIcons.share2,
-                  toggle,
-                  iconSize: 20,
-                  buttonWidth: 40,
-                  buttonHeight: 40,
-                ),
               ),
-              const SizedBox(width: 8),
-            ],
-          ),
-          body: SafeArea(
-            top: false,
-            child: c.booting || c.loadingSession
-                ? skeleton()
-                : Column(
-                    children: [
-                      Expanded(
-                        child: c.messages.isEmpty
-                            ? LayoutBuilder(
-                                builder: (context, box) => SingleChildScrollView(
-                                  child: ConstrainedBox(
-                                    constraints: BoxConstraints(
-                                      minHeight: (box.maxHeight - 24).clamp(
-                                        0,
-                                        double.infinity,
-                                      ),
-                                    ),
-                                    child: Center(
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 16,
-                                        ),
-                                        child: ConstrainedBox(
-                                          constraints: const BoxConstraints(
-                                            maxWidth: 840,
+              body: SafeArea(
+                top: false,
+                child: c.booting || c.loadingSession
+                    ? skeleton()
+                    : Column(
+                        children: [
+                          Expanded(
+                            child: c.messages.isEmpty
+                                ? LayoutBuilder(
+                                    builder: (context, box) => SingleChildScrollView(
+                                      child: ConstrainedBox(
+                                        constraints: BoxConstraints(
+                                          minHeight: (box.maxHeight - 24).clamp(
+                                            0,
+                                            double.infinity,
                                           ),
-                                          child: Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Row(
-                                                mainAxisAlignment:
-                                                    MainAxisAlignment.center,
+                                        ),
+                                        child: Center(
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 16,
+                                            ),
+                                            child: ConstrainedBox(
+                                              constraints: const BoxConstraints(
+                                                maxWidth: 840,
+                                              ),
+                                              child: Column(
+                                                mainAxisSize: MainAxisSize.min,
                                                 children: [
-                                                  const SizedBox(
-                                                    width: 64,
-                                                    height: 64,
-                                                    child: OverflowBox(
-                                                      maxWidth: 72,
-                                                      maxHeight: 72,
-                                                      child: AgentAvatar(
-                                                        size: 72,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 12),
-                                                  Flexible(
-                                                    child: Column(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        const Text(
-                                                          'MARKAI',
-                                                          style: TextStyle(
-                                                            fontFamily: 'Plus Jakarta Sans',
-                                                            fontSize: 24,
-                                                            height: 32 / 24,
-                                                            fontWeight:
-                                                                FontWeight.w600,
+                                                  Row(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .center,
+                                                    children: [
+                                                      const SizedBox(
+                                                        width: 64,
+                                                        height: 64,
+                                                        child: OverflowBox(
+                                                          maxWidth: 72,
+                                                          maxHeight: 72,
+                                                          child: AgentAvatar(
+                                                            size: 72,
                                                           ),
                                                         ),
-                                                        const SizedBox(
-                                                          height: 8,
+                                                      ),
+                                                      const SizedBox(width: 12),
+                                                      Flexible(
+                                                        child: Column(
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .start,
+                                                          children: [
+                                                            const Text(
+                                                              'MARKAI',
+                                                              style: TextStyle(
+                                                                fontFamily: 'Plus Jakarta Sans',
+                                                                fontSize: 24,
+                                                                height: 32 / 24,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                              ),
+                                                            ),
+                                                            const SizedBox(
+                                                              height: 8,
+                                                            ),
+                                                            const WelcomeCaption(),
+                                                          ],
                                                         ),
-                                                        const WelcomeCaption(),
-                                                      ],
-                                                    ),
+                                                      ),
+                                                    ],
                                                   ),
+                                                  const SizedBox(height: 24),
+                                                  composer(context),
                                                 ],
                                               ),
-                                              const SizedBox(height: 24),
-                                              composer(context),
-                                            ],
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                ),
-                              )
-                            : NotificationListener<ScrollNotification>(
-                                onNotification: (event) {
-                                  if (event is UserScrollNotification) {
-                                    follow = scroll.position.extentAfter < 80;
-                                  }
-                                  return false;
-                                },
-                                child: ListView.builder(
-                                  controller: scroll,
-                                  padding: const EdgeInsets.only(bottom: 20),
-                                  itemCount: c.messages.length,
-                                  itemBuilder: (context, index) {
-                                    final m = c.messages[index];
-                                    return Center(
-                                      child: AnimatedContainer(
-                                        duration: Duration(
-                                          milliseconds:
-                                              c.general['reduceMotion'] == true
-                                              ? 0
-                                              : 250,
-                                        ),
-                                        constraints: BoxConstraints(
-                                          maxWidth:
-                                              c.general['wideChatMode'] == true
-                                              ? MediaQuery.sizeOf(context).width
-                                              : 840,
-                                        ),
-                                        child: Row(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            if (selected.isNotEmpty)
-                                              Padding(
-                                                padding: const EdgeInsets.only(
-                                                  top: 20,
-                                                ),
-                                                child: Checkbox(
-                                                  value: selected.contains(
-                                                    m.id,
-                                                  ),
-                                                  onChanged: (_) => setState(
-                                                    () {
-                                                      selected.contains(m.id)
-                                                          ? selected.remove(
-                                                              m.id,
-                                                            )
-                                                          : selected.add(m.id);
-                                                    },
-                                                  ),
-                                                ),
-                                              ),
-                                            Expanded(
-                                              child: MessageItem(
-                                                key: ValueKey(m.id),
-                                                message: m,
-                                                controller: c,
-                                                onSelect: (m) => setState(
-                                                  () => selected.add(m.id),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
+                                  )
+                                : NotificationListener<ScrollNotification>(
+                                    onNotification: (event) {
+                                      if (event is UserScrollNotification) {
+                                        follow =
+                                            scroll.position.extentAfter < 80;
+                                      }
+                                      return false;
+                                    },
+                                    child: ListView.builder(
+                                      controller: scroll,
+                                      padding: const EdgeInsets.only(
+                                        bottom: 20,
                                       ),
-                                    );
-                                  },
-                                ),
-                              ),
-                      ),
-                      if (!follow && c.messages.isNotEmpty)
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: ActionIcon('回到底部', Icons.arrow_downward, () {
-                            follow = true;
-                            scroll.animateTo(
-                              scroll.position.maxScrollExtent,
-                              duration: const Duration(milliseconds: 200),
-                              curve: Curves.easeOut,
-                            );
-                          }),
-                        ),
-                      if (selected.isNotEmpty)
-                        Container(
-                          decoration: BoxDecoration(
-                            border: Border(
-                              top: BorderSide(color: scheme.outline),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              TextButton(
-                                onPressed: () => setState(selected.clear),
-                                child: const Text('取消'),
-                              ),
-                              Expanded(child: Text('已选 ${selected.length} 条')),
-                              ActionIcon(
-                                '复制选中消息',
-                                Icons.copy,
-                                () => Clipboard.setData(
-                                  ClipboardData(
-                                    text: c.messages
-                                        .where((m) => selected.contains(m.id))
-                                        .map((m) => m.content)
-                                        .join('\n\n'),
+                                      itemCount: c.messages.length,
+                                      itemBuilder: (context, index) {
+                                        final m = c.messages[index];
+                                        return Center(
+                                          child: AnimatedContainer(
+                                            duration: Duration(
+                                              milliseconds:
+                                                  c.general['reduceMotion'] ==
+                                                      true
+                                                  ? 0
+                                                  : 250,
+                                            ),
+                                            constraints: BoxConstraints(
+                                              maxWidth:
+                                                  c.general['wideChatMode'] ==
+                                                      true
+                                                  ? MediaQuery.sizeOf(context)
+                                                        .width
+                                                  : 840,
+                                            ),
+                                            child: Row(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                if (selected.isNotEmpty)
+                                                  Padding(
+                                                    padding:
+                                                        const EdgeInsets.only(
+                                                          top: 20,
+                                                        ),
+                                                    child: Checkbox(
+                                                      value: selected.contains(
+                                                        m.id,
+                                                      ),
+                                                      onChanged: (_) =>
+                                                          setState(() {
+                                                            selected.contains(
+                                                                  m.id,
+                                                                )
+                                                                ? selected
+                                                                      .remove(
+                                                                        m.id,
+                                                                      )
+                                                                : selected.add(
+                                                                    m.id,
+                                                                  );
+                                                          }),
+                                                    ),
+                                                  ),
+                                                Expanded(
+                                                  child: MessageItem(
+                                                    key: ValueKey(m.id),
+                                                    message: m,
+                                                    controller: c,
+                                                    onSelect: (m) => setState(
+                                                      () => selected.add(m.id),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
                                   ),
-                                ),
-                              ),
-                              ActionIcon(
-                                '删除选中消息',
-                                Icons.delete_outline,
-                                () async {
-                                  if (await confirmAction(
-                                    context,
-                                    '删除消息',
-                                    '确认删除选中的 ${selected.length} 条消息？',
-                                  )) {
-                                    await run(() => c.deleteMessages(selected));
-                                    setState(selected.clear);
-                                  }
+                          ),
+                          if (!follow && c.messages.isNotEmpty)
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: ActionIcon(
+                                '回到底部',
+                                Icons.arrow_downward,
+                                () {
+                                  follow = true;
+                                  scroll.animateTo(
+                                    scroll.position.maxScrollExtent,
+                                    duration: const Duration(milliseconds: 200),
+                                    curve: Curves.easeOut,
+                                  );
                                 },
                               ),
-                            ],
-                          ),
-                        )
-                      else if (c.messages.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-                          child: AnimatedContainer(
-                            duration: Duration(
-                              milliseconds: c.general['reduceMotion'] == true
-                                  ? 0
-                                  : 250,
                             ),
-                            constraints: BoxConstraints(
-                              maxWidth: c.general['wideChatMode'] == true
-                                  ? MediaQuery.sizeOf(context).width
-                                  : 840,
+                          if (selected.isNotEmpty)
+                            Container(
+                              decoration: BoxDecoration(
+                                border: Border(
+                                  top: BorderSide(color: scheme.outline),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  TextButton(
+                                    onPressed: () => setState(selected.clear),
+                                    child: const Text('取消'),
+                                  ),
+                                  Expanded(
+                                    child: Text('已选 ${selected.length} 条'),
+                                  ),
+                                  ActionIcon(
+                                    '复制选中消息',
+                                    Icons.copy,
+                                    () => Clipboard.setData(
+                                      ClipboardData(
+                                        text: c.messages
+                                            .where(
+                                              (m) => selected.contains(m.id),
+                                            )
+                                            .map((m) => m.content)
+                                            .join('\n\n'),
+                                      ),
+                                    ),
+                                  ),
+                                  ActionIcon(
+                                    '删除选中消息',
+                                    Icons.delete_outline,
+                                    () async {
+                                      if (await confirmAction(
+                                        context,
+                                        '删除消息',
+                                        '确认删除选中的 ${selected.length} 条消息？',
+                                      )) {
+                                        await run(
+                                          () => c.deleteMessages(selected),
+                                        );
+                                        setState(selected.clear);
+                                      }
+                                    },
+                                  ),
+                                ],
+                              ),
+                            )
+                          else if (c.messages.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                              child: AnimatedContainer(
+                                duration: Duration(
+                                  milliseconds:
+                                      c.general['reduceMotion'] == true
+                                      ? 0
+                                      : 250,
+                                ),
+                                constraints: BoxConstraints(
+                                  maxWidth: c.general['wideChatMode'] == true
+                                      ? MediaQuery.sizeOf(context).width
+                                      : 840,
+                                ),
+                                child: composer(context),
+                              ),
                             ),
-                            child: composer(context),
-                          ),
-                        ),
-                    ],
-                  ),
-          ),
+                        ],
+                      ),
+              ),
+            ),
+            if (settingsOpen)
+              SettingsScreen(
+                controller: c,
+                sidebarOpen: sidebarOpen,
+                onBack: () => setState(() => settingsOpen = false),
+                onOpenSidebar: () => setState(() => sidebarOpen = true),
+              ),
+          ],
         ),
       );
     },
@@ -979,9 +1015,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   Widget drawer(BuildContext context) => WorkspaceSidebar(
     controller: c,
+    onSelectConversation: () => setState(() => settingsOpen = false),
     onClose: closeSidebar,
     onFocusComposer: () {
       closeSidebar();
+      setState(() => settingsOpen = false);
       composerFocus.unfocus();
     },
     onTools: () {
@@ -989,8 +1027,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       showPluginCenter(context, c);
     },
     onSettings: () {
+      composerFocus.unfocus();
       closeSidebar();
-      showAppDialog<void>(context, (_) => SettingsScreen(controller: c));
+      setState(() => settingsOpen = true);
     },
   );
   Widget skeleton() => Padding(
