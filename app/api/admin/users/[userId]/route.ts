@@ -1,10 +1,17 @@
-import { and, count, eq, gt, ne } from "drizzle-orm";
+import { and, count, desc, eq, gt, ne } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { authorizeAdminApi } from "@/lib/admin/api";
 import { writeAdminAudit } from "@/lib/admin/auth";
 import { getDb } from "@/lib/db";
-import { accounts, authSessions, storageFiles, users, waitlistEntries } from "@/lib/db/schema";
+import {
+  accounts,
+  authSessions,
+  storageFiles,
+  users,
+  userPlatforms,
+  waitlistEntries,
+} from "@/lib/db/schema";
 import { isBootstrapAdminEmail, normalizeEmail } from "@/lib/registration";
 import { deleteStoredFile, toStoredFileRecord } from "@/lib/storage/file-storage";
 
@@ -20,7 +27,7 @@ export async function GET(request: Request, context: { params: Promise<{ userId:
   const user = await findUser(userId);
   if (!user) return NextResponse.json({ error: "用户不存在" }, { status: 404 });
   const db = getDb();
-  const [linkedAccounts, sessions] = await Promise.all([
+  const [linkedAccounts, sessions, platforms] = await Promise.all([
     db
       .select({ createdAt: accounts.createdAt, providerId: accounts.providerId })
       .from(accounts)
@@ -36,6 +43,16 @@ export async function GET(request: Request, context: { params: Promise<{ userId:
       })
       .from(authSessions)
       .where(and(eq(authSessions.userId, userId), gt(authSessions.expiresAt, new Date()))),
+    db
+      .select({
+        platform: userPlatforms.platform,
+        appVersion: userPlatforms.appVersion,
+        firstSeenAt: userPlatforms.firstSeenAt,
+        lastSeenAt: userPlatforms.lastSeenAt,
+      })
+      .from(userPlatforms)
+      .where(eq(userPlatforms.userId, userId))
+      .orderBy(desc(userPlatforms.lastSeenAt)),
   ]);
   await writeAdminAudit({
     action: "user.view",
@@ -44,7 +61,7 @@ export async function GET(request: Request, context: { params: Promise<{ userId:
     targetId: userId,
     targetType: "user",
   });
-  return NextResponse.json({ accounts: linkedAccounts, loginSessions: sessions, user });
+  return NextResponse.json({ accounts: linkedAccounts, loginSessions: sessions, platforms, user });
 }
 
 export async function PATCH(request: Request, context: { params: Promise<{ userId: string }> }) {

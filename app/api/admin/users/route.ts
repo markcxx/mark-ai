@@ -1,10 +1,18 @@
-import { and, asc, count, desc, eq, gt, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, exists, gt, ilike, inArray, or, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { authorizeAdminApi, getPagination } from "@/lib/admin/api";
 import { writeAdminAudit } from "@/lib/admin/auth";
 import { getDb } from "@/lib/db";
-import { authSessions, chatSessions, storageFiles, users, waitlistEntries } from "@/lib/db/schema";
+import {
+  authSessions,
+  chatSessions,
+  storageFiles,
+  users,
+  userPlatforms,
+  waitlistEntries,
+} from "@/lib/db/schema";
+import { CLIENT_PLATFORMS, type ClientPlatform } from "@/lib/client-platform";
 import { isBootstrapAdminEmail } from "@/lib/registration";
 import { deleteStoredFile, toStoredFileRecord } from "@/lib/storage/file-storage";
 
@@ -15,8 +23,26 @@ export async function GET(request: Request) {
   const search = searchParams.get("search")?.trim() || "";
   const role = searchParams.get("role")?.trim() || "";
   const status = searchParams.get("status")?.trim() || "";
+  const platform = searchParams.get("platform")?.trim();
+  if (platform && !CLIENT_PLATFORMS.includes(platform as ClientPlatform)) {
+    return NextResponse.json({ error: "平台筛选无效" }, { status: 400 });
+  }
+  const db = getDb();
   const direction = searchParams.get("direction") === "asc" ? asc : desc;
   const filters = [
+    platform
+      ? exists(
+          db
+            .select({ id: userPlatforms.userId })
+            .from(userPlatforms)
+            .where(
+              and(
+                eq(userPlatforms.userId, users.id),
+                eq(userPlatforms.platform, platform as ClientPlatform),
+              ),
+            ),
+        )
+      : undefined,
     role ? eq(users.role, role) : undefined,
     status === "banned" ? eq(users.banned, true) : undefined,
     status === "active" ? or(eq(users.banned, false), sql`${users.banned} is null`) : undefined,
@@ -29,7 +55,6 @@ export async function GET(request: Request) {
       : undefined,
   ].filter(Boolean);
   const where = filters.length ? and(...filters) : undefined;
-  const db = getDb();
   const [baseRows, totalRows] = await Promise.all([
     db
       .select({
@@ -56,7 +81,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ page, total: totalRows[0]?.value || 0, users: [] });
   }
 
-  const [fileRows, sessionRows, activityRows] = await Promise.all([
+  const [fileRows, sessionRows, activityRows, platformRows] = await Promise.all([
     db
       .select({
         bytes: sql<number>`coalesce(sum(${storageFiles.size}), 0)::bigint`,
@@ -85,16 +110,31 @@ export async function GET(request: Request) {
       .from(authSessions)
       .where(and(inArray(authSessions.userId, userIds), gt(authSessions.expiresAt, new Date())))
       .groupBy(authSessions.userId),
+    db
+      .select()
+      .from(userPlatforms)
+      .where(inArray(userPlatforms.userId, userIds))
+      .orderBy(desc(userPlatforms.lastSeenAt)),
   ]);
 
   const filesByUser = new Map(fileRows.map((row) => [row.userId, row]));
   const sessionsByUser = new Map(sessionRows.map((row) => [row.userId, row]));
   const activityByUser = new Map(activityRows.map((row) => [row.userId, row]));
+  const platformsByUser = new Map<string, typeof platformRows>();
+  for (const row of platformRows) {
+    const rows = platformsByUser.get(row.userId) || [];
+    rows.push(row);
+    platformsByUser.set(row.userId, rows);
+  }
   const rows = baseRows.map((user) => ({
     ...user,
+    platforms: (platformsByUser.get(user.id) || []).map(({ userId: _userId, ...usage }) => usage),
     fileBytes: Number(filesByUser.get(user.id)?.bytes || 0),
     fileCount: Number(filesByUser.get(user.id)?.count || 0),
-    lastActiveAt: activityByUser.get(user.id)?.lastActiveAt || null,
+    lastActiveAt:
+      [activityByUser.get(user.id)?.lastActiveAt, platformsByUser.get(user.id)?.[0]?.lastSeenAt]
+        .filter((date): date is Date => Boolean(date))
+        .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] || null,
     sessionCount: Number(sessionsByUser.get(user.id)?.count || 0),
   }));
 

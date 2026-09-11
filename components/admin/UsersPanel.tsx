@@ -27,8 +27,11 @@ import { UserManagementDrawer } from "@/components/admin/UserDetailDialog";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { AppSelect } from "@/components/ui/AppSelect";
 import { cn } from "@/lib/utils";
+import type { UserPlatformUsage } from "@/lib/client-platform";
+import { UserPlatformBadges } from "./UserPlatforms";
 
 export type AdminUserSummary = {
+  platforms?: UserPlatformUsage[];
   age?: number;
   avatar?: string;
   banned?: boolean;
@@ -52,6 +55,7 @@ export function UsersPanel() {
   const [search, setSearch] = useState("");
   const [role, setRole] = useState("all");
   const [status, setStatus] = useState("all");
+  const [platform, setPlatform] = useState("all");
   const [selectedUserId, setSelectedUserId] = useState<string>();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
@@ -74,6 +78,7 @@ export function UsersPanel() {
       if (search.trim()) params.set("search", search.trim());
       if (role !== "all") params.set("role", role);
       if (status !== "all") params.set("status", status);
+      if (platform !== "all") params.set("platform", platform);
       const response = await fetch(`/api/admin/users?${params}`, { cache: "no-store" });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "用户列表加载失败");
@@ -85,7 +90,7 @@ export function UsersPanel() {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, role, search, status]);
+  }, [page, pageSize, role, search, status, platform]);
 
   useEffect(() => void load(), [load]);
 
@@ -167,7 +172,7 @@ export function UsersPanel() {
             value={search}
           />
         </div>
-        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2 lg:flex lg:w-auto lg:items-center">
+        <div className="grid grid-cols-2 gap-2 lg:flex lg:w-auto lg:items-center">
           <div className="min-w-0 lg:w-36">
             <AppSelect
               onChange={(value) => {
@@ -200,8 +205,27 @@ export function UsersPanel() {
               value={status}
             />
           </div>
+          <div className="min-w-0 lg:w-36">
+            <AppSelect
+              aria-label="筛选使用平台"
+              classNames={{ trigger: "min-h-10 md:min-h-8" }}
+              onChange={(value) => {
+                if (typeof value !== "string") return;
+                setPlatform(value);
+                setPage(1);
+              }}
+              options={[
+                { label: "全部平台", value: "all" },
+                { label: "Web", value: "web" },
+                { label: "Android", value: "android" },
+                { label: "未知平台", value: "unknown" },
+              ]}
+              style={{ width: "100%" }}
+              value={platform}
+            />
+          </div>
           <AdminButton onClick={() => void load()}>
-            <RefreshCw size={15} /> <span className="hidden sm:inline">刷新</span>
+            <RefreshCw size={15} /> <span>刷新</span>
           </AdminButton>
         </div>
         {selectedIds.length > 0 && (
@@ -294,6 +318,9 @@ export function UsersPanel() {
                         {user.fullName || user.username || user.email.split("@")[0]}
                       </p>
                       <p className="mt-0.5 text-xs text-gray-400">{user.email}</p>
+                      <div className="mt-1.5">
+                        <UserPlatformBadges platforms={user.platforms} />
+                      </div>
                     </td>
                     <td className="px-5 py-3">
                       <StatusBadge
@@ -403,6 +430,9 @@ export function UsersPanel() {
                       status={user.banned ? "banned" : "active"}
                     />
                   </div>
+                </div>
+                <div className="mt-3">
+                  <UserPlatformBadges platforms={user.platforms} />
                 </div>
                 <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
                   <div>

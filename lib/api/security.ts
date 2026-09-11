@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { isActiveBan } from "@/lib/auth-access";
 import { isCloudMode } from "@/lib/env";
+import { recordUserPlatform } from "@/lib/server/user-platforms";
 
 type AuthorizedRequest = {
   authorized: true;
@@ -57,6 +58,7 @@ export const authorizeApiRequest = async (
     };
   }
 
+  await recordUserPlatform(session.user.id, req.headers);
   return { authorized: true, key: `user:${session.user.id}`, userId: session.user.id };
 };
 

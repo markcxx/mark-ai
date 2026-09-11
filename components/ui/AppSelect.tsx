@@ -23,6 +23,7 @@ export type AppSelectClassNames = {
 };
 
 export type AppSelectProps<Value> = {
+  "aria-label"?: string;
   className?: string;
   classNames?: AppSelectClassNames;
   defaultOpen?: boolean;
@@ -43,6 +44,7 @@ export type AppSelectProps<Value> = {
 };
 
 export function AppSelect<Value extends string | number = string>({
+  "aria-label": ariaLabel,
   className,
   classNames,
   defaultOpen,
@@ -80,6 +82,7 @@ export function AppSelect<Value extends string | number = string>({
       value={value}
     >
       <Select.Trigger
+        aria-label={ariaLabel}
         className={cn(
           "markai-select-trigger inline-flex w-full select-none items-center gap-2 rounded-md border font-sans text-gray-900 outline-none transition-all focus-visible:ring-2 focus-visible:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-100",
           size === "small" && "min-h-6 px-2 text-xs leading-[18px]",

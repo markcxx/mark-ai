@@ -35,8 +35,11 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { AppSelect } from "@/components/ui/AppSelect";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { cn } from "@/lib/utils";
+import type { UserPlatformUsage } from "@/lib/client-platform";
+import { UserPlatformHistory } from "./UserPlatforms";
 
 type UserDetail = {
+  platforms?: UserPlatformUsage[];
   accounts: Array<{ createdAt: string; providerId: string }>;
   loginSessions: Array<{
     createdAt: string;
@@ -866,6 +869,7 @@ function SecurityPanel({
   };
   return (
     <div className="max-w-4xl space-y-10">
+      <UserPlatformHistory platforms={detail.platforms} />
       <div>
         <h3 className="font-semibold">登录方式</h3>
         <div className="mt-3 flex flex-wrap gap-2">

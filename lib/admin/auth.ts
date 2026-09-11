@@ -7,6 +7,7 @@ import { isActiveBan } from "@/lib/auth-access";
 import { getDb } from "@/lib/db";
 import { adminAuditLogs, users } from "@/lib/db/schema";
 import { isBootstrapAdminEmail } from "@/lib/registration";
+import { recordUserPlatform } from "@/lib/server/user-platforms";
 
 export type CurrentAdmin = {
   email: string;
@@ -18,8 +19,9 @@ export const getCurrentAdmin = async (
   requestHeaders?: Headers,
 ): Promise<CurrentAdmin | undefined> => {
   const { auth } = await import("@/lib/auth");
+  const incomingHeaders = requestHeaders || (await getNextHeaders());
   const session = await auth.api.getSession({
-    headers: requestHeaders || (await getNextHeaders()),
+    headers: incomingHeaders,
     query: { disableCookieCache: true },
   });
   if (!session?.user?.id) return undefined;
@@ -56,6 +58,7 @@ export const getCurrentAdmin = async (
       .where(eq(users.id, user.id));
   }
 
+  await recordUserPlatform(user.id, incomingHeaders);
   return { email: user.email, id: user.id, role: "admin" };
 };
 

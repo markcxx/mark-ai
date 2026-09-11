@@ -7,3 +7,4 @@ export * from "./word";
 export * from "./admin";
 export * from "./shares";
 export * from "./site";
+export * from "./user-platforms";

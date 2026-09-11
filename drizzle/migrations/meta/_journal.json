@@ -85,6 +85,13 @@
       "when": 1789018593718,
       "tag": "0011_lively_wiccan",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1789102339180,
+      "tag": "0012_wet_zarda",
+      "breakpoints": true
     }
   ]
 }

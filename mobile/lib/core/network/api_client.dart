@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../shared/models/chat.dart';
 import '../storage/local_store.dart';
+import 'client_identity.dart';
 
 class ApiFailure implements Exception {
   final String message;
@@ -22,6 +23,7 @@ class ApiClient {
   final Dio dio;
   String baseUrl = '';
   String? _authOrigin;
+  Map<String, String>? _clientIdentity;
   final Map<String, Cookie> _cookies = {};
   bool _cookiesDirty = false;
   Future<void> _cookieWrites = Future.value();
@@ -40,6 +42,7 @@ class ApiClient {
       throw ApiFailure('请输入完整的服务地址，例如 https://你的域名');
     }
     baseUrl = uri.origin;
+    _clientIdentity ??= await loadClientIdentityHeaders();
     // Android's emulator routes 10.0.2.2 to the host loopback. It is a
     // transport alias, while the development auth service is localhost.
     // Production requests keep their actual origin; never disable server CSRF.
@@ -71,6 +74,7 @@ class ApiClient {
   Map<String, String> get headers {
     final now = DateTime.now();
     return {
+      ...?_clientIdentity,
       'Origin': _authOrigin ?? baseUrl,
       'Accept': 'application/json',
       'Cookie': _cookies.values
