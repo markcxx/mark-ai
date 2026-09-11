@@ -26,6 +26,7 @@ import 'tool_menu.dart';
 import 'workspace_shell.dart';
 import 'model_selector.dart';
 import 'context_indicator.dart';
+import 'hold_to_speak.dart';
 import '../../../shared/models/model_metadata.dart';
 import '../../../shared/models/chat.dart';
 import '../../auth/auth_screen.dart';
@@ -656,6 +657,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   );
   Widget composer(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final voiceContext = '${c.accountKey}:${c.activeSessionId}:${c.model?.key}';
+    final voiceEnabled =
+        !kIsWeb &&
+        defaultTargetPlatform == TargetPlatform.android &&
+        !c.guest &&
+        c.model != null &&
+        !c.generating &&
+        !uploading &&
+        c.draft.isEmpty;
     final hasDraft = c.draft.trim().isNotEmpty || c.attachments.isNotEmpty;
     final stopping = c.generating && !hasDraft;
     final sendDisabled =
@@ -781,39 +791,60 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   if (!uploading && c.model != null) sendMessage();
                   return KeyEventResult.handled;
                 },
-                child: TextField(
-                  enabled: c.model != null,
-                  controller: input,
-                  focusNode: composerFocus,
-                  onTapOutside: (_) => composerFocus.unfocus(),
-                  minLines: 1,
-                  maxLines: 6,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    height: 1.5,
-                    letterSpacing: 0,
-                  ),
-                  onChanged: c.setDraft,
-                  keyboardType: TextInputType.multiline,
-                  decoration: InputDecoration(
-                    hintText: c.model == null
-                        ? '正在加载可用模型列表……'
-                        : isImageGenerationModel(c.model!.id)
-                        ? '描述想生成的画面，或上传图片继续修改...'
-                        : '尽管问，带图也行...',
-                    hintStyle: const TextStyle(
-                      color: Color(0xff9ca3af),
+                child: HoldToSpeak(
+                  enabled: voiceEnabled,
+                  contextKey: voiceContext,
+                  onStart: composerFocus.unfocus,
+                  onError: c.report,
+                  onText: (text) {
+                    if (voiceContext !=
+                            '${c.accountKey}:${c.activeSessionId}:${c.model?.key}' ||
+                        c.guest ||
+                        c.generating ||
+                        uploading ||
+                        c.draft.isNotEmpty) {
+                      return;
+                    }
+                    c.setDraft(text);
+                    unawaited(sendMessage());
+                  },
+                  child: TextField(
+                    enabled: c.model != null,
+                    enableInteractiveSelection: !voiceEnabled,
+                    controller: input,
+                    focusNode: composerFocus,
+                    onTapOutside: (_) => composerFocus.unfocus(),
+                    minLines: 1,
+                    maxLines: 6,
+                    style: const TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w400,
+                      height: 1.5,
+                      letterSpacing: 0,
                     ),
-                    constraints: const BoxConstraints(minHeight: 56),
-                    filled: false,
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 12,
+                    onChanged: c.setDraft,
+                    keyboardType: TextInputType.multiline,
+                    decoration: InputDecoration(
+                      hintText: c.model == null
+                          ? '正在加载可用模型列表……'
+                          : isImageGenerationModel(c.model!.id)
+                          ? '描述想生成的画面，或上传图片继续修改...'
+                          : voiceEnabled
+                          ? '尽管问，长按说话...'
+                          : '尽管问，带图也行...',
+                      hintStyle: const TextStyle(
+                        color: Color(0xff9ca3af),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w400,
+                      ),
+                      constraints: const BoxConstraints(minHeight: 56),
+                      filled: false,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
                     ),
                   ),
                 ),
