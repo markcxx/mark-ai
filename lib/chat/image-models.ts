@@ -1,4 +1,8 @@
-export const IMAGE_GENERATION_MODEL_IDS = ["gpt-image-2"] as const;
+export const IMAGE_GENERATION_MODEL_IDS = [
+  "gpt-image-2",
+  "gpt-image-2.5-sunburst",
+  "gpt-image-2.5-flare",
+] as const;
 
 const imageGenerationModelIds = new Set<string>(IMAGE_GENERATION_MODEL_IDS);
 
