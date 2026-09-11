@@ -195,7 +195,7 @@ class WorkspaceController extends ChangeNotifier {
     _settingsTimer?.cancel();
     _draftTimer?.cancel();
     await stop();
-    await api.request('POST', '/api/auth/sign-out');
+    await api.request('POST', '/api/auth/sign-out', body: {});
     await api.clearLogin();
     user = {};
     messages = [];

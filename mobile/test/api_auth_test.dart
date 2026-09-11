@@ -5,10 +5,71 @@ import 'package:dio/dio.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:markai_mobile/core/network/api_client.dart';
+import 'package:markai_mobile/features/chat/application/workspace_controller.dart';
 
 import 'support/fake_workspace.dart';
 
 void main() {
+  test('logout sends JSON and clears durable authentication', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final origin = 'http://127.0.0.1:${server.port}';
+    final storage = MemoryStore();
+    await storage.write('cookies:$origin', {
+      'values': ['better-auth.session_token=test-session; Path=/; HttpOnly'],
+    });
+    final api = ApiClient(storage);
+    final restarted = ApiClient(storage);
+    final controller = WorkspaceController(api, storage);
+    var signedOut = false;
+    server.listen((request) async {
+      expect(request.method, 'POST');
+      expect(request.uri.path, '/api/auth/sign-out');
+      expect(request.headers.value('origin'), origin);
+      expect(request.headers.contentType?.mimeType, 'application/json');
+      expect(
+        request.headers.value('cookie'),
+        contains('better-auth.session_token=test-session'),
+      );
+      request.response.headers.contentType = ContentType.json;
+      try {
+        final body = jsonDecode(await utf8.decoder.bind(request).join());
+        expect(body, isEmpty);
+        signedOut = true;
+        request.response.cookies.add(
+          Cookie('better-auth.session_token', '')
+            ..path = '/'
+            ..maxAge = 0,
+        );
+        request.response.write('{"success":true}');
+      } on FormatException {
+        request.response.statusCode = 400;
+        request.response.write(
+          '{"code":"INVALID_JSON","message":"Malformed JSON request body"}',
+        );
+      }
+      await request.response.close();
+    });
+    try {
+      await api.configure(origin);
+      controller.user = {'id': 'fixture'};
+      controller.draft = 'private draft';
+      await controller.logout();
+      expect(signedOut, isTrue);
+      expect(controller.guest, isTrue);
+      expect(controller.user, isEmpty);
+      expect(controller.draft, isEmpty);
+      expect(api.headers['Cookie'], isEmpty);
+      expect(await storage.read('cookies:$origin'), isEmpty);
+      await restarted.configure(origin);
+      expect(restarted.headers['Cookie'], isEmpty);
+    } finally {
+      controller.dispose();
+      api.dio.close(force: true);
+      restarted.dio.close(force: true);
+      await server.close(force: true);
+    }
+  });
+
   test(
     'binary speech and download requests preserve JSON error details',
     () async {
