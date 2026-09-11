@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'features/sharing/incoming_shares.dart';
+import 'features/sharing/incoming_share_host.dart';
+
 import 'core/network/api_client.dart';
 import 'core/storage/local_store.dart';
 import 'core/theme/markai_theme.dart';
@@ -34,6 +37,7 @@ class MarkAIApp extends StatefulWidget {
 }
 
 class _MarkAIAppState extends State<MarkAIApp> {
+  final incomingShares = IncomingShareInbox();
   final messenger = GlobalKey<ScaffoldMessengerState>();
   final navigator = GlobalKey<NavigatorState>();
   final previewUpdates = updatePreviewEnabled ? PreviewUpdateService() : null;
@@ -45,7 +49,10 @@ class _MarkAIAppState extends State<MarkAIApp> {
     super.initState();
     introComplete = !(widget.showStartupAnimation ?? widget.autoStart);
     widget.controller.addListener(feedback);
-    if (widget.autoStart) widget.controller.start();
+    if (widget.autoStart) {
+      incomingShares.start();
+      widget.controller.start();
+    }
   }
 
   void feedback() {
@@ -65,6 +72,7 @@ class _MarkAIAppState extends State<MarkAIApp> {
 
   @override
   void dispose() {
+    incomingShares.dispose();
     widget.controller.removeListener(feedback);
     super.dispose();
   }
@@ -104,7 +112,12 @@ class _MarkAIAppState extends State<MarkAIApp> {
             // Updates use their own endpoints and must remain reachable even
             // when workspace initialization fails or is still waiting.
             ready: introComplete,
-            child: AppToastHost(key: toasts, child: child!),
+            child: IncomingShareHost(
+              inbox: incomingShares,
+              controller: c,
+              navigator: navigator,
+              child: AppToastHost(key: toasts, child: child!),
+            ),
           ),
         ),
         scaffoldMessengerKey: messenger,

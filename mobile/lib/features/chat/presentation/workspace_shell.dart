@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 
-/// Matches ChatApp's mobile push transition and desktop persistent column.
-class WorkspaceShell extends StatelessWidget {
+/// Mobile pushes the conversation with the finger; desktop keeps a fixed column.
+class WorkspaceShell extends StatefulWidget {
   final bool open, reduceMotion;
   final double sidebarWidth;
-  final VoidCallback onClose;
-  final VoidCallback onOpen;
+  final VoidCallback onClose, onOpen;
   final Widget sidebar, child;
   const WorkspaceShell({
     super.key,
@@ -18,154 +17,188 @@ class WorkspaceShell extends StatelessWidget {
     required this.child,
   });
   @override
+  State<WorkspaceShell> createState() => _WorkspaceShellState();
+}
+
+class _WorkspaceShellState extends State<WorkspaceShell>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController progress;
+  bool dragging = false;
+  @override
+  void initState() {
+    super.initState();
+    progress = AnimationController(vsync: this, value: widget.open ? 1 : 0);
+  }
+
+  void settle(bool open) {
+    dragging = false;
+    final target = open ? 1.0 : 0.0;
+    if (widget.reduceMotion || MediaQuery.disableAnimationsOf(context)) {
+      progress.value = target;
+    } else {
+      progress.animateTo(
+        target,
+        duration: const Duration(milliseconds: 240),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  void finish(bool open) {
+    settle(open);
+    if (open != widget.open) {
+      open ? widget.onOpen() : widget.onClose();
+    }
+  }
+
+  @override
+  void didUpdateWidget(WorkspaceShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.open != widget.open ||
+        oldWidget.reduceMotion != widget.reduceMotion) {
+      settle(widget.open);
+    }
+  }
+
+  @override
+  void dispose() {
+    progress.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, box) {
       final mobile = box.maxWidth < 768;
-      final width = sidebarWidth.clamp(0.0, box.maxWidth * (mobile ? .86 : 1));
+      final width = widget.sidebarWidth.clamp(
+        0.0,
+        box.maxWidth * (mobile ? .86 : 1),
+      );
       final dark = Theme.of(context).brightness == Brightness.dark;
+      final systemEdges = MediaQuery.systemGestureInsetsOf(context);
       return PopScope(
-        canPop: !open || !mobile,
+        canPop: !widget.open || !mobile,
         onPopInvokedWithResult: (didPop, _) {
-          if (!didPop && open) onClose();
+          if (!didPop && widget.open) finish(false);
         },
-        child: ColoredBox(
-          color: dark ? const Color(0xff0e0f11) : const Color(0xfff8f8f8),
-          child: ClipRect(
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(end: open ? 1 : 0),
-              duration: reduceMotion
-                  ? Duration.zero
-                  : Duration(milliseconds: mobile ? 500 : 300),
-              curve: mobile ? const Cubic(.22, 1, .36, 1) : Curves.easeOut,
-              builder: (context, progress, _) => Stack(
-                children: [
-                  Positioned(
-                    top: mobile ? 0 : 8,
-                    bottom: mobile ? 0 : 8,
-                    left: mobile
-                        ? width * progress
-                        : 8 + (width + 8) * progress,
-                    width: mobile
-                        ? box.maxWidth
-                        : (box.maxWidth - 16 - (width + 8) * progress).clamp(
-                            0,
-                            box.maxWidth,
-                          ),
-                    child: Container(
-                      clipBehavior: Clip.antiAlias,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).scaffoldBackgroundColor,
-                        borderRadius: mobile ? null : BorderRadius.circular(12),
-                        border: mobile
-                            ? null
-                            : Border.all(
-                                color: dark
-                                    ? const Color(0xff374151)
-                                    : const Color(0xffe5e5e5),
+        child: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onHorizontalDragStart: mobile && width > 0
+              ? (event) {
+                  // Leave the OS edge-back region alone. Child horizontal scrollables
+                  // win their own gesture arena before this ancestor.
+                  final x = event.localPosition.dx;
+                  dragging =
+                      x > systemEdges.left &&
+                      x < box.maxWidth - systemEdges.right;
+                  if (dragging) progress.stop();
+                }
+              : null,
+          onHorizontalDragUpdate: mobile
+              ? (event) {
+                  if (dragging) {
+                    progress.value = (progress.value + event.delta.dx / width)
+                        .clamp(0.0, 1.0);
+                  }
+                }
+              : null,
+          onHorizontalDragEnd: mobile
+              ? (event) {
+                  if (!dragging) return;
+                  final speed = event.primaryVelocity ?? 0;
+                  finish(speed.abs() > 600 ? speed > 0 : progress.value > .5);
+                }
+              : null,
+          onHorizontalDragCancel: mobile
+              ? () {
+                  if (dragging) settle(widget.open);
+                }
+              : null,
+          child: ColoredBox(
+            color: dark ? const Color(0xff0e0f11) : const Color(0xfff8f8f8),
+            child: ClipRect(
+              child: AnimatedBuilder(
+                animation: progress,
+                builder: (context, _) {
+                  final value = progress.value;
+                  return Stack(
+                    children: [
+                      Positioned(
+                        top: mobile ? 0 : 8,
+                        bottom: mobile ? 0 : 8,
+                        left: mobile ? width * value : 8 + (width + 8) * value,
+                        width: mobile
+                            ? box.maxWidth
+                            : (box.maxWidth - 16 - (width + 8) * value).clamp(
+                                0,
+                                box.maxWidth,
                               ),
+                        child: Container(
+                          key: const ValueKey('workspace-main-panel'),
+                          clipBehavior: Clip.antiAlias,
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).scaffoldBackgroundColor,
+                            borderRadius: mobile
+                                ? null
+                                : BorderRadius.circular(12),
+                            border: mobile
+                                ? null
+                                : Border.all(
+                                    color: dark
+                                        ? const Color(0xff374151)
+                                        : const Color(0xffe5e5e5),
+                                  ),
+                          ),
+                          child: widget.child,
+                        ),
                       ),
-                      child: _SidebarSwipe(
-                        enabled: mobile && !open,
-                        onOpen: onOpen,
-                        child: child,
-                      ),
-                    ),
-                  ),
-                  if (progress > 0)
-                    Positioned(
-                      top: mobile ? 0 : 8,
-                      bottom: mobile ? 0 : 8,
-                      left: mobile ? -(width + 24) * (1 - progress) : 8,
-                      width: width,
-                      child: IgnorePointer(
-                        ignoring: !open,
-                        child: Opacity(
-                          opacity: progress,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              boxShadow: mobile
-                                  ? const [
-                                      BoxShadow(
-                                        color: Color(0x290f172a),
-                                        offset: Offset(16, 0),
-                                        blurRadius: 40,
-                                      ),
-                                    ]
-                                  : null,
-                            ),
-                            child: _SidebarSwipe(
-                              enabled: mobile && open,
-                              onOpen: onClose,
-                              closing: true,
-                              child: sidebar,
+                      if (value > 0)
+                        Positioned(
+                          top: mobile ? 0 : 8,
+                          bottom: mobile ? 0 : 8,
+                          left: mobile ? -width * (1 - value) : 8,
+                          width: width,
+                          child: IgnorePointer(
+                            ignoring: !widget.open,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                boxShadow: mobile
+                                    ? const [
+                                        BoxShadow(
+                                          color: Color(0x29000000),
+                                          offset: Offset(12, 0),
+                                          blurRadius: 32,
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: widget.sidebar,
                             ),
                           ),
                         ),
-                      ),
-                    ),
-                  if (open && mobile)
-                    Positioned(
-                      top: 0,
-                      bottom: 0,
-                      left: width,
-                      right: 0,
-                      child: Semantics(
-                        button: true,
-                        label: '收起历史会话',
-                        child: _SidebarSwipe(
-                          enabled: true,
-                          closing: true,
-                          onOpen: onClose,
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: onClose,
+                      if (value > 0 && mobile)
+                        Positioned(
+                          top: 0,
+                          bottom: 0,
+                          left: width * value,
+                          right: 0,
+                          child: Semantics(
+                            button: true,
+                            label: '收起历史会话',
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () => finish(false),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
-                ],
+                    ],
+                  );
+                },
               ),
             ),
           ),
         ),
       );
     },
-  );
-}
-
-class _SidebarSwipe extends StatefulWidget {
-  final bool enabled;
-  final bool closing;
-  final VoidCallback onOpen;
-  final Widget child;
-  const _SidebarSwipe({
-    required this.enabled,
-    this.closing = false,
-    required this.onOpen,
-    required this.child,
-  });
-  @override
-  State<_SidebarSwipe> createState() => _SidebarSwipeState();
-}
-
-class _SidebarSwipeState extends State<_SidebarSwipe> {
-  double distance = 0;
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-    behavior: HitTestBehavior.translucent,
-    onHorizontalDragStart: widget.enabled ? (_) => distance = 0 : null,
-    onHorizontalDragUpdate: widget.enabled
-        ? (event) => distance += event.delta.dx
-        : null,
-    onHorizontalDragEnd: widget.enabled
-        ? (_) {
-            if (widget.closing ? distance <= -60 : distance >= 60) {
-              widget.onOpen();
-            }
-            distance = 0;
-          }
-        : null,
-    onHorizontalDragCancel: widget.enabled ? () => distance = 0 : null,
-    child: widget.child,
   );
 }

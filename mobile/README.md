@@ -76,3 +76,15 @@ flutter run -d emulator-5554 -t tool/preview.dart --dart-define=PREVIEW_THEME=da
 该入口仅使用合成测试数据。`qa/` 是按需生成、由 Git 忽略的本地截图目录，历史截图已清理；截图不代表已通过与 Web 的逐像素比较。启用截图导出时会自动创建目录，无需保留旧图片。
 
 字体来自 Google Fonts OFL 源，许可证在 `assets/fonts`；Logo/模型 SVG 来自本仓库。ECharts/Mermaid 脚本来自仓库现有 npm 依赖，许可证在 `assets/web`。
+
+## 本地测试与手机分享
+
+可以构建与正式版本并存的“MarkAI 测试”（独立数据，需要单独登录），不修改正式版本号或发布：
+
+```sh
+ORG_GRADLE_PROJECT_markaiTestBuild=true flutter build apk --debug -t lib/main.dart --dart-define=MARKAI_API_URL=https://chatai.markqq.com
+```
+
+输出 `build/app/outputs/flutter-apk/app-debug.apk`。系统分享支持文字、链接和附件，确认后添加到当前草稿，不自动发送。附件确认后才上传；现有附件与分享附件合计最多 4 个。本地接收单文件最大 25MB、合计 50MB，实际上传仍受服务端限制；未处理的分享缓存在应用私有缓存中，下次读取时清理超过 24 小时的内容，也可能被系统提前回收。
+
+侧栏支持跟手拖动、反向拖回和快速甩动，保留按钮与系统返回入口。`integration_test/incoming_shares_test.dart` 可配合文件内的 ADB 指令验证原生分享接收和本地文件清理。

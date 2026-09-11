@@ -34,7 +34,7 @@ android {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         // flutter drive uninstalls its target at teardown. Keep fixture/test
         // runs separate so they cannot erase the user's app and login keys.
-        val integrationTest = project.findProperty("target")?.toString()
+        val integrationTest = project.findProperty("markaiTestBuild") == "true" || project.findProperty("target")?.toString()
             ?.replace('\\', '/')?.contains("integration_test/") == true
         applicationId = if (integrationTest) "com.markai.markai_mobile.qa" else "com.markai.markai_mobile"
         manifestPlaceholders["appLabel"] = if (integrationTest) "MarkAI 测试" else "MarkAI"

@@ -13,24 +13,25 @@ import androidx.core.content.FileProvider
 import java.io.File
 
 class MainActivity : FlutterActivity() {
-    private var speechInput: SystemSpeechInput? = null
+    private var incomingShares: IncomingShares? = null
 
-    override fun onStop() {
-        speechInput?.cancel()
-        super.onStop()
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        incomingShares?.accept(intent)
     }
 
     override fun onDestroy() {
-        speechInput?.dispose()
-        speechInput = null
+        incomingShares?.dispose()
+        incomingShares = null
         super.onDestroy()
     }
 
     @Suppress("DEPRECATION")
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        speechInput?.dispose()
-        speechInput = SystemSpeechInput(this, flutterEngine.dartExecutor.binaryMessenger)
+        incomingShares = IncomingShares(this, flutterEngine.dartExecutor.binaryMessenger)
+        incomingShares?.accept(intent)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "markai/updates")
             .setMethodCallHandler { call, result ->
                 try {
