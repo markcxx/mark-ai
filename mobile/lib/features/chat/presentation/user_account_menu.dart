@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/ui_icon.dart';
 import '../../../shared/widgets/account_avatar_image.dart';
 import '../../../shared/models/chat.dart';
 import '../application/workspace_controller.dart';
-import 'file_manager.dart';
-import 'profile_dialog.dart';
 
 class UserAccountMenu extends StatefulWidget {
   final WorkspaceController controller;
@@ -23,8 +20,6 @@ class UserAccountMenu extends StatefulWidget {
 }
 
 class _UserAccountMenuState extends State<UserAccountMenu> {
-  final anchor = GlobalKey();
-  bool open = false;
   WorkspaceController get c => widget.controller;
   @override
   void initState() {
@@ -75,162 +70,12 @@ class _UserAccountMenuState extends State<UserAccountMenu> {
       ),
     ],
   );
-  Future<void> toggle() async {
-    if (open) return;
-    final box = anchor.currentContext!.findRenderObject() as RenderBox;
-    final position = box.localToGlobal(Offset.zero);
-    setState(() => open = true);
-    final result = await showGeneralDialog<String>(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: '关闭账号菜单',
-      barrierColor: Colors.transparent,
-      transitionDuration: MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : const Duration(milliseconds: 180),
-      transitionBuilder: (_, animation, _, child) => FadeTransition(
-        opacity: animation,
-        child: SlideTransition(
-          position: Tween(begin: const Offset(0, .01), end: Offset.zero)
-              .animate(
-                CurvedAnimation(
-                  parent: animation,
-                  curve: const Cubic(.22, 1, .36, 1),
-                ),
-              ),
-          child: child,
-        ),
-      ),
-      pageBuilder: (context, _, _) {
-        final dark = Theme.of(context).brightness == Brightness.dark;
-        return Stack(
-          children: [
-            Positioned(
-              left: position.dx,
-              width: box.size.width,
-              bottom: MediaQuery.sizeOf(context).height - position.dy + 10,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x2e0f172a),
-                      blurRadius: 55,
-                      offset: Offset(0, 18),
-                    ),
-                  ],
-                ),
-                child: Material(
-                  color: dark
-                      ? const Color(0xf2171717)
-                      : const Color(0xf2ffffff),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    side: BorderSide(
-                      color: dark
-                          ? const Color(0x1affffff)
-                          : const Color(0x0f000000),
-                    ),
-                  ),
-                  elevation: 0,
-                  child: Padding(
-                    padding: const EdgeInsets.all(7),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          child: identity(menu: true),
-                        ),
-                        const Divider(height: 1),
-                        const SizedBox(height: 4),
-                        for (final item in [
-                          ('files', LucideIcons.folderOpen, '文件管理'),
-                          ('profile', LucideIcons.circleUserRound, '个人资料'),
-                          ('settings', LucideIcons.settings, '设置'),
-                          ('logout', LucideIcons.logOut, '退出登录'),
-                        ]) ...[
-                          if (item.$1 == 'logout')
-                            const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 4),
-                              child: Divider(height: 1),
-                            ),
-                          InkWell(
-                            onTap: () => Navigator.pop(context, item.$1),
-                            borderRadius: BorderRadius.circular(6),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                              child: Row(
-                                children: [
-                                  UiIcon(
-                                    item.$2,
-                                    size: 17,
-                                    color: item.$1 == 'logout'
-                                        ? const Color(0xffdc2626)
-                                        : const Color(0xff9ca3af),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    item.$3,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      height: 20 / 14,
-                                      color: item.$1 == 'logout'
-                                          ? const Color(0xffdc2626)
-                                          : dark
-                                          ? const Color(0xffe5e7eb)
-                                          : const Color(0xff374151),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-    if (!mounted) return;
-    setState(() => open = false);
-    switch (result) {
-      case 'files':
-        await showFileManager(context, c);
-      case 'profile':
-        await showAppDialog(context, (_) => ProfileDialog(controller: c));
-      case 'settings':
-        widget.onSettings();
-      case 'logout':
-        widget.onCloseSidebar();
-        try {
-          await c.logout();
-        } catch (error) {
-          c.report(error);
-        }
-    }
-  }
-
   @override
   Widget build(BuildContext context) => Semantics(
-    expanded: open,
     button: true,
     child: InkWell(
-      key: anchor,
       borderRadius: BorderRadius.circular(8),
-      onTap: toggle,
+      onTap: widget.onSettings,
       child: Padding(
         padding: const EdgeInsets.all(8),
         child: Row(
@@ -284,16 +129,10 @@ class _UserAccountMenuState extends State<UserAccountMenu> {
             const SizedBox(width: 12),
             Expanded(child: identity()),
             const SizedBox(width: 12),
-            AnimatedRotation(
-              turns: open ? 0 : .5,
-              duration: MediaQuery.disableAnimationsOf(context)
-                  ? Duration.zero
-                  : const Duration(milliseconds: 200),
-              child: const UiIcon(
-                LucideIcons.chevronUp,
-                size: 16,
-                color: Color(0xff9ca3af),
-              ),
+            const UiIcon(
+              LucideIcons.chevronRight,
+              size: 16,
+              color: Color(0xff9ca3af),
             ),
           ],
         ),

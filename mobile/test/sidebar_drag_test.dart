@@ -51,7 +51,7 @@ void main() {
       await tester.dragFrom(const Offset(70, 400), const Offset(200, 0));
       await tester.pumpAndSettle();
       expect(open, isTrue);
-      expect(tester.getTopLeft(panel).dx, 260);
+      expect(tester.getTopLeft(panel).dx, 351);
       await tester.dragFrom(const Offset(230, 400), const Offset(-190, 0));
       await tester.pumpAndSettle();
       expect(open, isFalse);

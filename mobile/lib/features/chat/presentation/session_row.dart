@@ -5,18 +5,21 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../shared/models/chat.dart';
 import '../../../shared/widgets/common.dart';
 import '../../../shared/widgets/app_menu.dart';
-import '../../../shared/widgets/ui_icon.dart';
 import '../application/workspace_controller.dart';
 
 class SessionRow extends StatefulWidget {
   final WorkspaceController controller;
   final ChatSession session;
   final VoidCallback onSelect;
+  final bool selectionMode, selected, enabled;
   const SessionRow({
     super.key,
     required this.controller,
     required this.session,
     required this.onSelect,
+    this.selectionMode = false,
+    this.selected = false,
+    this.enabled = true,
   });
   @override
   State<SessionRow> createState() => _SessionRowState();
@@ -98,163 +101,188 @@ class _SessionRowState extends State<SessionRow> {
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final active = c.activeSessionId == widget.session.id;
-    return Material(
-      color: active
-          ? (dark ? const Color(0xff1f2937) : const Color(0xffeceef0))
-          : Colors.transparent,
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        onTap: editing ? null : widget.onSelect,
-        borderRadius: BorderRadius.circular(8),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            minHeight: MediaQuery.sizeOf(context).width < 768 ? 44 : 36,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Row(
-              children: [
-                const SizedBox(
-                  width: 28,
-                  height: 28,
-                  child: Center(
-                    child: UiIcon(
-                      LucideIcons.hash,
-                      size: 15,
-                      color: Color(0xff9ca3af),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: editing
-                      ? Focus(
-                          onKeyEvent: (_, event) {
-                            if (event is KeyDownEvent &&
-                                event.logicalKey == LogicalKeyboardKey.escape) {
-                              setState(() => editing = false);
-                              focus.unfocus();
-                              return KeyEventResult.handled;
-                            }
-                            return KeyEventResult.ignored;
-                          },
-                          child: SizedBox(
-                            height: 28,
-                            child: TextField(
-                              controller: title,
-                              focusNode: focus,
-                              autofocus: true,
-                              onSubmitted: (_) => save(),
-                              style: const TextStyle(
-                                fontSize: 14,
-                                height: 20 / 14,
-                              ),
-                              decoration: const InputDecoration(
-                                isDense: true,
-                                contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                              ),
+    return AppMenuButton(
+      width: 180,
+      radius: 8,
+      items: () => [
+        AppMenuItem(
+          '自动命名',
+          icon: LucideIcons.wandSparkles,
+          onPressed: () => action('auto'),
+        ),
+        AppMenuItem(
+          '重命名',
+          icon: LucideIcons.pencilLine,
+          onPressed: () => action('rename'),
+        ),
+        AppMenuItem(
+          widget.session.favorite ? '取消收藏' : '收藏',
+          icon: LucideIcons.star,
+          onPressed: () => action('favorite'),
+        ),
+        AppMenuItem(
+          '复制 ID',
+          icon: LucideIcons.copy,
+          onPressed: () => action('id'),
+        ),
+        const AppMenuItem.divider(),
+        AppMenuItem(
+          '删除',
+          icon: LucideIcons.trash2,
+          danger: true,
+          onPressed: () => action('delete'),
+        ),
+      ],
+      builder: (toggle) => Semantics(
+        checked: widget.selectionMode ? widget.selected : null,
+        child: Material(
+          color: active
+              ? (dark ? const Color(0xff1f2937) : const Color(0xffeceef0))
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          child: InkWell(
+            onTap: editing || !widget.enabled ? null : widget.onSelect,
+            onLongPress:
+                editing || widget.selectionMode || !widget.enabled || busy
+                ? null
+                : toggle,
+            borderRadius: BorderRadius.circular(8),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: MediaQuery.sizeOf(context).width < 768 ? 44 : 36,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Row(
+                  children: [
+                    TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0, end: widget.selectionMode ? 1 : 0),
+                      duration:
+                          c.general['reduceMotion'] == true ||
+                              MediaQuery.disableAnimationsOf(context)
+                          ? Duration.zero
+                          : const Duration(milliseconds: 240),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, value, child) => ClipRect(
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          widthFactor: value,
+                          child: Opacity(
+                            opacity: value,
+                            child: Transform.scale(
+                              scale: .75 + .25 * value,
+                              child: child,
                             ),
                           ),
-                        )
-                      : Text(
-                          c.namingSessions.contains(widget.session.id)
-                              ? '...'
-                              : widget.session.title.isEmpty
-                              ? '新对话'
-                              : widget.session.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 14,
-                            height: 20 / 14,
-                            color: dark
-                                ? const Color(0xffd1d5db)
-                                : const Color(0xff374151),
+                        ),
+                      ),
+                      child: SizedBox(
+                        width: 36,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Icon(
+                            widget.selected
+                                ? Icons.check_circle
+                                : Icons.circle_outlined,
+                            size: 22,
+                            color: widget.selected
+                                ? Theme.of(context).colorScheme.primary
+                                : Colors.grey,
                           ),
                         ),
-                ),
-                const SizedBox(width: 8),
-                if (widget.session.favorite) ...[
-                  ActionIcon(
-                    '取消收藏',
-                    LucideIcons.star,
-                    () => run(() => c.favorite(widget.session)),
-                    compact: true,
-                    iconSize: 14,
-                    buttonWidth: 28,
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                if (busy ||
-                    c.namingSessions.contains(widget.session.id) ||
-                    (c.generating && active))
-                  SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: Center(
-                      child: SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          value: c.general['reduceMotion'] == true ? .75 : null,
-                          color: const Color(0xff374151),
-                          backgroundColor: const Color(0xffd1d5db),
-                          semanticsLabel:
+                      ),
+                    ),
+                    Expanded(
+                      child: editing
+                          ? Focus(
+                              onKeyEvent: (_, event) {
+                                if (event is KeyDownEvent &&
+                                    event.logicalKey ==
+                                        LogicalKeyboardKey.escape) {
+                                  setState(() => editing = false);
+                                  focus.unfocus();
+                                  return KeyEventResult.handled;
+                                }
+                                return KeyEventResult.ignored;
+                              },
+                              child: SizedBox(
+                                height: 28,
+                                child: TextField(
+                                  controller: title,
+                                  focusNode: focus,
+                                  autofocus: true,
+                                  onSubmitted: (_) => save(),
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    height: 20 / 14,
+                                  ),
+                                  decoration: const InputDecoration(
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Text(
                               c.namingSessions.contains(widget.session.id)
-                              ? '正在自动命名'
-                              : '正在生成回复',
+                                  ? '...'
+                                  : widget.session.title.isEmpty
+                                  ? '新对话'
+                                  : widget.session.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 14,
+                                height: 20 / 14,
+                                color: dark
+                                    ? const Color(0xffd1d5db)
+                                    : const Color(0xff374151),
+                              ),
+                            ),
+                    ),
+                    const SizedBox(width: 8),
+                    if (widget.session.favorite && !widget.selectionMode) ...[
+                      const Tooltip(
+                        message: '已收藏',
+                        child: Icon(
+                          Icons.star_rounded,
+                          size: 20,
+                          color: Color(0xffeab308),
                         ),
                       ),
-                    ),
-                  )
-                else
-                  AppMenuButton(
-                    width: 144,
-                    radius: 8,
-                    alignRight: true,
-                    items: () => [
-                      AppMenuItem(
-                        '自动命名',
-                        icon: LucideIcons.wandSparkles,
-                        onPressed: () => action('auto'),
-                      ),
-                      AppMenuItem(
-                        '重命名',
-                        icon: LucideIcons.pencilLine,
-                        onPressed: () => action('rename'),
-                      ),
-                      AppMenuItem(
-                        widget.session.favorite ? '取消收藏' : '收藏',
-                        icon: LucideIcons.star,
-                        onPressed: () => action('favorite'),
-                      ),
-                      AppMenuItem(
-                        '复制 ID',
-                        icon: LucideIcons.copy,
-                        onPressed: () => action('id'),
-                      ),
-                      const AppMenuItem.divider(),
-                      AppMenuItem(
-                        '删除',
-                        icon: LucideIcons.trash2,
-                        danger: true,
-                        onPressed: () => action('delete'),
-                      ),
+                      const SizedBox(width: 8),
                     ],
-                    builder: (toggle) => ActionIcon(
-                      '会话操作',
-                      LucideIcons.ellipsis,
-                      toggle,
-                      compact: true,
-                      buttonWidth: 28,
-                      buttonHeight: 28,
-                    ),
-                  ),
-              ],
+                    if (busy ||
+                        c.namingSessions.contains(widget.session.id) ||
+                        (c.generating && active))
+                      SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: Center(
+                          child: SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              value: c.general['reduceMotion'] == true
+                                  ? .75
+                                  : null,
+                              color: const Color(0xff374151),
+                              backgroundColor: const Color(0xffd1d5db),
+                              semanticsLabel:
+                                  c.namingSessions.contains(widget.session.id)
+                                  ? '正在自动命名'
+                                  : '正在生成回复',
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),

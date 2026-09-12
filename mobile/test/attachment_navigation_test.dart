@@ -46,7 +46,7 @@ void main() {
       await tester.dragFrom(const Offset(200, 400), const Offset(-100, 0));
       await tester.pumpAndSettle();
       expect(opens, 0);
-      await tester.dragFrom(const Offset(100, 400), const Offset(150, 0));
+      await tester.dragFrom(const Offset(100, 400), const Offset(210, 0));
       await tester.pumpAndSettle();
       expect(opens, 1);
     },

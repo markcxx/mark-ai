@@ -9,7 +9,6 @@ import { IconButton } from "@/components/ui/IconButton";
 import type { ChatSession } from "@/lib/chat/types";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/useUIStore";
-import { useSettingsStore } from "@/stores/useSettingsStore";
 import type { SessionGenerationStatus } from "@/stores/useSessionStore";
 
 import { SessionGroupHeader } from "./SessionGroupHeader";
@@ -90,7 +89,6 @@ export function Sidebar({
   width: number;
 }) {
   const [openSessionMenuId, setOpenSessionMenuId] = useState<string | null>(null);
-  const commandCenterShortcut = useSettingsStore((state) => state.general.commandCenterShortcut);
   const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
@@ -208,21 +206,7 @@ export function Sidebar({
               <Plus size={20} />
               <span>开启新话题</span>
             </button>
-            <button
-              className="mt-1 flex h-9 w-full items-center gap-2 rounded-lg px-3 text-sm text-gray-500 transition-colors hover:bg-[#eceef0] hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
-              onClick={() => useUIStore.getState().setCommandCenterOpen(true)}
-              type="button"
-            >
-              <Search size={17} />
-              <span>命令中心</span>
-              <span className="ml-auto font-jakarta text-[11px] text-gray-400">
-                {commandCenterShortcut === "mod-shift-k"
-                  ? "Ctrl/Cmd ⇧K"
-                  : commandCenterShortcut === "mod-slash"
-                    ? "Ctrl/Cmd /"
-                    : "Ctrl/Cmd K"}
-              </span>
-            </button>
+
           </div>
 
           <div className="mb-4 px-3">

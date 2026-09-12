@@ -337,10 +337,7 @@ class _MessageItemState extends State<MessageItem> {
                         .toList(),
                   ),
                 if (editing)
-                  Padding(
-                    padding: EdgeInsets.only(left: m.isUser ? 0 : 40),
-                    child: editor(context),
-                  )
+                  Padding(padding: EdgeInsets.zero, child: editor(context))
                 else if (m.isUser)
                   Container(
                     constraints: BoxConstraints(
@@ -390,7 +387,7 @@ class _MessageItemState extends State<MessageItem> {
                   )
                 else if (collapsed)
                   const Padding(
-                    padding: EdgeInsets.only(left: 40),
+                    padding: EdgeInsets.zero,
                     child: Text(
                       '消息已收起',
                       style: TextStyle(fontSize: 14, color: Color(0xff9ca3af)),
@@ -398,7 +395,7 @@ class _MessageItemState extends State<MessageItem> {
                   )
                 else
                   Padding(
-                    padding: const EdgeInsets.only(left: 40),
+                    padding: EdgeInsets.zero,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -478,7 +475,7 @@ class _MessageItemState extends State<MessageItem> {
                               : const Duration(milliseconds: 150),
                           child: Padding(
                             padding: EdgeInsets.only(
-                              left: m.isUser ? 0 : 40,
+                              left: 0,
                               top: 8,
                               right: m.isUser ? 4 : 0,
                             ),

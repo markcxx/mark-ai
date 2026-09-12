@@ -46,6 +46,7 @@ final uiIconPaths = <IconData, String>{
   LucideIcons.layers: 'layers',
   LucideIcons.layoutGrid: 'layout-grid',
   LucideIcons.link2: 'link-2',
+  LucideIcons.listChecks: 'list-checks',
   LucideIcons.listCollapse: 'list-collapse',
   LucideIcons.listTree: 'list-tree',
   LucideIcons.loader: 'loader',

@@ -26,11 +26,20 @@ void main() {
         await tester.tap(find.byTooltip('展开侧栏'));
         await tester.pumpAndSettle();
         expect(find.byTooltip('搜索会话'), findsOneWidget);
-        expect(tester.getSize(find.byType(Drawer)).width, 260);
+        expect(
+          tester.getSize(find.byType(Drawer)).width,
+          width < 768 ? width * .90 : 260,
+        );
         expect(find.text('开启新话题'), findsOneWidget);
         await tester.tap(find.text('更早'));
         await tester.pumpAndSettle();
-        expect(find.descendant(of: find.byType(Drawer), matching: find.byTooltip('会话操作')), findsNothing);
+        expect(
+          find.descendant(
+            of: find.byType(Drawer),
+            matching: find.byTooltip('会话操作'),
+          ),
+          findsNothing,
+        );
         await tester.tap(find.text('更早'));
         await tester.pumpAndSettle();
         await tester.tap(find.byTooltip('搜索会话'));

@@ -70,12 +70,7 @@ void main() {
       }
 
       await screenshot('welcome');
-      await tester.tap(find.byTooltip('会话操作'));
-      await tester.pumpAndSettle();
-      await screenshot('header-menu');
-      expect(find.text('全宽显示'), findsOneWidget);
-      await tester.tapAt(const Offset(380, 400));
-      await tester.pumpAndSettle();
+      expect(find.byTooltip('会话操作'), findsNothing);
       await tester.tap(find.byTooltip('分享与导出'));
       await tester.pumpAndSettle();
       await screenshot('share-menu');
@@ -87,7 +82,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         tester.getRect(find.byType(TextField)).left,
-        initialComposer.left + 260,
+        initialComposer.left + 351,
       );
       expect(
         tester.getRect(find.byType(TextField)).width,
@@ -96,9 +91,9 @@ void main() {
       await screenshot('sidebar');
       await tester.tap(find.text('测试用户'));
       await tester.pumpAndSettle();
-      await screenshot('account-menu');
+      await screenshot('settings-home');
       expect(find.text('文件管理'), findsOneWidget);
-      await tester.tapAt(const Offset(380, 400));
+      await tester.tap(find.byTooltip('返回'));
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('收起侧栏'));
       await tester.pumpAndSettle();

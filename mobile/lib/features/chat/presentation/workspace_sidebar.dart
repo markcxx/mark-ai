@@ -6,8 +6,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../shared/models/chat.dart';
 import '../../../shared/widgets/common.dart';
 import 'user_account_menu.dart';
-import 'file_manager.dart';
-import 'command_center.dart';
 import 'session_search.dart';
 import 'session_row.dart';
 import '../application/workspace_controller.dart';
@@ -34,6 +32,49 @@ class WorkspaceSidebar extends StatefulWidget {
 class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
   final collapsed = <String>{};
   bool loadingMore = false;
+  bool selecting = false, batchBusy = false;
+  final selected = <String>{};
+
+  void toggleSelection(String id) => setState(() {
+    selected.contains(id) ? selected.remove(id) : selected.add(id);
+  });
+
+  Future<void> batchAction({required bool delete}) async {
+    final targets = c.sessions.where((s) => selected.contains(s.id)).toList();
+    if (batchBusy || targets.isEmpty) return;
+    if (delete &&
+        !await confirmAction(
+          context,
+          '删除选中的 ${targets.length} 个会话？',
+          '选中的会话会被永久删除，此操作无法撤销。',
+        )) {
+      return;
+    }
+    if (!mounted) return;
+    setState(() => batchBusy = true);
+    final completed = <String>{};
+    try {
+      for (final session in targets) {
+        if (delete) {
+          await c.deleteSession(session, refresh: false);
+        } else if (!session.favorite) {
+          await c.favorite(session, refresh: false);
+        }
+        completed.add(session.id);
+      }
+      c.message(delete ? '已删除选中的会话' : '已收藏选中的会话');
+    } catch (error) {
+      c.report(error);
+    } finally {
+      if (mounted) {
+        setState(() {
+          selected.removeAll(completed);
+          batchBusy = false;
+        });
+      }
+    }
+  }
+
   Future<void> loadMore() async {
     if (loadingMore || c.nextCursor == null) return;
     loadingMore = true;
@@ -68,6 +109,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
   }
 
   String group(ChatSession session) {
+    if (session.favorite) return '收藏';
     final now = DateTime.now();
     final days =
         (DateTime(now.year, now.month, now.day).millisecondsSinceEpoch -
@@ -84,40 +126,7 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
         : '更早';
   }
 
-  Future<void> search({bool commands = false}) async {
-    if (commands) {
-      final command = await showGeneralDialog<String>(
-        context: context,
-        barrierDismissible: true,
-        barrierLabel: '关闭命令中心',
-        barrierColor: const Color(0x40000000),
-        pageBuilder: (_, _, _) => const CommandCenter(),
-      );
-      if (!mounted || command == null) return;
-      switch (command) {
-        case 'new':
-          select(null);
-        case 'search':
-          await search();
-        case 'focus':
-          widget.onFocusComposer();
-        case 'sidebar':
-          close();
-        case 'web':
-          c.webSearch = !c.webSearch;
-          c.setSetting('defaultWebSearch', c.webSearch);
-          c.setDraft(c.draft);
-        case 'wide':
-          c.setSetting('wideChatMode', c.general['wideChatMode'] != true);
-        case 'plugins':
-          widget.onTools();
-        case 'files':
-          await showFileManager(context, c);
-        case 'settings':
-          widget.onSettings();
-      }
-      return;
-    }
+  Future<void> search() async {
     final result = await showGeneralDialog<String>(
       context: context,
       barrierDismissible: true,
@@ -195,10 +204,8 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final width = ((c.general['sidebarWidth'] as num?)?.toDouble() ?? 260)
-        .clamp(200, MediaQuery.sizeOf(context).width * .86);
     return Drawer(
-      width: width.toDouble(),
+      width: double.infinity,
       elevation: 0,
       backgroundColor: dark ? Colors.black : const Color(0xfff8f8f8),
       shape: const RoundedRectangleBorder(),
@@ -266,29 +273,6 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  row(
-                    LucideIcons.search,
-                    '命令中心',
-                    () => search(commands: true),
-                    iconSize: 17,
-                    foreground: dark
-                        ? const Color(0xff9ca3af)
-                        : const Color(0xff6b7280),
-                    height: 36,
-                    trailing: Text(
-                      switch (c.general['commandCenterShortcut']) {
-                        'mod-shift-k' => 'Ctrl/Cmd ⇧K',
-                        'mod-slash' => 'Ctrl/Cmd /',
-                        _ => 'Ctrl/Cmd K',
-                      },
-                      style: const TextStyle(
-                        fontFamily: 'Plus Jakarta Sans',
-                        fontSize: 11,
-                        color: Color(0xff9ca3af),
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -325,7 +309,26 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
                   children: [
                     const SizedBox(height: 16),
-                    label('历史'),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: label(
+                            selecting ? '历史 · 已选 ${selected.length}' : '历史',
+                          ),
+                        ),
+                        ActionIcon(
+                          selecting ? '退出批量管理' : '批量管理会话',
+                          selecting ? LucideIcons.x : LucideIcons.listChecks,
+                          batchBusy
+                              ? null
+                              : () => setState(() {
+                                  selecting = !selecting;
+                                  selected.clear();
+                                  if (selecting) collapsed.clear();
+                                }),
+                        ),
+                      ],
+                    ),
                     if (c.sessions.isEmpty)
                       const Padding(
                         padding: EdgeInsets.symmetric(
@@ -340,7 +343,14 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                           ),
                         ),
                       ),
-                    for (final title in ['今天', '昨天', '近 7 天', '近 30 天', '更早'])
+                    for (final title in [
+                      '收藏',
+                      '今天',
+                      '昨天',
+                      '近 7 天',
+                      '近 30 天',
+                      '更早',
+                    ])
                       if (c.sessions.any((s) => group(s) == title)) ...[
                         row(
                           collapsed.contains(title)
@@ -376,7 +386,12 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
                                 key: ValueKey(s.id),
                                 controller: c,
                                 session: s,
-                                onSelect: () => select(s.id),
+                                selectionMode: selecting,
+                                selected: selected.contains(s.id),
+                                enabled: !batchBusy,
+                                onSelect: () => selecting
+                                    ? toggleSelection(s.id)
+                                    : select(s.id),
                               ),
                             ),
                       ],
@@ -387,10 +402,65 @@ class _WorkspaceSidebarState extends State<WorkspaceSidebar> {
             const Divider(),
             Padding(
               padding: const EdgeInsets.all(12),
-              child: UserAccountMenu(
-                controller: c,
-                onSettings: widget.onSettings,
-                onCloseSidebar: close,
+              child: AnimatedSwitcher(
+                duration:
+                    c.general['reduceMotion'] == true ||
+                        MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : const Duration(milliseconds: 240),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                transitionBuilder: (child, animation) => IgnorePointer(
+                  ignoring: child.key != ValueKey(selecting),
+                  child: FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, .15),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
+                    ),
+                  ),
+                ),
+                child: selecting
+                    ? Row(
+                        key: const ValueKey(true),
+                        children: [
+                          Expanded(
+                            child: TextButton.icon(
+                              onPressed: batchBusy || selected.isEmpty
+                                  ? null
+                                  : () => batchAction(delete: false),
+                              style: TextButton.styleFrom(
+                                minimumSize: const Size(0, 44),
+                              ),
+                              icon: const UiIcon(LucideIcons.star, size: 18),
+                              label: const Text('收藏'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextButton.icon(
+                              onPressed: batchBusy || selected.isEmpty
+                                  ? null
+                                  : () => batchAction(delete: true),
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.red,
+                                minimumSize: const Size(0, 44),
+                              ),
+                              icon: const UiIcon(LucideIcons.trash2, size: 18),
+                              label: const Text('删除'),
+                            ),
+                          ),
+                        ],
+                      )
+                    : UserAccountMenu(
+                        key: const ValueKey(false),
+                        controller: c,
+                        onSettings: widget.onSettings,
+                        onCloseSidebar: close,
+                      ),
               ),
             ),
           ],

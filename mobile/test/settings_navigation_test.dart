@@ -1,71 +1,109 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:markai_mobile/main.dart';
-import 'package:markai_mobile/features/chat/presentation/workspace_sidebar.dart';
+import 'package:markai_mobile/features/settings/settings_home.dart';
 import 'package:markai_mobile/features/settings/settings_screen.dart';
 
 import 'support/fake_workspace.dart';
 
 void main() {
-  testWidgets(
-    'settings filters categories, shares navigation and preserves draft',
-    (tester) async {
+  for (final dark in [false, true]) {
+    testWidgets('grouped settings and interactive back navigation ($dark)', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.runAsync(() async {
+        await (FontLoader(
+          'Noto Sans SC',
+        )..addFont(rootBundle.load('assets/fonts/NotoSansSC.ttf'))).load();
+      });
       final c = await fixtureWorkspace();
-      c.settings['general']['reduceMotion'] = true;
+      addTearDown(c.dispose);
+      c.settings['general']['reduceMotion'] = false;
+      c.settings['general']['themeMode'] = dark ? 'dark' : 'light';
       c.setDraft('保留这条草稿');
-      await tester.pumpWidget(MarkAIApp(controller: c, autoStart: false));
-      await tester.pumpAndSettle();
+      final boundary = GlobalKey();
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: boundary,
+          child: MarkAIApp(controller: c, autoStart: false),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 500));
       await tester.tap(find.byTooltip('展开侧栏'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.tap(find.text('MarkAI 用户'));
       await tester.pumpAndSettle();
-      tester
-          .widget<WorkspaceSidebar>(find.byType(WorkspaceSidebar))
-          .onSettings();
-      await tester.pumpAndSettle();
-      expect(find.byType(SettingsScreen), findsOneWidget);
+      expect(find.byType(SettingsHome), findsOneWidget);
       expect(find.byType(Dialog), findsNothing);
-      expect(find.byTooltip('发送消息'), findsNothing);
-      final settings = find.byKey(const ValueKey('settings-scroll'));
-      for (final title in ['外观', '对话', '语音', 'AI 提供商', '应用更新']) {
-        await tester.tap(find.byKey(ValueKey('settings-tab-$title')));
-        await tester.pumpAndSettle();
-        expect(
-          find.descendant(of: settings, matching: find.text(title)),
-          findsOneWidget,
-        );
-        expect(
-          find.text('主题模式'),
-          title == '外观' ? findsOneWidget : findsNothing,
-        );
+      Future<void> screenshot(String name) async {
+        if (!const bool.fromEnvironment('UPDATE_COMPONENT_SCREENSHOTS')) return;
+        await tester.runAsync(() async {
+          final image =
+              await (boundary.currentContext!.findRenderObject()
+                      as RenderRepaintBoundary)
+                  .toImage();
+          final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+          await Directory('/tmp/markai-settings-qa').create(recursive: true);
+          await File('/tmp/markai-settings-qa/$name-$dark.png')
+              .writeAsBytes(bytes!.buffer.asUint8List());
+          image.dispose();
+        });
       }
-      await tester.tap(find.byKey(const ValueKey('settings-tab-外观')));
-      await tester.pumpAndSettle();
-      await tester.dragFrom(const Offset(80, 250), const Offset(160, 0));
-      await tester.pumpAndSettle();
+
+      await screenshot('home');
+      for (final title in [
+        '个人资料',
+        '文件管理',
+        '外观',
+        '对话',
+        '语音',
+        'AI 提供商',
+        '应用更新',
+      ]) {
+        final entry = find.byKey(ValueKey('settings-category-$title'));
+        await tester.ensureVisible(entry);
+        await tester.tap(entry);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('settings-tab-外观')), findsNothing);
+        expect(find.byType(Dialog), findsNothing);
+        final pageTitle = find.text(title).last;
+        final before = tester.getTopLeft(pageTitle).dx;
+        final drag = await tester.startGesture(const Offset(70, 220));
+        await drag.moveBy(const Offset(30, 0));
+        await tester.pump();
+        await drag.moveBy(const Offset(100, 0));
+        await tester.pump();
+        expect(tester.getTopLeft(pageTitle).dx, greaterThan(before + 50));
+        // Both levels must be painted while the current page follows the finger.
+        expect(find.byType(SettingsHome), findsOneWidget);
+        if (title == '外观') await screenshot('swipe');
+        await drag.cancel();
+        await tester.pumpAndSettle();
+        expect(tester.getTopLeft(pageTitle).dx, closeTo(before, .1));
+        await tester.dragFrom(const Offset(70, 220), const Offset(270, 0));
+        await tester.pumpAndSettle();
+        expect(find.byType(SettingsHome), findsOneWidget);
+        expect(find.byType(SettingsScreen), findsNothing);
+        expect(tester.takeException(), isNull);
+      }
+      await tester.dragFrom(const Offset(70, 220), const Offset(270, 0));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byType(SettingsHome), findsNothing);
       expect(find.text('开启新话题'), findsOneWidget);
-      await tester.dragFrom(const Offset(210, 250), const Offset(-150, 0));
-      await tester.pumpAndSettle();
-      expect(find.byType(WorkspaceSidebar), findsNothing);
-      expect(find.byType(SettingsScreen), findsOneWidget);
-      await tester.tap(find.byTooltip('展开侧栏'));
-      await tester.pumpAndSettle();
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(find.byType(WorkspaceSidebar), findsNothing);
-      expect(find.byType(SettingsScreen), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey('settings-tab-应用更新')));
-      await tester.pumpAndSettle();
-      expect(find.text('检查更新').hitTestable(), findsOneWidget);
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(find.byType(SettingsScreen), findsNothing);
       expect(c.draft, '保留这条草稿');
-      expect(tester.testTextInput.isVisible, isFalse);
       await tester.pumpWidget(const SizedBox());
-      c.dispose();
-    },
-  );
+    });
+  }
 }

@@ -801,20 +801,35 @@ class WorkspaceController extends ChangeNotifier {
     }
   }
 
-  Future<void> favorite(ChatSession s) async {
+  Future<void> favorite(ChatSession s, {bool refresh = true}) async {
     await api.request(
       'PATCH',
       '/api/sessions/${s.id}',
       body: {'favorite': !s.favorite},
     );
-    await loadSessions();
+    if (refresh) {
+      await loadSessions();
+    } else {
+      final current = _sessionById[s.id] ?? s;
+      final updated = ChatSession({...current.data, 'favorite': !s.favorite});
+      _sessionById[s.id] = updated;
+      sessions = sessions
+          .map((item) => item.id == s.id ? updated : item)
+          .toList();
+      if (!_disposed) notifyListeners();
+    }
   }
 
-  Future<void> deleteSession(ChatSession s) async {
+  Future<void> deleteSession(ChatSession s, {bool refresh = true}) async {
     if (s.id == activeSessionId) await openSession(null);
     await api.request('DELETE', '/api/sessions/${s.id}');
     _sessionById.remove(s.id);
-    await loadSessions();
+    if (refresh) {
+      await loadSessions();
+    } else {
+      sessions = sessions.where((item) => item.id != s.id).toList();
+      if (!_disposed) notifyListeners();
+    }
   }
 
   Future<void> translate(ChatMessage target, String language) async {

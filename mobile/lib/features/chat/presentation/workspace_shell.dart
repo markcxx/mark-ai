@@ -70,10 +70,9 @@ class _WorkspaceShellState extends State<WorkspaceShell>
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, box) {
       final mobile = box.maxWidth < 768;
-      final width = widget.sidebarWidth.clamp(
-        0.0,
-        box.maxWidth * (mobile ? .86 : 1),
-      );
+      final width = mobile
+          ? box.maxWidth * .90
+          : widget.sidebarWidth.clamp(0.0, box.maxWidth);
       final dark = Theme.of(context).brightness == Brightness.dark;
       final systemEdges = MediaQuery.systemGestureInsetsOf(context);
       return PopScope(

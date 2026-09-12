@@ -5,6 +5,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../shared/models/chat.dart';
 import '../../../shared/widgets/common.dart';
+import '../../../shared/widgets/swipe_back_route.dart';
 import '../../../shared/widgets/ui_icon.dart';
 import '../../previews/file_service.dart';
 import '../../previews/file_preview.dart';
@@ -14,20 +15,11 @@ import '../application/workspace_controller.dart';
 Future<void> showFileManager(BuildContext context, WorkspaceController c) =>
     Navigator.push(
       context,
-      PageRouteBuilder<void>(
-        pageBuilder: (_, _, _) => FileManager(controller: c),
-        transitionDuration: MediaQuery.disableAnimationsOf(context)
-            ? Duration.zero
-            : const Duration(milliseconds: 340),
-        transitionsBuilder: (_, animation, _, child) => SlideTransition(
-          position: Tween(begin: const Offset(0, 1), end: Offset.zero).animate(
-            CurvedAnimation(
-              parent: animation,
-              curve: const Cubic(.22, 1, .36, 1),
-            ),
-          ),
-          child: child,
-        ),
+      SwipeBackRoute<void>(
+        reduceMotion:
+            c.general['reduceMotion'] == true ||
+            MediaQuery.disableAnimationsOf(context),
+        builder: (_) => FileManager(controller: c),
       ),
     );
 
@@ -200,6 +192,12 @@ class _FileManagerState extends State<FileManager> {
               color: scheme.surface,
               child: Row(
                 children: [
+                  ActionIcon(
+                    '返回',
+                    LucideIcons.chevronLeft,
+                    () => Navigator.pop(context),
+                  ),
+                  const SizedBox(width: 8),
                   const Expanded(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -226,12 +224,6 @@ class _FileManagerState extends State<FileManager> {
                     onPressed: uploading == null ? upload : null,
                     icon: const UiIcon(LucideIcons.plus, size: 17),
                     label: const Text('上传'),
-                  ),
-                  const SizedBox(width: 8),
-                  ActionIcon(
-                    '关闭文件管理',
-                    LucideIcons.x,
-                    () => Navigator.pop(context),
                   ),
                 ],
               ),

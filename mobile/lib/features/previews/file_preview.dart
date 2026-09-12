@@ -1,3 +1,5 @@
+import '../../shared/widgets/swipe_back_route.dart';
+
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -65,14 +67,9 @@ Future<void> showFilePreview(
   }
   await Navigator.push(
     context,
-    PageRouteBuilder<void>(
-      opaque: !(file['contentType'] as String? ?? '').startsWith('image/'),
-      pageBuilder: (_, _, _) => FilePreview(api: api, file: file),
-      transitionDuration: MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : const Duration(milliseconds: 300),
-      transitionsBuilder: (_, animation, _, child) =>
-          FadeTransition(opacity: animation, child: child),
+    SwipeBackRoute<void>(
+      reduceMotion: MediaQuery.disableAnimationsOf(context),
+      builder: (_) => FilePreview(api: api, file: file),
     ),
   );
 }
