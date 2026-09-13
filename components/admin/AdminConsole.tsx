@@ -9,12 +9,14 @@ import {
   ScrollText,
   UsersRound,
   Megaphone,
+  Boxes,
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Toaster } from "react-hot-toast";
 
+import { ModelsPanel } from "@/components/admin/ModelsPanel";
 import { AuditPanel } from "@/components/admin/AuditPanel";
 import { AnnouncementPanel } from "@/components/admin/AnnouncementPanel";
 import { OverviewPanel } from "@/components/admin/OverviewPanel";
@@ -27,7 +29,7 @@ import { PRIMARY_COLOR_VALUES } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 
-type AdminView = "audit" | "overview" | "users" | "waitlist" | "announcement";
+type AdminView = "audit" | "overview" | "users" | "waitlist" | "announcement" | "models";
 
 const views = [
   {
@@ -47,6 +49,12 @@ const views = [
     icon: UsersRound,
     id: "users" as const,
     label: "用户管理",
+  },
+  {
+    description: "维护模型展示与上新信息",
+    icon: Boxes,
+    id: "models" as const,
+    label: "模型管理",
   },
   {
     description: "查看后台操作与安全记录",
@@ -168,7 +176,7 @@ export function AdminConsole() {
               返回
             </button>
           </div>
-          <div className="mx-auto mt-3 grid max-w-[1440px] grid-cols-5 gap-1 md:hidden">
+          <div className="mx-auto mt-3 grid max-w-[1440px] grid-cols-3 gap-1 md:hidden">
             {views.map((item) => {
               const Icon = item.icon;
               return (
@@ -206,6 +214,7 @@ export function AdminConsole() {
           {view === "waitlist" && <WaitlistPanel />}
           {view === "users" && <UsersPanel />}
           {view === "audit" && <AuditPanel />}
+          {view === "models" && <ModelsPanel />}
           {view === "announcement" && <AnnouncementPanel />}
         </div>
       </main>

@@ -179,6 +179,7 @@ export type ChatStreamEvent = {
 export type ConfiguredModel = {
   id: string;
   provider: string;
+  presentation?: import("@/lib/model-presentation").ModelPresentation;
 };
 
 export type MenuItem = {

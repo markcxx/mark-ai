@@ -30,6 +30,7 @@ import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
 import { GlobeOffIcon } from "@/components/icons/GlobeOffIcon";
 import { ContextWindowIndicator } from "./ContextWindowIndicator";
 import { FilePreviewDialog } from "./FilePreviewDialog";
+import { NewModelsBar } from "./NewModelsBar";
 import { ModelSelectorDialog } from "./ModelSelectorDialog";
 import { ModelBrandIcon } from "./ModelBrandIcon";
 import { ToolMenu } from "./ToolMenu";
@@ -346,7 +347,8 @@ export function ChatInput({
                         size={20}
                       />
                       <span className="hidden max-w-[160px] truncate text-[13px] sm:inline">
-                        {getModelDisplayName(selectedModel.id)}
+                        {selectedModel.presentation?.displayName ||
+                          getModelDisplayName(selectedModel.id)}
                       </span>
                     </>
                   ) : (
@@ -386,6 +388,13 @@ export function ChatInput({
             </div>
           </div>
 
+          {placement === "center" && (
+            <NewModelsBar
+              models={availableModels}
+              selectedModelKey={selectedModelKey}
+              onSelect={setSelectedModelKey}
+            />
+          )}
           <p className="mt-3 hidden text-center font-jakarta text-xs text-gray-400 sm:block">
             内容由 AI 生成，请注意甄别。
           </p>

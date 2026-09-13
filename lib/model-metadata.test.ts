@@ -3,6 +3,11 @@ import { describe, expect, it } from "vitest";
 import { getModelMetadata, hasKnownContextWindow } from "./model-metadata";
 
 const configuredModelExpectations = [
+  ["zai-org/GLM-5.3", "glm-5.3", 1_000_000, false],
+  ["glm-5.3", "glm-5.3", 1_000_000, false],
+  ["zai-org/GLM-5.3-Flash", "glm-5.3-flash", 1_000_000, true],
+  ["glm-5.3-flash", "glm-5.3-flash", 1_000_000, true],
+  ["deepseek-ai/DeepSeek-V4.1-Flash", "deepseek-v4.1-flash", 1_048_576, true],
   ["gpt-5.6-luna", "gpt-5.6-luna", 1_050_000, true],
   ["gpt-5.6-luna-低", "gpt-5.6-luna", 1_050_000, true],
   ["gpt-5.6-luna-中", "gpt-5.6-luna", 1_050_000, true],
@@ -89,4 +94,22 @@ it("recognizes Astra without assigning its limits to unverified GPT-6 identifier
   expect(getModelMetadata("gpt-6-astra-高")?.maxOutputTokens).toBe(128_000);
   expect(getModelMetadata("gpt-6")?.contextWindowTokens).toBeUndefined();
   expect(getModelMetadata("gpt-6-mini")).toBeUndefined();
+});
+
+it("keeps new model output limits and capabilities distinct", () => {
+  for (const id of ["glm-5.3", "glm-5.3-flash"]) {
+    expect(getModelMetadata(id)).toMatchObject({
+      maxOutputTokens: 131_072,
+      supportsReasoning: true,
+      supportsToolCalling: true,
+    });
+  }
+  expect(getModelMetadata("glm-5.3-flash")?.supportsVideo).toBe(true);
+  expect(getModelMetadata("deepseek-ai/DeepSeek-V4.1-Flash")).toMatchObject({
+    maxOutputTokens: 393_216,
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVision: true,
+  });
+  expect(getModelMetadata("glm-5.3-unknown")).toBeUndefined();
 });

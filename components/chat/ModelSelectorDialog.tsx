@@ -18,6 +18,8 @@ import { getModelDisplayName, getModelKey } from "@/lib/chat/helpers";
 import { formatTokenCount, getModelMetadata, hasKnownContextWindow } from "@/lib/model-metadata";
 import { isImageGenerationModel } from "@/lib/chat/image-models";
 import { compareModelProviders, sortModelsByFamily } from "@/lib/model-sorting";
+import { isNewModel } from "@/lib/model-presentation";
+import { useModelPresentationTime } from "@/hooks/useModelPresentationTime";
 import { cn } from "@/lib/utils";
 
 import { ModelBrandIcon } from "./ModelBrandIcon";
@@ -94,6 +96,7 @@ export function ModelSelectorDialog({
   setModelSearchKeyword: (keyword: string) => void;
   setSelectedModelKey: (key: string) => void;
 }) {
+  const now = useModelPresentationTime(availableModels);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const selectedItemRef = useRef<HTMLButtonElement>(null);
   const [modelTypeFilter, setModelTypeFilter] = useState<ModelTypeFilter>("all");
@@ -121,7 +124,9 @@ export function ModelSelectorDialog({
       if (
         keyword &&
         !model.id.toLowerCase().includes(keyword) &&
-        !getModelDisplayName(model.id).toLowerCase().includes(keyword)
+        !getModelDisplayName(model.id).toLowerCase().includes(keyword) &&
+        !model.presentation?.displayName.toLowerCase().includes(keyword) &&
+        !model.presentation?.description.toLowerCase().includes(keyword)
       )
         return false;
       return true;
@@ -267,7 +272,7 @@ export function ModelSelectorDialog({
                       return (
                         <button
                           className={cn(
-                            "flex h-10 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm transition-colors",
+                            "flex min-h-11 w-full items-center gap-2.5 py-2 rounded-lg px-3 text-left text-sm transition-colors",
                             isSelected
                               ? "bg-gray-100 text-gray-950 dark:bg-white/[0.08] dark:text-gray-50"
                               : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/[0.04]",
@@ -282,8 +287,25 @@ export function ModelSelectorDialog({
                           type="button"
                         >
                           <ModelBrandIcon model={model.id} provider={model.provider} size={20} />
-                          <span className="min-w-0 flex-1 truncate">
-                            {getModelDisplayName(model.id)}
+                          <span className="min-w-0 flex-1">
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span className="truncate">
+                                {model.presentation?.displayName || getModelDisplayName(model.id)}
+                              </span>
+                              {isNewModel(model.presentation, now) && (
+                                <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500 dark:bg-white/10 dark:text-gray-300">
+                                  上新
+                                </span>
+                              )}
+                            </span>
+                            {model.presentation?.description && (
+                              <span
+                                className="mt-0.5 block truncate text-xs text-gray-400"
+                                data-markai-tooltip={model.presentation.description}
+                              >
+                                {model.presentation.description}
+                              </span>
+                            )}
                           </span>
                           {imageGenerationModel && (
                             <>

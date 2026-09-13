@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { authorizeApiRequest, enforceRateLimit } from "@/lib/api/security";
 import { getAvailableProviderNames, getAvailablePublicModels } from "@/lib/available-models";
 import { getDb } from "@/lib/db";
+import { readModelPresentations } from "@/lib/model-presentation-server";
+import { withModelPresentations } from "@/lib/model-presentation";
+import { listUserModelProviders } from "@/lib/user-model-providers";
 import { userSettings } from "@/lib/db/schema";
 
 export const dynamic = "force-dynamic";
@@ -36,9 +39,31 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Optional display metadata must never prevent access to configured models.
+  let presentedModels = models;
+  try {
+    const [entries, providers] = await Promise.all([
+      readModelPresentations(),
+      authorization.userId ? listUserModelProviders(authorization.userId) : [],
+    ]);
+    presentedModels = withModelPresentations(
+      models,
+      entries,
+      new Set(
+        providers
+          .filter(
+            (provider) => provider.enabled && provider.hasApiKey && provider.models.length > 0,
+          )
+          .map((provider) => provider.provider),
+      ),
+    );
+  } catch (error) {
+    console.error("Model presentation unavailable:", error);
+  }
+
   return NextResponse.json(
     {
-      models,
+      models: presentedModels,
       providerNames,
       selectedModel,
     },
