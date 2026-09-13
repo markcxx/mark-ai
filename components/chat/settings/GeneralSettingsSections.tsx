@@ -1,5 +1,15 @@
 "use client";
 
+import dynamic from "next/dynamic";
+import {
+  CODE_THEMES,
+  MERMAID_PALETTES,
+  type MermaidTheme,
+} from "@/lib/visualization/theme-catalog";
+
+const CodeThemePreview = dynamic(() => import("./CodeThemePreview"), { ssr: false });
+const DiagramThemePreview = dynamic(() => import("./DiagramThemePreview"), { ssr: false });
+
 import { Check } from "lucide-react";
 import { useTheme } from "next-themes";
 import type { ReactNode } from "react";
@@ -34,10 +44,8 @@ const codeThemes: Array<{ id: CodeTheme; label: string }> = [
   { id: "gruvbox", label: "Gruvbox" },
   { id: "solarized", label: "Solarized" },
   { id: "github", label: "GitHub" },
-  { id: "dracula", label: "Dracula" },
-  { id: "night-owl", label: "Night Owl" },
-  { id: "nord", label: "Nord" },
   { id: "duotone", label: "Duotone" },
+  ...CODE_THEMES,
 ];
 
 function SettingRow({
@@ -133,8 +141,9 @@ export function AppearanceSettings() {
           onChange={(reduceMotion) => update({ reduceMotion })}
         />
       </SettingRow>
-      <SettingRow description="代码主题会自动匹配亮色和暗色模式" title="代码高亮主题">
+      <SettingRow description="下方预览与对话代码块同步更新" title="代码高亮主题">
         <AppSelect
+          aria-label="代码高亮主题"
           onChange={(value) => {
             if (typeof value === "string") update({ codeTheme: value as CodeTheme });
           }}
@@ -142,8 +151,19 @@ export function AppearanceSettings() {
           value={general.codeTheme}
         />
       </SettingRow>
-      <SettingRow description="可在亮色界面中固定使用暗色代码块，或反过来" title="代码块明暗模式">
+      <div className="py-4">
+        <CodeThemePreview />
+      </div>
+      <SettingRow
+        description="适用于 One、VS Code 等自适应主题；其他主题使用各自的明暗配色"
+        title="代码块明暗模式"
+      >
         <AppSelect
+          disabled={
+            !["one", "vscode", "material", "gruvbox", "solarized", "github", "duotone"].includes(
+              general.codeTheme,
+            )
+          }
           onChange={(value) => {
             if (typeof value === "string") {
               update({ codeColorMode: value as typeof general.codeColorMode });
@@ -175,6 +195,24 @@ export function AppearanceSettings() {
           value={general.codeCollapseLines}
         />
       </SettingRow>
+      <SettingRow title="Mermaid 图表主题" description="应用于流程图、时序图、脑图及导出图片">
+        <AppSelect
+          aria-label="Mermaid 图表主题"
+          value={general.mermaidTheme}
+          onChange={(value) => update({ mermaidTheme: value as MermaidTheme })}
+          options={[
+            { label: "跟随界面", value: "auto" },
+            ...Object.keys(MERMAID_PALETTES).map((id) => ({
+              value: id,
+              label: id
+                .split("-")
+                .map((word) => word[0].toUpperCase() + word.slice(1))
+                .join(" "),
+            })),
+          ]}
+        />
+      </SettingRow>
+      <DiagramThemePreview />
     </div>
   );
 }

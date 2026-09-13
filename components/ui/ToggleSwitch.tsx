@@ -1,11 +1,13 @@
 import { cn } from "@/lib/utils";
 
 export function ToggleSwitch({
+  "aria-label": ariaLabel,
   checked,
   className,
   disabled = false,
   onChange,
 }: {
+  "aria-label"?: string;
   checked: boolean;
   className?: string;
   disabled?: boolean;
@@ -33,6 +35,7 @@ export function ToggleSwitch({
 
   return (
     <button
+      aria-label={ariaLabel}
       aria-checked={checked}
       className="inline-flex h-7 w-11 items-center justify-center rounded-lg transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed dark:hover:bg-white/[0.07]"
       disabled={disabled}

@@ -18,6 +18,7 @@ export function AppDialog({
   maskClassName,
   maskClosable = true,
   onClose,
+  onOpenChangeComplete,
   open,
   panelClassName,
   title,
@@ -34,6 +35,7 @@ export function AppDialog({
   maskClassName?: string;
   maskClosable?: boolean;
   onClose: () => void;
+  onOpenChangeComplete?: (open: boolean) => void;
   open: boolean;
   panelClassName?: string;
   title?: ReactNode | false;
@@ -61,6 +63,7 @@ export function AppDialog({
 
   return (
     <Dialog.Root
+      onOpenChangeComplete={onOpenChangeComplete}
       disablePointerDismissal={!maskClosable || closeDisabled}
       onOpenChange={(nextOpen, details) => {
         if (nextOpen || !open) return;

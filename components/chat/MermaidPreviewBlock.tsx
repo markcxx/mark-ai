@@ -21,6 +21,9 @@ import { downloadSvg, downloadSvgAsPng } from "@/lib/visualization/svg-export";
 
 import { ToolPreviewCard, ToolPreviewError, toolPreviewActionClass } from "./ToolPreviewCard";
 
+import { useSettingsStore } from "@/stores/useSettingsStore";
+import { getMermaidTheme, queueMermaidRender } from "@/lib/visualization/mermaid-theme";
+
 const MAX_SOURCE_LENGTH = 50_000;
 const BLOCKED_SOURCE =
   /%%\s*\{\s*init|^\s*click\s|<\/?(?:script|iframe|object|embed|img|foreignObject)\b|javascript:/im;
@@ -63,6 +66,7 @@ const DiagramSurface = ({
   onReady?: (svg: SVGSVGElement | null) => void;
 }) => {
   const { resolvedTheme } = useTheme();
+  const mermaidTheme = useSettingsStore((state) => state.general.mermaidTheme);
   const containerRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const renderId = useRef(`markai-mermaid-${Math.random().toString(36).slice(2)}`);
@@ -126,15 +130,19 @@ const DiagramSurface = ({
 
     void import("mermaid")
       .then(async ({ default: mermaid }) => {
-        mermaid.initialize({
-          flowchart: { htmlLabels: false },
-          maxTextSize: MAX_SOURCE_LENGTH,
-          securityLevel: "strict",
-          startOnLoad: false,
-          suppressErrorRendering: true,
-          theme: resolvedTheme === "dark" ? "dark" : "default",
+        const result = await queueMermaidRender(async () => {
+          if (!active) return null;
+          mermaid.initialize({
+            flowchart: { htmlLabels: false },
+            maxTextSize: MAX_SOURCE_LENGTH,
+            securityLevel: "strict",
+            startOnLoad: false,
+            suppressErrorRendering: true,
+            ...getMermaidTheme(mermaidTheme, resolvedTheme === "dark").config,
+          });
+          return mermaid.render(`${renderId.current}-${Date.now()}`, source.trim());
         });
-        const result = await mermaid.render(`${renderId.current}-${Date.now()}`, source.trim());
+        if (!result) return;
         if (!active || !containerRef.current) return;
         containerRef.current.innerHTML = result.svg;
         const svg = containerRef.current.querySelector("svg");
@@ -166,11 +174,14 @@ const DiagramSurface = ({
       active = false;
       onReady?.(null);
     };
-  }, [onError, onReady, resolvedTheme, source, validationError]);
+  }, [onError, onReady, resolvedTheme, mermaidTheme, source, validationError]);
 
   return (
     <div
       className={`relative overflow-hidden bg-white touch-none dark:bg-[#171717] ${className}`}
+      style={{
+        backgroundColor: getMermaidTheme(mermaidTheme, resolvedTheme === "dark").background,
+      }}
       ref={viewportRef}
       onPointerCancel={() => {
         dragRef.current = null;
@@ -258,13 +269,14 @@ const DiagramSurface = ({
 
 export function MermaidPreviewBlock({ children }: { children: string }) {
   const { resolvedTheme } = useTheme();
+  const mermaidTheme = useSettingsStore((state) => state.general.mermaidTheme);
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [runtimeError, setRuntimeError] = useState(false);
   const [svg, setSvg] = useState<SVGSVGElement | null>(null);
   const [expandedSvg, setExpandedSvg] = useState<SVGSVGElement | null>(null);
   const title = "Mermaid 流程图";
-  const background = resolvedTheme === "dark" ? "#171717" : "#ffffff";
+  const background = getMermaidTheme(mermaidTheme, resolvedTheme === "dark").background;
   const validationError = useMemo(() => validateSource(children), [children]);
   const previewError = Boolean(validationError || runtimeError);
   const handleRenderError = useCallback(() => setRuntimeError(true), []);
@@ -272,7 +284,7 @@ export function MermaidPreviewBlock({ children }: { children: string }) {
   useEffect(() => {
     setRuntimeError(false);
     if (validationError) console.warn("Mermaid preview validation error:", validationError);
-  }, [children, resolvedTheme, validationError]);
+  }, [children, resolvedTheme, mermaidTheme, validationError]);
 
   const copySource = async () => {
     await navigator.clipboard.writeText(children.trim());

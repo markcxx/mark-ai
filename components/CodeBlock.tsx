@@ -1,25 +1,5 @@
-import React, { useState } from "react";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import {
-  atomDark,
-  coldarkCold,
-  dracula,
-  duotoneDark,
-  duotoneLight,
-  ghcolors,
-  gruvboxDark,
-  gruvboxLight,
-  materialDark,
-  materialLight,
-  nightOwl,
-  nord,
-  oneDark,
-  oneLight,
-  solarizedDarkAtom,
-  solarizedlight,
-  vs,
-  vscDarkPlus,
-} from "react-syntax-highlighter/dist/esm/styles/prism";
+import React, { useEffect, useState } from "react";
+import { ShikiCode } from "./ShikiCode";
 import { Check, ChevronDown, ChevronUp, Copy, Download, WrapText } from "lucide-react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
@@ -54,25 +34,6 @@ const LANGUAGE_EXTENSIONS: Record<string, string> = {
   yml: "yml",
 };
 
-type SyntaxTheme = Record<string, Record<string, string | number>>;
-
-const normalizeThemeBackgrounds = (theme: SyntaxTheme): SyntaxTheme =>
-  Object.fromEntries(
-    Object.entries(theme).map(([selector, styles]) => {
-      const { background, backgroundColor, ...rest } = styles;
-      const resolvedBackground = backgroundColor || background;
-      return [
-        selector,
-        resolvedBackground === undefined
-          ? rest
-          : {
-              ...rest,
-              backgroundColor: resolvedBackground === "none" ? "transparent" : resolvedBackground,
-            },
-      ];
-    }),
-  );
-
 export const Pre = ({ children, language }: { children: string; language: string }) => {
   const [copied, setCopied] = useState(false);
   const { resolvedTheme } = useTheme();
@@ -80,26 +41,22 @@ export const Pre = ({ children, language }: { children: string; language: string
   const lineCount = countLines(children.replace(/\n$/, ""));
   const settings = useSettingsStore((state) => state.general);
   const [wrapLongLines, setWrapLongLines] = useState(settings.codeWrap);
+  useEffect(() => setWrapLongLines(settings.codeWrap), [settings.codeWrap]);
   const collapsible = settings.codeCollapseLines > 0 && lineCount > settings.codeCollapseLines;
   const [collapsed, setCollapsed] = useState(false);
   const isDark =
     settings.codeColorMode === "dark" ||
     (settings.codeColorMode === "auto" && resolvedTheme === "dark");
-  const themePairs = {
-    dracula: [duotoneLight, dracula],
-    duotone: [duotoneLight, duotoneDark],
-    github: [ghcolors, atomDark],
-    gruvbox: [gruvboxLight, gruvboxDark],
-    material: [materialLight, materialDark],
-    "night-owl": [coldarkCold, nightOwl],
-    nord: [coldarkCold, nord],
-    one: [oneLight, oneDark],
-    solarized: [solarizedlight, solarizedDarkAtom],
-    vscode: [vs, vscDarkPlus],
-  } as const;
-  const syntaxTheme = normalizeThemeBackgrounds(
-    themePairs[settings.codeTheme][isDark ? 1 : 0] as SyntaxTheme,
-  );
+  const legacyThemes: Record<string, [string, string]> = {
+    one: ["one-light", "one-dark-pro"],
+    vscode: ["light-plus", "dark-plus"],
+    material: ["material-theme-lighter", "material-theme-darker"],
+    gruvbox: ["gruvbox-light-medium", "gruvbox-dark-medium"],
+    solarized: ["solarized-light", "solarized-dark"],
+    github: ["github-light", "github-dark"],
+    duotone: ["vitesse-light", "vitesse-dark"],
+  };
+  const syntaxTheme = legacyThemes[settings.codeTheme]?.[isDark ? 1 : 0] || settings.codeTheme;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(children);
@@ -230,23 +187,13 @@ export const Pre = ({ children, language }: { children: string; language: string
           collapsed && "max-h-0 overflow-hidden",
         )}
       >
-        <SyntaxHighlighter
+        <ShikiCode
+          code={children.replace(/\n$/, "")}
           language={normalizedLanguage}
-          style={syntaxTheme as any}
-          showLineNumbers={settings.codeLineNumbers}
-          wrapLongLines={wrapLongLines}
-          customStyle={{ borderRadius: 0, margin: 0, padding: "1rem" }}
-          lineNumberStyle={{
-            color: isDark ? "#6e7681" : "#94a3b8",
-            minWidth: "2.5em",
-            paddingRight: "1em",
-            textAlign: "right",
-            userSelect: "none",
-          }}
-          PreTag="div"
-        >
-          {children.replace(/\n$/, "")}
-        </SyntaxHighlighter>
+          theme={syntaxTheme}
+          lineNumbers={settings.codeLineNumbers}
+          wrap={wrapLongLines}
+        />
       </div>
     </div>
   );

@@ -180,11 +180,13 @@ const getMaskStyle = (slug: string): CSSProperties => ({
 });
 
 export function ProviderBrandIcon({
+  colorful = false,
   className,
   name,
   provider,
   size = 24,
 }: {
+  colorful?: boolean;
   className?: string;
   name?: string;
   provider?: string;
@@ -202,6 +204,28 @@ export function ProviderBrandIcon({
         style={{ height: size, width: size }}
       >
         {(name || provider || "AI").slice(0, 1).toUpperCase()}
+      </span>
+    );
+  }
+
+  if (colorful) {
+    return (
+      <span
+        aria-hidden="true"
+        className={cn("inline-flex shrink-0 items-center justify-center rounded-md", className)}
+        style={{ height: size, width: size, background: asset.background, color: asset.foreground }}
+      >
+        {asset.avatarSlug ? (
+          <Image
+            alt=""
+            unoptimized
+            src={`/images/model-icons/${asset.avatarSlug}.svg`}
+            width={Math.round(size * 0.8)}
+            height={Math.round(size * 0.8)}
+          />
+        ) : (
+          <span style={{ ...getMaskStyle(asset.slug), height: size * 0.76, width: size * 0.76 }} />
+        )}
       </span>
     );
   }

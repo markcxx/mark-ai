@@ -1,3 +1,4 @@
+import { CODE_THEMES, MERMAID_PALETTES, type MermaidTheme } from "./visualization/theme-catalog";
 import {
   isSpeechVoice,
   SYSTEM_SPEECH_VOICE,
@@ -8,6 +9,7 @@ export type ThemeMode = "light" | "dark" | "system";
 export type PrimaryColor =
   "black" | "blue" | "cyan" | "green" | "indigo" | "magenta" | "orange" | "red" | "violet";
 export type CodeTheme =
+  | (typeof CODE_THEMES)[number]["id"]
   | "dracula"
   | "duotone"
   | "github"
@@ -30,6 +32,7 @@ export type GeneralSettings = {
   codeColorMode: CodeColorMode;
   codeLineNumbers: boolean;
   codeTheme: CodeTheme;
+  mermaidTheme: MermaidTheme;
   codeWrap: boolean;
   commandCenterShortcut: CommandCenterShortcut;
   defaultWebSearch: boolean;
@@ -88,6 +91,7 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
   codeColorMode: "auto",
   codeLineNumbers: true,
   codeTheme: "one",
+  mermaidTheme: "auto",
   codeWrap: false,
   commandCenterShortcut: "mod-k",
   defaultWebSearch: false,
@@ -166,8 +170,14 @@ export const sanitizeGeneralSettings = (
         "night-owl",
         "nord",
         "duotone",
+        ...CODE_THEMES.map((theme) => theme.id),
       ],
       fallback.codeTheme,
+    ),
+    mermaidTheme: stringOption(
+      input.mermaidTheme,
+      ["auto", ...Object.keys(MERMAID_PALETTES)] as MermaidTheme[],
+      fallback.mermaidTheme,
     ),
     codeWrap: booleanValue(input.codeWrap, fallback.codeWrap),
     commandCenterShortcut: stringOption(

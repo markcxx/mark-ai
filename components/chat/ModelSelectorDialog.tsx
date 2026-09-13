@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Check,
   Image,
   LayoutGrid,
   MessageSquareText,
@@ -277,6 +276,7 @@ export function ModelSelectorDialog({
                               ? "bg-gray-100 text-gray-950 dark:bg-white/[0.08] dark:text-gray-50"
                               : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/[0.04]",
                           )}
+                          aria-pressed={isSelected}
                           key={key}
                           onClick={() => {
                             setSelectedModelKey(key);
@@ -349,7 +349,6 @@ export function ModelSelectorDialog({
                               {formatTokenCount(metadata.contextWindowTokens)}
                             </span>
                           )}
-                          {isSelected && <Check className="shrink-0 text-gray-400" size={16} />}
                         </button>
                       );
                     })}
