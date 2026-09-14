@@ -11,11 +11,21 @@ void main() {
     c.settings['general']['reduceMotion'] = true;
     await tester.pumpWidget(MarkAIApp(controller: c, autoStart: false));
     await tester.pumpAndSettle();
+    final inputBefore = tester.getTopLeft(find.byType(TextField)).dy;
     await tester.tap(find.byTooltip('添加附件'));
     await tester.pumpAndSettle();
-    for (final label in ['图片', '文件', '相机']) {
+    for (final label in ['拍照', '相册', '文件']) {
       expect(find.text(label), findsOneWidget);
     }
+    expect(tester.getTopLeft(find.byType(TextField)).dy, lessThan(inputBefore));
+    await tester.tap(find.byTooltip('收起附件选项'));
+    await tester.pumpAndSettle();
+    expect(find.text('拍照'), findsNothing);
+    await tester.tap(find.byTooltip('添加附件'));
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('拍照'), findsNothing);
     await tester.pumpWidget(const SizedBox());
     c.dispose();
   });

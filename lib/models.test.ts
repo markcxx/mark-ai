@@ -36,6 +36,23 @@ afterEach(() => {
 });
 
 describe("MarkAI model channels", () => {
+  it("routes an explicit thinking choice only to compatible channels", () => {
+    process.env.AI_PROVIDERS = "markchannela,markchannelb";
+    process.env.MARKCHANNELA_API_KEY = "test-a";
+    process.env.MARKCHANNELA_BASE_URL = "https://unknown.example/v1";
+    process.env.MARKCHANNELA_MODELS = "kimi-k2.5";
+    process.env.MARKCHANNELB_API_KEY = "test-b";
+    process.env.MARKCHANNELB_BASE_URL = "https://api.moonshot.cn/v1";
+    process.env.MARKCHANNELB_MODELS = "kimi-k2.5";
+    expect(
+      getPublicConfiguredModels().find((m) => m.provider === "markai" && m.id === "kimi-k2.5")
+        ?.thinking,
+    ).toEqual({ defaultEnabled: true });
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    expect(findConfiguredModel("kimi-k2.5", "markai")?.provider).toBe("markchannela");
+    expect(findConfiguredModel("kimi-k2.5", "markai", true)?.provider).toBe("markchannelb");
+    expect(findConfiguredModel("kimi-k2.5", "markchannela", true)).toBeUndefined();
+  });
   it("publishes a shared model once and randomly resolves its configured channel", () => {
     process.env.AI_PROVIDERS = "markchannela,markchannelb";
     process.env.MARKCHANNELA_API_KEY = "channel-a-key";

@@ -45,6 +45,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     Widget control, {
     String? description,
     bool last = false,
+    bool inline = false,
   }) {
     final caption = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -74,7 +75,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      constraints: const BoxConstraints(minHeight: 56),
       decoration: BoxDecoration(
         border: last
             ? null
@@ -85,10 +87,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
       ),
-      child: MediaQuery.sizeOf(context).width < 640
+      child: !inline && MediaQuery.sizeOf(context).width < 640
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [caption, const SizedBox(height: 12), control],
+              children: [caption, const SizedBox(height: 8), control],
             )
           : Row(
               children: [
@@ -109,20 +111,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
     title,
     AppSelect<String>(
       label: title,
+      width: key == 'translationModelKey'
+          ? 240
+          : (MediaQuery.sizeOf(context).width < 360 ? 136 : 160),
+      height: 40,
       value: c.general[key] as String? ?? options.keys.first,
       options: options,
       onChanged: (value) => c.setSetting(key, value),
     ),
     description: description,
+    inline:
+        key != 'translationModelKey' &&
+        MediaQuery.textScalerOf(context).scale(14) <= 18,
   );
   Widget toggle(String title, String key, {String? description}) => row(
     title,
-    ToggleSwitch(
-      label: title,
-      checked: c.general[key] == true,
-      onChanged: (value) => c.setSetting(key, value),
+    SizedBox(
+      height: 44,
+      child: ToggleSwitch(
+        label: title,
+        checked: c.general[key] == true,
+        onChanged: (value) => c.setSetting(key, value),
+      ),
     ),
     description: description,
+    inline: true,
   );
   Widget appearance() => Column(
     children: [
@@ -276,7 +289,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ],
   );
   Widget sectionBlock(String title, Widget child) => Padding(
-    padding: const EdgeInsets.only(top: 28),
+    padding: const EdgeInsets.only(top: 20),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -312,7 +325,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: SingleChildScrollView(
             key: const ValueKey('settings-scroll'),
             controller: scroll,
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 840),

@@ -33,12 +33,15 @@ class SettingsHome extends StatelessWidget {
       bool danger = false,
     }) => ListTile(
       key: ValueKey('settings-category-$title'),
-      minTileHeight: 60,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 18),
-      leading: UiIcon(icon, size: 22, color: danger ? Colors.red : null),
+      minTileHeight: 48,
+      dense: true,
+      minLeadingWidth: 20,
+      horizontalTitleGap: 12,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+      leading: UiIcon(icon, size: 20, color: danger ? Colors.red : null),
       title: Text(
         title,
-        style: TextStyle(fontSize: 16, color: danger ? Colors.red : null),
+        style: TextStyle(fontSize: 14, color: danger ? Colors.red : null),
       ),
       trailing: danger
           ? null
@@ -50,13 +53,13 @@ class SettingsHome extends StatelessWidget {
       onTap: onTap,
     );
     Widget group(String? title, List<Widget> entries) => Padding(
-      padding: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (title != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
               child: Text(
                 title,
                 style: const TextStyle(fontSize: 13, color: Color(0xff9ca3af)),
@@ -64,7 +67,7 @@ class SettingsHome extends StatelessWidget {
             ),
           Material(
             color: dark ? const Color(0xff191919) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
             clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
@@ -72,7 +75,7 @@ class SettingsHome extends StatelessWidget {
                   if (i > 0)
                     Divider(
                       height: 1,
-                      indent: 58,
+                      indent: 48,
                       endIndent: 16,
                       color: dark
                           ? const Color(0x14ffffff)
@@ -109,7 +112,7 @@ class SettingsHome extends StatelessWidget {
         top: false,
         child: ListView(
           key: const ValueKey('settings-home-scroll'),
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
           children: [
             group('账户', [
               entry(

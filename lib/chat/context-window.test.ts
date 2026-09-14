@@ -18,6 +18,18 @@ const metadata: ModelMetadataWithContext = {
 };
 
 describe("context window preparation", () => {
+  it("counts reasoning that the server will replay when trimming history", () => {
+    const result = prepareMessagesForContext(
+      [
+        { role: "user", content: "旧问题" },
+        { role: "model", content: "旧回答", reasoning: "长推理".repeat(5000) },
+        { role: "user", content: "新问题" },
+      ],
+      metadata,
+      256,
+    );
+    expect(result.removedMessageCount).toBe(2);
+  });
   it("reserves no more than half of a small context window", () => {
     expect(getOutputReserveTokens(metadata)).toBe(1024);
   });

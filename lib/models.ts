@@ -1,3 +1,8 @@
+import {
+  getPublicThinkingCapability,
+  getThinkingPolicy,
+  type ThinkingCapability,
+} from "./model-thinking";
 export type ModelRuntime = "gemini" | "openai-compatible";
 
 export type ConfiguredModel = {
@@ -8,7 +13,9 @@ export type ConfiguredModel = {
   baseUrl?: string;
 };
 
-export type PublicConfiguredModel = Pick<ConfiguredModel, "id" | "provider">;
+export type PublicConfiguredModel = Pick<ConfiguredModel, "id" | "provider"> & {
+  thinking?: ThinkingCapability;
+};
 
 type ProviderEnvConfig = {
   defaultBaseUrl?: string;
@@ -250,20 +257,16 @@ export const getProviderDisplayName = (provider: string): string => {
 };
 
 export const getPublicConfiguredModels = (): PublicConfiguredModel[] => {
-  const models = getConfiguredModels();
-  const seen = new Set<string>();
-
-  return models
-    .map(({ id, provider }) => ({
-      id,
-      provider: isMarkProvider(provider) ? "markai" : provider,
-    }))
-    .filter((model) => {
-      const key = `${model.provider}:${model.id}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+  const grouped = new Map<string, PublicConfiguredModel>();
+  for (const model of getConfiguredModels()) {
+    const provider = isMarkProvider(model.provider) ? "markai" : model.provider;
+    const key = `${provider}:${model.id}`;
+    const thinking = getPublicThinkingCapability(model);
+    const existing = grouped.get(key);
+    if (!existing) grouped.set(key, { id: model.id, provider, thinking });
+    else if (!existing.thinking && thinking) existing.thinking = thinking;
+  }
+  return [...grouped.values()];
 };
 
 const pickRandomKey = (apiKey: string): string => {
@@ -274,9 +277,15 @@ const pickRandomKey = (apiKey: string): string => {
   return keys.length > 1 ? keys[Math.floor(Math.random() * keys.length)] : apiKey;
 };
 
-export const findConfiguredModel = (modelId?: string, provider?: string) => {
+export const findConfiguredModel = (
+  modelId?: string,
+  provider?: string,
+  requireThinkingControl = false,
+) => {
   if (!modelId) return undefined;
-  const models = getConfiguredModels();
+  const models = getConfiguredModels().filter(
+    (model) => !requireThinkingControl || getThinkingPolicy(model),
+  );
 
   let found: ConfiguredModel | undefined;
 

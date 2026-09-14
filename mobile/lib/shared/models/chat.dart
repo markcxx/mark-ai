@@ -14,6 +14,8 @@ class ModelRef {
   ModelRef(this.id, this.provider, [this.metadata = const {}]);
   factory ModelRef.fromJson(Json json) =>
       ModelRef(json['id'] as String, json['provider'] as String, json);
+  bool? get thinkingDefault =>
+      jsonMap(metadata['thinking'])['defaultEnabled'] as bool?;
   String get key => '$provider:$id';
   String get label => metadata['name'] as String? ?? id;
   Json toJson() => {'id': id, 'provider': provider};
@@ -39,6 +41,7 @@ class ChatMessage {
   Json toJson() => cloneJson(data);
   Json toPrompt() => {
     'role': role,
+    if (data['reasoning'] is String) 'reasoning': data['reasoning'],
     'content': [
       ...segments.where((s) => s['type'] == 'quote').map((s) => s['content']),
       content,

@@ -1,5 +1,6 @@
 // Uses the original React components. Only routing/auth/network are fixtures.
 import React from 'react';
+import { UsageTrendChart } from '../../components/admin/UsageTrendChart';
 import fixture from '../../contracts/mobile-ui-fixture.json';
 import { createRoot } from 'react-dom/client';
 import { ThemeProvider } from 'next-themes';
@@ -43,7 +44,7 @@ window.fetch = async (input, options) => {
   else if (path === '/api/tools') result = { tools: catalog };
   else if (path === '/api/settings') result = { settings: { general: { themeMode: params.get('theme') || 'light', reduceMotion: true } } };
   else if (path === '/api/model-providers') result = {templates:MODEL_PROVIDER_TEMPLATES,providers:[],siteProviders:[],cloudPersistence:true};
-  else if (path === '/api/models') result = { models: fixture.models };
+  else if (path === '/api/models') result = { models: params.has('thinking') ? [{id:'kimi-k2.5',provider:'moonshot',thinking:{defaultEnabled:true}},...fixture.models] : fixture.models };
   else if (path === '/api/sessions') result = { sessions: params.has('history') || location.pathname !== '/' ? fixture.sessions : [] };
   else if (path === '/api/sessions/qa-session') result = {session: fixture.sessions[0], messages: params.has('performance') ? performanceMessages : fixture.messages};
   else if (path.endsWith('/tools')) result = {toolIds:[]};
@@ -61,6 +62,7 @@ createRoot(document.getElementById('root')!).render(<ThemeProvider attribute="cl
     : view === 'files' ? <FileManagerDrawer open onClose={()=>{}} />
     : view === 'settings' ? <SettingsDialog onClose={()=>{}} />
     : view === 'share' ? <ShareConversationDialog sessionId="qa-session" onClose={() => {}} busy={false} />
+    : view === 'trend' ? <div className="min-h-screen bg-gray-50 p-4 dark:bg-[#0e0f11]"><div className="mx-auto max-w-4xl rounded-xl border border-gray-200 bg-white p-4 dark:border-white/10 dark:bg-[#191919]"><h2 className="mb-4 text-sm font-semibold dark:text-white">用户与使用趋势 · 最近30天</h2><UsageTrendChart data={Array.from({length:30},(_,i)=>({date:`2026-08-${String(i+1).padStart(2,'0')}`,users:Math.round(5+Math.sin(i)*4+i*.5),sessions:Math.round(15+Math.cos(i*.6)*10+i),messages:Math.round(100+Math.sin(i*.5)*50+i*8)}))}/></div></div>
     : view === 'output' ? <div className="min-h-screen bg-white p-3 text-gray-900 dark:bg-[#111214] dark:text-gray-100">
       <WebSearchToolBlock webSearch={{status:'done',query:'Flutter 公式',results:[{title:'公式渲染参考',url:'https://example.invalid/math',content:'数学公式、工具调用与正文应该保持一致。'}]}} />
       <GeneratedFileToolBlock generatedFile={{callId:'qa-call',status:'error',toolId:'word-document',toolName:'word_document_finalize',error:'生成失败，请稍后重试'}} />

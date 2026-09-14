@@ -20,6 +20,7 @@ const defaultSettings = {
     "showMessageStats": true,
     "sidebarWidth": 260,
     "themeMode": "system",
+    "thinkingMode": "auto",
     "thinkingDisplay": "auto",
     "translationModelKey": "__system__",
     "wideChatMode": false,

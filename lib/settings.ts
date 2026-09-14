@@ -46,6 +46,7 @@ export type GeneralSettings = {
   showMessageStats: boolean;
   sidebarWidth: number;
   themeMode: ThemeMode;
+  thinkingMode: "auto" | "enabled" | "disabled";
   thinkingDisplay: ThinkingDisplay;
   translationModelKey: string;
   wideChatMode: boolean;
@@ -105,6 +106,7 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
   showMessageStats: true,
   sidebarWidth: 260,
   themeMode: "system",
+  thinkingMode: "auto",
   thinkingDisplay: "auto",
   translationModelKey: "__system__",
   wideChatMode: false,
@@ -207,6 +209,11 @@ export const sanitizeGeneralSettings = (
     showMessageStats: booleanValue(input.showMessageStats, fallback.showMessageStats),
     sidebarWidth: numberInRange(input.sidebarWidth, fallback.sidebarWidth, 220, 380),
     themeMode: stringOption(input.themeMode, ["light", "dark", "system"], fallback.themeMode),
+    thinkingMode: stringOption(
+      input.thinkingMode,
+      ["auto", "enabled", "disabled"],
+      fallback.thinkingMode,
+    ),
     thinkingDisplay: stringOption(
       input.thinkingDisplay,
       ["auto", "collapsed", "expanded"],

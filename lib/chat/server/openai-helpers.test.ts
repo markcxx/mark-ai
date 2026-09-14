@@ -3,6 +3,16 @@ import { describe, expect, it } from "vitest";
 import { toOpenAIMessages } from "./openai-helpers";
 
 describe("toOpenAIMessages", () => {
+  it("passes assistant reasoning back only to reasoning-aware requests", () => {
+    const input = {
+      messages: [{ role: "model" as const, content: "answer", reasoning: "earlier reasoning" }],
+      webSearchEnabled: true,
+    };
+    expect(toOpenAIMessages({ ...input, preserveReasoning: true })[1]).toMatchObject({
+      reasoning_content: "earlier reasoning",
+    });
+    expect(toOpenAIMessages(input)[1]).not.toHaveProperty("reasoning_content");
+  });
   it("keeps text-only messages as strings", () => {
     const messages = toOpenAIMessages({
       messages: [{ content: "hello", role: "user" }],

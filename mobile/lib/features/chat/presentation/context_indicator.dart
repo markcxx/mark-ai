@@ -36,7 +36,12 @@ class ContextIndicator extends StatelessWidget {
         ? const Color(0xff6b7280)
         : const Color(0xff9ca3af);
     final anchor = GlobalKey();
-    final size = MediaQuery.sizeOf(context).width >= 768 ? 32.0 : 44.0;
+    final width = MediaQuery.sizeOf(context).width;
+    final size = width >= 768
+        ? 32.0
+        : width < 360
+        ? 40.0
+        : 44.0;
     return SizedBox(
       key: anchor,
       width: size,

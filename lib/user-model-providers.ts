@@ -1,3 +1,4 @@
+import { getPublicThinkingCapability } from "./model-thinking";
 import { and, eq } from "drizzle-orm";
 
 import { decryptCredential } from "./credential-crypto";
@@ -71,4 +72,10 @@ export const getUserConfiguredModels = async (userId: string): Promise<Configure
 export const getPublicUserModels = async (userId: string): Promise<PublicConfiguredModel[]> =>
   (await listUserModelProviders(userId))
     .filter((provider) => provider.enabled && provider.hasApiKey)
-    .flatMap((provider) => provider.models.map((id) => ({ id, provider: provider.provider })));
+    .flatMap((provider) =>
+      provider.models.map((id) => ({
+        id,
+        provider: provider.provider,
+        thinking: getPublicThinkingCapability({ ...provider, id }),
+      })),
+    );

@@ -1,3 +1,4 @@
+import { getThinkingRequestParameters, type ThinkingPolicy } from "@/lib/model-thinking";
 import { NextResponse } from "next/server";
 
 import type { ContextPreparation } from "@/lib/chat/context-window";
@@ -56,7 +57,11 @@ export const createOpenAICompatibleStream = async (
     skillPrompt?: string;
     userId: string;
   },
+  thinking?: { policy?: ThinkingPolicy; enabled?: boolean },
 ) => {
+  const thinkingActive = thinking?.enabled ?? thinking?.policy?.defaultEnabled;
+  const preserveReasoning = Boolean(thinking?.policy && thinkingActive);
+  const autoToolChoice = Boolean(thinking?.policy?.autoToolChoice && thinkingActive);
   const endpoint = toOpenAIChatEndpoint(baseUrl);
   if (!endpoint) {
     return NextResponse.json({ error: "模型接口地址尚未配置" }, { status: 400 });
@@ -68,6 +73,7 @@ export const createOpenAICompatibleStream = async (
     : 18_000;
   const openAIMessages = toOpenAIMessages({
     messages,
+    preserveReasoning,
     skillPrompt: toolRuntime?.skillPrompt,
     timezone,
     webSearchEnabled,
@@ -108,6 +114,7 @@ export const createOpenAICompatibleStream = async (
           ? availableTools.filter((tool) => requiredToolNameSet.has(tool.function.name))
           : availableTools;
         const createRequestBody = (includeUsage: boolean, enforceRequiredTools = true) => ({
+          ...getThinkingRequestParameters(thinking?.policy, thinking?.enabled),
           messages: requestMessages,
           model,
           stream: true,
@@ -115,12 +122,12 @@ export const createOpenAICompatibleStream = async (
           ...(allowTools
             ? {
                 tool_choice:
-                  enforceRequiredTools && requiredToolNames.length === 1
+                  !autoToolChoice && enforceRequiredTools && requiredToolNames.length === 1
                     ? {
                         function: { name: requiredToolNames[0] },
                         type: "function",
                       }
-                    : enforceRequiredTools && requiredToolNames.length > 1
+                    : !autoToolChoice && enforceRequiredTools && requiredToolNames.length > 1
                       ? "required"
                       : "auto",
                 tools: requestTools,
@@ -177,6 +184,7 @@ export const createOpenAICompatibleStream = async (
       ) =>
         estimateTextTokens(
           JSON.stringify({
+            ...getThinkingRequestParameters(thinking?.policy, thinking?.enabled),
             messages: requestMessages,
             ...(allowTools
               ? {
@@ -296,6 +304,7 @@ export const createOpenAICompatibleStream = async (
           const toolCalls = normalizeToolCalls([...toolCallsByIndex.values()]);
           return {
             assistantContent,
+            assistantReasoning,
             toolCalls,
             usage: resolveTokenUsage({
               estimatedInputTokens: estimateOpenAIInputTokens(
@@ -392,7 +401,13 @@ export const createOpenAICompatibleStream = async (
             currentMessages = [
               ...currentMessages,
               ...(pass.assistantContent
-                ? ([{ content: pass.assistantContent, role: "assistant" }] as OpenAIChatMessage[])
+                ? ([
+                    {
+                      content: pass.assistantContent,
+                      role: "assistant",
+                      ...(preserveReasoning ? { reasoning_content: pass.assistantReasoning } : {}),
+                    },
+                  ] as OpenAIChatMessage[])
                 : []),
               {
                 content: getWordContinuationPrompt(requiredWordToolNames),
@@ -407,6 +422,7 @@ export const createOpenAICompatibleStream = async (
             content: pass.assistantContent || null,
             role: "assistant",
             tool_calls: executableToolCalls,
+            ...(preserveReasoning ? { reasoning_content: pass.assistantReasoning } : {}),
           };
           const toolResultMessages: OpenAIChatMessage[] = [];
 

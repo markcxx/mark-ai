@@ -1,6 +1,5 @@
 "use client";
 
-import type { EChartsOption } from "echarts";
 import {
   Ban,
   Clock3,
@@ -13,9 +12,9 @@ import {
   Users,
   UserPlus,
 } from "lucide-react";
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 
-import { AdminChart } from "@/components/admin/AdminChart";
+import { UsageTrendChart } from "@/components/admin/UsageTrendChart";
 import { AdminError, formatBytes } from "@/components/admin/AdminPrimitives";
 import { cn } from "@/lib/utils";
 
@@ -83,12 +82,8 @@ function dateKey(date: Date) {
 
 function ActivityHeatmap({ trend }: { trend: OverviewData["activityTrend"] }) {
   const values = new Map(trend.map((item) => [item.date, item.sessions]));
-  const firstDate = trend[0]?.date
-    ? new Date(`${trend[0].date}T00:00:00Z`)
-    : new Date();
-  const lastDate = trend.at(-1)?.date
-    ? new Date(`${trend.at(-1)?.date}T00:00:00Z`)
-    : firstDate;
+  const firstDate = trend[0]?.date ? new Date(`${trend[0].date}T00:00:00Z`) : new Date();
+  const lastDate = trend.at(-1)?.date ? new Date(`${trend.at(-1)?.date}T00:00:00Z`) : firstDate;
 
   const start = new Date(firstDate);
   start.setUTCDate(start.getUTCDate() - ((start.getUTCDay() + 6) % 7));
@@ -113,7 +108,8 @@ function ActivityHeatmap({ trend }: { trend: OverviewData["activityTrend"] }) {
       <div className="grid w-max gap-1" style={gridStyle}>
         <span aria-hidden="true" />
         {weeks.map((week, index) => {
-          const monthChanged = index === 0 || week[0].getUTCMonth() !== weeks[index - 1][0].getUTCMonth();
+          const monthChanged =
+            index === 0 || week[0].getUTCMonth() !== weeks[index - 1][0].getUTCMonth();
           return (
             <span className="truncate text-[10px] text-gray-400" key={dateKey(week[0])}>
               {monthChanged ? `${week[0].getUTCMonth() + 1}月` : ""}
@@ -129,7 +125,9 @@ function ActivityHeatmap({ trend }: { trend: OverviewData["activityTrend"] }) {
               const intensity =
                 typeof value === "number" && value > 0 ? 0.12 + 0.88 * (value / maxValue) : 0;
               const description =
-                typeof value === "number" && value > 0 ? `${formatCount(value)} 个新对话` : "暂无数据";
+                typeof value === "number" && value > 0
+                  ? `${formatCount(value)} 个新对话`
+                  : "暂无数据";
               return (
                 <span
                   aria-label={`${key}：${description}`}
@@ -140,7 +138,11 @@ function ActivityHeatmap({ trend }: { trend: OverviewData["activityTrend"] }) {
                       : "border-gray-100 bg-gray-50 dark:border-white/[0.06] dark:bg-white/[0.025]",
                   )}
                   key={key}
-                  style={intensity > 0 ? { backgroundColor: `rgba(37, 99, 235, ${intensity})` } : undefined}
+                  style={
+                    intensity > 0
+                      ? { backgroundColor: `rgba(37, 99, 235, ${intensity})` }
+                      : undefined
+                  }
                   title={`${key}：${description}`}
                 />
               );
@@ -150,16 +152,22 @@ function ActivityHeatmap({ trend }: { trend: OverviewData["activityTrend"] }) {
       </div>
       <div className="mt-3 flex w-max items-center gap-1.5 text-[10px] text-gray-400">
         <span>低活跃</span>
-        {["bg-gray-100 dark:bg-white/[0.06]", "bg-blue-100", "bg-blue-300", "bg-blue-600"].map((color) => (
-          <span className={cn("h-2.5 w-2.5 rounded-[2px]", color)} key={color} />
-        ))}
+        {["bg-gray-100 dark:bg-white/[0.06]", "bg-blue-100", "bg-blue-300", "bg-blue-600"].map(
+          (color) => (
+            <span className={cn("h-2.5 w-2.5 rounded-[2px]", color)} key={color} />
+          ),
+        )}
         <span>高活跃</span>
       </div>
     </div>
   );
 }
 
-export function OverviewPanel({ onRangeDaysChange, rangeDays, refreshToken = 0 }: OverviewPanelProps) {
+export function OverviewPanel({
+  onRangeDaysChange,
+  rangeDays,
+  refreshToken = 0,
+}: OverviewPanelProps) {
   const [data, setData] = useState<OverviewData>();
   const [error, setError] = useState("");
 
@@ -182,95 +190,6 @@ export function OverviewPanel({ onRangeDaysChange, rangeDays, refreshToken = 0 }
     void load();
   }, [load]);
 
-  const trendOption = useMemo<EChartsOption>(
-    () => ({
-      animationDuration: 260,
-      dataZoom: [{ end: 100, start: rangeDays === 30 ? 20 : 0, type: "inside" }],
-      grid: { bottom: 28, containLabel: true, left: 8, right: 8, top: 30 },
-      legend: {
-        data: ["新增用户", "对话", "消息"],
-        left: 0,
-        itemHeight: 7,
-        itemWidth: 18,
-        itemGap: 18,
-        textStyle: { color: "#9ca3af", fontSize: 11 },
-        top: 0,
-      },
-      series: [
-        {
-          data: data?.trend.map((item) => item.users) || [],
-          emphasis: { focus: "series" },
-          itemStyle: { color: "#2563eb" },
-          lineStyle: { color: "#2563eb", width: 1.6 },
-          name: "新增用户",
-          showSymbol: rangeDays <= 14,
-          smooth: 0.18,
-          symbol: "circle",
-          symbolSize: 4,
-          type: "line",
-        },
-        {
-          data: data?.trend.map((item) => item.sessions) || [],
-          emphasis: { focus: "series" },
-          itemStyle: { color: "#6b7280" },
-          lineStyle: { color: "#6b7280", width: 1.4 },
-          name: "对话",
-          showSymbol: rangeDays <= 14,
-          smooth: 0.18,
-          symbol: "circle",
-          symbolSize: 4,
-          type: "line",
-        },
-        {
-          data: data?.trend.map((item) => item.messages) || [],
-          emphasis: { focus: "series" },
-          itemStyle: { color: "#c1c7d0" },
-          lineStyle: { color: "#c1c7d0", width: 1.4 },
-          name: "消息",
-          showSymbol: rangeDays <= 14,
-          smooth: 0.18,
-          symbol: "circle",
-          symbolSize: 4,
-          type: "line",
-          yAxisIndex: 1,
-        },
-      ],
-      tooltip: {
-        axisPointer: { type: "line" },
-        backgroundColor: "rgba(255,255,255,0.96)",
-        borderColor: "#e5e7eb",
-        textStyle: { color: "#111827", fontSize: 12 },
-        trigger: "axis",
-      },
-      xAxis: {
-        axisLabel: { color: "#9ca3af", fontSize: 11 },
-        axisLine: { lineStyle: { color: "#e5e7eb" } },
-        axisTick: { show: false },
-        data: data?.trend.map((item) => item.date.slice(5)) || [],
-        type: "category",
-      },
-      yAxis: [
-        {
-          axisLabel: { color: "#9ca3af", fontSize: 11 },
-          axisLine: { show: false },
-          axisTick: { show: false },
-          minInterval: 1,
-          splitLine: { lineStyle: { color: "#eef0f2", type: "dashed" } },
-          type: "value",
-        },
-        {
-          axisLabel: { color: "#c1c7d0", fontSize: 11 },
-          axisLine: { show: false },
-          axisTick: { show: false },
-          minInterval: 1,
-          splitLine: { show: false },
-          type: "value",
-        },
-      ],
-    }),
-    [data, rangeDays],
-  );
-
   const metrics = data
     ? [
         { icon: Users, label: "全部用户", value: formatCount(data.stats.users) },
@@ -290,7 +209,10 @@ export function OverviewPanel({ onRangeDaysChange, rangeDays, refreshToken = 0 }
     (total, item) => total + Number(item.value || 0),
     0,
   );
-  const fileTotal = (data?.fileTypes || []).reduce((total, item) => total + Number(item.value || 0), 0);
+  const fileTotal = (data?.fileTypes || []).reduce(
+    (total, item) => total + Number(item.value || 0),
+    0,
+  );
   const providers = (data?.providerTypes || []).slice(0, 5);
   const fileTypes = (data?.fileTypes || []).slice().sort((a, b) => b.value - a.value);
   const reminders = data
@@ -384,8 +306,11 @@ export function OverviewPanel({ onRangeDaysChange, rangeDays, refreshToken = 0 }
 
       <section className="grid gap-7 border-b border-gray-200/80 pb-7 xl:grid-cols-[1.7fr_1fr] dark:border-white/[0.09]">
         <div className="min-w-0">
-          <SectionHeading description="新增用户数、对话数与消息数的趋势对比" title="用户与使用趋势" />
-          <AdminChart height={286} mobileHeight={250} option={trendOption} />
+          <SectionHeading
+            description="新增用户数、对话数与消息数的趋势对比"
+            title="用户与使用趋势"
+          />
+          <UsageTrendChart data={data.trend} />
         </div>
         <div className="min-w-0">
           <SectionHeading description="需要关注的关键事项" title="运营提醒" />
@@ -419,7 +344,9 @@ export function OverviewPanel({ onRangeDaysChange, rangeDays, refreshToken = 0 }
                 <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100 dark:bg-white/[0.1]">
                   <div
                     className={`h-full rounded-full ${index < 3 ? "bg-blue-600" : "bg-gray-400 dark:bg-gray-500"}`}
-                    style={{ width: `${providerTotal ? (item.value / Math.max(...providers.map((entry) => entry.value))) * 100 : 0}%` }}
+                    style={{
+                      width: `${providerTotal ? (item.value / Math.max(...providers.map((entry) => entry.value))) * 100 : 0}%`,
+                    }}
                   />
                 </div>
                 <span className="w-10 shrink-0 text-right tabular-nums text-gray-400">
@@ -441,7 +368,9 @@ export function OverviewPanel({ onRangeDaysChange, rangeDays, refreshToken = 0 }
                 <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100 dark:bg-white/[0.1]">
                   <div
                     className="h-full rounded-full bg-blue-600"
-                    style={{ width: `${fileTotal ? (item.value / Math.max(...fileTypes.map((entry) => entry.value))) * 100 : 0}%` }}
+                    style={{
+                      width: `${fileTotal ? (item.value / Math.max(...fileTypes.map((entry) => entry.value))) * 100 : 0}%`,
+                    }}
                   />
                 </div>
                 <span className="w-10 shrink-0 text-right tabular-nums text-gray-400">

@@ -8,6 +8,7 @@ const MAX_OUTPUT_RESERVE_TOKENS = 32_768;
 const TRUNCATION_MARKER = "\n\n[较早内容因上下文限制已截断]";
 
 type ContextMessage = {
+  reasoning?: string;
   content: string;
   role: string;
 };
@@ -24,7 +25,13 @@ export type ContextPreparation<T> = {
 
 export const estimateContextMessagesTokens = (messages: ContextMessage[]) =>
   estimateTextTokens(
-    JSON.stringify(messages.map((message) => ({ content: message.content, role: message.role }))),
+    JSON.stringify(
+      messages.map((message) => ({
+        content: message.content,
+        role: message.role,
+        ...(message.reasoning ? { reasoning_content: message.reasoning } : {}),
+      })),
+    ),
   );
 
 export const getOutputReserveTokens = (metadata: ModelMetadataWithContext) => {

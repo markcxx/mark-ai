@@ -1,3 +1,4 @@
+import 'composer_attachments.dart';
 import 'export_dialog.dart';
 
 import 'package:markai_mobile/shared/widgets/ui_icon.dart';
@@ -49,7 +50,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final input = TextEditingController(), scroll = ScrollController();
   final composerFocus = FocusNode();
   final imagePicker = ImagePicker();
-  bool pickingAttachment = false;
+  bool pickingAttachment = false, attachmentPanelOpen = false;
   final toolAnchor = GlobalKey();
   final selected = <String>{};
   bool follow = true, uploading = false;
@@ -61,6 +62,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    composerFocus.addListener(onComposerFocus);
     c.addListener(changed);
     c.streamingRevision.addListener(changed);
     input.text = c.draft;
@@ -123,7 +125,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     await run(action);
   }
 
+  void onComposerFocus() {
+    if (composerFocus.hasFocus && attachmentPanelOpen) {
+      setState(() => attachmentPanelOpen = false);
+    }
+  }
+
+  void toggleAttachmentPanel() {
+    composerFocus.unfocus();
+    setState(() => attachmentPanelOpen = !attachmentPanelOpen);
+  }
+
   Future<void> sendMessage() async {
+    if (attachmentPanelOpen) setState(() => attachmentPanelOpen = false);
     composerFocus.unfocus();
     await protected(c.send);
   }
@@ -161,7 +175,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     composerFocus.unfocus();
     await protected(() async {
       if (c.attachments.length >= 4) throw ApiFailureForUi('最多添加 4 个附件');
-      setState(() => pickingAttachment = true);
+      setState(() {
+        pickingAttachment = true;
+        attachmentPanelOpen = false;
+      });
       try {
         final List<XFile> result;
         if (source == 'camera') {
@@ -567,6 +584,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   );
   Widget composer(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final compactToolbar = MediaQuery.sizeOf(context).width < 360;
     final hasDraft = c.draft.trim().isNotEmpty || c.attachments.isNotEmpty;
     final stopping = c.generating && !hasDraft;
     final sendDisabled =
@@ -574,380 +592,406 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         c.model == null ||
         (!hasDraft && !c.generating) ||
         (c.generating && c.queued != null && hasDraft);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (c.queued != null)
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  '1 条消息待发送',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
+    return PopScope<void>(
+      canPop: !attachmentPanelOpen,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && attachmentPanelOpen) {
+          setState(() => attachmentPanelOpen = false);
+        }
+      },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (c.queued != null)
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    '1 条消息待发送',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
                 ),
-              ),
-              ActionIcon('取消待发送', Icons.close, () {
-                c.queued = null;
-                c.setDraft(c.draft);
-              }),
-            ],
-          ),
-        Container(
-          decoration: BoxDecoration(
-            color: scheme.surface,
-            border: Border.all(color: scheme.outline),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: .035),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (c.quote != null)
+                ActionIcon('取消待发送', Icons.close, () {
+                  c.queued = null;
+                  c.setDraft(c.draft);
+                }),
+              ],
+            ),
+          Container(
+            decoration: BoxDecoration(
+              color: scheme.surface,
+              border: Border.all(color: scheme.outline),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: .035),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (c.quote != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 12),
+                    child: Row(
+                      children: [
+                        const UiIcon(Icons.subdirectory_arrow_right, size: 16),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            c.quote!['content'] as String,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ),
+                        ActionIcon('移除引用', Icons.close, () {
+                          c.quote = null;
+                          c.setDraft(c.draft);
+                        }),
+                      ],
+                    ),
+                  ),
+                if (c.attachments.isNotEmpty)
+                  PendingAttachments(
+                    files: c.attachments,
+                    loadImage: FileService(c.api).bytes,
+                    onRemove: (id) {
+                      c.attachments = c.attachments
+                          .where((file) => file['id'] != id)
+                          .toList();
+                      c.setDraft(c.draft);
+                    },
+                  ),
+                if (uploading)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: LinearProgressIndicator(value: uploadProgress),
+                        ),
+                      ),
+                      ActionIcon(
+                        '取消上传',
+                        Icons.close,
+                        () => uploadCancel?.cancel(),
+                      ),
+                    ],
+                  ),
+                Focus(
+                  onKeyEvent: (_, event) {
+                    if (event is! KeyDownEvent ||
+                        event.logicalKey != LogicalKeyboardKey.enter ||
+                        input.value.composing.isValid &&
+                            !input.value.composing.isCollapsed) {
+                      return KeyEventResult.ignored;
+                    }
+                    final keyboard = HardwareKeyboard.instance;
+                    final send = c.general['sendShortcut'] == 'mod-enter'
+                        ? keyboard.isControlPressed || keyboard.isMetaPressed
+                        : !keyboard.isShiftPressed;
+                    if (!send) return KeyEventResult.ignored;
+                    if (!uploading && c.model != null) sendMessage();
+                    return KeyEventResult.handled;
+                  },
+                  child: TextField(
+                    enabled: c.model != null,
+                    controller: input,
+                    focusNode: composerFocus,
+                    onTapOutside: (_) => composerFocus.unfocus(),
+                    minLines: 1,
+                    maxLines: 6,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      height: 1.5,
+                      letterSpacing: 0,
+                    ),
+                    onChanged: c.setDraft,
+                    keyboardType: TextInputType.multiline,
+                    decoration: InputDecoration(
+                      hintText: c.model == null
+                          ? '正在加载可用模型列表……'
+                          : isImageGenerationModel(c.model!.id)
+                          ? '描述想生成的画面，或上传图片继续修改...'
+                          : '尽管问，带图也行...',
+                      hintStyle: const TextStyle(
+                        color: Color(0xff9ca3af),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w400,
+                      ),
+                      constraints: const BoxConstraints(minHeight: 56),
+                      filled: false,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+                ),
                 Padding(
-                  padding: const EdgeInsets.only(left: 12),
+                  padding: EdgeInsets.fromLTRB(
+                    compactToolbar ? 4 : 10,
+                    4,
+                    compactToolbar ? 4 : 10,
+                    10,
+                  ),
                   child: Row(
                     children: [
-                      const UiIcon(Icons.subdirectory_arrow_right, size: 16),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          c.quote!['content'] as String,
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
+                      if (!c.guest)
+                        KeyedSubtree(
+                          key: toolAnchor,
+                          child: Tooltip(
+                            message: '当前会话工具',
+                            child: Material(
+                              color: toolMenuOpen
+                                  ? (Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? const Color(0xff1f2937)
+                                        : const Color(0xfff3f4f6))
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(8),
+                                onTap:
+                                    c.generating ||
+                                        isImageGenerationModel(
+                                          c.model?.id ?? '',
+                                        )
+                                    ? null
+                                    : toolMenu,
+                                child: SizedBox(
+                                  height: 44,
+                                  width: compactToolbar ? 40 : null,
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: compactToolbar ? 0 : 8,
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        const UiIcon(
+                                          LucideIcons.wrench,
+                                          size: 18,
+                                          color: Color(0xff9ca3af),
+                                        ),
+                                        if (c.enabledTools.isNotEmpty &&
+                                            !compactToolbar) ...[
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '${c.enabledTools.length}',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (!compactToolbar) const SizedBox(width: 4),
+                      if (c.thinkingEnabled != null)
+                        Semantics(
+                          toggled: c.thinkingEnabled,
+                          child: ActionIcon(
+                            c.thinkingEnabled! ? '关闭深度思考' : '开启深度思考',
+                            LucideIcons.atom,
+                            c.generating ? null : c.toggleThinking,
+                            buttonWidth: 40,
+                            color: c.thinkingEnabled!
+                                ? scheme.primary
+                                : const Color(0xff9ca3af),
+                          ),
+                        ),
+                      ActionIcon(
+                        c.webSearch ? '关闭联网搜索' : '开启联网搜索',
+                        c.webSearch ? LucideIcons.globe : LucideIcons.globeOff,
+                        c.generating ||
+                                isImageGenerationModel(c.model?.id ?? '')
+                            ? null
+                            : () => protected(() async {
+                                c.webSearch = !c.webSearch;
+                                c.setDraft(c.draft);
+                              }),
+                        buttonWidth: compactToolbar ? 40 : 34,
+                        color: c.webSearch
+                            ? scheme.primary
+                            : const Color(0xff9ca3af),
+                      ),
+                      const Spacer(),
+                      if (c.messages.isNotEmpty)
+                        ListenableBuilder(
+                          listenable: c.streamingRevision,
+                          builder: (context, _) =>
+                              ContextIndicator(controller: c),
+                        ),
+                      Tooltip(
+                        message: c.model?.id ?? '选择模型',
+                        child: TextButton(
+                          style: TextButton.styleFrom(
+                            minimumSize: compactToolbar
+                                ? const Size(40, 44)
+                                : Size.zero,
+                            fixedSize: const Size.fromHeight(44),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: compactToolbar ? 0 : 10,
+                            ),
+                          ),
+                          onPressed: c.generating ? null : modelMenu,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ModelBrand(
+                                model: c.model?.id ?? '',
+                                provider: c.model?.provider ?? '',
+                              ),
+                              if (MediaQuery.sizeOf(context).width >= 640)
+                                ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 140,
+                                  ),
+                                  child: Text(
+                                    c.model?.label ?? '选择模型',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              if (!compactToolbar) ...[
+                                const SizedBox(width: 8),
+                                const UiIcon(
+                                  LucideIcons.chevronRight,
+                                  size: 14,
+                                  color: Color(0xff9ca3af),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                       ),
-                      ActionIcon('移除引用', Icons.close, () {
-                        c.quote = null;
-                        c.setDraft(c.draft);
-                      }),
+                      ActionIcon(
+                        attachmentPanelOpen ? '收起附件选项' : '添加附件',
+                        attachmentPanelOpen ? LucideIcons.x : LucideIcons.plus,
+                        uploading || pickingAttachment
+                            ? null
+                            : toggleAttachmentPanel,
+                        iconSize: 22,
+                        buttonWidth: compactToolbar ? 40 : 44,
+                        color: attachmentPanelOpen
+                            ? scheme.primary
+                            : const Color(0xff9ca3af),
+                      ),
+                      IconButton.filled(
+                        tooltip: c.generating && !hasDraft
+                            ? '停止生成'
+                            : c.generating
+                            ? '加入待发送'
+                            : '发送消息',
+                        onPressed: sendDisabled ? null : sendMessage,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 44,
+                          height: 44,
+                        ),
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          disabledBackgroundColor: Colors.transparent,
+                          disabledForegroundColor:
+                              Theme.of(context).brightness == Brightness.dark
+                              ? const Color(0xff9ca3af)
+                              : const Color(0xff6b7280),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          padding: EdgeInsets.zero,
+                          foregroundColor: scheme.onPrimary,
+                          minimumSize: const Size(44, 44),
+                        ),
+                        icon: Container(
+                          key: const ValueKey('chat-send-surface'),
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: sendDisabled
+                                ? (Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? const Color(0xff374151)
+                                      : const Color(0xffd1d5db))
+                                : stopping
+                                ? const Color(0xffef4444)
+                                : scheme.primary,
+                          ),
+                          child: stopping
+                              ? Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        value: c.general['reduceMotion'] == true
+                                            ? .75
+                                            : null,
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                        backgroundColor: Colors.white30,
+                                      ),
+                                    ),
+                                    const Icon(
+                                      Icons.square,
+                                      size: 11,
+                                      color: Colors.white,
+                                    ),
+                                  ],
+                                )
+                              : const Center(
+                                  child: UiIcon(
+                                    LucideIcons.sendHorizontal,
+                                    size: 15,
+                                  ),
+                                ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
-              if (c.attachments.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Wrap(
-                    spacing: 4,
-                    children: c.attachments
-                        .map(
-                          (file) => InputChip(
-                            label: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 170),
-                              child: Text(
-                                file['name'] as String,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            onDeleted: () {
-                              c.attachments = c.attachments
-                                  .where((f) => f['id'] != file['id'])
-                                  .toList();
-                              c.setDraft(c.draft);
-                            },
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ),
-              if (uploading)
-                Row(
-                  children: [
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: LinearProgressIndicator(value: uploadProgress),
-                      ),
-                    ),
-                    ActionIcon(
-                      '取消上传',
-                      Icons.close,
-                      () => uploadCancel?.cancel(),
-                    ),
-                  ],
-                ),
-              Focus(
-                onKeyEvent: (_, event) {
-                  if (event is! KeyDownEvent ||
-                      event.logicalKey != LogicalKeyboardKey.enter ||
-                      input.value.composing.isValid &&
-                          !input.value.composing.isCollapsed) {
-                    return KeyEventResult.ignored;
-                  }
-                  final keyboard = HardwareKeyboard.instance;
-                  final send = c.general['sendShortcut'] == 'mod-enter'
-                      ? keyboard.isControlPressed || keyboard.isMetaPressed
-                      : !keyboard.isShiftPressed;
-                  if (!send) return KeyEventResult.ignored;
-                  if (!uploading && c.model != null) sendMessage();
-                  return KeyEventResult.handled;
-                },
-                child: TextField(
-                  enabled: c.model != null,
-                  controller: input,
-                  focusNode: composerFocus,
-                  onTapOutside: (_) => composerFocus.unfocus(),
-                  minLines: 1,
-                  maxLines: 6,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    height: 1.5,
-                    letterSpacing: 0,
-                  ),
-                  onChanged: c.setDraft,
-                  keyboardType: TextInputType.multiline,
-                  decoration: InputDecoration(
-                    hintText: c.model == null
-                        ? '正在加载可用模型列表……'
-                        : isImageGenerationModel(c.model!.id)
-                        ? '描述想生成的画面，或上传图片继续修改...'
-                        : '尽管问，带图也行...',
-                    hintStyle: const TextStyle(
-                      color: Color(0xff9ca3af),
-                      fontSize: 16,
-                      fontWeight: FontWeight.w400,
-                    ),
-                    constraints: const BoxConstraints(minHeight: 56),
-                    filled: false,
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 12,
-                    ),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 4, 10, 10),
-                child: Row(
-                  children: [
-                    AppMenuButton(
-                      width: 160,
-                      radius: 8,
-                      items: () => [
-                        AppMenuItem(
-                          '图片',
-                          icon: LucideIcons.image,
-                          onPressed: () => attach('images'),
-                        ),
-                        AppMenuItem(
-                          '文件',
-                          icon: LucideIcons.file,
-                          onPressed: () => attach('files'),
-                        ),
-                        AppMenuItem(
-                          '相机',
-                          icon: LucideIcons.camera,
-                          onPressed: () => attach('camera'),
-                        ),
-                      ],
-                      builder: (toggle) => ActionIcon(
-                        '添加附件',
-                        Icons.attach_file,
-                        uploading || pickingAttachment ? null : toggle,
-                        iconSize: 20,
-                        color: const Color(0xff9ca3af),
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    if (!c.guest)
-                      KeyedSubtree(
-                        key: toolAnchor,
-                        child: Tooltip(
-                          message: '当前会话工具',
-                          child: Material(
-                            color: toolMenuOpen
-                                ? (Theme.of(context).brightness ==
-                                          Brightness.dark
-                                      ? const Color(0xff1f2937)
-                                      : const Color(0xfff3f4f6))
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(8),
-                              onTap:
-                                  c.generating ||
-                                      isImageGenerationModel(c.model?.id ?? '')
-                                  ? null
-                                  : toolMenu,
-                              child: SizedBox(
-                                height: 44,
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const UiIcon(
-                                        LucideIcons.wrench,
-                                        size: 18,
-                                        color: Color(0xff9ca3af),
-                                      ),
-                                      if (c.enabledTools.isNotEmpty) ...[
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '${c.enabledTools.length}',
-                                          style: const TextStyle(fontSize: 12),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    const SizedBox(width: 4),
-                    ActionIcon(
-                      c.webSearch ? '关闭联网搜索' : '开启联网搜索',
-                      c.webSearch ? LucideIcons.globe : LucideIcons.globeOff,
-                      c.generating || isImageGenerationModel(c.model?.id ?? '')
-                          ? null
-                          : () => protected(() async {
-                              c.webSearch = !c.webSearch;
-                              c.setDraft(c.draft);
-                            }),
-                      buttonWidth: 34,
-                      color: c.webSearch
-                          ? scheme.primary
-                          : const Color(0xff9ca3af),
-                    ),
-                    const Spacer(),
-                    if (c.messages.isNotEmpty)
-                      ListenableBuilder(
-                        listenable: c.streamingRevision,
-                        builder: (context, _) =>
-                            ContextIndicator(controller: c),
-                      ),
-                    Tooltip(
-                      message: c.model?.id ?? '选择模型',
-                      child: TextButton(
-                        style: TextButton.styleFrom(
-                          minimumSize: Size.zero,
-                          fixedSize: const Size.fromHeight(44),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                        ),
-                        onPressed: c.generating ? null : modelMenu,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            ModelBrand(
-                              model: c.model?.id ?? '',
-                              provider: c.model?.provider ?? '',
-                            ),
-                            if (MediaQuery.sizeOf(context).width >= 640)
-                              ConstrainedBox(
-                                constraints: const BoxConstraints(
-                                  maxWidth: 140,
-                                ),
-                                child: Text(
-                                  c.model?.label ?? '选择模型',
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            const SizedBox(width: 8),
-                            const UiIcon(
-                              LucideIcons.chevronRight,
-                              size: 14,
-                              color: Color(0xff9ca3af),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 2),
-                    IconButton.filled(
-                      tooltip: c.generating && !hasDraft
-                          ? '停止生成'
-                          : c.generating
-                          ? '加入待发送'
-                          : '发送消息',
-                      onPressed: sendDisabled ? null : sendMessage,
-                      constraints: const BoxConstraints.tightFor(
-                        width: 44,
-                        height: 44,
-                      ),
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.transparent,
-                        disabledBackgroundColor: Colors.transparent,
-                        disabledForegroundColor:
-                            Theme.of(context).brightness == Brightness.dark
-                            ? const Color(0xff9ca3af)
-                            : const Color(0xff6b7280),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        padding: EdgeInsets.zero,
-                        foregroundColor: scheme.onPrimary,
-                        minimumSize: const Size(44, 44),
-                      ),
-                      icon: Container(
-                        key: const ValueKey('chat-send-surface'),
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: sendDisabled
-                              ? (Theme.of(context).brightness == Brightness.dark
-                                    ? const Color(0xff374151)
-                                    : const Color(0xffd1d5db))
-                              : stopping
-                              ? const Color(0xffef4444)
-                              : scheme.primary,
-                        ),
-                        child: stopping
-                            ? Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  SizedBox(
-                                    width: 28,
-                                    height: 28,
-                                    child: CircularProgressIndicator(
-                                      value: c.general['reduceMotion'] == true
-                                          ? .75
-                                          : null,
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                      backgroundColor: Colors.white30,
-                                    ),
-                                  ),
-                                  const Icon(
-                                    Icons.square,
-                                    size: 11,
-                                    color: Colors.white,
-                                  ),
-                                ],
-                              )
-                            : const Center(
-                                child: UiIcon(
-                                  LucideIcons.sendHorizontal,
-                                  size: 17,
-                                ),
-                              ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+          if (c.general['reduceMotion'] == true ||
+              MediaQuery.disableAnimationsOf(context))
+            attachmentPanel(context)
+          else
+            AnimatedSize(
+              alignment: Alignment.bottomCenter,
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              child: attachmentPanel(context),
+            ),
+        ],
+      ),
     );
   }
+
+  Widget attachmentPanel(BuildContext context) =>
+      attachmentPanelOpen && MediaQuery.viewInsetsOf(context).bottom == 0
+      ? ComposerAttachmentPanel(
+          disabled: uploading || pickingAttachment || c.attachments.length >= 4,
+          onPick: attach,
+        )
+      : const SizedBox(width: double.infinity);
 
   Widget drawer(BuildContext context) => WorkspaceSidebar(
     controller: c,

@@ -54,7 +54,7 @@ void main() {
       expect(tester.widget<TextField>(field).controller!.text, isEmpty);
       expect(
         tester.getSize(find.byKey(const ValueKey('chat-send-surface'))),
-        const Size(36, 36),
+        const Size(32, 32),
       );
       api.createGate!.complete();
       await tester.pumpAndSettle();

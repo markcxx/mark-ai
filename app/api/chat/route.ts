@@ -1,3 +1,4 @@
+import { getThinkingPolicy } from "@/lib/model-thinking";
 import { NextRequest, NextResponse } from "next/server";
 
 import { authorizeApiRequest, enforceRateLimit } from "@/lib/api/security";
@@ -48,11 +49,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "请求内容格式无效" }, { status: 400 });
     }
 
-    const { messages, model, provider, sessionId, timezone, webSearchEnabled } = body;
-    const selectedModel = await findAvailableModel(model, provider, authorization.userId);
+    const { messages, model, provider, sessionId, timezone, webSearchEnabled, thinkingEnabled } =
+      body;
+    if (thinkingEnabled !== undefined && typeof thinkingEnabled !== "boolean") {
+      return NextResponse.json({ error: "思考模式参数无效，请刷新后重试" }, { status: 400 });
+    }
+    const selectedModel = await findAvailableModel(
+      model,
+      provider,
+      authorization.userId,
+      thinkingEnabled !== undefined,
+    );
 
     if (!selectedModel) {
-      return NextResponse.json({ error: "所选模型尚未配置或不可用" }, { status: 400 });
+      return NextResponse.json(
+        {
+          error:
+            thinkingEnabled !== undefined
+              ? "所选模型暂无支持思考切换的可用线路，请刷新模型列表后重试"
+              : "所选模型尚未配置或不可用",
+        },
+        { status: 400 },
+      );
     }
 
     if (
@@ -66,6 +84,9 @@ export async function POST(req: NextRequest) {
           (message.role === "user" || message.role === "model") &&
           typeof message.content === "string" &&
           message.content.length <= MAX_CHAT_MESSAGE_CHARS &&
+          (message.reasoning === undefined ||
+            (typeof message.reasoning === "string" &&
+              message.reasoning.length <= MAX_CHAT_MESSAGE_CHARS)) &&
           (!message.attachments ||
             (Array.isArray(message.attachments) &&
               message.attachments.length <= 4 &&
@@ -137,9 +158,17 @@ export async function POST(req: NextRequest) {
       function: toolFunction,
       type: "function",
     }));
-    const resolvedMessages = storageOwnerId
+    const thinkingPolicy = getThinkingPolicy(selectedModel);
+    const retainReasoning = Boolean(
+      thinkingPolicy && (thinkingEnabled ?? thinkingPolicy.defaultEnabled),
+    );
+    const fileMessages = storageOwnerId
       ? await injectFileContexts(messages as ChatMessage[], storageOwnerId)
       : (messages as ChatMessage[]);
+    const resolvedMessages = fileMessages.map((message) => ({
+      ...message,
+      reasoning: retainReasoning && message.role === "model" ? message.reasoning : undefined,
+    }));
     const modelMetadata = getModelMetadata(selectedModel.id);
     const runtimeSystemPrompt = getRuntimeSystemPrompt({
       skillPrompt,
@@ -200,6 +229,7 @@ export async function POST(req: NextRequest) {
               userId: storageOwnerId,
             }
           : undefined,
+        { policy: thinkingPolicy, enabled: thinkingEnabled },
       );
     }
 

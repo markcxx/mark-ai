@@ -7,6 +7,7 @@ export type ModelImageInput = {
 };
 
 export type ChatMessage = {
+  reasoning?: string;
   attachments?: FileAttachment[];
   content: string;
   generatedImageIds?: string[];
@@ -18,6 +19,7 @@ export type OpenAIContentPart =
   { text: string; type: "text" } | { image_url: { url: string }; type: "image_url" };
 
 export type OpenAIChatMessage = {
+  reasoning_content?: string;
   content: string | OpenAIContentPart[] | null;
   role: "system" | "user" | "assistant" | "tool";
   tool_call_id?: string;

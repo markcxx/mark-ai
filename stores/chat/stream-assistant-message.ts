@@ -1,3 +1,4 @@
+import { resolveThinkingEnabled } from "@/lib/model-thinking";
 import toast from "react-hot-toast";
 import type { StoreApi } from "zustand";
 
@@ -111,6 +112,7 @@ export const createStreamAssistantMessage =
         body: JSON.stringify({
           messages: historyMessages.map((m) => ({
             attachments: m.attachments,
+            reasoning: m.reasoning,
             content: getMessageContentForModel(m),
             generatedImageIds: m.segments
               ?.filter((segment) => segment.type === "generated-image")
@@ -122,6 +124,10 @@ export const createStreamAssistantMessage =
           sessionId: options.sessionId,
           timezone: getClientTimezone(),
           webSearchEnabled: Boolean(options.webSearchEnabled),
+          thinkingEnabled:
+            settings.thinkingMode === "auto"
+              ? undefined
+              : resolveThinkingEnabled(modelConfig.thinking, settings.thinkingMode),
         }),
         headers: { "Content-Type": "application/json" },
         method: "POST",

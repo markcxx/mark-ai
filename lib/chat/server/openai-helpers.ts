@@ -48,11 +48,13 @@ export const isUnsupportedStreamUsageError = (status: number, detail: string) =>
 
 export const toOpenAIMessages = ({
   messages,
+  preserveReasoning = false,
   skillPrompt,
   timezone,
   webSearchEnabled,
 }: {
   messages: ChatMessage[];
+  preserveReasoning?: boolean;
   skillPrompt?: string;
   timezone?: unknown;
   webSearchEnabled: boolean;
@@ -73,6 +75,9 @@ export const toOpenAIMessages = ({
             ]
           : message.content,
       role: message.role === "model" ? "assistant" : message.role,
+      ...(preserveReasoning && (message.role === "model" || message.role === "assistant")
+        ? { reasoning_content: message.reasoning || "" }
+        : {}),
     };
   });
 

@@ -83,6 +83,24 @@ class WorkspaceController extends ChangeNotifier {
     ...jsonMap(defaultSettings['general']),
     ...jsonMap(settings['general']),
   };
+  bool? thinkingEnabledFor(ModelRef? selected) {
+    final initial = selected?.thinkingDefault;
+    if (initial == null) return null;
+    return switch (general['thinkingMode']) {
+      'enabled' => true,
+      'disabled' => false,
+      _ => initial,
+    };
+  }
+
+  bool? get thinkingEnabled => thinkingEnabledFor(model);
+
+  void toggleThinking() {
+    final enabled = thinkingEnabled;
+    if (enabled == null || generating) return;
+    setSetting('thinkingMode', enabled ? 'disabled' : 'enabled');
+  }
+
   void report(Object e) {
     if (_disposed) return;
     error = e.toString();
@@ -574,6 +592,9 @@ class WorkspaceController extends ChangeNotifier {
         'provider': selected.provider,
         'sessionId': sessionId,
         'webSearchEnabled': webSearch,
+        if (thinkingEnabledFor(selected) != null &&
+            ['enabled', 'disabled'].contains(general['thinkingMode']))
+          'thinkingEnabled': thinkingEnabledFor(selected),
       }, cancel)) {
         if (checkpointError != null) throw checkpointError!;
         if (smooth && event['type'] == 'content') {

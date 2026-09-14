@@ -1,3 +1,4 @@
+import { getThinkingPolicy } from "./model-thinking";
 import { getProviderDisplayName, getPublicConfiguredModels, findConfiguredModel } from "./models";
 import type { ConfiguredModel, PublicConfiguredModel } from "./models";
 import {
@@ -59,6 +60,7 @@ export const findAvailableModel = async (
   modelId?: string,
   provider?: string,
   userId?: string,
+  requireThinkingControl = false,
 ): Promise<ConfiguredModel | undefined> => {
   if (!modelId) return undefined;
 
@@ -70,7 +72,8 @@ export const findAvailableModel = async (
     const userModel = userModels.find(
       (model) => model.id === modelId && (!provider || model.provider === provider),
     );
-    if (userModel) return userModel;
+    if (userModel)
+      return !requireThinkingControl || getThinkingPolicy(userModel) ? userModel : undefined;
 
     const overriddenProviders = new Set(
       userProviders
@@ -83,11 +86,11 @@ export const findAvailableModel = async (
     if (provider && disabledProviders.has(provider)) return undefined;
     if (provider && overriddenProviders.has(provider)) return undefined;
 
-    const siteModel = findConfiguredModel(modelId, provider);
+    const siteModel = findConfiguredModel(modelId, provider, requireThinkingControl);
     if (siteModel && disabledProviders.has(siteModel.provider)) return undefined;
     if (siteModel && overriddenProviders.has(siteModel.provider)) return undefined;
     return siteModel;
   }
 
-  return findConfiguredModel(modelId, provider);
+  return findConfiguredModel(modelId, provider, requireThinkingControl);
 };

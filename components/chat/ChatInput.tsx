@@ -1,5 +1,7 @@
 "use client";
 
+import { ThinkingToggle } from "./ThinkingToggle";
+
 import type { RefObject } from "react";
 import { useRef, useState } from "react";
 import toast from "react-hot-toast";
@@ -289,6 +291,7 @@ export function ChatInput({
                   <Mic size={20} />
                 </button>
                 <ToolMenu disabled={isLoading || imageGenerationModel} />
+                <ThinkingToggle model={selectedModel} disabled={isLoading} />
                 <button
                   className={cn(
                     "flex h-11 items-center gap-1.5 rounded-lg px-2 text-sm transition-colors md:h-9",
@@ -312,7 +315,7 @@ export function ChatInput({
                   type="button"
                 >
                   {webSearchEnabled ? <Globe size={18} /> : <GlobeOffIcon size={18} />}
-                  <span className="hidden text-sm sm:inline">联网搜索</span>
+                  <span className="hidden text-sm lg:inline">联网搜索</span>
                   <span className="hidden sm:inline-flex">
                     <ToggleSwitch checked={webSearchEnabled} disabled={isLoading} />
                   </span>
