@@ -269,6 +269,13 @@ export function MarkdownContent({
   const components = React.useMemo(
     () => ({
       ...markdownComponents,
+      code: (props: { children?: React.ReactNode; className?: string }) => {
+        const language = /language-(\w+)/.exec(props.className || "")?.[1]?.toLowerCase();
+        if (streaming && (language === "html" || language === "htm")) {
+          return <Pre language={language}>{String(props.children)}</Pre>;
+        }
+        return markdownComponents.code(props);
+      },
       a: ({
         href,
         node: _node,
@@ -287,7 +294,7 @@ export function MarkdownContent({
         );
       },
     }),
-    [citationById],
+    [citationById, streaming],
   );
 
   return (

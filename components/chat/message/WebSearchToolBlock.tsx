@@ -28,16 +28,14 @@ export function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchStat
       : `已调用${toolLabel}`;
 
   return (
-    <details className="group/tool mb-2.5 overflow-hidden rounded-lg border border-gray-200 bg-white transition-colors open:border-gray-300 dark:border-white/10 dark:bg-white/[0.025] dark:open:border-white/15">
-      <summary className="flex h-9 cursor-pointer list-none items-center gap-2 px-2.5 transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.04] [&::-webkit-details-marker]:hidden">
+    <details className="group/tool mb-2.5 min-w-0 text-gray-500 dark:text-gray-400">
+      <summary className="flex min-h-10 w-fit max-w-full cursor-pointer list-none items-center gap-2 py-1 text-gray-500 transition-colors hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary dark:text-gray-400 dark:hover:text-gray-200 [&::-webkit-details-marker]:hidden">
         <span
           className={cn(
-            "flex h-5 w-5 shrink-0 items-center justify-center rounded-md",
+            "flex h-5 w-5 shrink-0 items-center justify-center",
             failed
-              ? "bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-300"
-              : done
-                ? "bg-primary/10 text-primary"
-                : "bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-200",
+              ? "text-red-600 dark:text-red-400"
+              : "text-gray-400 dark:text-gray-500",
           )}
         >
           {searching ? (
@@ -50,19 +48,19 @@ export function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchStat
         </span>
         <span
           className={cn(
-            "min-w-0 flex-1 truncate text-xs font-medium",
-            failed ? "text-red-600 dark:text-red-300" : "text-gray-600 dark:text-gray-300",
+            "min-w-0 truncate text-xs",
+            failed ? "text-red-600 dark:text-red-300" : "text-gray-500 dark:text-gray-400",
           )}
         >
           {summaryLabel}
         </span>
         <ChevronRight
-          className="shrink-0 text-gray-400 transition-transform duration-200 group-open/tool:-rotate-90"
+          className="shrink-0 text-gray-400 transition-transform duration-200 group-open/tool:rotate-90"
           size={14}
         />
       </summary>
 
-      <div className="border-t border-gray-100 dark:border-white/[0.08]">
+      <div className="min-w-0 pl-4">
         <div className="flex min-w-0 items-center gap-2 px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
           <span className="shrink-0 font-mono text-[11px] text-gray-400 dark:text-gray-500">
             {toolName}
@@ -93,7 +91,7 @@ export function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchStat
             <div className="flex gap-2 overflow-hidden">
               {Array.from({ length: 4 }).map((_, index) => (
                 <div
-                  className="h-[86px] min-w-[172px] animate-pulse rounded-lg border border-gray-100 bg-gray-50 dark:border-white/10 dark:bg-white/[0.05]"
+                  className="min-w-0 flex-1 animate-pulse"
                   key={index}
                 >
                   <div className="m-3 h-3 w-4/5 rounded bg-gray-200 dark:bg-white/10" />
@@ -105,7 +103,7 @@ export function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchStat
           </div>
         ) : failed ? (
           <div className="px-3 pb-3">
-            <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-400/20 dark:bg-red-500/10 dark:text-red-300">
+            <div className="py-2 text-xs text-red-600 dark:text-red-400">
               {webSearch.error || (isWebpageRead ? "网页读取服务暂时不可用" : "搜索服务暂时不可用")}
             </div>
             <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
@@ -130,7 +128,7 @@ export function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchStat
                   tabIndex={0}
                 >
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                    <div className="truncate text-xs font-medium text-gray-500 dark:text-gray-400">
                       {webSearch.title || webSearch.url}
                     </div>
                     {webSearch.description && (
@@ -156,7 +154,7 @@ export function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchStat
               </SourcePopover>
             ) : null}
             {webSearch.content && (
-              <pre className="mt-3 max-h-[220px] overflow-auto whitespace-pre-wrap rounded-lg bg-gray-50 px-3 py-2 font-sans text-[13px] leading-relaxed text-gray-600 dark:bg-white/[0.04] dark:text-gray-300">
+              <pre className="mt-3 max-h-[220px] overflow-auto whitespace-pre-wrap break-words py-2 font-sans text-xs leading-relaxed text-gray-500 dark:text-gray-400">
                 {webSearch.content.slice(0, 2400)}
                 {webSearch.content.length > 2400 ? "\n\n..." : ""}
               </pre>
@@ -165,7 +163,7 @@ export function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchStat
         ) : (
           <div className="px-1 pb-2">
             {webSearch.answer && (
-              <pre className="mx-2 my-1 max-h-[120px] overflow-auto whitespace-pre-wrap rounded-md bg-gray-50 px-2 py-1.5 font-sans text-[13px] leading-relaxed text-gray-600 dark:bg-white/[0.04] dark:text-gray-300">
+              <pre className="mx-2 my-1 max-h-[120px] overflow-auto whitespace-pre-wrap break-words py-1.5 font-sans text-xs leading-relaxed text-gray-500 dark:text-gray-400">
                 {webSearch.answer}
               </pre>
             )}
@@ -175,7 +173,7 @@ export function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchStat
                 return (
                   <SourcePopover citation={citation} key={result.url}>
                     <a
-                      className="group/search-result flex min-w-0 items-start gap-2.5 border-b border-gray-100 px-2 py-2 transition-colors last:border-b-0 hover:bg-gray-50 dark:border-white/10 dark:hover:bg-white/[0.04]"
+                      className="group/search-result flex min-w-0 items-start gap-2.5 px-2 py-2 transition-colors hover:text-gray-700 dark:hover:text-gray-200"
                       href={result.url}
                       rel="noreferrer"
                       target="_blank"
@@ -183,7 +181,7 @@ export function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchStat
                       <SourceFavicon citation={citation} size={20} />
                       <span className="min-w-0 flex-1">
                         <span className="flex min-w-0 items-center gap-1.5">
-                          <span className="min-w-0 truncate text-[13px] font-medium leading-relaxed text-gray-900 group-hover/search-result:text-primary dark:text-gray-100">
+                          <span className="min-w-0 truncate text-xs leading-relaxed text-gray-500 group-hover/search-result:text-gray-800 dark:text-gray-400 dark:group-hover/search-result:text-gray-200">
                             {result.title}
                           </span>
                           <ExternalLink

@@ -44,14 +44,14 @@ export function GeneratedFileToolBlock({
       : progress?.label || `已调用${toolLabel}`;
 
   return (
-    <details className="group/file-tool mb-2.5 overflow-hidden rounded-lg border border-gray-200 bg-white transition-colors open:border-gray-300 dark:border-white/10 dark:bg-white/[0.025] dark:open:border-white/15">
-      <summary className="flex h-9 cursor-pointer list-none items-center gap-2 px-2.5 transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.04] [&::-webkit-details-marker]:hidden">
+    <details className="group/file-tool mb-2.5 min-w-0 text-gray-500 dark:text-gray-400">
+      <summary className="flex min-h-10 w-fit max-w-full cursor-pointer list-none items-center gap-2 py-1 text-gray-500 transition-colors hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary dark:text-gray-400 dark:hover:text-gray-200 [&::-webkit-details-marker]:hidden">
         <span
           className={cn(
-            "flex h-5 w-5 shrink-0 items-center justify-center rounded-md",
+            "flex h-5 w-5 shrink-0 items-center justify-center",
             failed
-              ? "bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-300"
-              : "bg-primary/10 text-primary",
+              ? "text-red-600 dark:text-red-400"
+              : "text-gray-400 dark:text-gray-500",
           )}
         >
           {running ? (
@@ -64,19 +64,19 @@ export function GeneratedFileToolBlock({
         </span>
         <span
           className={cn(
-            "min-w-0 flex-1 truncate text-xs font-medium",
-            failed ? "text-red-600 dark:text-red-300" : "text-gray-600 dark:text-gray-300",
+            "min-w-0 truncate text-xs",
+            failed ? "text-red-600 dark:text-red-300" : "text-gray-500 dark:text-gray-400",
           )}
         >
           {summaryLabel}
         </span>
         <ChevronRight
-          className="shrink-0 text-gray-400 transition-transform duration-200 group-open/file-tool:-rotate-90"
+          className="shrink-0 text-gray-400 transition-transform duration-200 group-open/file-tool:rotate-90"
           size={14}
         />
       </summary>
 
-      <div className="border-t border-gray-100 px-3 py-2.5 dark:border-white/[0.08]">
+      <div className="min-w-0 pl-7 pb-2 pt-1">
         <div className="flex min-w-0 items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
           <span className="shrink-0 font-mono text-[11px] text-gray-400 dark:text-gray-500">
             {generatedFile.toolName}
@@ -122,7 +122,7 @@ export function GeneratedFileToolBlock({
         )}
 
         {failed && (
-          <div className="mt-2 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-400/20 dark:bg-red-500/10 dark:text-red-300">
+          <div className="mt-2 py-2 text-xs text-red-600 dark:text-red-400">
             {generatedFile.error || "文件生成失败，请稍后重试"}
           </div>
         )}

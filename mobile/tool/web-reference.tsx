@@ -23,7 +23,8 @@ const user = fixture.user;
 const catalog = fixture.tools;
 const performanceMessages = Array.from({length: 100}, (_, index) => ({
   ...fixture.messages[index % 2], id: `perf-${index}`, segments: undefined,
-  content: index === 99 ? '```typescript\nconst answer: number = 42;\n```' : fixture.messages[index % 2].content,
+  isStreaming: index === 99 && params.has('streaming'),
+  content: index === 99 && params.has('html') ? '```html\n<!doctype html><html><head><title>网页预览</title></head><body><h1>你好，MarkAI</h1></body></html>\n```' : index === 99 ? '```typescript\nconst answer: number = 42;\n```' : fixture.messages[index % 2].content,
 }));
 function streamFixture() {
   let ticks = 0;

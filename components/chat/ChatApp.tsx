@@ -749,12 +749,13 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
               />
 
               <div
+                data-chat-message-scroll="true"
                 ref={messagesScrollRef}
                 className={cn(
-                  "flex flex-1 flex-col items-center overflow-y-auto px-3 md:px-8",
+                  "flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-3 md:px-8",
                   showWelcome
                     ? "justify-center pb-6 pt-0 md:pb-8"
-                    : "pb-[calc(11rem+env(safe-area-inset-bottom))] pt-4 md:pb-40 md:pt-6",
+                    : "pb-[calc(var(--chat-composer-height,10rem)+1.5rem)] pt-4 md:pt-6",
                 )}
                 onScroll={handleMessagesScroll}
               >

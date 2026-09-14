@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Atom, ChevronDown, Loader2 } from "lucide-react";
+import { Atom, ChevronRight, Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/useSettingsStore";
@@ -44,6 +44,7 @@ export function ThinkingPanel({
   return (
     <div className="mb-4 text-sm">
       <button
+        aria-expanded={expanded}
         className="flex items-center gap-1.5 rounded-lg px-1 py-1 text-left text-gray-500 dark:text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
         onClick={() => setShowDetail((value) => !value)}
         type="button"
@@ -68,8 +69,8 @@ export function ThinkingPanel({
         >
           {title}
         </span>
-        <ChevronDown
-          className={cn("text-gray-400 transition-transform", expanded && "rotate-180")}
+        <ChevronRight
+          className={cn("text-gray-400 transition-transform duration-200", expanded && "rotate-90")}
           size={14}
         />
       </button>

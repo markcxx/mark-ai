@@ -150,3 +150,21 @@ it("preserves display content in containers and surrounding prose", () => {
     ).not.toThrow();
   }
 });
+
+describe("HTML preview lifecycle", () => {
+  const source = '```html\n<html><head><title>示例网页</title></head><body>你好</body></html>\n```';
+
+  it("keeps HTML visible as code while streaming", () => {
+    const html = renderToStaticMarkup(<MarkdownContent streaming>{source}</MarkdownContent>);
+    expect(html).toContain('&lt;html&gt;');
+    expect(html).not.toContain('打开网页预览');
+  });
+
+  it("shows a compact website entry after generation", () => {
+    const html = renderToStaticMarkup(<MarkdownContent>{source}</MarkdownContent>);
+    expect(html).toContain('打开网页预览：示例网页');
+    expect(html).toContain('网站');
+    expect(html).not.toContain('打开方式');
+    expect(html).not.toContain('&lt;html&gt;');
+  });
+});

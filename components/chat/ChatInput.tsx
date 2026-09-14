@@ -3,7 +3,7 @@
 import { ThinkingToggle } from "./ThinkingToggle";
 
 import type { RefObject } from "react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import {
   ArrowDown,
@@ -119,22 +119,41 @@ export function ChatInput({
   const hasDraft = Boolean(input.trim() || attachments.length > 0);
   const stopping = isLoading && !hasDraft;
   const imageGenerationModel = isImageGenerationModel(selectedModel?.id);
+  const composerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (placement !== "bottom" || !composerRef.current) return;
+    const composer = composerRef.current;
+    const panel = composer.closest("main");
+    if (!panel) return;
+    const scrollArea = panel.querySelector<HTMLElement>("[data-chat-message-scroll]");
+    const updateHeight = () => {
+      panel.style.setProperty("--chat-composer-height", `${composer.offsetHeight}px`);
+      if (scrollArea) {
+        panel.style.setProperty("--chat-scrollbar-width", `${scrollArea.offsetWidth - scrollArea.clientWidth}px`);
+      }
+    };
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(composer);
+    if (scrollArea) observer.observe(scrollArea);
+    return () => {
+      observer.disconnect();
+      panel.style.removeProperty("--chat-composer-height");
+      panel.style.removeProperty("--chat-scrollbar-width");
+    };
+  }, [placement]);
 
   return (
     <>
       <div
+        ref={composerRef}
         className={cn(
           placement === "bottom"
-            ? "pointer-events-none absolute bottom-0 left-0 right-0 z-20 flex justify-center px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-8 md:p-4 md:px-8 md:pb-8 md:pt-10"
+            ? "absolute bottom-0 left-0 right-[var(--chat-scrollbar-width,0px)] z-20 flex justify-center bg-[var(--chat-panel-bg)] px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 md:px-8 md:pb-6"
             : "w-full",
         )}
       >
-        {placement === "bottom" && (
-          <div
-            aria-hidden="true"
-            className="absolute inset-y-0 left-0 right-[6px] bg-gradient-to-t from-[var(--chat-input-overlay-from)] via-[var(--chat-input-overlay-via)] to-transparent"
-          />
-        )}
         <div
           className={cn(
             "relative flex w-full flex-col transition-[max-width] duration-300 ease-out",
