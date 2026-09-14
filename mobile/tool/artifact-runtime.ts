@@ -1,3 +1,5 @@
+// The offline mobile artifact bundle retains GL; Web loads it on demand.
+import "echarts-gl";
 import { echarts, ensureEChartsTheme } from "../../lib/visualization/echarts-client";
 import mermaid from "mermaid";
 import { Transformer } from "markmap-lib";

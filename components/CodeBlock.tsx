@@ -1,3 +1,4 @@
+import { resolveCodeTheme } from "@/lib/code/themes";
 import React, { useEffect, useState } from "react";
 import { ShikiCode } from "./ShikiCode";
 import { Check, ChevronDown, ChevronUp, Copy, Download, WrapText } from "lucide-react";
@@ -47,16 +48,7 @@ export const Pre = ({ children, language }: { children: string; language: string
   const isDark =
     settings.codeColorMode === "dark" ||
     (settings.codeColorMode === "auto" && resolvedTheme === "dark");
-  const legacyThemes: Record<string, [string, string]> = {
-    one: ["one-light", "one-dark-pro"],
-    vscode: ["light-plus", "dark-plus"],
-    material: ["material-theme-lighter", "material-theme-darker"],
-    gruvbox: ["gruvbox-light-medium", "gruvbox-dark-medium"],
-    solarized: ["solarized-light", "solarized-dark"],
-    github: ["github-light", "github-dark"],
-    duotone: ["vitesse-light", "vitesse-dark"],
-  };
-  const syntaxTheme = legacyThemes[settings.codeTheme]?.[isDark ? 1 : 0] || settings.codeTheme;
+  const syntaxTheme = resolveCodeTheme(settings.codeTheme, isDark);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(children);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import toast, { Toaster } from "react-hot-toast";
 
@@ -27,6 +27,9 @@ import { useUIStore } from "@/stores/useUIStore";
 import { PluginCenterDrawer } from "@/components/tools/PluginCenterDrawer";
 
 import { ChatInput } from "./ChatInput";
+import type { ComponentProps } from "react";
+import type { Message, RegenerateMode } from "@/lib/chat/types";
+import type { TranslationLanguage } from "@/lib/chat/translation-languages";
 import { ChatMiniMap } from "./ChatMiniMap";
 import { CommandCenter } from "./CommandCenter";
 import { ExportDialog, type ExportMode } from "./ExportDialog";
@@ -42,6 +45,12 @@ import { SelectionQuoteAction } from "./SelectionQuoteAction";
 import { TopHeader } from "./TopHeader";
 import { AnnouncementBar } from "@/components/AnnouncementBar";
 import { WelcomePanel } from "./WelcomePanel";
+
+// Draft changes stay inside the composer instead of rerendering chat history.
+function ConnectedChatInput(props: Omit<ComponentProps<typeof ChatInput>, "input">) {
+  const input = useChatStore((state) => state.input);
+  return <ChatInput {...props} input={input} />;
+}
 
 function MessageSkeletonList() {
   const lineWidths = ["100%", "88%", "64%"];
@@ -117,7 +126,6 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
 
   // Chat Store
   const messages = useChatStore((s) => s.messages);
-  const input = useChatStore((s) => s.input);
   const isLoading = useChatStore((s) => s.isLoading);
   const loadingText = useChatStore((s) => s.loadingText);
   const editingMessageId = useChatStore((s) => s.editingMessageId);
@@ -430,7 +438,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
 
   const handleSend = () => {
     if (attachmentUploading) return;
-    if (isLoading && !input.trim() && pendingAttachments.length === 0) {
+    if (isLoading && !useChatStore.getState().input.trim() && pendingAttachments.length === 0) {
       useChatStore.getState().abortStreaming();
       return;
     }
@@ -447,13 +455,47 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
     setExportDialogOpen(true);
   };
 
-  const getMessageModel = (message: { role: string; model?: string; provider?: string }) => {
-    if (message.role !== "model") return selectedModel;
-    return (
-      availableModels.find((m) => m.id === message.model && m.provider === message.provider) ||
-      selectedModel
-    );
-  };
+  const getMessageModel = useCallback(
+    (message: Message) => {
+      if (message.role !== "model") return selectedModel;
+      return (
+        availableModels.find((m) => m.id === message.model && m.provider === message.provider) ||
+        selectedModel
+      );
+    },
+    [availableModels, selectedModel],
+  );
+
+  const messageActions = useMemo(
+    () => ({
+      cancelEditingMessage: () => useChatStore.getState().cancelEditing(),
+      continueMessage: (message: Message) => useChatStore.getState().continueMessage(message),
+      copyMessage: (message: Message) => useChatStore.getState().copyMessage(message),
+      deleteMessage: (id: string) => useChatStore.getState().deleteMessage(id),
+      enableMultiSelect: (id: string) => {
+        setSelectionLayoutMode(true);
+        window.requestAnimationFrame(() => useUIStore.getState().enableMultiSelect(id));
+      },
+      menuUnavailable: () => {
+        useUIStore.getState().setOpenMenuMessageId(null);
+        toast(NOT_IMPLEMENTED_TOAST);
+      },
+      regenerateMessage: (message: Message, mode?: RegenerateMode) =>
+        useChatStore.getState().regenerateMessage(message, mode),
+      saveEditingMessage: () => useChatStore.getState().saveEditing(),
+      selectMessageVariant: (id: string, variant: string) =>
+        useChatStore.getState().selectMessageVariant(id, variant),
+      setEditingContent: (content: string) => useChatStore.setState({ editingContent: content }),
+      setOpenMenuMessageId: (id: string | null) => useUIStore.getState().setOpenMenuMessageId(id),
+      startEditingMessage: (message: Message) => useChatStore.getState().startEditing(message),
+      toggleCollapseMessage: (id: string) => useUIStore.getState().toggleCollapseMessage(id),
+      toggleSelectedMessage: (id: string, shift?: boolean) =>
+        useUIStore.getState().toggleSelectedMessage(id, !!shift, useChatStore.getState().messages),
+      translateMessage: (message: Message, language: TranslationLanguage) =>
+        useChatStore.getState().translateMessage(message, language),
+    }),
+    [],
+  );
 
   const openHtmlPreview = useCallback((preview: HtmlPreviewPayload) => {
     setActiveHtmlPreview(preview);
@@ -720,14 +762,13 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                   <MessageSkeletonList />
                 ) : showWelcome ? (
                   <WelcomePanel>
-                    <ChatInput
+                    <ConnectedChatInput
                       availableModels={availableModels}
                       attachments={pendingAttachments}
                       attachmentUploading={attachmentUploading}
                       uploads={uploads}
                       onCancelUpload={cancelUpload}
                       onRetryUpload={retryUpload}
-                      input={input}
                       isLoading={isLoading}
                       isLoadingModels={isLoadingModels}
                       modelSearchKeyword={modelSearchKeyword}
@@ -784,56 +825,24 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                   >
                     {messages.map((message, index) => (
                       <MessageItem
-                        cancelEditingMessage={() => useChatStore.getState().cancelEditing()}
+                        {...messageActions}
                         collapsed={collapsedMessageIds.includes(message.id)}
-                        continueMessage={(m) => useChatStore.getState().continueMessage(m)}
-                        copyMessage={(m) => useChatStore.getState().copyMessage(m)}
-                        deleteMessage={(id) => useChatStore.getState().deleteMessage(id)}
-                        editingContent={editingContent}
-                        editingMessageId={editingMessageId}
-                        enableMultiSelect={(id) => {
-                          setSelectionLayoutMode(true);
-                          window.requestAnimationFrame(() => {
-                            useUIStore.getState().enableMultiSelect(id);
-                          });
-                        }}
+                        editingContent={editingMessageId === message.id ? editingContent : ""}
+                        editingMessageId={editingMessageId === message.id ? editingMessageId : null}
                         getMessageModel={getMessageModel}
                         isConversationTail={
                           index === messages.length - 1 && message.role === "model"
                         }
                         isSelected={selectedMessageIds.includes(message.id)}
                         key={message.id}
-                        loadingText={loadingText}
-                        menuUnavailable={() => {
-                          useUIStore.getState().setOpenMenuMessageId(null);
-                          toast(NOT_IMPLEMENTED_TOAST);
-                        }}
+                        loadingText={index === messages.length - 1 ? loadingText : ""}
                         message={message}
                         multiSelectMode={multiSelectMode}
-                        openMenuMessageId={openMenuMessageId}
-                        regenerateMessage={(message, mode) =>
-                          useChatStore.getState().regenerateMessage(message, mode)
-                        }
-                        saveEditingMessage={() => useChatStore.getState().saveEditing()}
-                        selectMessageVariant={(messageId, variantId) =>
-                          useChatStore.getState().selectMessageVariant(messageId, variantId)
+                        openMenuMessageId={
+                          openMenuMessageId === message.id ? openMenuMessageId : null
                         }
                         selectedModel={selectedModel}
                         selectionLayoutMode={selectionLayoutMode}
-                        setEditingContent={(c) => useChatStore.setState({ editingContent: c })}
-                        setOpenMenuMessageId={(id) =>
-                          useUIStore.getState().setOpenMenuMessageId(id)
-                        }
-                        startEditingMessage={(m) => useChatStore.getState().startEditing(m)}
-                        toggleCollapseMessage={(id) =>
-                          useUIStore.getState().toggleCollapseMessage(id)
-                        }
-                        toggleSelectedMessage={(id, shift) =>
-                          useUIStore.getState().toggleSelectedMessage(id, !!shift, messages)
-                        }
-                        translateMessage={(message, language) =>
-                          useChatStore.getState().translateMessage(message, language)
-                        }
                       />
                     ))}
                     <div ref={messagesEndRef} />
@@ -862,14 +871,13 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                   selectedCount={selectedMessageIds.length}
                 />
               ) : (
-                <ChatInput
+                <ConnectedChatInput
                   availableModels={availableModels}
                   attachments={pendingAttachments}
                   attachmentUploading={attachmentUploading}
                   uploads={uploads}
                   onCancelUpload={cancelUpload}
                   onRetryUpload={retryUpload}
-                  input={input}
                   isLoading={isLoading}
                   isLoadingModels={isLoadingModels}
                   modelSearchKeyword={modelSearchKeyword}

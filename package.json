@@ -1,6 +1,6 @@
 {
   "name": "mark-ai",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -18,7 +18,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "mobile:highlight": "node mobile/tool/export-code-highlighter.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1086.0",
@@ -27,14 +28,12 @@
     "@fontsource-variable/noto-sans-sc": "^5.2.10",
     "@fontsource-variable/plus-jakarta-sans": "^5.2.8",
     "@google/genai": "^2.4.0",
-    "@hookform/resolvers": "^5.2.1",
     "@js-preview/docx": "^1.6.4",
     "@js-preview/excel": "^1.7.14",
     "@neondatabase/serverless": "^1.1.0",
     "@zumer/snapdom": "^2.15.0",
     "autoprefixer": "^10.4.21",
     "better-auth": "^1.6.23",
-    "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "docx": "^9.7.1",
     "drizzle-orm": "^0.45.2",
@@ -57,7 +56,6 @@
     "react-dom": "^19.2.1",
     "react-hot-toast": "^2.6.0",
     "react-markdown": "^10.1.0",
-    "react-syntax-highlighter": "^16.1.1",
     "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
@@ -75,8 +73,8 @@
     "@types/nodemailer": "^8.0.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@types/react-syntax-highlighter": "^15.5.13",
     "drizzle-kit": "^0.31.10",
+    "esbuild": "^0.25.12",
     "eslint": "^8.57.1",
     "eslint-config-next": "^15.5.20",
     "prettier": "^3.9.5",

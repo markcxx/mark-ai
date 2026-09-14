@@ -86,6 +86,13 @@ class _CodeBlockState extends State<CodeBlock> {
   Timer? copyTimer, parseTimer;
   List<Json> tokens = [];
   int revision = 0;
+  String? highlightedTheme, highlightedLanguage;
+  String get resolvedTheme => resolveCodeTheme(
+    widget.theme,
+    widget.colorMode == 'dark' ||
+        widget.colorMode == 'auto' &&
+            Theme.of(context).brightness == Brightness.dark,
+  );
   String get language => widget.language.trim().isEmpty
       ? 'txt'
       : widget.language.trim().toLowerCase();
@@ -93,25 +100,50 @@ class _CodeBlockState extends State<CodeBlock> {
   @override
   void initState() {
     super.initState();
-    parse();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    scheduleParse();
+  }
+
+  void scheduleParse() {
+    // Do not reset the timer on every streamed chunk: process the latest revision.
+    parseTimer ??= Timer(const Duration(milliseconds: 100), () {
+      parseTimer = null;
+      parse();
+    });
   }
 
   @override
   void didUpdateWidget(covariant CodeBlock oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.code != widget.code ||
-        oldWidget.language != widget.language) {
-      parseTimer?.cancel();
-      parseTimer = Timer(const Duration(milliseconds: 100), parse);
+        oldWidget.language != widget.language ||
+        oldWidget.theme != widget.theme ||
+        oldWidget.colorMode != widget.colorMode) {
+      scheduleParse();
     }
   }
 
   void parse() async {
-    final current = ++revision, source = code;
+    final current = ++revision,
+        source = code,
+        theme = resolvedTheme,
+        lang = language;
     try {
-      final result = await CodeHighlighter.tokenize(source, language);
-      if (mounted && current == revision && source == code) {
-        setState(() => tokens = result);
+      final result = await CodeHighlighter.highlight(source, lang, theme);
+      if (mounted &&
+          current == revision &&
+          source == code &&
+          theme == resolvedTheme &&
+          lang == language) {
+        setState(() {
+          tokens = jsonList(result['tokens']);
+          highlightedTheme = theme;
+          highlightedLanguage = lang;
+        });
       }
     } catch (_) {
       if (mounted && current == revision) {
@@ -131,79 +163,48 @@ class _CodeBlockState extends State<CodeBlock> {
     super.dispose();
   }
 
+  // Shiki emits CSS hex colors; preserve alpha when a theme supplies it.
   Color? color(dynamic value) {
-    if (value is! String) return null;
-    if (value == 'white') return Colors.white;
-    if (value == 'black') return Colors.black;
-    if (value == 'transparent') return Colors.transparent;
-    if (value.startsWith('#')) {
-      var hex = value.substring(1);
-      if (hex.length == 3) hex = hex.split('').map((c) => '$c$c').join();
-      return Color(0xff000000 | int.parse(hex, radix: 16));
+    if (value is! String || !value.startsWith('#')) return null;
+    var hex = value.substring(1);
+    if (hex.length == 3 || hex.length == 4) {
+      hex = hex.split('').map((c) => '$c$c').join();
     }
-    final parts = RegExp(r'[\d.]+')
-        .allMatches(value)
-        .map((m) => double.parse(m.group(0)!))
-        .toList();
-    if (value.startsWith('hsl') && parts.length >= 3) {
-      return HSLColor.fromAHSL(
-        parts.length > 3 ? parts[3] : 1,
-        parts[0],
-        parts[1] / 100,
-        parts[2] / 100,
-      ).toColor();
-    }
-    if (value.startsWith('rgb') && parts.length >= 3) {
-      return Color.fromRGBO(
-        parts[0].round(),
-        parts[1].round(),
-        parts[2].round(),
-        parts.length > 3 ? parts[3] : 1,
-      );
-    }
+    final number = int.tryParse(hex, radix: 16);
+    if (number == null) return null;
+    if (hex.length == 6) return Color(0xff000000 | number);
+    if (hex.length == 8) return Color((number >> 8) | ((number & 0xff) << 24));
     return null;
   }
 
-  TextStyle tokenStyle(Json styles) => TextStyle(
-    color: color(styles['color']),
-    backgroundColor: color(styles['backgroundColor']),
-    fontWeight: styles['fontWeight'] == 'bold' ? FontWeight.bold : null,
-    fontStyle: styles['fontStyle'] == 'italic' ? FontStyle.italic : null,
-    decoration: styles['textDecoration'] == 'underline'
-        ? TextDecoration.underline
-        : null,
-  );
   @override
   Widget build(BuildContext context) {
     final dark =
         widget.colorMode == 'dark' ||
         widget.colorMode == 'auto' &&
             Theme.of(context).brightness == Brightness.dark;
-    final theme = jsonMap(
-      (codeThemes[widget.theme] ?? codeThemes['one'])![dark ? 1 : 0],
-    );
-    final base = jsonMap(theme['code[class*="language-"]']);
+    final base = codeThemeColors[resolvedTheme] ?? const <String, String>{};
     final lines = <List<InlineSpan>>[[]];
     for (final token
-        in tokens.isEmpty || tokens.map((t) => t['text']).join() != code
+        in highlightedTheme != resolvedTheme ||
+                highlightedLanguage != language ||
+                tokens.isEmpty ||
+                tokens.map((t) => t['text']).join() != code
             ? [
-                {'text': code, 'classes': []},
+                {'text': code},
               ]
             : tokens) {
-      final classes = (token['classes'] as List).cast<String>(),
-          styles = <String, dynamic>{};
-      for (final name in classes) {
-        styles.addAll(jsonMap(theme[name]));
-      }
-      for (var i = 0; i < classes.length; i++) {
-        for (var j = i + 1; j < classes.length; j++) {
-          styles.addAll(jsonMap(theme['${classes[i]}.${classes[j]}']));
-        }
-      }
+      final flags = (token['fontStyle'] as num?)?.toInt() ?? 0;
+      final style = TextStyle(
+        color: color(token['color']),
+        fontWeight: flags & 2 != 0 ? FontWeight.bold : null,
+        fontStyle: flags & 1 != 0 ? FontStyle.italic : null,
+        decoration: flags & 4 != 0 ? TextDecoration.underline : null,
+      );
       final parts = (token['text'] as String).split('\n');
       for (var i = 0; i < parts.length; i++) {
         if (i > 0) lines.add([]);
-        lines.last.add(TextSpan(text: parts[i], style: tokenStyle(styles)));
+        lines.last.add(TextSpan(text: parts[i], style: style));
       }
     }
     final collapsible =
@@ -268,7 +269,7 @@ class _CodeBlockState extends State<CodeBlock> {
                         fontSize: 13,
                         height: 1.5,
                         letterSpacing: 0,
-                        color: color(base['color']) ?? foreground,
+                        color: color(base['fg']) ?? foreground,
                       ),
                     ),
                   )
@@ -281,7 +282,7 @@ class _CodeBlockState extends State<CodeBlock> {
                       fontSize: 13,
                       height: 1.5,
                       letterSpacing: 0,
-                      color: color(base['color']) ?? foreground,
+                      color: color(base['fg']) ?? foreground,
                     ),
                   ),
               ],
@@ -412,7 +413,7 @@ class _CodeBlockState extends State<CodeBlock> {
               curve: Curves.easeOut,
               child: Container(
                 width: double.infinity,
-                color: color(base['backgroundColor'] ?? base['background']),
+                color: color(base['bg']),
                 child: wrap
                     ? Padding(
                         padding: const EdgeInsets.all(16),

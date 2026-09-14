@@ -1,188 +1,155 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
-import 'dart:isolate';
 
 import 'package:flutter/services.dart';
-import 'package:flutter_js/javascript_runtime.dart';
-import 'package:flutter_js/javascriptcore/jscore_runtime.dart';
-import 'package:flutter_js/quickjs/quickjs_runtime2.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../shared/models/chat.dart';
+import '../../../shared/models/code_themes.dart';
 
-class CodeHighlighter {
-  static final _source = rootBundle.loadString(
-    'assets/web/code-highlighter.js',
-  );
-  static Future<_HighlightWorker>? _worker;
-  static Timer? _idle;
-  static final _pending = <(String, String), Future<List<Json>>>{};
-  static final _cache = <(String, String), List<Json>>{};
-  static int _cachedCharacters = 0;
-  static const _maxCachedCharacters = 256 * 1024;
+typedef HighlightBackend = Future<Json> Function(
+  String code,
+  String language,
+  String theme,
+);
 
-  static Future<List<Json>> tokenize(String code, String language) {
-    final key = (code, language);
+/// Shared, bounded cache. Each key includes the theme as well as source/language.
+class HighlightService {
+  final HighlightBackend backend;
+  HighlightService(this.backend);
+  final _pending = <(String, String, String), Future<Json>>{};
+  final _cache = <(String, String, String), Json>{};
+  int _characters = 0;
+  static const _maxCharacters = 256 * 1024;
+
+  Future<Json> highlight(String code, String language, String theme) {
+    final key = (code, language, theme);
     final cached = _cache.remove(key);
     if (cached != null) {
       _cache[key] = cached;
       return Future.value(cached);
     }
-    return _pending[key] ??= _tokenize(key);
+    return _pending[key] ??= _highlight(key);
   }
 
-  static Future<List<Json>> _tokenize((String, String) key) async {
-    _idle?.cancel();
-    final worker = _worker ??= _start();
+  Future<Json> _highlight((String, String, String) key) async {
     try {
-      final result = await (await worker).parse(key.$1, key.$2);
-      final tokens = List<Json>.unmodifiable(
-        result.map(
-          (token) => Map<String, dynamic>.unmodifiable({
-            ...token,
-            'classes': List.unmodifiable(token['classes'] as List? ?? const []),
-          }),
-        ),
-      );
-      if (key.$1.length <= _maxCachedCharacters) {
-        _cache[key] = tokens;
-        _cachedCharacters += key.$1.length;
-        while (_cache.length > 32 || _cachedCharacters > _maxCachedCharacters) {
+      final result = await backend(key.$1, key.$2, key.$3);
+      if (key.$1.length <= _maxCharacters) {
+        _cache[key] = result;
+        _characters += key.$1.length;
+        while (_cache.length > 32 || _characters > _maxCharacters) {
           final oldest = _cache.keys.first;
-          _cachedCharacters -= oldest.$1.length;
+          _characters -= oldest.$1.length;
           _cache.remove(oldest);
         }
       }
-      return tokens;
-    } catch (_) {
-      try {
-        final instance = await worker;
-        if (instance.disposed && identical(_worker, worker)) _worker = null;
-      } catch (_) {
-        if (identical(_worker, worker)) _worker = null;
-      }
-      rethrow;
+      return result;
     } finally {
       _pending.remove(key);
-      if (_pending.isEmpty) {
-        _idle = Timer(const Duration(seconds: 30), () {
-          if (identical(_worker, worker)) {
-            _worker = null;
-            unawaited(
-              worker.then((value) => value.dispose()).catchError((_) {}),
-            );
-          }
-        });
-      }
     }
   }
-
-  static Future<_HighlightWorker> _start() async =>
-      _HighlightWorker.start(await _source);
 }
 
-/// One isolate and one grammar runtime are reused across blocks. Only bundled
-/// grammar executes; source is a JSON argument with no network or native bridge.
-class _HighlightWorker {
-  final ReceivePort replies = ReceivePort();
-  final ready = Completer<SendPort>();
-  final pending = <int, Completer<List<Json>>>{};
-  Isolate? isolate;
-  SendPort? commands;
-  int nextId = 0;
-  bool disposed = false;
+class CodeHighlighter {
+  static final _runtime = _ShikiRuntime();
+  static final _service = HighlightService(_runtime.highlight);
+  static Future<Json> highlight(String code, String language, String theme) =>
+      _service.highlight(code, language, theme);
+}
 
-  static Future<_HighlightWorker> start(String source) async {
-    final worker = _HighlightWorker();
-    worker.replies.listen(worker.receive);
+/// One lazily created local WebView runs the same Oniguruma WASM as Web Shiki.
+/// Only tokens cross the bridge; Flutter still renders/selects/copies the code.
+class _ShikiRuntime {
+  WebViewController? _web;
+  Future<void>? _ready;
+  Future<void> _queue = Future.value();
+  Timer? _idle;
+  final _languages = <String>{}, _themes = <String>{};
+
+  Future<void> _start() async {
+    final ready = Completer<void>();
+    final web = WebViewController();
+    _web = web;
+    await web.setJavaScriptMode(JavaScriptMode.unrestricted);
+    await web.setNavigationDelegate(
+      NavigationDelegate(
+        onNavigationRequest: (_) => NavigationDecision.prevent,
+      ),
+    );
+    await web.addJavaScriptChannel(
+      'MarkAIHighlightReady',
+      onMessageReceived: (message) {
+        if (ready.isCompleted) return;
+        if (message.message == 'ready') {
+          ready.complete();
+        } else {
+          ready.completeError(StateError('代码着色资源加载失败'));
+        }
+      },
+    );
+    final source = await rootBundle.loadString(
+      'assets/web/code-highlighter.js',
+    );
+    await web.loadHtmlString('''<!doctype html><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval'">
+<script>${source.replaceAll('</script', r'<\/script')}</script>''');
+    await ready.future.timeout(const Duration(seconds: 20));
+  }
+
+  Future<Json> highlight(String code, String language, String theme) {
+    _idle?.cancel();
+    final task = _queue.then((_) => _highlight(code, language, theme));
+    _queue = task.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    final currentQueue = _queue;
+    unawaited(
+      currentQueue.then((_) {
+        if (!identical(_queue, currentQueue)) return;
+        _idle = Timer(const Duration(seconds: 30), () {
+          // Drop the controller and native runtime after all pending work finishes.
+          unawaited(_web?.loadHtmlString('') ?? Future.value());
+          _web = null;
+          _ready = null;
+          _languages.clear();
+          _themes.clear();
+        });
+      }),
+    );
+    return task;
+  }
+
+  Future<Json> _highlight(String code, String language, String theme) async {
     try {
-      worker.isolate = await Isolate.spawn(
-        _run,
-        (worker.replies.sendPort, source),
-        onError: worker.replies.sendPort,
-        onExit: worker.replies.sendPort,
-      );
-      await worker.ready.future;
-      return worker;
+      await (_ready ??= _start());
     } catch (_) {
-      worker.dispose();
+      _web = null;
+      _ready = null;
+      _languages.clear();
+      _themes.clear();
       rethrow;
     }
-  }
-
-  void receive(dynamic value) {
-    if (value is SendPort) {
-      commands = value;
-      ready.complete(value);
-    } else if (value is (int, List<Json>?, String?)) {
-      final task = pending.remove(value.$1);
-      if (value.$3 != null) {
-        task?.completeError(StateError('代码着色失败'));
-      } else {
-        task?.complete(value.$2!);
-      }
-    } else {
-      dispose();
-    }
-  }
-
-  Future<List<Json>> parse(String code, String language) async {
-    final port = await ready.future;
-    if (disposed) throw StateError('代码着色资源已释放');
-    final id = nextId++;
-    final task = Completer<List<Json>>();
-    pending[id] = task;
-    port.send((id, code, language));
-    return task.future;
-  }
-
-  void dispose() {
-    if (disposed) return;
-    disposed = true;
-    // Let the isolate release the native JS engine before it exits. Killing a
-    // warm isolate directly can strand native allocations outside Dart's heap.
-    if (commands != null) {
-      commands!.send(null);
-    } else {
-      isolate?.kill(priority: Isolate.immediate);
-    }
-    replies.close();
-    final error = StateError('代码着色资源已释放');
-    if (!ready.isCompleted) ready.completeError(error);
-    for (final task in pending.values) {
-      task.completeError(error);
-    }
-    pending.clear();
-  }
-
-  static void _run((SendPort, String) input) {
-    final JavascriptRuntime engine =
-        Platform.isAndroid || Platform.isLinux || Platform.isWindows
-        ? QuickJsRuntime2(timeout: 3000)
-        : JavascriptCoreRuntime();
-    final loaded = engine.evaluate(input.$2);
-    if (loaded.isError) {
-      engine.dispose();
-      throw StateError('代码着色规则加载失败');
-    }
-    final requests = ReceivePort();
-    input.$1.send(requests.sendPort);
-    requests.listen((dynamic message) {
-      if (message == null) {
-        engine.dispose();
-        requests.close();
-        return;
-      }
-      final (id, code, language) = message as (int, String, String);
-      try {
-        final value = engine.evaluate(
-          'JSON.stringify(markaiTokens(${jsonEncode(code)},${jsonEncode(language)}))',
-        );
-        if (value.isError) throw StateError('代码着色失败');
-        input.$1.send((id, jsonList(jsonDecode(value.stringResult)), null));
-      } catch (_) {
-        input.$1.send((id, null, '代码着色失败'));
-      }
-    });
+    final names = codeLanguages[language] ?? const <String>[];
+    final missing = names.where((name) => !_languages.contains(name)).toList();
+    final grammars = await Future.wait(
+      missing.map(
+        (name) async => jsonDecode(
+          await rootBundle.loadString('assets/web/shiki/languages/$name.json'),
+        ),
+      ),
+    );
+    final themeData = _themes.contains(theme)
+        ? null
+        : jsonDecode(
+            await rootBundle.loadString('assets/web/shiki/themes/$theme.json'),
+          );
+    final result = await _web!.runJavaScriptReturningResult(
+      'JSON.stringify(markaiHighlight(${jsonEncode(code)},${jsonEncode(names.isEmpty ? 'text' : language)},${jsonEncode(theme)},${jsonEncode(grammars)},${jsonEncode(themeData)}))',
+    );
+    // Android and WKWebView return JSON strings with different quoting.
+    dynamic decoded = result is String ? jsonDecode(result) : result;
+    if (decoded is String) decoded = jsonDecode(decoded);
+    _languages.addAll(missing);
+    _themes.add(theme);
+    return jsonMap(decoded);
   }
 }

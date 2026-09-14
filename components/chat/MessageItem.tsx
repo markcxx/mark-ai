@@ -1,6 +1,6 @@
 "use client";
 
-import { RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { RefObject, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -318,7 +318,7 @@ function MessageVariantSwitcher({
   );
 }
 
-export function MessageItem({
+export const MessageItem = memo(function MessageItem({
   cancelEditingMessage,
   collapsed,
   continueMessage,
@@ -912,4 +912,4 @@ export function MessageItem({
       <FilePreviewDialog file={previewFile} onClose={() => setPreviewFile(null)} />
     </>
   );
-}
+});

@@ -10,6 +10,7 @@ import { ShareConversationDialog } from '../../components/chat/ShareConversation
 import { FileManagerDrawer } from '../../components/chat/FileManagerDrawer';
 import { SettingsDialog } from '../../components/chat/SettingsDialog';
 import { MODEL_PROVIDER_TEMPLATES } from '../../lib/model-provider-registry';
+import { useChatStore } from '../../stores/useChatStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 import { ThinkingPanel } from '../../components/chat/ThinkingPanel';
 import { MarkdownContent } from '../../components/chat/MarkdownContent';
@@ -19,6 +20,20 @@ import { GeneratedFileToolBlock } from '../../components/chat/message/GeneratedF
 const params = new URLSearchParams(location.search);
 const user = fixture.user;
 const catalog = fixture.tools;
+const performanceMessages = Array.from({length: 100}, (_, index) => ({
+  ...fixture.messages[index % 2], id: `perf-${index}`, segments: undefined,
+  content: index === 99 ? '```typescript\nconst answer: number = 42;\n```' : fixture.messages[index % 2].content,
+}));
+function streamFixture() {
+  let ticks = 0;
+  const timer = setInterval(() => {
+    ticks++;
+    useChatStore.setState(state => ({messages: state.messages.map((message, index) => index === state.messages.length - 1 ? {
+      ...message, content: '```typescript\nconst answer: number = 42;\n// ' + '片段 '.repeat(ticks) + '\n```', isStreaming: ticks < 20,
+    } : message)}));
+    if (ticks === 20) clearInterval(timer);
+  }, 50);
+}
 window.fetch = async (input, options) => {
   const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, location.href);
   if (!url.pathname.startsWith('/api/')) throw new Error('QA network isolation: ' + url.pathname);
@@ -30,7 +45,7 @@ window.fetch = async (input, options) => {
   else if (path === '/api/model-providers') result = {templates:MODEL_PROVIDER_TEMPLATES,providers:[],siteProviders:[],cloudPersistence:true};
   else if (path === '/api/models') result = { models: fixture.models };
   else if (path === '/api/sessions') result = { sessions: params.has('history') || location.pathname !== '/' ? fixture.sessions : [] };
-  else if (path === '/api/sessions/qa-session') result = {session: fixture.sessions[0], messages: fixture.messages};
+  else if (path === '/api/sessions/qa-session') result = {session: fixture.sessions[0], messages: params.has('performance') ? performanceMessages : fixture.messages};
   else if (path.endsWith('/tools')) result = {toolIds:[]};
   else if (path.endsWith('/share')) result = { share: null };
   else if (path === '/api/admin/me') result = { admin: false };
@@ -56,5 +71,7 @@ createRoot(document.getElementById('root')!).render(<ThemeProvider attribute="cl
 \frac{-b\pm\sqrt{b^2-4ac}}{2a}
 \]`}</MarkdownContent>
     </div>
-    : <ChatApp />}
+    : <><ChatApp initialSessionId={params.has('performance') ? 'qa-session' : undefined} />
+      {params.has('performance') && <button style={{position:'fixed',top:8,right:8,zIndex:9999}} onClick={streamFixture}>测试流式更新</button>}
+    </>}
 </ThemeProvider>);

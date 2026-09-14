@@ -20,6 +20,15 @@ await build({entryPoints: ['mobile/tool/web-reference.tsx'], bundle: true, outdi
   external: ['@js-preview/docx', 'echarts-gl'],
   define: {'process.env.NODE_ENV':'"development"'}, loader: {'.css':'empty', '.woff2':'file', '.ttf':'file'},
   plugins: [{name:'qa-shims',setup(b){
+    // Instrument only this isolated QA bundle, never production components.
+    b.onLoad({filter:/components\/chat\/(ChatApp|MessageItem)\.tsx$/}, async args => {
+      const source = await readFile(args.path, 'utf8');
+      const message = args.path.endsWith('/MessageItem.tsx');
+      const probe = message
+        ? `const counts = JSON.parse(document.documentElement.dataset.qaMessageRenders || '{}'); counts[message.id] = (counts[message.id] || 0) + 1; document.documentElement.dataset.qaMessageRenders = JSON.stringify(counts);`
+        : `document.documentElement.dataset.qaChatRenders = String(Number(document.documentElement.dataset.qaChatRenders || 0) + 1);`;
+      return {contents: source.replace('  const generalSettings =', `  if (new URLSearchParams(location.search).has('performance')) { ${probe} }\n  const generalSettings =`), loader:'tsx', resolveDir: resolve(args.path, '..')};
+    });
     b.onResolve({filter:/^(next\/|@\/lib\/auth-client$)/},args=>shims[args.path] ? {path:args.path,namespace:'shim'} : undefined);
     b.onLoad({filter:/.*/,namespace:'shim'},args=>({contents:shims[args.path],loader:'tsx',resolveDir:root}));
   }}]});

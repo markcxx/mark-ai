@@ -1,3 +1,5 @@
+import '../../shared/models/code_themes.dart';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -210,18 +212,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         'spacious': '宽松',
       }),
       toggle('减少动画', 'reduceMotion', description: '关闭大部分装饰性动画'),
-      choice('代码高亮主题', 'codeTheme', const {
-        'one': 'One',
-        'vscode': 'VS Code',
-        'material': 'Material',
-        'gruvbox': 'Gruvbox',
-        'solarized': 'Solarized',
-        'github': 'GitHub',
-        'dracula': 'Dracula',
-        'night-owl': 'Night Owl',
-        'nord': 'Nord',
-        'duotone': 'Duotone',
-      }, description: '代码主题会自动匹配亮色和暗色模式'),
+      choice(
+        '代码高亮主题',
+        'codeTheme',
+        codeThemeOptions,
+        description: '与网页端使用相同的 Shiki 主题',
+      ),
       choice('代码块明暗模式', 'codeColorMode', const {
         'auto': '跟随界面',
         'light': '固定亮色',

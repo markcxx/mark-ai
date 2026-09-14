@@ -293,8 +293,8 @@ export function ModelSelectorDialog({
                                 {model.presentation?.displayName || getModelDisplayName(model.id)}
                               </span>
                               {isNewModel(model.presentation, now) && (
-                                <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500 dark:bg-white/10 dark:text-gray-300">
-                                  上新
+                                <span className="inline-flex h-[18px] shrink-0 items-center rounded-md bg-emerald-50 px-1.5 text-[10px] font-semibold leading-none text-emerald-700 ring-1 ring-inset ring-emerald-600/15 dark:bg-emerald-400/15 dark:text-emerald-300 dark:ring-emerald-400/25">
+                                  新
                                 </span>
                               )}
                             </span>

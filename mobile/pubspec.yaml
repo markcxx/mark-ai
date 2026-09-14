@@ -48,7 +48,6 @@ dependencies:
   audioplayers: ^6.8.1
   lucide_icons_flutter: ^3.1.19
   markdown: ^7.3.1
-  flutter_js: ^0.8.7
   flutter_math_fork: ^0.7.4
   image_picker: ^1.2.3
   crypto: ^3.0.7
@@ -81,6 +80,9 @@ flutter:
     - assets/avatar/
     - assets/model_icons/
     - assets/web/
+    - assets/web/shiki/
+    - assets/web/shiki/languages/
+    - assets/web/shiki/themes/
   fonts:
     - family: Noto Sans SC
       fonts:

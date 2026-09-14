@@ -266,8 +266,8 @@ function ChartCanvas({
     onReady(false);
 
     void import("@/lib/visualization/echarts-client")
-      .then(async ({ echarts, ensureEChartsTheme }) => {
-        await ensureEChartsTheme(theme);
+      .then(async ({ echarts, ensureEChartsTheme, ensureEChartsExtensions }) => {
+        await Promise.all([ensureEChartsTheme(theme), ensureEChartsExtensions(option)]);
         if (!active || !containerRef.current) return;
         const chart = echarts.init(containerRef.current, theme, { renderer: "canvas" });
         chartRef.current = chart;

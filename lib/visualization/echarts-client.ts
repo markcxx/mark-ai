@@ -1,5 +1,5 @@
 import * as echarts from "echarts";
-import "echarts-gl";
+export { ensureEChartsExtensions } from "./echarts-gl";
 
 import { ECHARTS_THEME_PALETTES } from "@/lib/visualization/echarts-theme-palettes";
 

@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ThemedToken } from "shiki";
+import { highlightCode, loadHighlighter } from "@/lib/code/highlight";
 
 export function ShikiCode({
   code,
@@ -22,26 +23,27 @@ export function ShikiCode({
     fg?: string;
   }>();
   const key = `${theme}\0${language}\0${code}`;
+  const lastRun = useRef(0);
   useEffect(() => {
     let active = true;
-    void import("shiki/bundle/web")
-      .then(async (shiki) => {
-        const lang =
-          language in shiki.bundledLanguages ||
-          Object.values(shiki.bundledLanguagesInfo).some((item) => item.aliases?.includes(language))
-            ? language
-            : "text";
-        const highlighted = await shiki.codeToTokens(code, {
-          lang: lang as any,
-          theme: theme as any,
-        });
-        if (active) setResult({ key, ...highlighted });
-      })
-      .catch(() => {
-        if (active) setResult(undefined);
-      });
+    // Throttle continuous streaming, but always process the final revision.
+    const timer = setTimeout(
+      () => {
+        lastRun.current = Date.now();
+        void loadHighlighter()
+          .then(() => (active ? highlightCode(code, language, theme) : undefined))
+          .then((highlighted) => {
+            if (active && highlighted) setResult({ key, ...highlighted });
+          })
+          .catch(() => {
+            if (active) setResult(undefined);
+          });
+      },
+      Math.max(0, 100 - (Date.now() - lastRun.current)),
+    );
     return () => {
       active = false;
+      clearTimeout(timer);
     };
   }, [code, language, theme, key]);
   const current = result?.key === key ? result : undefined;

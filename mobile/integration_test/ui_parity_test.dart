@@ -12,7 +12,7 @@ import '../test/support/ui_fixture.dart';
 
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-  testWidgets('Android native layout, keyboard, menus and Prism runtime', (
+  testWidgets('Android native layout, keyboard, menus and Shiki runtime', (
     tester,
   ) async {
     Future<void> screenshot(String name) async {
@@ -24,15 +24,14 @@ void main() {
       await binding.takeScreenshot(name);
     }
 
-    final tokens = await CodeHighlighter.tokenize(
+    final highlighted = await CodeHighlighter.highlight(
       'const answer = 42;',
       'javascript',
+      'one-dark-pro',
     );
+    final tokens = jsonList(highlighted['tokens']);
     expect(tokens.map((t) => t['text']).join(), 'const answer = 42;');
-    expect(
-      tokens.any((t) => (t['classes'] as List).contains('keyword')),
-      isTrue,
-    );
+    expect(tokens.any((t) => t['color'] != null), isTrue);
     final c = await fixtureWorkspace();
     c.settings['general']['reduceMotion'] = true;
     c.user = jsonMap(uiFixture['user']);

@@ -74,7 +74,7 @@
 - 侧栏改为与移动 Web 相同的推移主面板，取消黑色覆盖；恢复会话行内编辑、自动命名，后台会话命名不会切换当前会话。
 - 新增原生插件中心、文件管理、个人资料、分享、模型选择和上下文指示器；设置包含外观、对话、语音、提供商四组。接口已按源码接入，仍待真实账号联调。
 - Web 和 Flutter 使用同一组隔离数据；原 Web 组件参考站独立构建到 `mobile/qa/web-reference`，不写 `.next`。
-- 代码高亮复用原 Web 的 Refractor/Prism 规则和十组明暗主题，最终由 Flutter 富文本绘制。Android QuickJS 需要 Object.hasOwn 兼容补丁，且不能调用插件未导出的 jsSetMemoryLimit；真实 Android 测试已覆盖初始化和关键词结果。
+- 代码高亮与 Web 共用 Shiki、Oniguruma 和主题目录，按需加载本地语法/主题资源，仍由 Flutter 富文本绘制。已移除 Refractor/Prism 和 QuickJS 依赖；生成、对照测试及 Android 验证见 [code-highlighting.md](code-highlighting.md)。
 - Android 集成检查覆盖欢迎页、侧栏、真实键盘、对话、行内编辑、工具菜单、模型选择和暗色切换。截图等待 SVG 异步解码，避免把未加载图标的中间帧误作最终 UI。
 - 最新完整 Flutter 测试为 37 项通过（后续新增变动需继续验证）；模拟器原生集成检查通过。测试数据不包含用户账号凭据。
 - HTML 代码块恢复原 Web 的文档卡片，预览页的工具栏由原生组件绘制；生成的 HTML 文档本身仍使用隔离 WebView。桌面分栏、Mermaid/ECharts/Markmap 专用渲染和 Office 预览仍有缺口。

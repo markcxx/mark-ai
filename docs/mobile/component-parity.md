@@ -5,7 +5,7 @@ Every row requires matching native rendering, interaction, data contract, light/
 | Web source | Work remaining | Acceptance |
 | --- | --- | --- |
 | `components/AppBootSplash.tsx` | Pending source/native/state comparison | Not accepted |
-| `components/CodeBlock.tsx` | Prism tokens match Web fixtures on macOS; Android runtime verified. Native theme/collapse/wrap/download implemented; visual theme matrix pending | Not accepted |
+| `components/CodeBlock.tsx` | Shared Shiki tokens/styles/surfaces match Web fixtures; Android offline runtime and theme switching verified. Native collapse/wrap/download retained; full visual theme matrix pending | Not accepted |
 | `components/FluentEmoji.tsx` | Pending source/native/state comparison | Not accepted |
 | `components/GlobalTooltip.tsx` | Pending source/native/state comparison | Not accepted |
 | `components/MarkAILoadingScreen.tsx` | Pending source/native/state comparison | Not accepted |

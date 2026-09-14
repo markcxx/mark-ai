@@ -31,7 +31,8 @@ export function AdminChart({
     setFailed(false);
 
     void import("@/lib/visualization/echarts-client")
-      .then(({ echarts }) => {
+      .then(async ({ echarts, ensureEChartsExtensions }) => {
+        await ensureEChartsExtensions(option);
         if (!active || !containerRef.current) return;
         const chart = echarts.init(containerRef.current, dark ? "dark" : undefined, {
           renderer: "canvas",
