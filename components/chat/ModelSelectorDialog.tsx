@@ -14,7 +14,7 @@ import {
 import { AppDialog } from "@/components/ui/AppDialog";
 import type { ConfiguredModel } from "@/lib/chat/types";
 import { getModelDisplayName, getModelKey } from "@/lib/chat/helpers";
-import { formatTokenCount, getModelMetadata, hasKnownContextWindow } from "@/lib/model-metadata";
+import { formatContextWindow, getModelMetadata, hasKnownContextWindow } from "@/lib/model-metadata";
 import { isImageGenerationModel } from "@/lib/chat/image-models";
 import { compareModelProviders, sortModelsByFamily } from "@/lib/model-sorting";
 import { isNewModel } from "@/lib/model-presentation";
@@ -346,7 +346,15 @@ export function ModelSelectorDialog({
                                 .filter(Boolean)
                                 .join("\n")}
                             >
-                              {formatTokenCount(metadata.contextWindowTokens)}
+                              {formatContextWindow(metadata.contextWindowTokens)}
+                            </span>
+                          )}
+                          {!hasKnownContextWindow(metadata) && !imageGenerationModel && (
+                            <span
+                              className="shrink-0 text-[11px] text-gray-400 dark:text-gray-500"
+                              data-markai-tooltip="暂未核实该型号的上下文规格，请以服务商配置为准"
+                            >
+                              上下文未知
                             </span>
                           )}
                         </button>

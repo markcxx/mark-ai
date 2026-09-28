@@ -68,3 +68,74 @@ describe("thinking mode with search continuation", () => {
     },
   );
 });
+
+it("sends a structured error instead of breaking the stream on upstream 503", async () => {
+  vi.mocked(fetchWithDevelopmentProxy).mockResolvedValueOnce(
+    new Response(
+      JSON.stringify([
+        { error: { code: 503, message: "This model is currently experiencing high demand." } },
+      ]),
+      { status: 503 },
+    ),
+  );
+  const response = await createOpenAICompatibleStream(
+    [{ role: "user", content: "你好" }],
+    "gemini-3.8-flash",
+    "secret",
+    "https://test.invalid/v1",
+    false,
+  );
+  const event = JSON.parse((await response.text()).trim());
+  expect(event.type).toBe("error");
+  expect(event.text).toContain("503");
+  expect(event.text).toContain("This model is currently experiencing high demand.");
+});
+
+it("preserves partial text then emits an SSE error", async () => {
+  vi.mocked(fetchWithDevelopmentProxy).mockResolvedValueOnce(
+    new Response(
+      'data: {"choices":[{"delta":{"content":"部分正文"}}]}\n\ndata: {"error":{"code":429,"message":"rate limit exceeded"}}\n\n',
+    ),
+  );
+  const response = await createOpenAICompatibleStream(
+    [{ role: "user", content: "你好" }],
+    "test",
+    "secret",
+    "https://test.invalid/v1",
+    false,
+  );
+  const events = (await response.text())
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  expect(events[0]).toEqual({ type: "content", text: "部分正文" });
+  expect(events.at(-1)).toEqual({ type: "error", text: expect.stringContaining("429") });
+});
+
+it("delivers the provider location restriction through the response stream", async () => {
+  vi.mocked(fetchWithDevelopmentProxy).mockResolvedValueOnce(
+    new Response(
+      JSON.stringify([
+        {
+          error: {
+            code: 400,
+            message: "User location is not supported for the API use.",
+            status: "FAILED_PRECONDITION",
+          },
+        },
+      ]),
+      { status: 400 },
+    ),
+  );
+  const response = await createOpenAICompatibleStream(
+    [{ role: "user", content: "你好" }],
+    "gemini-3.8-flash",
+    "secret",
+    "https://test.invalid/v1",
+    false,
+  );
+  expect(JSON.parse((await response.text()).trim())).toEqual({
+    type: "error",
+    text: "生成失败：User location is not supported for the API use.（400）",
+  });
+});

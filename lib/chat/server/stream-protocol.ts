@@ -4,7 +4,7 @@ import type { GeneratedFileState, WebSearchState } from "@/lib/chat/types";
 
 import type { ChatMessage } from "./types";
 
-type StreamEventType = "content" | "reasoning";
+type StreamEventType = "content" | "reasoning" | "error";
 
 export const encodeStreamEvent = (encoder: TextEncoder, type: StreamEventType, text: string) =>
   encoder.encode(`${JSON.stringify({ type, text })}\n`);

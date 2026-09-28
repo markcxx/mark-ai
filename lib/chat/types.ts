@@ -66,6 +66,7 @@ export type QuoteSegment = {
 };
 
 export type MessageSegment =
+  | { type: "error"; content: string }
   | ThinkingSegment
   | ToolSegment
   | ContentSegment
@@ -172,7 +173,7 @@ export type ChatStreamEvent = {
   text?: string;
   totalTokens?: number;
   tokenUsageSource?: TokenUsageSource;
-  type?: "content" | "file" | "image" | "reasoning" | "tool" | "usage";
+  type?: "error" | "content" | "file" | "image" | "reasoning" | "tool" | "usage";
   webSearch?: WebSearchState;
 };
 

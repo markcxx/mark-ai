@@ -743,6 +743,7 @@ export const MessageItem = memo(function MessageItem({
                   )}
                   {contentSegments.map((seg, i) => {
                     if (seg.type === "translation") return null;
+                    if (seg.type === "error") return null;
                     if (seg.type === "thinking") {
                       return (
                         <ThinkingPanel
@@ -835,6 +836,17 @@ export const MessageItem = memo(function MessageItem({
                 />
               )}
               {!message.isStreaming && <MessageSources citations={citations} />}
+              {message.segments
+                ?.filter((segment) => segment.type === "error")
+                .map((segment, index) => (
+                  <p
+                    key={`error-${index}`}
+                    role="alert"
+                    className="mt-3 text-sm text-red-600 dark:text-red-400"
+                  >
+                    {segment.content}
+                  </p>
+                ))}
               {message.interrupted && !readOnly && (
                 <InterruptedHint
                   onContinue={() => continueMessage(message)}

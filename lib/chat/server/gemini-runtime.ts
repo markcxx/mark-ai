@@ -1,3 +1,4 @@
+import { describeGenerationError } from "@/lib/chat/generation-error";
 import { FunctionCallingConfigMode, GoogleGenAI } from "@google/genai";
 
 import type { ContextPreparation } from "@/lib/chat/context-window";
@@ -253,7 +254,10 @@ export const createGeminiStream = async ({
           }
           controller.close();
         } catch (error) {
-          controller.error(error);
+          controller.enqueue(
+            encodeStreamEvent(new TextEncoder(), "error", describeGenerationError(error, [apiKey])),
+          );
+          controller.close();
         }
       },
     });
@@ -280,36 +284,41 @@ export const createGeminiStream = async ({
       let outputText = "";
       let providerUsage: TokenUsage | undefined;
 
-      for await (const chunk of responseStream) {
-        if (chunk.text) {
-          outputText += chunk.text;
-          controller.enqueue(encodeStreamEvent(encoder, "content", chunk.text));
+      try {
+        for await (const chunk of responseStream) {
+          if (chunk.text) {
+            outputText += chunk.text;
+            controller.enqueue(encodeStreamEvent(encoder, "content", chunk.text));
+          }
+          const usageMetadata = (chunk as any).usageMetadata;
+          if (usageMetadata) {
+            const inputTokens = getUsageNumber(usageMetadata.promptTokenCount);
+            const candidateTokens = getUsageNumber(usageMetadata.candidatesTokenCount);
+            const reasoningTokens = getUsageNumber(usageMetadata.thoughtsTokenCount) || 0;
+            const totalTokens = getUsageNumber(usageMetadata.totalTokenCount);
+            providerUsage = {
+              inputTokens: inputTokens ?? providerUsage?.inputTokens,
+              outputTokens:
+                (totalTokens !== undefined && inputTokens !== undefined
+                  ? Math.max(totalTokens - inputTokens, 0)
+                  : candidateTokens !== undefined
+                    ? candidateTokens + reasoningTokens
+                    : undefined) ?? providerUsage?.outputTokens,
+              totalTokens: totalTokens ?? providerUsage?.totalTokens,
+            };
+          }
         }
-        const usageMetadata = (chunk as any).usageMetadata;
-        if (usageMetadata) {
-          const inputTokens = getUsageNumber(usageMetadata.promptTokenCount);
-          const candidateTokens = getUsageNumber(usageMetadata.candidatesTokenCount);
-          const reasoningTokens = getUsageNumber(usageMetadata.thoughtsTokenCount) || 0;
-          const totalTokens = getUsageNumber(usageMetadata.totalTokenCount);
-          providerUsage = {
-            inputTokens: inputTokens ?? providerUsage?.inputTokens,
-            outputTokens:
-              (totalTokens !== undefined && inputTokens !== undefined
-                ? Math.max(totalTokens - inputTokens, 0)
-                : candidateTokens !== undefined
-                  ? candidateTokens + reasoningTokens
-                  : undefined) ?? providerUsage?.outputTokens,
-            totalTokens: totalTokens ?? providerUsage?.totalTokens,
-          };
-        }
+        const resolvedUsage = resolveTokenUsage({
+          estimatedInputTokens: estimateTextTokens(JSON.stringify(contents)),
+          estimatedOutputTokens: estimateTextTokens(outputText),
+          providerUsage,
+        });
+        controller.enqueue(encodeUsageEvent(encoder, resolvedUsage));
+        controller.close();
+      } catch (error) {
+        controller.enqueue(encodeStreamEvent(encoder, "error", describeGenerationError(error, [apiKey])));
+        controller.close();
       }
-      const resolvedUsage = resolveTokenUsage({
-        estimatedInputTokens: estimateTextTokens(JSON.stringify(contents)),
-        estimatedOutputTokens: estimateTextTokens(outputText),
-        providerUsage,
-      });
-      controller.enqueue(encodeUsageEvent(encoder, resolvedUsage));
-      controller.close();
     },
   });
 

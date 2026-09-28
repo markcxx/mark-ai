@@ -3,6 +3,19 @@ import { describe, expect, it } from "vitest";
 import { getModelMetadata, hasKnownContextWindow } from "./model-metadata";
 
 const configuredModelExpectations = [
+  ["gpt-6-sol-高", "gpt-6-sol", 1_050_000, true],
+  ["gpt-6-sol-中", "gpt-6-sol", 1_050_000, true],
+  ["gpt-6-sol-低", "gpt-6-sol", 1_050_000, true],
+  ["gpt-6-luna-高", "gpt-6-luna", 1_050_000, true],
+  ["gpt-6-luna-中", "gpt-6-luna", 1_050_000, true],
+  ["gpt-6-luna-低", "gpt-6-luna", 1_050_000, true],
+  ["gemini-3.7-flash", "gemini-3.7-flash", 1_048_576, true],
+  ["gemini-3.8-flash", "gemini-3.8-flash", 1_048_576, true],
+  ["qwen3.8-flash", "qwen3.8-flash", 1_000_000, true],
+  ["qwen3.8-max", "qwen3.8-max", 1_000_000, true],
+  ["qwen3.8-max-0902", "qwen3.8-max", 1_000_000, true],
+  ["deepseek-flash", "deepseek-v4.1-flash", 1_048_576, true],
+  ["XiaomiMiMo/MiMo-V2.5", "mimo-v2.5", 1_000_000, true],
   ["zai-org/GLM-5.3", "glm-5.3", 1_000_000, false],
   ["glm-5.3", "glm-5.3", 1_000_000, false],
   ["zai-org/GLM-5.3-Flash", "glm-5.3-flash", 1_000_000, true],
@@ -112,4 +125,9 @@ it("keeps new model output limits and capabilities distinct", () => {
     supportsVision: true,
   });
   expect(getModelMetadata("glm-5.3-unknown")).toBeUndefined();
+});
+
+it("keeps unverified preview and custom identifiers unknown", () => {
+  expect(hasKnownContextWindow(getModelMetadata("qwen3.8-max-preview"))).toBe(false);
+  expect(getModelMetadata("gpt-6-sol-custom")).toBeUndefined();
 });

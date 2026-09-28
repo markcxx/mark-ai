@@ -186,3 +186,9 @@ List<ModelRef> sortModelsByFamily(List<ModelRef> models) {
   }
   return groups.values.expand((m) => m).toList();
 }
+
+String formatContextWindow(num tokens) {
+  if (tokens >= 1000000) return '${(tokens / 1000000).round()}M';
+  final divisor = tokens % 1000 != 0 && tokens % 1024 == 0 ? 1024 : 1000;
+  return tokens >= 1000 ? '${(tokens / divisor).round()}K' : '$tokens';
+}

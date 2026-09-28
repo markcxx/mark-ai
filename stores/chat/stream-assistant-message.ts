@@ -1,3 +1,4 @@
+import { GenerationError } from "@/lib/chat/generation-error";
 import { resolveThinkingEnabled } from "@/lib/model-thinking";
 import toast from "react-hot-toast";
 import type { StoreApi } from "zustand";
@@ -143,7 +144,9 @@ export const createStreamAssistantMessage =
         } catch {
           // Use raw text fallback.
         }
-        throw new Error(typeof detail === "string" && detail.trim() ? detail : "模型请求失败");
+        throw new GenerationError(
+          typeof detail === "string" && detail.trim() ? detail : "模型请求失败",
+        );
       }
       if (!response.body) throw new Error("模型服务未返回可读取的响应");
 
@@ -265,6 +268,7 @@ export const createStreamAssistantMessage =
       const handleStreamLine = (line: string) => {
         const event = parseChatStreamLine(line);
         if (!event) return;
+        if (event.type === "error") throw new GenerationError(event.text || "生成失败，请重试");
         if (event.type === "usage") {
           inputTokens = event.inputTokens ?? inputTokens;
           outputTokens = event.outputTokens ?? outputTokens;
@@ -431,9 +435,12 @@ export const createStreamAssistantMessage =
       outcome = "failed";
       console.error("Chat error:", error);
       const failureMessage =
-        isImageGenerationModel(modelConfig.id) && error instanceof Error && error.message.trim()
+        (error instanceof GenerationError || isImageGenerationModel(modelConfig.id)) &&
+        error instanceof Error &&
+        error.message.trim()
           ? error.message
           : "生成失败，请稍后重试。";
+      segments.push({ type: "error", content: failureMessage });
       if (!sessionId || useSessionStore.getState().activeSessionId === sessionId) {
         toast.error(failureMessage);
       }
@@ -442,7 +449,11 @@ export const createStreamAssistantMessage =
           m.id === modelMessageId
             ? {
                 ...m,
-                content: failureMessage,
+                content: segments
+                  .filter((s) => s.type === "content")
+                  .map((s) => s.content)
+                  .join(""),
+                segments: [...segments],
                 interrupted: true,
                 isReasoning: false,
               }
@@ -451,17 +462,32 @@ export const createStreamAssistantMessage =
       }));
       const errReasoning = getAllReasoning();
       return {
-        content: failureMessage,
+        content: segments
+          .filter((s) => s.type === "content")
+          .map((s) => s.content)
+          .join(""),
         generationDuration: Date.now() - startedAt,
         inputTokens,
         isReasoning: false,
         interrupted: true,
         isStreaming: false,
-        outputTokens: estimateTextTokens(failureMessage),
+        outputTokens: estimateTextTokens(
+          segments
+            .filter((s) => s.type === "content")
+            .map((s) => s.content)
+            .join(""),
+        ),
         reasoning: errReasoning || undefined,
         segments: segments.length > 0 ? [...segments] : undefined,
         tokenUsageSource: "estimated",
-        totalTokens: inputTokens + estimateTextTokens(failureMessage),
+        totalTokens:
+          inputTokens +
+          estimateTextTokens(
+            segments
+              .filter((s) => s.type === "content")
+              .map((s) => s.content)
+              .join(""),
+          ),
       };
     } finally {
       if (sessionId && sessionStreamControllers.get(sessionId) === controller) {

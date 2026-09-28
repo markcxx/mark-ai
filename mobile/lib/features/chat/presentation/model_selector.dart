@@ -401,7 +401,26 @@ class _ModelSelectorState extends State<ModelSelector> {
                                                 child: Tooltip(
                                                   message: '上下文 $tokens tokens',
                                                   child: Text(
-                                                    formatTokenCount(tokens),
+                                                    formatContextWindow(tokens),
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: muted,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            if ((tokens == null ||
+                                                    tokens <= 0) &&
+                                                !image)
+                                              Padding(
+                                                padding: const EdgeInsets.only(
+                                                  left: 10,
+                                                ),
+                                                child: Tooltip(
+                                                  message:
+                                                      '暂未核实该型号的上下文规格，请以服务商配置为准',
+                                                  child: Text(
+                                                    '上下文未知',
                                                     style: TextStyle(
                                                       fontSize: 11,
                                                       color: muted,

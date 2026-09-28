@@ -444,6 +444,19 @@ class _MessageItemState extends State<MessageItem> {
                     (s) => s['type'] == 'translation',
                   ))
                     segmentWidget(context, segment),
+                for (final segment in m.segments.where(
+                  (s) => s['type'] == 'error',
+                ))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      segment['content'] as String? ?? '生成失败',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
                 if (m.interrupted)
                   Row(
                     children: [

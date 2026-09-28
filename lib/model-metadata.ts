@@ -27,6 +27,106 @@ const DOUBAO_SOURCE_URL = "https://www.volcengine.com/docs/82379/1330310";
 // inheriting an unsafe context limit from a similarly named model.
 export const MODEL_METADATA: ModelMetadata[] = [
   {
+    id: "gemini-3.7-flash",
+    displayName: "Gemini 3.7 Flash",
+    family: "Gemini 3.7",
+    description: "支持长上下文、图像与视频理解的多模态推理模型。",
+    contextWindowTokens: 1_048_576,
+    maxOutputTokens: 65_536,
+    sourceUrl: "https://ai.google.dev/gemini-api/docs/models/gemini-3.7-flash",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVision: true,
+    supportsVideo: true,
+  },
+  {
+    id: "qwen3.8-flash",
+    displayName: "Qwen3.8 Flash",
+    family: "Qwen3.8",
+    description: "支持百万上下文、图文理解与工具调用的高效多模态模型。",
+    contextWindowTokens: 1_000_000,
+    maxOutputTokens: 131_072,
+    sourceUrl: "https://help.aliyun.com/zh/model-studio/qwen3-8-flash",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVision: true,
+    supportsVideo: true,
+  },
+  {
+    aliases: ["qwen3.8-max-0902"],
+    id: "qwen3.8-max",
+    displayName: "Qwen3.8 Max",
+    family: "Qwen3.8",
+    description: "支持百万上下文、视觉理解与长程任务规划的旗舰模型。",
+    contextWindowTokens: 1_000_000,
+    maxOutputTokens: 131_072,
+    sourceUrl: "https://help.aliyun.com/zh/model-studio/qwen3-8-max",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVision: true,
+    supportsVideo: true,
+  },
+  {
+    id: "qwen3.8-max-preview",
+    displayName: "Qwen3.8 Max Preview",
+    family: "Qwen3.8",
+    description: "预览版配置标识，尚未核实独立规格，请以服务商配置为准。",
+    sourceUrl: "https://help.aliyun.com/zh/model-studio/text-generation-model",
+  },
+  {
+    id: "mimo-v2.5",
+    displayName: "MiMo-V2.5",
+    family: "MiMo",
+    description: "小米原生多模态模型，支持百万上下文、图像与视频理解和 Agent 任务。",
+    contextWindowTokens: 1_000_000,
+    sourceUrl: "https://huggingface.co/XiaomiMiMo/MiMo-V2.5",
+    supportsVision: true,
+    supportsVideo: true,
+  },
+
+  {
+    aliases: ["gpt-6-sol-低", "gpt-6-sol-中", "gpt-6-sol-高"],
+    id: "gpt-6-sol",
+    displayName: "GPT-6 Sol",
+    family: "GPT-6",
+    description: "面向复杂编码与 Agent 工作流的推理模型。",
+    contextWindowTokens: 1_050_000,
+    maxOutputTokens: 128_000,
+    knowledgeCutoff: "2026-04-20",
+    sourceUrl: "https://developers.openai.com/api/docs/models/gpt-6-sol",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVision: true,
+  },
+  {
+    aliases: ["gpt-6-luna-低", "gpt-6-luna-中", "gpt-6-luna-高"],
+    id: "gpt-6-luna",
+    displayName: "GPT-6 Luna",
+    family: "GPT-6",
+    description: "面向聚焦任务与高并发场景的高效推理模型。",
+    contextWindowTokens: 1_050_000,
+    maxOutputTokens: 128_000,
+    knowledgeCutoff: "2026-05-18",
+    sourceUrl: "https://developers.openai.com/api/docs/models/gpt-6-luna",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVision: true,
+  },
+  {
+    id: "gemini-3.8-flash",
+    displayName: "Gemini 3.8 Flash",
+    family: "Gemini 3.8",
+    description: "面向长程软件工程、自主 Agent 与复杂工作流的高速多模态模型。",
+    contextWindowTokens: 1_048_576,
+    maxOutputTokens: 65_536,
+    sourceUrl: "https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVision: true,
+    supportsVideo: true,
+  },
+
+  {
     aliases: ["gpt-6-astra-低", "gpt-6-astra-中", "gpt-6-astra-高"],
     contextWindowTokens: 1_050_000,
     description: "OpenAI 旗舰推理模型，面向复杂推理、编码、计算机使用、研究和文档创作。",
@@ -51,7 +151,8 @@ export const MODEL_METADATA: ModelMetadata[] = [
   {
     aliases: ["gpt-5.6-sol-低", "gpt-5.6-sol-中", "gpt-5.6-sol-高"],
     contextWindowTokens: 1_050_000,
-    description: "OpenAI GPT-5.6 系列旗舰推理模型，面向复杂专业工作、编码、研究和高级 Agent 工作流。",
+    description:
+      "OpenAI GPT-5.6 系列旗舰推理模型，面向复杂专业工作、编码、研究和高级 Agent 工作流。",
     displayName: "GPT-5.6 Sol",
     family: "GPT-5.6",
     id: "gpt-5.6-sol",
@@ -215,8 +316,7 @@ export const MODEL_METADATA: ModelMetadata[] = [
   },
   {
     contextWindowTokens: 1_048_576,
-    description:
-      "Google 面向真实 Agent 工作负载的高速前沿模型，擅长代码生成、代理执行和空间推理。",
+    description: "Google 面向真实 Agent 工作负载的高速前沿模型，擅长代码生成、代理执行和空间推理。",
     displayName: "Gemini 3.6 Flash",
     family: "Gemini 3.6",
     id: "gemini-3.6-flash",
@@ -229,8 +329,7 @@ export const MODEL_METADATA: ModelMetadata[] = [
   },
   {
     contextWindowTokens: 1_048_576,
-    description:
-      "Google 面向子 Agent、文档解析和高吞吐工作流的低延迟、低成本多模态模型。",
+    description: "Google 面向子 Agent、文档解析和高吞吐工作流的低延迟、低成本多模态模型。",
     displayName: "Gemini 3.5 Flash-Lite",
     family: "Gemini 3.5",
     id: "gemini-3.5-flash-lite",
@@ -305,6 +404,7 @@ export const MODEL_METADATA: ModelMetadata[] = [
     description: "DeepSeek 原生多模态模型，支持图像理解、复杂推理、编码和工具调用。",
     displayName: "DeepSeek V4.1 Flash",
     family: "DeepSeek V4.1",
+    aliases: ["deepseek-flash"],
     id: "deepseek-v4.1-flash",
     // API output limit: https://api-docs.deepseek.com/api/create-chat-completion/
     maxOutputTokens: 393_216,
@@ -816,11 +916,7 @@ export const MODEL_METADATA: ModelMetadata[] = [
     sourceUrl: DOUBAO_SOURCE_URL,
   },
   {
-    aliases: [
-      "doubao-seed-2-0-lite",
-      "doubao-seed-2-0-lite-260215",
-      "doubao-seed-2-0-lite-260428",
-    ],
+    aliases: ["doubao-seed-2-0-lite", "doubao-seed-2-0-lite-260215", "doubao-seed-2-0-lite-260428"],
     contextWindowTokens: 256_000,
     description: "兼顾成本和通用任务能力的豆包多模态深度推理模型，适合常规生产工作负载。",
     displayName: "Doubao Seed 2.0 Lite",
@@ -830,11 +926,7 @@ export const MODEL_METADATA: ModelMetadata[] = [
     sourceUrl: DOUBAO_SOURCE_URL,
   },
   {
-    aliases: [
-      "doubao-seed-2-0-mini",
-      "doubao-seed-2-0-mini-260215",
-      "doubao-seed-2-0-mini-260428",
-    ],
+    aliases: ["doubao-seed-2-0-mini", "doubao-seed-2-0-mini-260215", "doubao-seed-2-0-mini-260428"],
     contextWindowTokens: 256_000,
     description: "面向轻量任务和高并发场景的豆包快速模型，保留多模态、推理和工具调用能力。",
     displayName: "Doubao Seed 2.0 Mini",
@@ -1056,8 +1148,7 @@ export const MODEL_METADATA: ModelMetadata[] = [
   },
   {
     contextWindowTokens: 131_072,
-    description:
-      "智谱原生多模态视觉推理模型，支持图像、视频、文件、深度思考和工具调用。",
+    description: "智谱原生多模态视觉推理模型，支持图像、视频、文件、深度思考和工具调用。",
     displayName: "GLM-4.6V",
     family: "GLM-4",
     id: "glm-4.6v",
@@ -1080,8 +1171,7 @@ export const MODEL_METADATA: ModelMetadata[] = [
   },
   {
     contextWindowTokens: 65_536,
-    description:
-      "智谱 MoE 视觉推理模型，覆盖图像、视频、文档理解和 GUI Agent，并支持思考模式。",
+    description: "智谱 MoE 视觉推理模型，覆盖图像、视频、文档理解和 GUI Agent，并支持思考模式。",
     displayName: "GLM-4.5V",
     family: "GLM-4",
     id: "glm-4.5v",
@@ -1181,4 +1271,11 @@ export const formatTokenCount = (tokens: number) => {
     return `${Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1).replace(/\.0$/, "")}K`;
   }
   return String(tokens);
+};
+
+// Catalog labels use conventional integer units; exact limits remain unchanged.
+export const formatContextWindow = (tokens: number) => {
+  if (tokens >= 1_000_000) return `${Math.round(tokens / 1_000_000)}M`;
+  const divisor = tokens % 1000 !== 0 && tokens % 1024 === 0 ? 1024 : 1000;
+  return tokens >= 1000 ? `${Math.round(tokens / divisor)}K` : String(tokens);
 };

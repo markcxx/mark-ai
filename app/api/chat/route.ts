@@ -1,3 +1,4 @@
+import { describeGenerationError } from "@/lib/chat/generation-error";
 import { getThinkingPolicy } from "@/lib/model-thinking";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -233,7 +234,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return createGeminiStream({
+    return await createGeminiStream({
       apiKey: selectedModel.apiKey,
       baseUrl: selectedModel.baseUrl,
       contextPreparation,
@@ -248,6 +249,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("Chat error:", error);
-    return NextResponse.json({ error: "生成回复失败，请稍后重试" }, { status: 500 });
+    return NextResponse.json({ error: describeGenerationError(error) }, { status: 500 });
   }
 }

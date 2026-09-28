@@ -597,6 +597,9 @@ class WorkspaceController extends ChangeNotifier {
           'thinkingEnabled': thinkingEnabledFor(selected),
       }, cancel)) {
         if (checkpointError != null) throw checkpointError!;
+        if (event['type'] == 'error') {
+          throw ApiFailure(event['text'] as String? ?? '生成失败，请重试');
+        }
         if (smooth && event['type'] == 'content') {
           reasoningBuffer.flush();
           contentBuffer.push(event['text'] as String? ?? '');
@@ -632,6 +635,12 @@ class WorkspaceController extends ChangeNotifier {
       if (checkpointError != null) throw checkpointError!;
     } catch (e) {
       interrupted = true;
+      if (e is ApiFailure) {
+        assistant.segments = [
+          ...assistant.segments,
+          {'type': 'error', 'content': e.toString()},
+        ];
+      }
       if (e is! DioException || !CancelToken.isCancel(e)) report(e);
     } finally {
       contentBuffer.flush();

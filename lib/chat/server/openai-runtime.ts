@@ -1,3 +1,4 @@
+import { describeGenerationError } from "@/lib/chat/generation-error";
 import { getThinkingRequestParameters, type ThinkingPolicy } from "@/lib/model-thinking";
 import { NextResponse } from "next/server";
 
@@ -167,7 +168,9 @@ export const createOpenAICompatibleStream = async (
             upstream = await sendRequest(includeUsage, enforceRequiredTools);
             continue;
           }
-          throw new Error(detail || "Upstream model request failed");
+          throw Object.assign(new Error(detail || "Upstream model request failed"), {
+            status: upstream.status,
+          });
         }
 
         if (!upstream.body) {
@@ -333,11 +336,14 @@ export const createOpenAICompatibleStream = async (
           const data = trimmed.slice(5).trim();
           if (!data || data === "[DONE]") return data === "[DONE]";
 
+          let parsed;
           try {
-            handleParsedEvent(JSON.parse(data));
+            parsed = JSON.parse(data);
           } catch {
-            // Some compatible providers send comments or metadata lines in the SSE stream.
+            return false;
           }
+          if (parsed.error) throw new Error(JSON.stringify(parsed));
+          handleParsedEvent(parsed);
 
           return false;
         };
@@ -609,7 +615,10 @@ export const createOpenAICompatibleStream = async (
         controller.close();
       } catch (error) {
         console.error("OpenAI compatible chat error:", error);
-        controller.error(error);
+        controller.enqueue(
+          encodeStreamEvent(new TextEncoder(), "error", describeGenerationError(error, [apiKey])),
+        );
+        controller.close();
       }
     },
   });
