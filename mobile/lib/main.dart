@@ -24,7 +24,7 @@ class MarkAIApp extends StatefulWidget {
   final WorkspaceController controller;
   final bool autoStart;
 
-  /// Fixture hosts can opt into the greeting without starting network requests.
+  /// Fixture hosts can show the startup surface without starting network requests.
   final bool? showStartupAnimation;
   const MarkAIApp({
     super.key,

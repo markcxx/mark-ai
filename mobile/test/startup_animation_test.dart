@@ -13,7 +13,6 @@ import 'package:markai_mobile/features/chat/presentation/chat_screen.dart';
 import 'package:markai_mobile/main.dart';
 import 'package:markai_mobile/features/updates/update_widgets.dart';
 import 'package:markai_mobile/shared/models/chat.dart';
-import 'package:markai_mobile/shared/widgets/agent_avatar.dart';
 
 import 'support/fake_workspace.dart';
 
@@ -47,7 +46,6 @@ void viewport(WidgetTester tester, double width) {
 
 Future<void> preload(WidgetTester tester) async {
   await tester.runAsync(() async {
-    await AgentAvatar.preload();
     if (const bool.fromEnvironment('CAPTURE_STARTUP')) {
       for (final font in ['NotoSansSC', 'PlusJakartaSans']) {
         await (FontLoader(
@@ -60,7 +58,7 @@ Future<void> preload(WidgetTester tester) async {
 
 void main() {
   testWidgets(
-    'ready workspace waits for the full greeting without tap skipping or replay',
+    'ready workspace enters immediately without waiting for an intro',
     (tester) async {
       viewport(tester, 390);
       await preload(tester);
@@ -69,17 +67,7 @@ void main() {
         MarkAIApp(controller: c, autoStart: false, showStartupAnimation: true),
       );
       await tester.pump();
-      expect(find.byType(ChatScreen), findsNothing);
-      expect(find.text('你好，我是 MarkAI'), findsOneWidget);
-      await tester.pump(const Duration(milliseconds: 1600));
-      expect(find.byType(ChatScreen), findsNothing);
-      await tester.tap(find.byType(AgentAvatar));
-      await tester.pump(const Duration(milliseconds: 1600));
-      expect(find.byType(ChatScreen), findsNothing);
-      await tester.pump(const Duration(milliseconds: 250));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 350));
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
       expect(find.byType(ChatScreen), findsOneWidget);
       expect(find.byType(StartupScreen), findsNothing);
       c.setDraft('继续聊天');
@@ -98,11 +86,11 @@ void main() {
     final c = WorkspaceController(api, store);
     await tester.pumpWidget(MarkAIApp(controller: c));
     await tester.pump();
-    await tester.pump(StartupScreen.introDuration);
+    await tester.pump(const Duration(seconds: 1));
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pump();
     expect(find.byType(ChatScreen), findsNothing);
-    expect(find.text('正在连接你的工作空间…'), findsOneWidget);
+    expect(find.text('正在连接…'), findsOneWidget);
     expect(tester.widget<UpdateHost>(find.byType(UpdateHost)).ready, isTrue);
     api.modelsReady.complete();
     await tester.pump(const Duration(milliseconds: 350));
@@ -125,36 +113,10 @@ void main() {
       MarkAIApp(controller: c, autoStart: false, showStartupAnimation: true),
     );
     await tester.pump();
-    expect(find.byType(ChatScreen), findsNothing);
     await tester.pump(const Duration(milliseconds: 450));
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pump();
     expect(find.byType(StartupScreen), findsNothing);
-    expect(find.byType(ChatScreen), findsOneWidget);
-    await tester.pumpWidget(const SizedBox());
-    c.dispose();
-  });
-  testWidgets('backgrounding pauses the greeting instead of skipping it', (
-    tester,
-  ) async {
-    await preload(tester);
-    final c = await fixtureWorkspace();
-    await tester.pumpWidget(
-      MarkAIApp(controller: c, autoStart: false, showStartupAnimation: true),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 900));
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
-    await tester.pump(const Duration(seconds: 5));
-    expect(find.byType(ChatScreen), findsNothing);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 900));
-    expect(find.byType(ChatScreen), findsNothing);
-    await tester.pump(const Duration(milliseconds: 2000));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 350));
-    await tester.pump();
     expect(find.byType(ChatScreen), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
     c.dispose();
@@ -171,10 +133,10 @@ void main() {
       MarkAIApp(controller: c, autoStart: false, showStartupAnimation: true),
     );
     await tester.pump();
-    await tester.pump(StartupScreen.introDuration);
+    await tester.pump(const Duration(seconds: 1));
     await tester.pump();
     expect(tester.takeException(), isNull);
-    expect(find.text('你好，我是 MarkAI'), findsOneWidget);
+    expect(find.text('MarkAI'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
     c.dispose();
   });
@@ -224,7 +186,7 @@ void main() {
             });
           }
         }
-        expect(find.text('正在连接你的工作空间…'), findsOneWidget);
+        expect(find.text('正在连接…'), findsOneWidget);
         expect(find.byType(ChatScreen), findsNothing);
         await tester.pumpWidget(const SizedBox());
         c.dispose();
