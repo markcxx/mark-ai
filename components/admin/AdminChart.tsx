@@ -41,6 +41,7 @@ export function AdminChart({
         chart.setOption(
           {
             ...option,
+            animation: document.documentElement.dataset.reduceMotion !== "true",
             animationDuration: 500,
             aria: { enabled: true },
             backgroundColor: "transparent",

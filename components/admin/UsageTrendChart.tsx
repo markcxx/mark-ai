@@ -13,9 +13,9 @@ export type UsageTrendPoint = {
 };
 
 const series = [
-  { key: "users", name: "新增用户", color: "#10b981", axis: 0 },
-  { key: "sessions", name: "对话", color: "#3b82f6", axis: 0 },
-  { key: "messages", name: "消息", color: "#8b5cf6", axis: 1 },
+  { key: "users", name: "新增用户", color: "#70b6a3", axis: 0 },
+  { key: "sessions", name: "对话", color: "#87afd7", axis: 0 },
+  { key: "messages", name: "消息", color: "#9b8be8", axis: 1 },
 ] as const;
 
 export function UsageTrendChart({ data }: { data: UsageTrendPoint[] }) {
@@ -78,11 +78,12 @@ export function UsageTrendChart({ data }: { data: UsageTrendPoint[] }) {
         type: "line",
         yAxisIndex: item.axis,
         data: data.map((point) => point[item.key]),
-        smooth: false,
+        smooth: 0.25,
         showSymbol: data.length <= 7,
         symbol: "circle",
         symbolSize: 5,
-        lineStyle: { width: 2.3 },
+        lineStyle: { width: 2.5 },
+        areaStyle: { color: item.color, opacity: item.key === "messages" ? 0.08 : 0 },
         itemStyle: { color: item.color },
         emphasis: { focus: "series", scale: true },
       })),

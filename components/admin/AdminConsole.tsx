@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   ClipboardList,
   LayoutDashboard,
-  RefreshCw,
   ScrollText,
   UsersRound,
   Megaphone,
@@ -23,8 +22,6 @@ import { OverviewPanel } from "@/components/admin/OverviewPanel";
 import { UsersPanel } from "@/components/admin/UsersPanel";
 import { WaitlistPanel } from "@/components/admin/WaitlistPanel";
 import { SidebarNavItem } from "@/components/chat/SidebarNavItem";
-import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { IconButton } from "@/components/ui/IconButton";
 import { PRIMARY_COLOR_VALUES } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/useSettingsStore";
@@ -135,37 +132,28 @@ export function AdminConsole() {
         </button>
       </aside>
 
-      <main className="min-w-0 flex-1 overflow-y-auto border-0 bg-[var(--chat-panel-bg)] md:rounded-xl md:border md:border-[#e5e5e5] dark:md:border-gray-700">
-        <header className="sticky top-0 z-20 border-b border-gray-200/70 bg-[var(--chat-header-bg)] px-3 py-3 backdrop-blur-md md:px-6 dark:border-white/[0.07]">
+      <main
+        className={cn(
+          "min-w-0 flex-1 overflow-y-auto border-0",
+          view === "overview"
+            ? "bg-[#f4f5f7] dark:bg-[#111214]"
+            : "bg-[var(--chat-panel-bg)] md:rounded-xl md:border md:border-[#e5e5e5] dark:md:border-gray-700",
+        )}
+      >
+        <header
+          className={cn(
+            "sticky top-0 z-20 border-b border-gray-200/70 bg-[var(--chat-header-bg)] px-3 py-3 backdrop-blur-md md:px-6 dark:border-white/[0.07]",
+            view === "overview" && "md:hidden",
+          )}
+        >
           <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-gray-400 md:hidden">MarkAI 管理中心</p>
-              <h2 className="truncate text-[17px] font-semibold leading-6">{current.label}</h2>
-              <p className="mt-0.5 hidden truncate text-xs text-gray-400 md:block">
-                {current.description}
-              </p>
-            </div>
-            {view === "overview" && (
-              <div className="hidden shrink-0 items-center gap-2 md:flex">
-                <SegmentedControl
-                  onChange={(value) => setOverviewRangeDays(Number(value))}
-                  options={[
-                    { label: "7 天", value: 7 },
-                    { label: "14 天", value: 14 },
-                    { label: "30 天", value: 30 },
-                  ]}
-                  padding={3}
-                  value={overviewRangeDays}
-                />
-                <IconButton
-                  aria-label="刷新概览数据"
-                  data-markai-tooltip="刷新概览数据"
-                  onClick={() => setOverviewRefreshToken((value) => value + 1)}
-                  shape="rounded"
-                  size="sm"
-                >
-                  <RefreshCw size={16} />
-                </IconButton>
+            {view !== "overview" && (
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-gray-400 md:hidden">MarkAI 管理中心</p>
+                <h2 className="truncate text-[17px] font-semibold leading-6">{current.label}</h2>
+                <p className="mt-0.5 hidden truncate text-xs text-gray-400 md:block">
+                  {current.description}
+                </p>
               </div>
             )}
             <button
@@ -207,6 +195,7 @@ export function AdminConsole() {
           {view === "overview" && (
             <OverviewPanel
               onRangeDaysChange={setOverviewRangeDays}
+              onRefresh={() => setOverviewRefreshToken((value) => value + 1)}
               rangeDays={overviewRangeDays}
               refreshToken={overviewRefreshToken}
             />

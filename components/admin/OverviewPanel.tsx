@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  RefreshCw,
   Ban,
   Clock3,
   Files,
@@ -12,10 +13,14 @@ import {
   Users,
   UserPlus,
 } from "lucide-react";
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { IconButton } from "@/components/ui/IconButton";
+import { OverviewDistributionChart } from "./OverviewDistributionChart";
 import { UsageTrendChart } from "@/components/admin/UsageTrendChart";
 import { AdminError, formatBytes } from "@/components/admin/AdminPrimitives";
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 type OverviewData = {
@@ -47,6 +52,7 @@ type OverviewData = {
 };
 
 type OverviewPanelProps = {
+  onRefresh?: () => void;
   onRangeDaysChange?: (value: number) => void;
   rangeDays: number;
   refreshToken?: number;
@@ -62,15 +68,30 @@ const fileTypeLabels: Record<string, string> = {
 
 const formatCount = (value: number) => new Intl.NumberFormat("zh-CN").format(Number(value) || 0);
 
-const formatPercent = (value: number, total: number) =>
-  total > 0 ? `${((value / total) * 100).toFixed(1)}%` : "0%";
-
-function SectionHeading({ description, title }: { description?: string; title: string }) {
+function DashboardCard({
+  title,
+  description,
+  children,
+  className,
+}: {
+  title: string;
+  description: string;
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="mb-3">
-      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
-      {description && <p className="mt-1 text-xs text-gray-400">{description}</p>}
-    </div>
+    <section
+      className={cn(
+        "min-w-0 rounded-xl border border-gray-200/60 bg-white p-4 md:p-5 dark:border-white/[0.07] dark:bg-[#191919]",
+        className,
+      )}
+    >
+      <div className="mb-4">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
+        <p className="mt-1 text-[11px] text-gray-400">{description}</p>
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -140,10 +161,10 @@ function ActivityHeatmap({ trend }: { trend: OverviewData["activityTrend"] }) {
                   key={key}
                   style={
                     intensity > 0
-                      ? { backgroundColor: `rgba(37, 99, 235, ${intensity})` }
+                      ? { backgroundColor: `rgba(112, 182, 163, ${intensity})` }
                       : undefined
                   }
-                  title={`${key}：${description}`}
+                  data-markai-tooltip={`${key}：${description}`}
                 />
               );
             })}
@@ -152,7 +173,7 @@ function ActivityHeatmap({ trend }: { trend: OverviewData["activityTrend"] }) {
       </div>
       <div className="mt-3 flex w-max items-center gap-1.5 text-[10px] text-gray-400">
         <span>低活跃</span>
-        {["bg-gray-100 dark:bg-white/[0.06]", "bg-blue-100", "bg-blue-300", "bg-blue-600"].map(
+        {["bg-gray-100 dark:bg-white/[0.06]", "bg-[#d6eae3]", "bg-[#a5d0c1]", "bg-[#70b6a3]"].map(
           (color) => (
             <span className={cn("h-2.5 w-2.5 rounded-[2px]", color)} key={color} />
           ),
@@ -164,6 +185,7 @@ function ActivityHeatmap({ trend }: { trend: OverviewData["activityTrend"] }) {
 }
 
 export function OverviewPanel({
+  onRefresh,
   onRangeDaysChange,
   rangeDays,
   refreshToken = 0,
@@ -171,23 +193,39 @@ export function OverviewPanel({
   const [data, setData] = useState<OverviewData>();
   const [error, setError] = useState("");
 
+  const requestRef = useRef<AbortController | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadedKey, setLoadedKey] = useState("");
+  const requestKey = `${rangeDays}:${refreshToken}`;
+  const busy = loading || loadedKey !== requestKey;
+
   const load = useCallback(async () => {
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
+    setLoading(true);
     setError("");
     try {
       const response = await fetch(
         `/api/admin/overview?days=${rangeDays}&refresh=${refreshToken}`,
-        { cache: "no-store" },
+        { cache: "no-store", signal: controller.signal },
       );
       const result = await response.json();
+      if (controller.signal.aborted || requestRef.current !== controller) return;
       if (!response.ok) throw new Error(result.error || "概览数据加载失败");
       setData(result);
+      setLoadedKey(`${rangeDays}:${refreshToken}`);
     } catch (loadError) {
+      if (controller.signal.aborted || requestRef.current !== controller) return;
       setError(loadError instanceof Error ? loadError.message : "概览数据加载失败");
+    } finally {
+      if (!controller.signal.aborted && requestRef.current === controller) setLoading(false);
     }
   }, [rangeDays, refreshToken]);
 
   useEffect(() => {
     void load();
+    return () => requestRef.current?.abort();
   }, [load]);
 
   const metrics = data
@@ -205,16 +243,10 @@ export function OverviewPanel({
       ]
     : [];
 
-  const providerTotal = (data?.providerTypes || []).reduce(
-    (total, item) => total + Number(item.value || 0),
-    0,
-  );
-  const fileTotal = (data?.fileTypes || []).reduce(
-    (total, item) => total + Number(item.value || 0),
-    0,
-  );
-  const providers = (data?.providerTypes || []).slice(0, 5);
-  const fileTypes = (data?.fileTypes || []).slice().sort((a, b) => b.value - a.value);
+  const providers = (data?.providerTypes || []).slice(0, 6);
+  const fileTypes = (data?.fileTypes || [])
+    .map((item) => ({ ...item, name: fileTypeLabels[item.name] || item.name }))
+    .sort((a, b) => b.value - a.value);
   const reminders = data
     ? [
         {
@@ -263,129 +295,159 @@ export function OverviewPanel({
     );
   }
 
+  const periodMessages = data.trend.reduce((sum, day) => sum + day.messages, 0);
+  const periodSessions = data.trend.reduce((sum, day) => sum + day.sessions, 0);
+  const averageDepth = periodSessions ? (periodMessages / periodSessions).toFixed(1) : "—";
+  const verifiedRate = data.stats.users
+    ? ((data.stats.verifiedUsers / data.stats.users) * 100).toFixed(1)
+    : "0.0";
+  const tones = [
+    "bg-[#e8f3ed] text-gray-900 dark:bg-[#d4f77d] dark:text-[#202710]",
+    "bg-[#eeeafa] text-gray-900 dark:bg-[#b4a0ef] dark:text-[#241b3a]",
+    "bg-[#faf2e2] text-gray-900 dark:bg-[#f0c777] dark:text-[#322710]",
+    "bg-[#242424] text-white dark:bg-[#191919] dark:text-gray-100",
+  ];
+
   return (
-    <div className="mx-auto max-w-[1180px] space-y-7 md:space-y-8">
-      <div className="flex items-center justify-between gap-3 md:hidden">
+    <div className="mx-auto max-w-[1400px] space-y-4 md:space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold">运营数据</h3>
-          <p className="mt-1 text-xs text-gray-400">查看用户与系统运行情况</p>
+          <p className="font-jakarta text-[10px] font-semibold tracking-[.15em] text-gray-400">
+            WORKSPACE ANALYTICS
+          </p>
+          <h2 className="mt-1 text-xl font-semibold tracking-tight">运营概览</h2>
+          <p className="mt-1 text-xs text-gray-500">从使用趋势到资源分布，了解 MarkAI 的运行情况</p>
         </div>
-        <div className="shrink-0">
-          <select
-            aria-label="概览时间范围"
-            className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-xs text-gray-700 outline-none dark:border-white/10 dark:bg-[#191919] dark:text-gray-200"
-            onChange={(event) => onRangeDaysChange?.(Number(event.target.value))}
+        <div className="flex shrink-0 items-center gap-2" aria-label="概览时间范围">
+          <SegmentedControl
+            className="min-h-11 md:min-h-8 [&_button]:min-h-10 md:[&_button]:min-h-7"
+            onChange={onRangeDaysChange}
+            options={[
+              { label: "7 天", value: 7 },
+              { label: "14 天", value: 14 },
+              { label: "30 天", value: 30 },
+            ]}
+            padding={3}
             value={rangeDays}
+          />
+          <IconButton
+            aria-label="刷新概览数据"
+            data-markai-tooltip="刷新概览数据"
+            onClick={onRefresh}
+            shape="rounded"
+            size="sm"
           >
-            <option value={7}>7 天</option>
-            <option value={14}>14 天</option>
-            <option value={30}>30 天</option>
-          </select>
+            <RefreshCw size={16} className={busy ? "animate-spin" : undefined} />
+          </IconButton>
         </div>
       </div>
-
-      <section>
-        <SectionHeading description="关键指标总览，了解平台整体运营状况" title="运营数据" />
-        <div className="grid grid-cols-2 border-y border-gray-200/80 sm:grid-cols-3 xl:grid-cols-6 dark:border-white/[0.09]">
-          {metrics.map(({ icon: Icon, label, value }) => (
-            <div
-              className="flex min-w-0 items-center gap-2.5 px-2 py-3.5 sm:px-3.5 xl:border-l xl:border-gray-200/60 xl:first:border-l-0 dark:border-white/[0.09]"
-              key={label}
-            >
-              <Icon className="shrink-0 text-gray-400" size={16} strokeWidth={1.7} />
-              <div className="min-w-0">
-                <p className="truncate text-xs text-gray-400">{label}</p>
-                <p className="mt-0.5 truncate font-jakarta text-[18px] font-semibold leading-6 text-gray-900 dark:text-gray-100">
+      {busy ? (
+        <div
+          role="status"
+          aria-live="polite"
+          aria-label="正在加载概览数据"
+          className="space-y-4 animate-pulse"
+        >
+          <p className="text-xs text-gray-500">正在加载近 {rangeDays} 天的数据…</p>
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            {tones.map((tone) => (
+              <div key={tone} className={cn("h-[150px] rounded-xl", tone)} />
+            ))}
+          </div>
+          <div className="grid gap-4 xl:grid-cols-[1.8fr_1fr]">
+            <div className="h-[390px] rounded-xl bg-white dark:bg-[#191919]" />
+            <div className="h-[390px] rounded-xl bg-white dark:bg-[#191919]" />
+          </div>
+          <div className="grid gap-4 lg:grid-cols-3">
+            {[0, 1, 2].map((key) => (
+              <div key={key} className="h-[310px] rounded-xl bg-white dark:bg-[#191919]" />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            {metrics.slice(0, 4).map(({ icon: Icon, label, value }, index) => (
+              <div key={label} className={cn("min-w-0 rounded-xl p-4 md:p-5", tones[index])}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-xs text-current opacity-70">{label}</span>
+                  <Icon size={17} className="shrink-0 text-current opacity-60" strokeWidth={1.6} />
+                </div>
+                <p className="mt-5 truncate font-jakarta text-2xl font-semibold tracking-tight md:text-3xl">
                   {value}
                 </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="grid gap-7 border-b border-gray-200/80 pb-7 xl:grid-cols-[1.7fr_1fr] dark:border-white/[0.09]">
-        <div className="min-w-0">
-          <SectionHeading
-            description="新增用户数、对话数与消息数的趋势对比"
-            title="用户与使用趋势"
-          />
-          <UsageTrendChart data={data.trend} />
-        </div>
-        <div className="min-w-0">
-          <SectionHeading description="需要关注的关键事项" title="运营提醒" />
-          <div className="overflow-hidden rounded-lg border border-gray-200/80 dark:border-white/[0.1]">
-            {reminders.map(({ icon: Icon, label, tone, value }) => (
-              <div
-                className="flex h-[58px] items-center gap-3 border-b border-gray-200/80 px-3.5 last:border-b-0 dark:border-white/[0.09]"
-                key={label}
-              >
-                <Icon className={tone} size={17} strokeWidth={1.7} />
-                <span className="min-w-0 flex-1 truncate text-sm text-gray-700 dark:text-gray-200">
-                  {label}
-                </span>
-                <span className={`shrink-0 font-jakarta text-sm font-medium ${tone}`}>{value}</span>
+                <p className="mt-2 text-[10px] text-current opacity-60">
+                  {index === 1 ? "所选时间范围内注册" : "截至当前累计"}
+                </p>
               </div>
             ))}
           </div>
-        </div>
-      </section>
-
-      <section className="grid gap-7 xl:grid-cols-3 xl:gap-0">
-        <div className="min-w-0 xl:pr-7">
-          <SectionHeading description="按对话数统计 Top 5" title="模型服务商" />
-          <div className="space-y-3">
-            {providers.map((item, index) => (
-              <div className="flex items-center gap-2 text-xs" key={item.name || index}>
-                <span className="w-4 shrink-0 text-gray-400">{index + 1}</span>
-                <span className="w-20 shrink-0 truncate text-gray-700 dark:text-gray-300">
-                  {item.name || "未知"}
-                </span>
-                <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100 dark:bg-white/[0.1]">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)]">
+            <DashboardCard title="使用趋势" description={`近 ${rangeDays} 天 · 用户增长与对话活动`}>
+              <UsageTrendChart data={data.trend} />
+            </DashboardCard>
+            <DashboardCard title="运营状态" description="账户验证与需要关注的事项">
+              <div className="mb-4 rounded-lg bg-[#eeeafa] p-4 dark:bg-[#2c273b]">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-xs text-gray-600 dark:text-gray-300">邮箱验证率</span>
+                  <span className="font-jakarta text-2xl font-semibold">
+                    {verifiedRate}
+                    <span className="ml-1 text-sm">%</span>
+                  </span>
+                </div>
+                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-black/5 dark:bg-white/10">
                   <div
-                    className={`h-full rounded-full ${index < 3 ? "bg-blue-600" : "bg-gray-400 dark:bg-gray-500"}`}
-                    style={{
-                      width: `${providerTotal ? (item.value / Math.max(...providers.map((entry) => entry.value))) * 100 : 0}%`,
-                    }}
+                    className="h-full rounded-full bg-[#9b8be8]"
+                    style={{ width: `${verifiedRate}%` }}
                   />
                 </div>
-                <span className="w-10 shrink-0 text-right tabular-nums text-gray-400">
-                  {formatPercent(item.value, providerTotal)}
+                <p className="mt-2 text-[10px] text-gray-500">
+                  {formatCount(data.stats.verifiedUsers)} / {formatCount(data.stats.users)}{" "}
+                  位用户已验证
+                </p>
+              </div>
+              <div className="divide-y divide-gray-100 dark:divide-white/5">
+                {reminders.map(({ icon: Icon, label, tone, value }) => (
+                  <div key={label} className="flex min-h-12 items-center gap-2">
+                    <Icon size={15} className="text-gray-400" />
+                    <span className="flex-1 text-xs text-gray-500 dark:text-gray-400">{label}</span>
+                    <span className={cn("font-jakarta text-sm font-semibold", tone)}>{value}</span>
+                  </div>
+                ))}
+              </div>
+            </DashboardCard>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-3">
+            <DashboardCard title="模型服务商" description="累计对话数 · Top 6">
+              <OverviewDistributionChart data={providers} kind="provider" />
+            </DashboardCard>
+            <DashboardCard title="存储构成" description="按文件容量分布 · 不含头像">
+              <div className="flex items-baseline justify-between">
+                <span className="font-jakarta text-xl font-semibold">
+                  {formatBytes(data.stats.fileBytes)}
+                </span>
+                <span className="text-xs text-gray-400">
+                  {formatCount(data.stats.files)} 个文件
                 </span>
               </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="min-w-0 border-t border-gray-200/80 pt-7 xl:border-l xl:border-t-0 xl:px-7 xl:pt-0 dark:border-white/[0.09]">
-          <SectionHeading description="按存储容量统计" title="文件存储" />
-          <div className="space-y-3">
-            {fileTypes.map((item) => (
-              <div className="flex items-center gap-3 text-xs" key={item.name}>
-                <span className="w-16 shrink-0 truncate text-gray-700 dark:text-gray-300">
-                  {fileTypeLabels[item.name] || item.name}
-                </span>
-                <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100 dark:bg-white/[0.1]">
-                  <div
-                    className="h-full rounded-full bg-blue-600"
-                    style={{
-                      width: `${fileTotal ? (item.value / Math.max(...fileTypes.map((entry) => entry.value))) * 100 : 0}%`,
-                    }}
-                  />
-                </div>
-                <span className="w-10 shrink-0 text-right tabular-nums text-gray-400">
-                  {formatPercent(item.value, fileTotal)}
-                </span>
+              <OverviewDistributionChart data={fileTypes} kind="storage" />
+            </DashboardCard>
+            <DashboardCard title="对话节奏" description="过去 90 天 · 每日新建对话">
+              <div className="mb-5 rounded-lg bg-[#e8f3ed] p-4 dark:bg-[#22342d]">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  近 {rangeDays} 天消息数 / 新建对话数
+                </p>
+                <p className="mt-2 font-jakarta text-3xl font-semibold">
+                  {averageDepth}
+                  <span className="ml-2 text-xs font-normal text-gray-500">条 / 个</span>
+                </p>
+                <p className="mt-2 text-[10px] text-gray-500">包含期间在历史对话中发送的消息</p>
               </div>
-            ))}
+              <ActivityHeatmap trend={data.activityTrend} />
+            </DashboardCard>
           </div>
-        </div>
-
-        <div className="min-w-0 border-t border-gray-200/80 pt-7 xl:border-l xl:border-t-0 xl:pl-7 xl:pt-0 dark:border-white/[0.09]">
-          <SectionHeading description="过去 3 个月活跃用户热力图" title="每日活跃" />
-          <ActivityHeatmap trend={data.activityTrend} />
-        </div>
-      </section>
+        </>
+      )}
     </div>
   );
 }
