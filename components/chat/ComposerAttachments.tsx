@@ -3,6 +3,7 @@
 import { LoaderCircle, RotateCcw, X } from "lucide-react";
 import type { AttachmentUpload } from "@/hooks/use-chat-attachments";
 import type { FileAttachment } from "@/lib/chat/types";
+import { AttachmentImage } from "./files/AttachmentImage";
 import { FileTypeIcon } from "./files/FileTypeIcon";
 
 export function ComposerAttachments({
@@ -26,36 +27,61 @@ export function ComposerAttachments({
       className="flex max-h-48 flex-wrap items-start gap-2 overflow-y-auto px-3 pt-3 md:px-4"
       aria-label="消息附件"
     >
-      {attachments.map((file) => (
-        <div
-          key={file.id}
-          className="flex h-10 max-w-full items-center gap-1 rounded-md bg-gray-100/80 pl-2 text-xs text-gray-600 dark:bg-white/[0.06] dark:text-gray-300 md:h-7"
-        >
-          <button
-            type="button"
-            aria-label={`预览 ${file.name}`}
-            data-markai-tooltip={file.name}
-            className="flex min-w-0 items-center gap-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-            onClick={() => onPreview(file)}
+      {attachments.map((file) =>
+        file.contentType.startsWith("image/") ? (
+          <div key={file.id} className="relative h-24 w-24 shrink-0">
+            <button
+              type="button"
+              aria-label={`预览 ${file.name}`}
+              data-markai-tooltip={file.name}
+              className="h-full w-full overflow-hidden rounded-lg border border-gray-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary dark:border-white/10"
+              onClick={() => onPreview(file)}
+            >
+              <AttachmentImage file={file} />
+            </button>
+            <button
+              type="button"
+              aria-label={`移除 ${file.name}`}
+              data-markai-tooltip="移除附件"
+              className="absolute right-0 top-0 flex size-10 items-center justify-center rounded-lg text-white drop-shadow-md md:size-7"
+              onClick={() => onRemove(file.id)}
+            >
+              <span className="flex size-5 items-center justify-center rounded-full bg-black/60">
+                <X size={12} />
+              </span>
+            </button>
+          </div>
+        ) : (
+          <div
+            key={file.id}
+            className="flex h-10 max-w-full items-center gap-1 rounded-md bg-gray-100/80 pl-2 text-xs text-gray-600 dark:bg-white/[0.06] dark:text-gray-300 md:h-7"
           >
-            <FileTypeIcon
-              name={file.name}
-              contentType={file.contentType}
-              className="size-4 shrink-0"
-            />
-            <span className="max-w-[min(220px,55vw)] truncate">{file.name}</span>
-          </button>
-          <button
-            type="button"
-            aria-label={`移除 ${file.name}`}
-            data-markai-tooltip="移除附件"
-            className="flex size-10 shrink-0 items-center justify-center rounded-md text-gray-400 hover:bg-gray-200 hover:text-gray-700 focus-visible:ring-2 focus-visible:ring-primary/30 dark:hover:bg-white/10 dark:hover:text-white md:size-7"
-            onClick={() => onRemove(file.id)}
-          >
-            <X size={12} />
-          </button>
-        </div>
-      ))}
+            <button
+              type="button"
+              aria-label={`预览 ${file.name}`}
+              data-markai-tooltip={file.name}
+              className="flex min-w-0 items-center gap-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+              onClick={() => onPreview(file)}
+            >
+              <FileTypeIcon
+                name={file.name}
+                contentType={file.contentType}
+                className="size-4 shrink-0"
+              />
+              <span className="max-w-[min(220px,55vw)] truncate">{file.name}</span>
+            </button>
+            <button
+              type="button"
+              aria-label={`移除 ${file.name}`}
+              data-markai-tooltip="移除附件"
+              className="flex size-10 shrink-0 items-center justify-center rounded-md text-gray-400 hover:bg-gray-200 hover:text-gray-700 focus-visible:ring-2 focus-visible:ring-primary/30 dark:hover:bg-white/10 dark:hover:text-white md:size-7"
+              onClick={() => onRemove(file.id)}
+            >
+              <X size={12} />
+            </button>
+          </div>
+        ),
+      )}
       {uploads.map((file) => (
         <div
           key={file.id}

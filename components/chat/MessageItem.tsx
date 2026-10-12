@@ -1,5 +1,7 @@
 "use client";
 
+import { AttachmentImage } from "./files/AttachmentImage";
+
 import { RefObject, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronLeft,
@@ -609,34 +611,50 @@ export const MessageItem = memo(function MessageItem({
             )}
             {message.attachments && message.attachments.length > 0 && !collapsed && (
               <div className="mb-2 flex w-full max-w-[360px] flex-col items-stretch gap-2">
-                {message.attachments.map((file) => (
-                  <button
-                    aria-label={`预览 ${file.name}`}
-                    className="group/file grid min-h-16 w-full grid-cols-[44px_minmax(0,1fr)] items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-left shadow-sm transition-[border-color,background-color,box-shadow] hover:border-gray-300 hover:bg-gray-50/70 hover:shadow-md dark:border-white/10 dark:bg-[#191919] dark:hover:border-white/20 dark:hover:bg-[#1d1d1d]"
-                    key={file.id}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setPreviewFile(file);
-                    }}
-                    type="button"
-                  >
-                    <FileTypeIcon
-                      className="h-[22px] w-[22px]"
-                      contentType={file.contentType}
-                      name={file.name}
-                      tile
-                      tileClassName="h-11 w-11"
-                    />
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
-                        {file.name}
+                {message.attachments.map((file) =>
+                  file.contentType.startsWith("image/") ? (
+                    <button
+                      key={file.id}
+                      type="button"
+                      aria-label={`预览 ${file.name}`}
+                      data-markai-tooltip={file.name}
+                      className="h-36 w-36 max-w-full self-end overflow-hidden rounded-xl border border-gray-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary dark:border-white/10"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setPreviewFile(file);
+                      }}
+                    >
+                      <AttachmentImage file={file} />
+                    </button>
+                  ) : (
+                    <button
+                      aria-label={`预览 ${file.name}`}
+                      className="group/file grid min-h-16 w-full grid-cols-[44px_minmax(0,1fr)] items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-left shadow-sm transition-[border-color,background-color,box-shadow] hover:border-gray-300 hover:bg-gray-50/70 hover:shadow-md dark:border-white/10 dark:bg-[#191919] dark:hover:border-white/20 dark:hover:bg-[#1d1d1d]"
+                      key={file.id}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setPreviewFile(file);
+                      }}
+                      type="button"
+                    >
+                      <FileTypeIcon
+                        className="h-[22px] w-[22px]"
+                        contentType={file.contentType}
+                        name={file.name}
+                        tile
+                        tileClassName="h-11 w-11"
+                      />
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+                          {file.name}
+                        </span>
+                        <span className="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400">
+                          {getAttachmentTypeLabel(file)} · {formatAttachmentSize(file.size)}
+                        </span>
                       </span>
-                      <span className="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400">
-                        {getAttachmentTypeLabel(file)} · {formatAttachmentSize(file.size)}
-                      </span>
-                    </span>
-                  </button>
-                ))}
+                    </button>
+                  ),
+                )}
               </div>
             )}
             <div className="flex w-fit max-w-[92%] flex-col gap-3 break-words rounded-2xl rounded-tr-sm bg-[var(--chat-user-bubble-bg)] px-4 py-3 text-left text-[length:var(--chat-font-size)] text-gray-900 shadow-sm dark:text-gray-100 md:max-w-[85%] md:px-5">
