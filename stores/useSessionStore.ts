@@ -53,12 +53,14 @@ interface SessionActions {
 export type SessionStore = SessionState & SessionActions;
 
 const updateBrowserUrl = (path: string, history: "push" | "replace") => {
-  const method =
-    history === "replace" ? History.prototype.replaceState : History.prototype.pushState;
-
-  // Next.js patches window.history and treats these client-owned chat URLs as
-  // App Router navigations. Use the native method so ChatApp stays mounted.
-  method.call(window.history, null, "", path);
+  // Next.js synchronizes its canonical URL and preserves the current route tree
+  // through these patched methods. Bypassing them lets a later router update
+  // restore the old URL and also loses the router state used by back/forward.
+  if (history === "replace") {
+    window.history.replaceState(null, "", path);
+  } else {
+    window.history.pushState(null, "", path);
+  }
 };
 
 const navigateToSession = (sessionId: string, history: "push" | "replace" = "push") => {
