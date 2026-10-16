@@ -25,24 +25,27 @@
   animation: gradient 5s ease 5s infinite;
 }
 .viewport {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   font-size: 13px;
   line-height: 24px;
 }
-.moving {
-  flex: 1;
-}
 .track {
   display: flex;
   width: max-content;
   white-space: pre;
+  margin-inline: auto;
 }
 .moving .track {
+  margin-inline: 0;
   animation: marquee var(--announcement-duration, 24s) linear infinite;
 }
 .moving .text {
   padding-right: 48px;
+}
+.content {
+  display: inline-block;
 }
 .bar:hover .track,
 .bar:focus-within .track {

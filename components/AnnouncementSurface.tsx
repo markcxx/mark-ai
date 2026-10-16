@@ -23,10 +23,10 @@ export function AnnouncementSurface({
   useEffect(() => {
     const measure = () => {
       if (!viewport.current || !text.current) return;
-      const width =
-        text.current.getBoundingClientRect().width -
-        parseFloat(getComputedStyle(text.current).paddingRight || "0");
-      setOverflow(width > viewport.current.clientWidth);
+      // Measure the unpadded content, independently of the marquee state.
+      // clientWidth rounds to integers and can misclassify fitting text.
+      const width = text.current.getBoundingClientRect().width;
+      setOverflow(width > viewport.current.getBoundingClientRect().width + 1);
       setDuration(Math.max(12, width / 35));
     };
     const observer = new ResizeObserver(measure);
@@ -47,8 +47,10 @@ export function AnnouncementSurface({
           className={styles.track}
           style={{ "--announcement-duration": `${duration}s` } as CSSProperties}
         >
-          <span className={styles.text} ref={text}>
-            {announcement.content.replace(/\s*\n\s*/g, "　")}
+          <span className={styles.text}>
+            <span className={styles.content} ref={text}>
+              {announcement.content.replace(/\s*\n\s*/g, "　")}
+            </span>
           </span>
           {overflow && (
             <span aria-hidden className={`${styles.text} ${styles.duplicate}`}>
