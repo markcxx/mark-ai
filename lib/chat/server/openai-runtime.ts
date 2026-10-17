@@ -1,5 +1,4 @@
 import { describeGenerationError } from "@/lib/chat/generation-error";
-import { UpstreamTextStream } from "./upstream-text-stream";
 import { getThinkingRequestParameters, type ThinkingPolicy } from "@/lib/model-thinking";
 import { NextResponse } from "next/server";
 
@@ -217,10 +216,6 @@ export const createOpenAICompatibleStream = async (
         let providerUsage: TokenUsage | undefined;
         let thinkingParsersFinished = false;
         const thinkingParsers = new Map<number, ThinkingTagStreamParser>();
-        const textStreams = new Map<
-          number,
-          { content: UpstreamTextStream; reasoning: UpstreamTextStream }
-        >();
 
         const emitTextEvent = (event: ThinkingTagStreamEvent) => {
           if (!event.text) return;
@@ -277,14 +272,6 @@ export const createOpenAICompatibleStream = async (
           }
 
           for (const [fallbackIndex, choice] of choices.entries()) {
-            const choiceIndex = Number.isFinite(choice?.index)
-              ? Number(choice.index)
-              : fallbackIndex;
-            const streams = textStreams.get(choiceIndex) || {
-              content: new UpstreamTextStream(),
-              reasoning: new UpstreamTextStream(),
-            };
-            textStreams.set(choiceIndex, streams);
             const reasoning = getChoiceText(choice, [
               "reasoning_content",
               "reasoningContent",
@@ -299,17 +286,15 @@ export const createOpenAICompatibleStream = async (
             const deltaToolCalls = choice?.delta?.tool_calls || choice?.message?.tool_calls;
 
             if (reasoning) {
-              emitTextEvent({
-                text: streams.reasoning.push(reasoning, !choice?.delta && Boolean(choice?.message)),
-                type: "reasoning",
-              });
+              emitTextEvent({ text: reasoning, type: "reasoning" });
             }
             if (content) {
+              const choiceIndex = Number.isFinite(choice?.index)
+                ? Number(choice.index)
+                : fallbackIndex;
               const parser = thinkingParsers.get(choiceIndex) || new ThinkingTagStreamParser();
               thinkingParsers.set(choiceIndex, parser);
-              parser
-                .push(streams.content.push(content, !choice?.delta && Boolean(choice?.message)))
-                .forEach(emitTextEvent);
+              parser.push(content).forEach(emitTextEvent);
             }
             if (Array.isArray(deltaToolCalls)) {
               deltaToolCalls.forEach(appendToolCall);
