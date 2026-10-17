@@ -139,3 +139,45 @@ it("delivers the provider location restriction through the response stream", asy
     text: "生成失败：User location is not supported for the API use.（400）",
   });
 });
+
+it("normalizes replayed snapshots before thinking parsing and client events", async () => {
+  const intro =
+    "<think>首先分析用户的问题，确认需要检索的主题和范围，然后给出准确清晰的回复。</think>";
+  const answer =
+    "这是测试回答的正文，介绍中文技术社区的主要用途与使用规则，并提醒用户自行核实信息。";
+  const tail = "最后请以官方网站发布的公告为准。";
+  const chunks = [intro, answer, intro, answer, intro + answer, tail, intro + answer + tail];
+  vi.mocked(fetchWithDevelopmentProxy).mockResolvedValueOnce(
+    new Response(
+      chunks
+        .map(
+          (content) =>
+            `data: ${JSON.stringify({ choices: [{ index: 0, delta: { content } }] })}\n\n`,
+        )
+        .join("") + "data: [DONE]\n\n",
+    ),
+  );
+  const response = await createOpenAICompatibleStream(
+    [{ role: "user", content: "介绍社区" }],
+    "test",
+    "secret",
+    "https://test.invalid/v1",
+    false,
+  );
+  const events = (await response.text())
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  expect(
+    events
+      .filter((e) => e.type === "content")
+      .map((e) => e.text)
+      .join(""),
+  ).toBe(answer + tail);
+  expect(
+    events
+      .filter((e) => e.type === "reasoning")
+      .map((e) => e.text)
+      .join(""),
+  ).toBe(intro.slice(7, -8));
+});
