@@ -70,8 +70,41 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "qwen3.8-max-preview",
     displayName: "Qwen3.8 Max Preview",
     family: "Qwen3.8",
-    description: "预览版配置标识，尚未核实独立规格，请以服务商配置为准。",
-    sourceUrl: "https://help.aliyun.com/zh/model-studio/text-generation-model",
+    description: "百炼已将此预览标识路由至正式版 Qwen3.8 Max，支持推理、视觉理解和工具调用。",
+    contextWindowTokens: 1_000_000,
+    maxOutputTokens: 131_072,
+    sourceUrl: "https://help.aliyun.com/zh/model-studio/token-plan-personal-overview",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVision: true,
+    supportsVideo: true,
+  },
+  {
+    id: "mimo-v2.6-pro",
+    displayName: "MiMo-V2.6 Pro",
+    family: "MiMo",
+    description: "小米多模态旗舰推理模型，支持百万上下文、图像与视频理解、编码和长程工具任务。",
+    // Exact context also reported by CommandCode /provider/v1/models (2026-10-21).
+    contextWindowTokens: 1_048_576,
+    maxOutputTokens: 131_072,
+    sourceUrl: "https://mimo.mi.com/docs/en-US/api/chat/openai-api",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVision: true,
+    supportsVideo: true,
+  },
+  {
+    id: "mimo-v2.6-flash",
+    displayName: "MiMo-V2.6 Flash",
+    family: "MiMo",
+    description: "小米高效多模态推理模型，支持百万上下文、图像与视频理解和工具调用。",
+    contextWindowTokens: 1_048_576,
+    maxOutputTokens: 131_072,
+    sourceUrl: "https://mimo.mi.com/docs/en-US/api/chat/openai-api",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVision: true,
+    supportsVideo: true,
   },
   {
     id: "mimo-v2.5",
@@ -79,7 +112,11 @@ export const MODEL_METADATA: ModelMetadata[] = [
     family: "MiMo",
     description: "小米原生多模态模型，支持百万上下文、图像与视频理解和 Agent 任务。",
     contextWindowTokens: 1_000_000,
+    // API limit, including reasoning: https://mimo.mi.com/docs/en-US/api/chat/anthropic-api
+    maxOutputTokens: 131_072,
     sourceUrl: "https://huggingface.co/XiaomiMiMo/MiMo-V2.5",
+    supportsReasoning: true,
+    supportsToolCalling: true,
     supportsVision: true,
     supportsVideo: true,
   },
@@ -111,6 +148,7 @@ export const MODEL_METADATA: ModelMetadata[] = [
     supportsReasoning: true,
     supportsToolCalling: true,
     supportsVision: true,
+    supportsVideo: false,
   },
   {
     id: "gemini-3.8-flash",
@@ -190,6 +228,7 @@ export const MODEL_METADATA: ModelMetadata[] = [
     supportsReasoning: true,
     supportsToolCalling: true,
     supportsVision: true,
+    supportsVideo: false,
   },
   {
     aliases: ["gpt-5-5"],
@@ -358,25 +397,33 @@ export const MODEL_METADATA: ModelMetadata[] = [
   },
   {
     aliases: ["gemini-3.1-flash-lite-preview", "gemini-flash-lite-latest"],
-    contextWindowTokens: 1_114_112,
+    contextWindowTokens: 1_048_576,
     description: "Google 面向高吞吐代理任务、翻译和数据处理的高性价比多模态模型。",
     displayName: "Gemini 3.1 Flash-Lite",
     family: "Gemini 3.1",
     id: "gemini-3.1-flash-lite",
     knowledgeCutoff: "2025-01",
     maxOutputTokens: 65_536,
-    sourceUrl: "https://ai.google.dev/gemini-api/docs/models",
+    sourceUrl: "https://ai.google.dev/gemini-api/docs/models/gemini-3.1-flash-lite",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVideo: true,
+    supportsVision: true,
   },
   {
     aliases: ["gemini-3-flash", "gemini-flash-latest"],
-    contextWindowTokens: 1_114_112,
+    contextWindowTokens: 1_048_576,
     description: "兼顾前沿推理、生成速度与搜索 grounding 的 Gemini 3 快速型号。",
     displayName: "Gemini 3 Flash",
     family: "Gemini 3",
     id: "gemini-3-flash-preview",
     knowledgeCutoff: "2025-01",
     maxOutputTokens: 65_536,
-    sourceUrl: "https://ai.google.dev/gemini-api/docs/models",
+    sourceUrl: "https://ai.google.dev/gemini-api/docs/models/gemini-3-flash-preview",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVideo: true,
+    supportsVision: true,
   },
   {
     contextWindowTokens: 1_048_576,
@@ -397,7 +444,11 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "gemini-2.5-flash",
     knowledgeCutoff: "2025-01",
     maxOutputTokens: 65_536,
-    sourceUrl: "https://ai.google.dev/gemini-api/docs/models",
+    sourceUrl: "https://ai.google.dev/gemini-api/docs/models/gemini-2.5-flash",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVideo: true,
+    supportsVision: true,
   },
   {
     contextWindowTokens: 1_048_576,
@@ -839,6 +890,20 @@ export const MODEL_METADATA: ModelMetadata[] = [
   },
   {
     contextWindowTokens: 1_000_000,
+    description:
+      "MiniMax 高效多模态编码模型，支持图像、视频、工具调用与可调深度的推理，思考始终开启。",
+    displayName: "MiniMax M3.1 Flash",
+    family: "MiniMax",
+    id: "minimax-m3.1-flash",
+    maxOutputTokens: 524_288,
+    sourceUrl: "https://platform.minimax.io/docs/api-reference/text-chat-openai",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVideo: true,
+    supportsVision: true,
+  },
+  {
+    contextWindowTokens: 1_000_000,
     description: "MiniMax 多模态编码与代理模型，提供百万级上下文。",
     displayName: "MiniMax M3",
     family: "MiniMax",
@@ -1144,7 +1209,11 @@ export const MODEL_METADATA: ModelMetadata[] = [
     family: "GLM-4",
     id: "glm-4.6",
     maxOutputTokens: 131_072,
-    sourceUrl: "https://docs.bigmodel.cn/cn/guide/start/model-overview",
+    sourceUrl: "https://docs.bigmodel.cn/cn/guide/models/text/glm-4.6",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVision: false,
+    supportsVideo: false,
   },
   {
     contextWindowTokens: 131_072,
@@ -1167,7 +1236,11 @@ export const MODEL_METADATA: ModelMetadata[] = [
     family: "GLM-4",
     id: "glm-4.5",
     maxOutputTokens: 98_304,
-    sourceUrl: "https://docs.bigmodel.cn/cn/guide/start/model-overview",
+    sourceUrl: "https://docs.bigmodel.cn/cn/guide/models/text/glm-4.5",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVision: false,
+    supportsVideo: false,
   },
   {
     contextWindowTokens: 65_536,
@@ -1190,6 +1263,21 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "glm-4-plus",
     maxOutputTokens: 4096,
     sourceUrl: "https://docs.bigmodel.cn/cn/guide/models/text/glm-4",
+  },
+  {
+    contextWindowTokens: 1_000_000,
+    description:
+      "Anthropic 低延迟模型，面向分类、提取和高频任务，支持图像理解、自适应思考与工具调用。",
+    displayName: "Claude Haiku 5.5",
+    family: "Claude 5.5",
+    id: "claude-haiku-5-5",
+    knowledgeCutoff: "2026-06",
+    maxOutputTokens: 128_000,
+    sourceUrl: "https://platform.claude.com/docs/en/models/haiku-5-5/overview",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVision: true,
+    supportsVideo: false,
   },
   {
     contextWindowTokens: 1_000_000,
@@ -1220,6 +1308,45 @@ export const MODEL_METADATA: ModelMetadata[] = [
     id: "claude-sonnet-4-5",
     maxOutputTokens: 64_000,
     sourceUrl: "https://docs.anthropic.com/en/docs/about-claude/models/overview",
+  },
+  {
+    contextWindowTokens: 500_000,
+    description: "xAI 面向编码、Agent 与知识工作的旗舰模型，支持图像理解、工具调用和可调推理深度。",
+    displayName: "Grok 4.7",
+    family: "Grok",
+    id: "grok-4.7",
+    knowledgeCutoff: "2026-05",
+    // The official model page does not publish a maximum output token limit.
+    sourceUrl: "https://docs.x.ai/developers/models/grok-4.7",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVision: true,
+    supportsVideo: false,
+  },
+  {
+    contextWindowTokens: 500_000,
+    description: "xAI 编码与通用任务模型，支持图像理解、工具调用、结构化输出和可调推理深度。",
+    displayName: "Grok 4.6",
+    family: "Grok",
+    id: "grok-4.6",
+    // The official model page does not publish an output limit or knowledge cutoff.
+    sourceUrl: "https://docs.x.ai/developers/models/grok-4.6",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVision: true,
+    supportsVideo: false,
+  },
+  {
+    contextWindowTokens: 500_000,
+    description: "xAI 面向软件工程与 Agent 工作流的模型，支持图像理解、工具调用和可调推理深度。",
+    displayName: "Grok 4.5",
+    family: "Grok",
+    id: "grok-4.5",
+    sourceUrl: "https://docs.x.ai/developers/models/grok-4.5",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVision: true,
+    supportsVideo: false,
   },
   {
     aliases: ["grok-4.20", "grok-4.20-0309-non-reasoning"],
@@ -1260,6 +1387,24 @@ export const getModelMetadata = (modelId?: string): ModelMetadata | undefined =>
 
   return undefined;
 };
+
+export const formatModelMetadataDetails = (metadata: ModelMetadata) =>
+  [
+    metadata.description,
+    hasKnownContextWindow(metadata)
+      ? `上下文 ${metadata.contextWindowTokens.toLocaleString()} tokens`
+      : "上下文暂未核实",
+    metadata.maxOutputTokens
+      ? `最大输出 ${metadata.maxOutputTokens.toLocaleString()} tokens`
+      : "最大输出暂未核实",
+    metadata.knowledgeCutoff ? `知识截止 ${metadata.knowledgeCutoff}` : "知识截止暂未公布",
+    metadata.supportsReasoning ? "支持深度思考" : "",
+    metadata.supportsToolCalling ? "支持工具调用" : "",
+    metadata.supportsVision ? "支持图像理解" : "",
+    metadata.supportsVideo ? "支持视频理解" : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 
 export const formatTokenCount = (tokens: number) => {
   if (tokens >= 1_000_000) {

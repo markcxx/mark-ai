@@ -23,7 +23,11 @@ import { IconButton } from "@/components/ui/IconButton";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
 import { MODEL_PROVIDER_TEMPLATES } from "@/lib/model-provider-registry";
-import { getModelMetadata, formatTokenCount } from "@/lib/model-metadata";
+import {
+  getModelMetadata,
+  formatModelMetadataDetails,
+  formatTokenCount,
+} from "@/lib/model-metadata";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/useUIStore";
 import { ProviderBrandIcon } from "../ModelBrandIcon";
@@ -761,7 +765,7 @@ export function ProviderSettings() {
                         {metadata?.contextWindowTokens && (
                           <span
                             className="rounded-md bg-gray-100 px-1.5 py-1 text-[10px] dark:bg-white/5"
-                            data-markai-tooltip="上下文窗口"
+                            data-markai-tooltip={formatModelMetadataDetails(metadata)}
                           >
                             {formatTokenCount(metadata.contextWindowTokens)}
                           </span>

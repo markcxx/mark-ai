@@ -1,8 +1,27 @@
 import { describe, expect, it } from "vitest";
 
-import { getModelMetadata, hasKnownContextWindow } from "./model-metadata";
+import {
+  formatModelMetadataDetails,
+  getModelMetadata,
+  hasKnownContextWindow,
+} from "./model-metadata";
 
 const configuredModelExpectations = [
+  ["xiaomi/mimo-v2.6-pro", "mimo-v2.6-pro", 1_048_576, true],
+  ["xiaomi/mimo-v2.6-flash", "mimo-v2.6-flash", 1_048_576, true],
+  ["minimax/minimax-m3.1-flash", "minimax-m3.1-flash", 1_000_000, true],
+  ["claude-haiku-5-5", "claude-haiku-5-5", 1_000_000, true],
+  ["grok-4.7", "grok-4.7", 500_000, true],
+  ["xai/grok-4.7", "grok-4.7", 500_000, true],
+  ["xai/grok-4.7-latest", "grok-4.7", 500_000, true],
+  ["xai/grok-4.6", "grok-4.6", 500_000, true],
+  ["xai/grok-4.5", "grok-4.5", 500_000, true],
+  ["xiaomi/mimo-v2.5-pro", "mimo-v2.5-pro", 1_000_000, false],
+  ["xiaomi/mimo-v2.5", "mimo-v2.5", 1_000_000, true],
+  ["qwen3.8-max-preview", "qwen3.8-max-preview", 1_000_000, true],
+  ["gemini-3-flash-preview", "gemini-3-flash-preview", 1_048_576, true],
+  ["gemini-3.1-flash-lite", "gemini-3.1-flash-lite", 1_048_576, true],
+  ["gemini-2.5-flash", "gemini-2.5-flash", 1_048_576, true],
   ["gpt-6-sol-高", "gpt-6-sol", 1_050_000, true],
   ["gpt-6-sol-中", "gpt-6-sol", 1_050_000, true],
   ["gpt-6-sol-低", "gpt-6-sol", 1_050_000, true],
@@ -127,7 +146,40 @@ it("keeps new model output limits and capabilities distinct", () => {
   expect(getModelMetadata("glm-5.3-unknown")).toBeUndefined();
 });
 
-it("keeps unverified preview and custom identifiers unknown", () => {
-  expect(hasKnownContextWindow(getModelMetadata("qwen3.8-max-preview"))).toBe(false);
+it("does not infer specifications for custom or undocumented model variants", () => {
+  expect(getModelMetadata("mimo-v2.6-pro-custom")).toBeUndefined();
+  expect(getModelMetadata("minimax-m3.1-flash-preview")).toBeUndefined();
   expect(getModelMetadata("gpt-6-sol-custom")).toBeUndefined();
+});
+
+it("preserves distinct generation budgets for new gateway models", () => {
+  expect(getModelMetadata("xiaomi/mimo-v2.6-pro")?.maxOutputTokens).toBe(131_072);
+  expect(getModelMetadata("xiaomi/mimo-v2.6-flash")?.maxOutputTokens).toBe(131_072);
+  expect(getModelMetadata("minimax/minimax-m3.1-flash")?.maxOutputTokens).toBe(524_288);
+  expect(getModelMetadata("claude-haiku-5-5")?.maxOutputTokens).toBe(128_000);
+  expect(getModelMetadata("xai/grok-4.6")?.maxOutputTokens).toBeUndefined();
+  expect(getModelMetadata("xai/grok-4.5")?.maxOutputTokens).toBeUndefined();
+  expect(getModelMetadata("xai/grok-4.7")?.maxOutputTokens).toBeUndefined();
+  expect(getModelMetadata("xai/grok-4.7")).toMatchObject({
+    knowledgeCutoff: "2026-05",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVideo: false,
+  });
+});
+
+it("shows exact limits and capabilities while keeping unpublished values explicit", () => {
+  const metadata = getModelMetadata("minimax/minimax-m3.1-flash")!;
+  const details = formatModelMetadataDetails(metadata);
+  expect(details).toContain(`上下文 ${metadata.contextWindowTokens!.toLocaleString()} tokens`);
+  expect(details).toContain(`最大输出 ${metadata.maxOutputTokens!.toLocaleString()} tokens`);
+  expect(details).toContain("支持视频理解");
+  expect(details).toContain("支持工具调用");
+  expect(details).toContain("知识截止暂未公布");
+  const grokDetails = formatModelMetadataDetails(getModelMetadata("xai/grok-4.6")!);
+  expect(grokDetails).toContain("最大输出暂未核实");
+  expect(grokDetails).not.toContain("支持视频理解");
+  const unknownDetails = formatModelMetadataDetails(getModelMetadata("gpt-6")!);
+  expect(unknownDetails).toContain("上下文暂未核实");
+  expect(unknownDetails).not.toContain("支持图像理解");
 });

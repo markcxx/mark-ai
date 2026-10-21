@@ -14,7 +14,12 @@ import {
 import { AppDialog } from "@/components/ui/AppDialog";
 import type { ConfiguredModel } from "@/lib/chat/types";
 import { getModelDisplayName, getModelKey } from "@/lib/chat/helpers";
-import { formatContextWindow, getModelMetadata, hasKnownContextWindow } from "@/lib/model-metadata";
+import {
+  formatContextWindow,
+  formatModelMetadataDetails,
+  getModelMetadata,
+  hasKnownContextWindow,
+} from "@/lib/model-metadata";
 import { isImageGenerationModel } from "@/lib/chat/image-models";
 import { compareModelProviders, sortModelsByFamily } from "@/lib/model-sorting";
 import { isNewModel } from "@/lib/model-presentation";
@@ -266,6 +271,7 @@ export function ModelSelectorDialog({
                       const key = getModelKey(model);
                       const isSelected = key === selectedModelKey;
                       const metadata = getModelMetadata(model.id);
+                      const description = model.presentation?.description || metadata?.description;
                       const imageGenerationModel = isImageGenerationModel(model.id);
 
                       return (
@@ -298,12 +304,12 @@ export function ModelSelectorDialog({
                                 </span>
                               )}
                             </span>
-                            {model.presentation?.description && (
+                            {description && (
                               <span
                                 className="mt-0.5 block truncate text-xs text-gray-400"
-                                data-markai-tooltip={model.presentation.description}
+                                data-markai-tooltip={description}
                               >
-                                {model.presentation.description}
+                                {description}
                               </span>
                             )}
                           </span>
@@ -334,17 +340,7 @@ export function ModelSelectorDialog({
                           {hasKnownContextWindow(metadata) && (
                             <span
                               className="shrink-0 text-[11px] tabular-nums text-gray-400 dark:text-gray-500"
-                              title={[
-                                `上下文 ${metadata.contextWindowTokens.toLocaleString()} tokens`,
-                                metadata.maxOutputTokens
-                                  ? `最大输出 ${metadata.maxOutputTokens.toLocaleString()} tokens`
-                                  : "",
-                                metadata.knowledgeCutoff
-                                  ? `知识截止 ${metadata.knowledgeCutoff}`
-                                  : "",
-                              ]
-                                .filter(Boolean)
-                                .join("\n")}
+                              data-markai-tooltip={formatModelMetadataDetails(metadata)}
                             >
                               {formatContextWindow(metadata.contextWindowTokens)}
                             </span>
