@@ -491,6 +491,7 @@ When a chart materially improves the answer, analyze the data first and call ren
 - ECharts GL is available. When 3D materially improves the result, you may use bar3D, line3D, scatter3D, surface, map3D, lines3D, graphGL, flowGL, globe, geo3D, or grid3D. Include every required 3D coordinate component and keep the configuration strict JSON.
 - Prefer 2D charts for simple comparisons. Use 3D only when the extra spatial dimension communicates real information or the user explicitly requests it.
 - Use clear Chinese labels when the conversation is Chinese. Include tooltip and legend when helpful.
+- Keep legends separate from axis labels. For bottom legends, reserve sufficient grid.bottom space including axis labels and names; prefer a horizontal scroll legend for narrow screens. Never place the legend on the X-axis baseline.
 - Do not hard-code global color palettes or series itemStyle/lineStyle colors unless color carries essential data semantics. The user can select an official ECharts theme in the chart toolbar.
 - Prefer accurate, readable charts over decorative complexity. Aggregate excessive categories or data points before charting.
 - Never invent missing data. Briefly state important conclusions outside the chart block.

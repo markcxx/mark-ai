@@ -44,6 +44,41 @@ const visualizationMessage: Message = {
     }),
     "```",
     "",
+    "下面是底部图例与月份标签的排版示例，缩窄窗口可查看图例翻页效果。",
+    "",
+    "```echarts",
+    JSON.stringify({
+      title: { text: "月度销售额、去年同期与利润组合图", left: "center" },
+      tooltip: { trigger: "axis" },
+      legend: { bottom: 0 },
+      grid: { top: 76, right: 48, bottom: 20, left: 48 },
+      xAxis: { type: "category", data: Array.from({ length: 12 }, (_, i) => `${i + 1}月`) },
+      yAxis: [
+        { type: "value", name: "销售额（万元）" },
+        { type: "value", name: "利润（万元）" },
+      ],
+      series: [
+        {
+          name: "销售额（万元）",
+          type: "bar",
+          data: [130, 98, 158, 143, 170, 190, 176, 163, 200, 218, 270, 248],
+        },
+        {
+          name: "去年同期销售额（万元）",
+          type: "bar",
+          data: [115, 88, 137, 130, 150, 167, 159, 146, 174, 188, 230, 212],
+        },
+        {
+          name: "利润（万元）",
+          type: "line",
+          yAxisIndex: 1,
+          smooth: true,
+          data: [26, 19, 33, 30, 36, 42, 39, 34, 46, 51, 66, 59],
+        },
+      ],
+    }),
+    "```",
+    "",
     "知识库可以按以下结构组织，每个节点都可以展开、收起。",
     "",
     "```markmap",
@@ -199,6 +234,7 @@ export function ToolCallsPreview({
   const [mobile, setMobile] = useState(false);
   const [view, setView] = useState<PreviewView>(initialView === "calls" ? "calls" : "visuals");
   const [generatedChart, setGeneratedChart] = useState<GeneratedTestChart | null>(null);
+  const [modelTestOpen, setModelTestOpen] = useState(false);
   const [previewTheme, setPreviewTheme] = useState(initialTheme === "dark" ? "dark" : "light");
 
   useEffect(() => {
@@ -321,7 +357,13 @@ export function ToolCallsPreview({
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 md:px-8">
             <div className="mx-auto w-full max-w-[840px] space-y-7">
               {view === "visuals" && !embedded && (
-                <ChartGenerationTest onChart={setGeneratedChart} />
+                <details
+                  className="text-sm text-gray-500 dark:text-gray-400"
+                  onToggle={(event) => setModelTestOpen(event.currentTarget.open)}
+                >
+                  <summary className="cursor-pointer py-2">真实模型测试（需要登录）</summary>
+                  {modelTestOpen && <ChartGenerationTest onChart={setGeneratedChart} />}
+                </details>
               )}
               <div className="flex justify-end">
                 <p className="max-w-[85%] rounded-2xl rounded-tr-sm bg-[var(--chat-user-bubble-bg)] px-4 py-3 text-sm">

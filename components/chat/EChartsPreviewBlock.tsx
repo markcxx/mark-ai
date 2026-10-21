@@ -11,6 +11,7 @@ import { AppSelect } from "@/components/ui/AppSelect";
 import { cn } from "@/lib/utils";
 import { parseEChartsOption as parseOption } from "@/lib/visualization/echarts-option";
 import { ECHARTS_THEME_PALETTES } from "@/lib/visualization/echarts-theme-palettes";
+import { layoutEChartsOption } from "@/lib/visualization/echarts-layout";
 
 import { ToolPreviewCard, ToolPreviewError, toolPreviewActionClass } from "./ToolPreviewCard";
 
@@ -188,8 +189,33 @@ function ChartCanvas({
         if (!active || !containerRef.current) return;
         const chart = echarts.init(containerRef.current, theme, { renderer: "canvas" });
         chartRef.current = chart;
-        chart.setOption({ ...option, backgroundColor }, { lazyUpdate: false, notMerge: true });
-        observer = new ResizeObserver(() => chart.resize());
+        let renderedSize = "";
+        const render = () => {
+          const container = containerRef.current;
+          if (!container || !active) return;
+          const size = `${container.clientWidth}:${container.clientHeight}`;
+          if (size === renderedSize) return;
+          const layout = layoutEChartsOption(option, container.clientWidth, container.clientHeight);
+          chart.resize();
+          if (!renderedSize) {
+            chart.setOption({ ...layout, backgroundColor }, { lazyUpdate: false, notMerge: true });
+          } else if (layout !== option) {
+            // Reflow only layout; keep the user's legend selection, page and data zoom.
+            const previousLegends = chart.getOption().legend as Array<Record<string, unknown>>;
+            const legends = layout.legend as Array<Record<string, unknown>>;
+            chart.setOption({
+              grid: layout.grid,
+              legend: legends.map((legend, index) => ({
+                ...legend,
+                selected: previousLegends[index]?.selected,
+                scrollDataIndex: previousLegends[index]?.scrollDataIndex,
+              })),
+            } as EChartsOption);
+          }
+          renderedSize = size;
+        };
+        render();
+        observer = new ResizeObserver(render);
         observer.observe(containerRef.current);
         setLoading(false);
         onReady(true);

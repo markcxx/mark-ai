@@ -22,6 +22,7 @@ export async function middleware(req: NextRequest) {
 
   if (
     pathname === "/" ||
+    (process.env.NODE_ENV === "development" && pathname === "/dev/tool-calls") ||
     isPublicPath(pathname) ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/images")
