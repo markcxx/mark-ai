@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
         if (error instanceof DOMException && error.name === "AbortError") throw error;
         console.error("Image generation error:", error);
         return NextResponse.json(
-          { error: error instanceof Error ? error.message : "图片生成失败，请稍后重试" },
+          { error: describeGenerationError(error, [selectedModel.apiKey]) },
           { status: 502 },
         );
       }

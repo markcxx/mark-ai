@@ -102,7 +102,13 @@ export function SourcePopover({
 }) {
   return (
     <Popover.Root>
-      <Popover.Trigger closeDelay={120} delay={120} openOnHover render={children} />
+      <Popover.Trigger
+        closeDelay={120}
+        delay={120}
+        nativeButton={false}
+        openOnHover
+        render={children}
+      />
       <Popover.Portal>
         <Popover.Positioner align="center" className="z-[120]" side="top" sideOffset={8}>
           <Popover.Popup

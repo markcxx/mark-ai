@@ -9,17 +9,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppDialog } from "@/components/ui/AppDialog";
 import { AppSelect } from "@/components/ui/AppSelect";
 import { cn } from "@/lib/utils";
+import { parseEChartsOption as parseOption } from "@/lib/visualization/echarts-option";
 import { ECHARTS_THEME_PALETTES } from "@/lib/visualization/echarts-theme-palettes";
 
 import { ToolPreviewCard, ToolPreviewError, toolPreviewActionClass } from "./ToolPreviewCard";
-
-const MAX_CONFIG_CHARS = 160_000;
-const MAX_NODES = 60_000;
-const MAX_SERIES = 30;
-const BLOCKED_KEYS = new Set(["__proto__", "constructor", "graphic", "prototype"]);
-
-type ParseResult =
-  { error: string; ok: false } | { ok: true; option: EChartsOption; title: string };
 
 type ChartThemeId =
   | "auto"
@@ -102,91 +95,15 @@ const chartThemeOptions: Array<{ label: string; value: ChartThemeId }> = [
   { label: "复古", value: "vintage" },
 ];
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value) && typeof value === "object" && !Array.isArray(value);
-
-const sanitizeOption = (input: unknown) => {
-  let nodes = 0;
-
-  const visit = (value: unknown, key = "", depth = 0): unknown => {
-    nodes += 1;
-    if (nodes > MAX_NODES) throw new Error("图表数据量过大");
-    if (depth > 24) throw new Error("图表配置嵌套过深");
-    if (value === null || typeof value === "boolean" || typeof value === "number") return value;
-    if (typeof value === "string") {
-      if (
-        (key === "image" || key === "symbol") &&
-        /^(?:data:|image:\/\/|https?:\/\/)/i.test(value)
-      ) {
-        return key === "symbol" ? "circle" : undefined;
-      }
-      return value;
-    }
-    if (Array.isArray(value)) return value.map((item) => visit(item, key, depth + 1));
-    if (!isRecord(value)) return undefined;
-
-    return Object.fromEntries(
-      Object.entries(value)
-        .filter(([childKey]) => !BLOCKED_KEYS.has(childKey))
-        .map(([childKey, childValue]) => [childKey, visit(childValue, childKey, depth + 1)])
-        .filter((entry) => entry[1] !== undefined),
-    );
-  };
-
-  return visit(input);
-};
-
-const getChartTitle = (option: Record<string, unknown>) => {
-  const title = Array.isArray(option.title) ? option.title[0] : option.title;
-  if (!isRecord(title) || typeof title.text !== "string" || !title.text.trim()) return "数据图表";
-  return title.text.trim().slice(0, 80);
-};
-
-const parseOption = (source: string): ParseResult => {
-  const trimmed = source.trim();
-  if (!trimmed) return { error: "图表配置为空", ok: false };
-  if (trimmed.length > MAX_CONFIG_CHARS) return { error: "图表配置过大", ok: false };
-
-  try {
-    const parsed = JSON.parse(trimmed) as unknown;
-    const sanitized = sanitizeOption(parsed);
-    if (!isRecord(sanitized)) return { error: "图表配置必须是 JSON 对象", ok: false };
-    if (!Array.isArray(sanitized.series) || sanitized.series.length === 0) {
-      return { error: "图表配置缺少 series 数据", ok: false };
-    }
-    if (sanitized.series.length > MAX_SERIES) {
-      return { error: "图表系列数量过多", ok: false };
-    }
-    if (
-      sanitized.series.some(
-        (series) => isRecord(series) && (series.type === "custom" || "renderItem" in series),
-      )
-    ) {
-      return { error: "不支持执行自定义图表代码", ok: false };
-    }
-
-    const tooltip = isRecord(sanitized.tooltip) ? sanitized.tooltip : {};
-    const option = {
-      ...sanitized,
-      aria: { enabled: true, ...(isRecord(sanitized.aria) ? sanitized.aria : {}) },
-      tooltip: { ...tooltip, appendToBody: false, confine: true, renderMode: "richText" },
-    } as EChartsOption;
-
-    return { ok: true, option, title: getChartTitle(sanitized) };
-  } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "JSON 格式不正确",
-      ok: false,
-    };
-  }
-};
-
 const safeFileName = (value: string) =>
   value
     .replaceAll(/[/\\:*?"<>|]/g, "-")
     .replaceAll(/\s+/g, " ")
     .trim()
     .slice(0, 80) || "MarkAI 数据图表";
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
 const resolveTheme = (theme: ChartThemeId, dark: boolean) => {
   if (theme === "auto") return dark ? "dark" : undefined;
@@ -271,7 +188,7 @@ function ChartCanvas({
         if (!active || !containerRef.current) return;
         const chart = echarts.init(containerRef.current, theme, { renderer: "canvas" });
         chartRef.current = chart;
-        chart.setOption(option, { lazyUpdate: false, notMerge: true });
+        chart.setOption({ ...option, backgroundColor }, { lazyUpdate: false, notMerge: true });
         observer = new ResizeObserver(() => chart.resize());
         observer.observe(containerRef.current);
         setLoading(false);
@@ -293,7 +210,7 @@ function ChartCanvas({
       chartRef.current = null;
       onReady(false);
     };
-  }, [chartRef, onError, onReady, option, theme]);
+  }, [backgroundColor, chartRef, onError, onReady, option, theme]);
 
   return (
     <div className={cn("relative", className)} style={{ backgroundColor }}>
@@ -364,6 +281,7 @@ export function EChartsPreviewBlock({ children }: { children: string }) {
   return (
     <>
       <ToolPreviewCard
+        appearance="inline"
         actions={
           <>
             {parsed.ok && !runtimeError && (
@@ -418,7 +336,7 @@ export function EChartsPreviewBlock({ children }: { children: string }) {
       >
         {parsed.ok && !runtimeError ? (
           <ChartCanvas
-            backgroundColor={chartBackground}
+            backgroundColor={chartTheme === "auto" ? "transparent" : chartBackground}
             chartRef={chartRef}
             className="h-[340px] w-full sm:h-[380px]"
             onError={handleRenderError}

@@ -272,10 +272,10 @@ const MindMapSurface = ({
   }, [onError, onReady, resolvedTheme, source, validationError]);
 
   return (
-    <div className={`relative overflow-hidden bg-white dark:bg-[#171717] ${className}`}>
+    <div className={`relative overflow-hidden ${className}`}>
       <svg className="absolute inset-0 h-full w-full" ref={svgRef} />
       {!error && !loading && (
-        <div className="absolute bottom-3 right-3 z-10 flex gap-1 rounded-lg border border-gray-200 bg-white/90 p-1 shadow-sm backdrop-blur dark:border-white/10 dark:bg-[#191919]/90">
+        <div className="absolute bottom-1 right-0 z-10 flex gap-0.5 bg-[var(--chat-panel-bg)]">
           <button
             aria-label="折叠脑图节点"
             className={toolPreviewActionClass}
@@ -384,6 +384,7 @@ export function MarkmapPreviewBlock({ children }: { children: string }) {
   return (
     <>
       <ToolPreviewCard
+        appearance="inline"
         actions={
           <>
             {!previewError && (

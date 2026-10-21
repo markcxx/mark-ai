@@ -64,7 +64,11 @@ export function getThinkingPolicy(model: ModelRoute): ThinkingPolicy | undefined
   }
   if (is(["volcengine", "doubao", "ark"], ["volces.com"])) {
     if (/^doubao-seed-(1-6|2-[01])($|-)/.test(id) && !/thinking|code/.test(id)) return policy();
-    if (/^deepseek-v4-(flash|pro)(-\d{6})?$/.test(id) || /^glm-5-2-\d{6}$/.test(id))
+    if (
+      /^deepseek-v4-(flash|pro)(-ga)?(-\d{6})?$/.test(id) ||
+      /^deepseek-v4-1-flash-(260910|261017)$/.test(id) ||
+      /^glm-5-2-\d{6}$/.test(id)
+    )
       return policy();
     return;
   }

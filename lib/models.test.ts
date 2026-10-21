@@ -11,6 +11,9 @@ const TEST_ENV_KEYS = [
   "MARKCHANNELB_API_KEY",
   "MARKCHANNELB_BASE_URL",
   "MARKCHANNELB_MODELS",
+  "MARKCHANNELA_EXTRA_API_KEY",
+  "MARKCHANNELA_EXTRA_BASE_URL",
+  "MARKCHANNELA_EXTRA_MODELS",
 ] as const;
 
 const originalEnvironment = new Map<string, string | undefined>();
@@ -36,6 +39,26 @@ afterEach(() => {
 });
 
 describe("MarkAI model channels", () => {
+  it("auto-discovers an isolated channel without sharing its key pool with the original channel", () => {
+    process.env.MARKCHANNELA_API_KEY = "key-one,key-two";
+    process.env.MARKCHANNELA_BASE_URL = "https://channel.example/v1";
+    process.env.MARKCHANNELA_MODELS = "existing-only";
+    process.env.MARKCHANNELA_EXTRA_API_KEY = "key-one";
+    process.env.MARKCHANNELA_EXTRA_BASE_URL = "https://channel.example/v1";
+    process.env.MARKCHANNELA_EXTRA_MODELS = "new-only";
+    vi.spyOn(Math, "random").mockReturnValue(0.999);
+    expect(findConfiguredModel("new-only", "markai")).toMatchObject({
+      provider: "markchannela_extra",
+      apiKey: "key-one",
+    });
+    expect(findConfiguredModel("existing-only", "markai")).toMatchObject({
+      provider: "markchannela",
+      apiKey: "key-two",
+    });
+    expect(getPublicConfiguredModels()).toContainEqual(
+      expect.objectContaining({ provider: "markai", id: "new-only" }),
+    );
+  });
   it("routes an explicit thinking choice only to compatible channels", () => {
     process.env.AI_PROVIDERS = "markchannela,markchannelb";
     process.env.MARKCHANNELA_API_KEY = "test-a";

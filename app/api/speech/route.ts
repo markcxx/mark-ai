@@ -1,3 +1,4 @@
+import { describeGenerationError } from "@/lib/chat/generation-error";
 import { NextRequest, NextResponse } from "next/server";
 
 import { authorizeApiRequest, enforceRateLimit } from "@/lib/api/security";
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
     }
     console.error("Speech synthesis error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "语音合成失败，请稍后重试" },
+      { error: describeGenerationError(error, [process.env.MARKAI_TTS_API_KEY || ""]) },
       { status: 500 },
     );
   }

@@ -1,59 +1,88 @@
-import { describe, expect, it } from "vitest";
-import { describeGenerationError } from "./generation-error";
+import { describe, expect, it, vi } from "vitest";
+import { describeGenerationError, readProviderResponseError } from "./generation-error";
 import { formatContextWindow, getModelMetadata } from "../model-metadata";
 
-describe("generation error reporting", () => {
-  it("explains Google's nested 503 error", () => {
-    const result = describeGenerationError(
-      new Error(
-        JSON.stringify([
-          {
-            error: {
-              code: 503,
-              message: "This model is currently experiencing high demand.",
-              status: "UNAVAILABLE",
-            },
-          },
-        ]),
-      ),
+describe("raw generation error reporting", () => {
+  it("preserves a failed HTTP response body and redacts the configured key", async () => {
+    const raw = JSON.stringify({
+      error: { message: "schema failed", debug: "configured-key", request_id: "req-2" },
+    });
+    const error = await readProviderResponseError(new Response(raw, { status: 422 }), [
+      "configured-key",
+    ]);
+    expect(describeGenerationError(error)).toBe(
+      `HTTP 422\n${raw.replace("configured-key", "[已隐藏]")}`,
     );
-    expect(result).toContain("This model is currently experiencing high demand.");
-    expect(result).toContain("503");
   });
-  it("preserves the exact unsupported-location reason", () => {
-    const reason = "User location is not supported for the API use.";
-    const error = Object.assign(
-      new Error(
-        JSON.stringify([{ error: { code: 400, message: reason, status: "FAILED_PRECONDITION" } }]),
-      ),
-      { status: 400 },
-    );
-    expect(describeGenerationError(error)).toBe(`生成失败：${reason}（400）`);
-  });
-  it("redacts credentials while retaining the provider explanation", () => {
-    const error = {
-      error: {
-        code: 401,
-        message:
-          "Invalid API key: sk-secret. Bearer token-secret https://internal.invalid/?key=secret custom-value",
+
+  it.each([400, 401, 402, 403, 404, 422, 429, 500, 503])(
+    "preserves HTTP %s and the complete upstream JSON",
+    (status) => {
+      const raw = JSON.stringify({
+        error: {
+          code: "provider_error",
+          message: "Original upstream reason",
+          request_id: "req-test",
+        },
+      });
+      const error = Object.assign(new Error(raw), { status });
+      expect(describeGenerationError(error)).toBe(`HTTP ${status}\n${raw}`);
+    },
+  );
+  it("preserves nested provider errors without extracting only the message", () => {
+    const raw = JSON.stringify([
+      {
+        error: {
+          code: 503,
+          message: "This model is currently experiencing high demand.",
+          status: "UNAVAILABLE",
+        },
       },
-    };
-    const result = describeGenerationError(error, ["custom-value"]);
-    expect(result).toContain("Invalid API key");
-    expect(result).not.toMatch(/sk-secret|token-secret|internal.invalid|custom-value/);
+    ]);
+    expect(describeGenerationError(new Error(raw))).toBe(`HTTP 503\n${raw}`);
   });
   it.each([
-    [429, "限流"],
-    [401, "认证"],
-    [404, "不存在"],
-    [500, "内部错误"],
-  ])("explains HTTP %s", (status, text) => {
-    expect(describeGenerationError(Object.assign(new Error(""), { status }))).toContain(text);
+    "insufficient permissions",
+    "quota exceeded",
+    "fetch failed",
+    "some unrecognized reason",
+    "<html>Bad gateway</html>",
+  ])("does not rewrite plain text: %s", (raw) => {
+    expect(describeGenerationError(new Error(raw))).toBe(raw);
   });
-  it("does not expose an unknown provider body or credentials", () => {
-    expect(
-      describeGenerationError(new Error("debug secret=private-value https://private.invalid")),
-    ).not.toMatch(/private/);
+  it("preserves multiline and long errors without truncating diagnostic details", () => {
+    const raw = "First line\n" + "x".repeat(2000) + "\nrequest-id=last";
+    expect(describeGenerationError(new Error(raw))).toBe(raw);
+  });
+  it("redacts credentials but retains URLs and diagnostic fields", () => {
+    const raw = JSON.stringify({
+      error: {
+        message:
+          "Invalid API key: sk-secret Bearer token-secret custom-value https://provider.invalid/endpoint?key=private",
+        api_key: "unusual-key",
+        request_id: "req-1",
+      },
+    });
+    const result = describeGenerationError(new Error(raw), ["custom-value"]);
+    expect(result).toContain("Invalid API key");
+    expect(result).toContain("https://provider.invalid/endpoint");
+    expect(result).toContain("req-1");
+    expect(result).not.toMatch(/sk-secret|token-secret|custom-value|unusual-key|private/);
+  });
+  it("does the same in production", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    try {
+      expect(
+        describeGenerationError(
+          Object.assign(new Error("tool_choice unsupported"), { status: 400 }),
+        ),
+      ).toBe("HTTP 400\ntool_choice unsupported");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+  it("retains a status when no upstream body was provided", () => {
+    expect(describeGenerationError(Object.assign(new Error(""), { status: 402 }))).toBe("HTTP 402");
   });
 });
 

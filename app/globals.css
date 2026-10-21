@@ -681,6 +681,14 @@ button:disabled {
   }
 }
 
+/* Tool sequences read as compact activity lines between prose paragraphs. */
+.markdown-body :not(.chat-tool-call) + .chat-tool-call {
+  margin-top: 0.75rem;
+}
+.markdown-body .chat-tool-call + :not(.chat-tool-call) {
+  margin-top: 1rem;
+}
+
 .markdown-body p {
   @apply mb-4 leading-relaxed;
 }

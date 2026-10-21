@@ -1,3 +1,4 @@
+import { readProviderResponseError } from "../generation-error";
 import { fetchWithDevelopmentProxy } from "@/lib/server/development-proxy";
 
 const DEFAULT_TTS_BASE_URL =
@@ -61,7 +62,7 @@ const decodeBase64Audio = (data: string): SpeechAudio => {
 const downloadAudio = async (url: string, signal?: AbortSignal): Promise<SpeechAudio> => {
   const parsedUrl = requireHttpUrl(url);
   const response = await fetchWithDevelopmentProxy(parsedUrl, { signal });
-  if (!response.ok) throw new Error(`下载合成音频失败 (${response.status})`);
+  if (!response.ok) throw await readProviderResponseError(response);
 
   const declaredLength = Number(response.headers.get("content-length") || 0);
   if (declaredLength > MAX_AUDIO_BYTES) throw new Error("合成音频过大，请缩短朗读内容");
@@ -102,11 +103,8 @@ export const generateSpeechAudio = async ({
     signal,
   });
 
+  if (!response.ok) throw await readProviderResponseError(response, [config.apiKey]);
   const data = await response.json().catch(() => null);
-  if (!response.ok) {
-    const detail = typeof data?.message === "string" ? `：${data.message}` : "";
-    throw new Error(`语音合成服务请求失败 (${response.status})${detail}`);
-  }
 
   const audio = data?.output?.audio;
   if (typeof audio?.data === "string" && audio.data.trim()) {

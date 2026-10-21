@@ -1,3 +1,4 @@
+import { describeGenerationError } from "@/lib/chat/generation-error";
 import { NextRequest, NextResponse } from "next/server";
 
 import { authorizeApiRequest, enforceRateLimit } from "@/lib/api/security";
@@ -33,6 +34,7 @@ const resolveEnvironmentTranslationModel = () => {
 };
 
 export async function POST(req: NextRequest) {
+  let apiKey = "";
   try {
     const authorization = await authorizeApiRequest(req);
     if (!authorization.authorized) return authorization.response;
@@ -68,14 +70,12 @@ export async function POST(req: NextRequest) {
     }
     if (!model) return NextResponse.json({ error: "当前模型不可用" }, { status: 400 });
 
+    apiKey = model.apiKey;
     const language = getTranslationLanguageLabel(targetLanguage)!;
     const translation = await generateTranslation({ content, language, model });
     return NextResponse.json({ language, translation });
   } catch (error) {
     console.error("Translation error:", error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "翻译失败，请稍后重试" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: describeGenerationError(error, [apiKey]) }, { status: 500 });
   }
 }

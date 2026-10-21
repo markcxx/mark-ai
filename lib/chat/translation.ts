@@ -1,3 +1,4 @@
+import { readProviderResponseError } from "./generation-error";
 import { GoogleGenAI } from "@google/genai";
 
 import type { ConfiguredModel } from "@/lib/models";
@@ -43,7 +44,7 @@ export const generateTranslation = async ({
       },
       method: "POST",
     });
-    if (!response.ok) throw new Error(`翻译模型请求失败 (${response.status})`);
+    if (!response.ok) throw await readProviderResponseError(response, [model.apiKey]);
     const data = await response.json();
     const translated = extractTranslation(String(data?.choices?.[0]?.message?.content || ""));
     if (!translated) throw new Error("模型没有返回译文");

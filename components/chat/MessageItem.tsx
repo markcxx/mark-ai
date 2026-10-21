@@ -860,7 +860,7 @@ export const MessageItem = memo(function MessageItem({
                   <p
                     key={`error-${index}`}
                     role="alert"
-                    className="mt-3 text-sm text-red-600 dark:text-red-400"
+                    className="mt-3 whitespace-pre-wrap break-words text-sm text-red-600 dark:text-red-400"
                   >
                     {segment.content}
                   </p>

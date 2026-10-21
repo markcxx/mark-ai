@@ -1,16 +1,54 @@
-import { Check, ChevronRight, Download, Eye, FileOutput, Loader2, X } from "lucide-react";
+import {
+  Calculator,
+  ChartColumn,
+  Check,
+  Download,
+  Eye,
+  FileCheck2,
+  FileDown,
+  FilePenLine,
+  FileText,
+  FolderOpen,
+  ListTree,
+  Loader2,
+  Paintbrush,
+  Table2,
+  Wrench,
+  type LucideIcon,
+} from "lucide-react";
 
 import { isFilePreviewable } from "@/components/chat/FilePreviewDialog";
 import { useFileUrl } from "../FileAccessContext";
 import { useHtmlPreview } from "@/components/chat/HtmlPreviewContext";
 import type { GeneratedFileState } from "@/lib/chat/types";
 import { getBuiltinTool } from "@/lib/tools/registry";
-import { cn } from "@/lib/utils";
+import { ToolCallDisclosure } from "./ToolCallDisclosure";
 
 const formatSize = (size: number) =>
   size < 1024 * 1024
     ? `${Math.max(1, Math.ceil(size / 1024))} KB`
     : `${(size / 1024 / 1024).toFixed(1)} MB`;
+
+const TOOL_ICONS: Record<string, LucideIcon> = {
+  calculator: Calculator,
+  "data-visualization": ChartColumn,
+  "excel-workbook": Table2,
+  "word-document": FileText,
+};
+const WORD_STEP_ICONS: Record<string, LucideIcon> = {
+  word_document_begin: ListTree,
+  word_document_open: FolderOpen,
+  word_document_append: FileText,
+  word_document_revise: FilePenLine,
+  word_document_restyle: Paintbrush,
+  word_document_inspect: FileCheck2,
+  word_document_finalize: FileDown,
+};
+const TOOL_LABELS: Record<string, { running: string; done: string; error: string }> = {
+  calculator: { running: "正在计算", done: "已完成计算", error: "计算失败" },
+  "data-visualization": { running: "正在校验图表", done: "已生成图表", error: "图表校验失败" },
+  "excel-workbook": { running: "正在生成表格", done: "已生成表格", error: "表格生成失败" },
+};
 
 const WORD_RUNNING_LABELS: Record<string, string> = {
   word_document_append: "正在构建下一个章节",
@@ -37,46 +75,18 @@ export function GeneratedFileToolBlock({
   const progress = generatedFile.progress;
   const livePreview = generatedFile.preview;
   const toolLabel = getBuiltinTool(generatedFile.toolId)?.name || "文件生成";
+  const labels = TOOL_LABELS[generatedFile.toolId];
+  const icon =
+    WORD_STEP_ICONS[generatedFile.toolName] || TOOL_ICONS[generatedFile.toolId] || Wrench;
   const summaryLabel = running
-    ? WORD_RUNNING_LABELS[generatedFile.toolName] || `正在调用${toolLabel}`
+    ? WORD_RUNNING_LABELS[generatedFile.toolName] || labels?.running || `正在使用${toolLabel}`
     : failed
-      ? `${toolLabel}调用失败`
-      : progress?.label || `已调用${toolLabel}`;
+      ? labels?.error || `${toolLabel}执行失败`
+      : progress?.label || labels?.done || `已使用${toolLabel}`;
 
   return (
-    <details className="group/file-tool mb-2.5 min-w-0 text-gray-500 dark:text-gray-400">
-      <summary className="flex min-h-10 w-fit max-w-full cursor-pointer list-none items-center gap-2 py-1 text-gray-500 transition-colors hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary dark:text-gray-400 dark:hover:text-gray-200 [&::-webkit-details-marker]:hidden">
-        <span
-          className={cn(
-            "flex h-5 w-5 shrink-0 items-center justify-center",
-            failed
-              ? "text-red-600 dark:text-red-400"
-              : "text-gray-400 dark:text-gray-500",
-          )}
-        >
-          {running ? (
-            <Loader2 className="animate-spin" size={12} />
-          ) : failed ? (
-            <X size={12} />
-          ) : (
-            <FileOutput size={12} />
-          )}
-        </span>
-        <span
-          className={cn(
-            "min-w-0 truncate text-xs",
-            failed ? "text-red-600 dark:text-red-300" : "text-gray-500 dark:text-gray-400",
-          )}
-        >
-          {summaryLabel}
-        </span>
-        <ChevronRight
-          className="shrink-0 text-gray-400 transition-transform duration-200 group-open/file-tool:rotate-90"
-          size={14}
-        />
-      </summary>
-
-      <div className="min-w-0 pl-7 pb-2 pt-1">
+    <ToolCallDisclosure icon={icon} label={summaryLabel} status={generatedFile.status}>
+      <div className="min-w-0 pl-[22px] pb-2 pt-1">
         <div className="flex min-w-0 items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
           <span className="shrink-0 font-mono text-[11px] text-gray-400 dark:text-gray-500">
             {generatedFile.toolName}
@@ -184,6 +194,6 @@ export function GeneratedFileToolBlock({
           </div>
         )}
       </div>
-    </details>
+    </ToolCallDisclosure>
   );
 }

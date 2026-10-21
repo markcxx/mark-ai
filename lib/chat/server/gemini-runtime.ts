@@ -1,5 +1,12 @@
+import { ChartValidationLimitError } from "./chart-validation";
 import { describeGenerationError } from "@/lib/chat/generation-error";
-import { FunctionCallingConfigMode, GoogleGenAI } from "@google/genai";
+import {
+  FunctionCallingConfigMode,
+  GoogleGenAI,
+  type GenerateContentParameters,
+  type Part,
+  type GenerateContentResponseUsageMetadata,
+} from "@google/genai";
 
 import type { ContextPreparation } from "@/lib/chat/context-window";
 import { estimateTextTokens } from "@/lib/chat/metrics";
@@ -39,6 +46,7 @@ export const createGeminiStream = async ({
   systemPrompt: string;
   toolRuntime?: {
     enabledToolIds: string[];
+    debugChartAttempts?: boolean;
     sessionId: string;
     userId: string;
   };
@@ -73,6 +81,7 @@ export const createGeminiStream = async ({
       async start(controller) {
         const encoder = new TextEncoder();
         const toolRuntimeState = new Map<string, unknown>();
+        let chartAttemptIndex = 0;
         const toolContents = [...contents] as any[];
         let outputText = "";
         let latestUsage: ResolvedTokenUsage | undefined;
@@ -86,7 +95,7 @@ export const createGeminiStream = async ({
             ? 32
             : 5;
           for (let round = 0; round < maxToolRounds; round += 1) {
-            const response = await ai.models.generateContent({
+            const request: GenerateContentParameters = {
               config: {
                 abortSignal: signal,
                 ...(requiredWordToolNames.length
@@ -111,7 +120,42 @@ export const createGeminiStream = async ({
               },
               contents: toolContents,
               model,
-            });
+            };
+            const response = toolRuntime.debugChartAttempts
+              ? await (async () => {
+                  const chunks = await ai.models.generateContentStream({
+                    ...request,
+                    config: { ...request.config, thinkingConfig: { includeThoughts: true } },
+                  });
+                  const parts: Part[] = [];
+                  let usageMetadata: GenerateContentResponseUsageMetadata | undefined;
+                  let text = "";
+                  for await (const chunk of chunks) {
+                    if (chunk.usageMetadata) usageMetadata = chunk.usageMetadata;
+                    for (const part of chunk.candidates?.[0]?.content?.parts || []) {
+                      parts.push(part);
+                      if (part.text) {
+                        if (!part.thought) text += part.text;
+                        controller.enqueue(
+                          encodeStreamEvent(
+                            encoder,
+                            part.thought ? "reasoning" : "content",
+                            part.text,
+                          ),
+                        );
+                      }
+                    }
+                  }
+                  return {
+                    usageMetadata,
+                    text,
+                    functionCalls: parts.flatMap((part) =>
+                      part.functionCall ? [part.functionCall] : [],
+                    ),
+                    candidates: [{ content: { role: "model", parts } }],
+                  };
+                })()
+              : await ai.models.generateContent(request);
             const usageMetadata = response.usageMetadata;
             let providerUsage: TokenUsage | undefined;
             if (usageMetadata) {
@@ -149,7 +193,7 @@ export const createGeminiStream = async ({
             if (functionCalls.length === 0) {
               if (requiredWordToolNames.length === 0) {
                 outputText = response.text || "";
-                if (outputText) {
+                if (outputText && !toolRuntime.debugChartAttempts) {
                   controller.enqueue(encodeStreamEvent(encoder, "content", outputText));
                 }
                 break;
@@ -193,6 +237,10 @@ export const createGeminiStream = async ({
               };
               controller.enqueue(encodeGeneratedFileEvent(encoder, runningState));
 
+              const chartAttempt =
+                toolRuntime.debugChartAttempts && name === "render_echarts_chart"
+                  ? { index: ++chartAttemptIndex, raw: JSON.stringify(functionArgs, null, 2) }
+                  : undefined;
               try {
                 const result = await executeBuiltinTool(name, functionArgs, {
                   runtimeState: toolRuntimeState,
@@ -212,6 +260,15 @@ export const createGeminiStream = async ({
                 if (builtinTool.id === "word-document") {
                   requiredWordToolNames = getWordContinuationToolNames(name, result.content) || [];
                 }
+                if (chartAttempt)
+                  controller.enqueue(
+                    encoder.encode(
+                      `${JSON.stringify({ type: "attempt", ...chartAttempt, validation: result.content.validation })}\n`,
+                    ),
+                  );
+                if (result.output) {
+                  controller.enqueue(encodeStreamEvent(encoder, "content", result.output));
+                }
                 responseParts.push({
                   functionResponse: {
                     id: functionCall.id,
@@ -221,6 +278,12 @@ export const createGeminiStream = async ({
                 });
               } catch (error) {
                 const message = error instanceof Error ? error.message : "File generation failed";
+                if (chartAttempt)
+                  controller.enqueue(
+                    encoder.encode(
+                      `${JSON.stringify({ type: "attempt", ...chartAttempt, error: message })}\n`,
+                    ),
+                  );
                 controller.enqueue(
                   encodeGeneratedFileEvent(encoder, {
                     ...runningState,
@@ -228,6 +291,7 @@ export const createGeminiStream = async ({
                     status: "error",
                   }),
                 );
+                if (error instanceof ChartValidationLimitError) throw error;
                 if (builtinTool.id === "word-document") requiredWordToolNames = [];
                 responseParts.push({
                   functionResponse: {
@@ -316,7 +380,9 @@ export const createGeminiStream = async ({
         controller.enqueue(encodeUsageEvent(encoder, resolvedUsage));
         controller.close();
       } catch (error) {
-        controller.enqueue(encodeStreamEvent(encoder, "error", describeGenerationError(error, [apiKey])));
+        controller.enqueue(
+          encodeStreamEvent(encoder, "error", describeGenerationError(error, [apiKey])),
+        );
         controller.close();
       }
     },

@@ -1,3 +1,4 @@
+import { describeGenerationError, readProviderResponseError } from "./generation-error";
 import { GoogleGenAI } from "@google/genai";
 
 import { findConfiguredModel, getConfiguredModels } from "@/lib/models";
@@ -143,7 +144,9 @@ ${transcript}
           title: fallback,
           titleModel: {
             ...titleModel,
-            reason: `Title model request failed with status ${response.status}`,
+            reason: describeGenerationError(
+              await readProviderResponseError(response, [selectedModel.apiKey]),
+            ),
           },
         };
       }
@@ -171,7 +174,7 @@ ${transcript}
       title: fallback,
       titleModel: {
         ...titleModel,
-        reason: error instanceof Error ? error.message : "Title model request failed",
+        reason: describeGenerationError(error, [selectedModel.apiKey]),
       },
     };
   }

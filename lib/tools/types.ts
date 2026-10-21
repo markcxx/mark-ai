@@ -3,6 +3,7 @@ export type BuiltinToolKind = "tool" | "skill";
 
 export type ToolJsonSchema = {
   additionalProperties?: boolean;
+  anyOf?: ToolJsonSchema[];
   description?: string;
   enum?: string[];
   items?: ToolJsonSchema;
@@ -12,7 +13,7 @@ export type ToolJsonSchema = {
   minimum?: number;
   properties?: Record<string, ToolJsonSchema>;
   required?: string[];
-  type: "array" | "boolean" | "integer" | "number" | "object" | "string";
+  type?: "array" | "boolean" | "integer" | "number" | "object" | "string";
 };
 
 export type BuiltinToolFunction = {
@@ -64,6 +65,8 @@ export type GeneratedFile = {
 
 export type ToolExecutionResult = {
   content: Record<string, unknown>;
+  /** Validated auxiliary output, persisted through normal content segments. */
+  output?: string;
   file?: GeneratedFile;
   preview?: import("./word/types").WordDocumentPreviewState;
   progress?: ToolProgress;

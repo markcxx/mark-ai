@@ -136,6 +136,6 @@ it("delivers the provider location restriction through the response stream", asy
   );
   expect(JSON.parse((await response.text()).trim())).toEqual({
     type: "error",
-    text: "生成失败：User location is not supported for the API use.（400）",
+    text: 'HTTP 400\n[{"error":{"code":400,"message":"User location is not supported for the API use.","status":"FAILED_PRECONDITION"}}]',
   });
 });

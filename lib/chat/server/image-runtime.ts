@@ -1,3 +1,4 @@
+import { readProviderResponseError } from "../generation-error";
 import { getStoredFileBytes, getStoredFilesByIds } from "@/lib/storage/file-storage";
 import { saveGeneratedFile } from "@/lib/tools/generated-file";
 import { fetchWithDevelopmentProxy } from "@/lib/server/development-proxy";
@@ -49,17 +50,6 @@ export const detectGeneratedImageFormat = (bytes: Uint8Array): ImageFormat => {
   return { contentType: "image/png", extension: ".png" };
 };
 
-const getProviderError = async (response: Response) => {
-  const raw = await response.text().catch(() => "");
-  try {
-    const payload = JSON.parse(raw) as ImageApiPayload;
-    if (typeof payload.error === "string") return payload.error;
-    return payload.error?.message || raw;
-  } catch {
-    return raw;
-  }
-};
-
 const readGeneratedBytes = async (
   item: NonNullable<ImageApiPayload["data"]>[number],
   signal: AbortSignal,
@@ -68,7 +58,7 @@ const readGeneratedBytes = async (
   if (!item.url) throw new Error("图片服务未返回图片数据");
 
   const response = await fetchWithDevelopmentProxy(item.url, { signal });
-  if (!response.ok) throw new Error("图片服务返回的临时图片无法下载");
+  if (!response.ok) throw await readProviderResponseError(response);
   return new Uint8Array(await response.arrayBuffer());
 };
 
@@ -151,10 +141,7 @@ export const generateOrEditImage = async ({
     });
   }
 
-  if (!response.ok) {
-    const detail = await getProviderError(response);
-    throw new Error(detail ? `图片生成服务返回错误：${detail}` : "图片生成服务请求失败");
-  }
+  if (!response.ok) throw await readProviderResponseError(response, [apiKey]);
 
   const payload = (await response.json()) as ImageApiPayload;
   const item = payload.data?.[0];

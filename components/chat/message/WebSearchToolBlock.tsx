@@ -1,10 +1,10 @@
-import { ChevronRight, ExternalLink, Globe, Loader2, X } from "lucide-react";
+import { ExternalLink, ScanText, Search } from "lucide-react";
 
 import type { WebCitation } from "@/lib/chat/citations";
 import type { WebSearchResult, WebSearchState } from "@/lib/chat/types";
-import { cn } from "@/lib/utils";
 
 import { SourceFavicon, SourcePopover } from "./MessageSources";
+import { ToolCallDisclosure } from "./ToolCallDisclosure";
 
 const toCitation = (result: WebSearchResult, fallbackId: number): WebCitation => ({
   ...result,
@@ -17,49 +17,27 @@ export function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchStat
   const failed = webSearch.status === "error";
   const done = webSearch.status === "done";
   const isWebpageRead = webSearch.tool === "read_webpage";
+  const Icon = isWebpageRead ? ScanText : Search;
   const toolName = isWebpageRead ? "read_webpage" : "web_search";
   const toolLabel = isWebpageRead ? "网页读取" : "联网搜索";
   const argumentLabel = isWebpageRead ? "url:" : "query:";
   const argumentValue = isWebpageRead ? webSearch.url || webSearch.query : webSearch.query;
   const summaryLabel = searching
-    ? `正在调用${toolLabel}`
+    ? isWebpageRead
+      ? "正在读取网页"
+      : "正在搜索网页"
     : failed
       ? `${toolLabel}调用失败`
-      : `已调用${toolLabel}`;
+      : isWebpageRead
+        ? "已读取网页"
+        : "已搜索网页";
 
   return (
-    <details className="group/tool mb-2.5 min-w-0 text-gray-500 dark:text-gray-400">
-      <summary className="flex min-h-10 w-fit max-w-full cursor-pointer list-none items-center gap-2 py-1 text-gray-500 transition-colors hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary dark:text-gray-400 dark:hover:text-gray-200 [&::-webkit-details-marker]:hidden">
-        <span
-          className={cn(
-            "flex h-5 w-5 shrink-0 items-center justify-center",
-            failed
-              ? "text-red-600 dark:text-red-400"
-              : "text-gray-400 dark:text-gray-500",
-          )}
-        >
-          {searching ? (
-            <Loader2 className="animate-spin" size={12} />
-          ) : failed ? (
-            <X size={12} />
-          ) : (
-            <Globe size={12} />
-          )}
-        </span>
-        <span
-          className={cn(
-            "min-w-0 truncate text-xs",
-            failed ? "text-red-600 dark:text-red-300" : "text-gray-500 dark:text-gray-400",
-          )}
-        >
-          {summaryLabel}
-        </span>
-        <ChevronRight
-          className="shrink-0 text-gray-400 transition-transform duration-200 group-open/tool:rotate-90"
-          size={14}
-        />
-      </summary>
-
+    <ToolCallDisclosure
+      icon={Icon}
+      label={summaryLabel}
+      status={searching ? "running" : failed ? "error" : "done"}
+    >
       <div className="min-w-0 pl-4">
         <div className="flex min-w-0 items-center gap-2 px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
           <span className="shrink-0 font-mono text-[11px] text-gray-400 dark:text-gray-500">
@@ -81,7 +59,7 @@ export function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchStat
         {searching ? (
           <div className="px-3 pb-3">
             <div className="mb-3 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-              <Globe size={14} />
+              <Icon size={14} strokeWidth={1.5} />
               <span>
                 {isWebpageRead
                   ? "正在读取网页、提取正文和页面信息..."
@@ -90,10 +68,7 @@ export function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchStat
             </div>
             <div className="flex gap-2 overflow-hidden">
               {Array.from({ length: 4 }).map((_, index) => (
-                <div
-                  className="min-w-0 flex-1 animate-pulse"
-                  key={index}
-                >
+                <div className="min-w-0 flex-1 animate-pulse" key={index}>
                   <div className="m-3 h-3 w-4/5 rounded bg-gray-200 dark:bg-white/10" />
                   <div className="mx-3 mt-2 h-3 w-2/3 rounded bg-gray-200 dark:bg-white/10" />
                   <div className="mx-3 mt-5 h-3 w-1/2 rounded bg-gray-200 dark:bg-white/10" />
@@ -142,11 +117,12 @@ export function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchStat
                     </div>
                   </div>
                   <a
+                    aria-label="打开网页"
                     className="shrink-0 rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/[0.06] dark:hover:text-gray-200"
+                    data-markai-tooltip="打开网页"
                     href={webSearch.url}
                     rel="noreferrer"
                     target="_blank"
-                    title="打开网页"
                   >
                     <ExternalLink size={14} />
                   </a>
@@ -206,7 +182,7 @@ export function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchStat
           </div>
         )}
       </div>
-    </details>
+    </ToolCallDisclosure>
   );
 }
 

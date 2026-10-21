@@ -1,3 +1,4 @@
+import { ChartValidationLimitError } from "./chart-validation";
 import { describeGenerationError } from "@/lib/chat/generation-error";
 import { getThinkingRequestParameters, type ThinkingPolicy } from "@/lib/model-thinking";
 import { NextResponse } from "next/server";
@@ -54,6 +55,7 @@ export const createOpenAICompatibleStream = async (
   contextPreparation?: ContextPreparation<ChatMessage>,
   toolRuntime?: {
     enabledToolIds: string[];
+    debugChartAttempts?: boolean;
     sessionId: string;
     skillPrompt?: string;
     userId: string;
@@ -89,6 +91,7 @@ export const createOpenAICompatibleStream = async (
   const stream = new ReadableStream({
     async start(controller) {
       const toolRuntimeState = new Map<string, unknown>();
+      let chartAttemptIndex = 0;
       const citationIdsByUrl = new Map<string, number>();
       let nextCitationId = 1;
 
@@ -453,6 +456,10 @@ export const createOpenAICompatibleStream = async (
               };
               controller.enqueue(encodeGeneratedFileEvent(encoder, runningState));
 
+              const chartAttempt =
+                toolRuntime.debugChartAttempts && toolCall.function.name === "render_echarts_chart"
+                  ? { index: ++chartAttemptIndex, raw: toolCall.function.arguments }
+                  : undefined;
               try {
                 const result = await executeBuiltinTool(toolCall.function.name, args, {
                   runtimeState: toolRuntimeState,
@@ -473,6 +480,15 @@ export const createOpenAICompatibleStream = async (
                   requiredWordToolNames =
                     getWordContinuationToolNames(toolCall.function.name, result.content) || [];
                 }
+                if (chartAttempt)
+                  controller.enqueue(
+                    encoder.encode(
+                      `${JSON.stringify({ type: "attempt", ...chartAttempt, validation: result.content.validation })}\n`,
+                    ),
+                  );
+                if (result.output) {
+                  controller.enqueue(encodeStreamEvent(encoder, "content", result.output));
+                }
                 toolResultMessages.push({
                   content: JSON.stringify(result.content),
                   role: "tool",
@@ -480,6 +496,12 @@ export const createOpenAICompatibleStream = async (
                 });
               } catch (error) {
                 const message = error instanceof Error ? error.message : "File generation failed";
+                if (chartAttempt)
+                  controller.enqueue(
+                    encoder.encode(
+                      `${JSON.stringify({ type: "attempt", ...chartAttempt, error: message })}\n`,
+                    ),
+                  );
                 controller.enqueue(
                   encodeGeneratedFileEvent(encoder, {
                     ...runningState,
@@ -487,6 +509,7 @@ export const createOpenAICompatibleStream = async (
                     status: "error",
                   }),
                 );
+                if (error instanceof ChartValidationLimitError) throw error;
                 if (builtinTool.id === "word-document") requiredWordToolNames = [];
                 toolResultMessages.push({
                   content: JSON.stringify({ error: message, success: false }),

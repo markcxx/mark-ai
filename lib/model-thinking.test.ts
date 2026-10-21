@@ -52,6 +52,19 @@ describe("thinking capabilities and request dialects", () => {
     expect(getThinkingRequestParameters(policy, false)).toEqual({ thinking: { type: "disabled" } });
     expect(getThinkingPolicy(route("doubao-1-5-pro-32k-250115", "volcengine"))).toBeUndefined();
   });
+  it.each([
+    "deepseek-v4-flash-ga-260731",
+    "deepseek-v4-1-flash-260910",
+    "deepseek-v4-1-flash-261017",
+    "doubao-seed-2-1-lite-260915",
+  ])("supports the verified Ark thinking switch for %s", (id) => {
+    const policy = getThinkingPolicy(
+      route(id, "markdoubao_key2", "https://ark.cn-beijing.volces.com/api/v3"),
+    );
+    expect(policy).toBeDefined();
+    expect(getThinkingRequestParameters(policy, false)).toEqual({ thinking: { type: "disabled" } });
+    expect(getThinkingRequestParameters(policy, true)).toEqual({ thinking: { type: "enabled" } });
+  });
   it("uses adaptive for MiniMax M3 and preserves old clients' omitted fields", () => {
     const policy = getThinkingPolicy(route("MiniMax-M3", "minimax"));
     expect(getThinkingRequestParameters(policy, true)).toEqual({ thinking: { type: "adaptive" } });

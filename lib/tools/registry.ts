@@ -1,4 +1,5 @@
 import type { BuiltinToolDefinition, ToolJsonSchema } from "./types";
+import { ECHARTS_SERIES_TYPES } from "@/lib/visualization/echarts-option";
 
 const WORD_FORMAT_SCHEMA: ToolJsonSchema = {
   additionalProperties: false,
@@ -402,30 +403,98 @@ const EXCEL_TOOL: BuiltinToolDefinition = {
   version: "1.0.0",
 };
 
+// Leave ECharts extension fields open while describing the common fields explicitly.
+// A schema that only lists series.type encourages some models to omit axes and data.
+const CHART_AXIS_SCHEMA: ToolJsonSchema = {
+  type: "object",
+  additionalProperties: true,
+  properties: {
+    type: { type: "string", enum: ["category", "value", "time", "log"] },
+    name: { type: "string" },
+    data: { type: "array", items: {} },
+  },
+};
+const CHART_AXES_SCHEMA: ToolJsonSchema = {
+  anyOf: [CHART_AXIS_SCHEMA, { type: "array", items: CHART_AXIS_SCHEMA }],
+};
+const CHART_COMPONENT_SCHEMA: ToolJsonSchema = { type: "object", additionalProperties: true };
+
 const DATA_VISUALIZATION_SKILL: BuiltinToolDefinition = {
   accent: "violet",
   category: "creation",
   description: "把对话或附件中的数据转换为可交互的 ECharts 2D/3D 图表。",
   features: ["完整 2D/3D 图表", "多主题切换", "放大查看与 PNG 导出"],
-  functions: [],
+  functions: [
+    {
+      name: "render_echarts_chart",
+      description:
+        "Validate and display an ECharts chart. On validation error, fix the indicated field and call this tool again. Do not print chart JSON in the response.",
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        required: ["option"],
+        properties: {
+          option: {
+            type: "object",
+            description:
+              "Complete ECharts option with actual data. Bar/line/scatter charts require xAxis and yAxis. Example: {xAxis:{type:'category',data:['May']},yAxis:{type:'value'},series:[{type:'bar',data:[18]}]}. Include all fields needed to render; do not submit only series.type.",
+            additionalProperties: true,
+            required: ["series"],
+            properties: {
+              title: { ...CHART_COMPONENT_SCHEMA, properties: { text: { type: "string" } } },
+              xAxis: CHART_AXES_SCHEMA,
+              yAxis: CHART_AXES_SCHEMA,
+              grid: CHART_COMPONENT_SCHEMA,
+              tooltip: CHART_COMPONENT_SCHEMA,
+              legend: CHART_COMPONENT_SCHEMA,
+              dataset: CHART_COMPONENT_SCHEMA,
+              radar: CHART_COMPONENT_SCHEMA,
+              grid3D: CHART_COMPONENT_SCHEMA,
+              xAxis3D: CHART_AXIS_SCHEMA,
+              yAxis3D: CHART_AXIS_SCHEMA,
+              zAxis3D: CHART_AXIS_SCHEMA,
+              series: {
+                type: "array",
+                maxItems: 30,
+                items: {
+                  type: "object",
+                  additionalProperties: true,
+                  required: ["type"],
+                  properties: {
+                    type: { type: "string", enum: ECHARTS_SERIES_TYPES },
+                    name: { type: "string" },
+                    data: { type: "array", items: {} },
+                    coordinateSystem: { type: "string" },
+                    stack: { type: "string" },
+                    smooth: { type: "boolean" },
+                    encode: CHART_COMPONENT_SCHEMA,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  ],
   id: "data-visualization",
   kind: "skill",
   name: "ECharts 可视化",
   shortName: "ECharts",
   status: "available",
   systemPrompt: `Data visualization skill is enabled for this conversation.
-When a chart materially improves the answer, analyze the data first and then output one or more Apache ECharts option objects inside fenced \`\`\`echarts code blocks.
-- The block content must be strict JSON: no JavaScript, functions, comments, trailing commas, Markdown, or HTML.
-- Output the ECharts option object directly, not wrapped in another property.
+When a chart materially improves the answer, analyze the data first and call render_echarts_chart with the option object. The application validates and displays the chart. If the tool reports an error, correct the exact error and retry at most twice; never claim success after a failed validation. Do not output fenced chart JSON yourself or duplicate an already displayed chart.
+- The option argument must be strict JSON: no JavaScript, functions, comments, trailing commas, Markdown, or HTML.
+- Pass the ECharts option object as the tool's option argument.
 - Always include a non-empty series array and a concise title.text.
 - Choose any appropriate ECharts chart type. Supported 2D types include line, bar, pie, scatter, effectScatter, radar, heatmap, funnel, gauge, treemap, sunburst, sankey, graph, lines, pictorialBar, themeRiver, custom-free candlestick, and boxplot.
 - ECharts GL is available. When 3D materially improves the result, you may use bar3D, line3D, scatter3D, surface, map3D, lines3D, graphGL, flowGL, globe, geo3D, or grid3D. Include every required 3D coordinate component and keep the configuration strict JSON.
 - Prefer 2D charts for simple comparisons. Use 3D only when the extra spatial dimension communicates real information or the user explicitly requests it.
 - Use clear Chinese labels when the conversation is Chinese. Include tooltip and legend when helpful.
-- Do not hard-code global color palettes or series itemStyle/lineStyle colors unless color carries essential data semantics. The user can select an official ECharts theme in the chart card.
+- Do not hard-code global color palettes or series itemStyle/lineStyle colors unless color carries essential data semantics. The user can select an official ECharts theme in the chart toolbar.
 - Prefer accurate, readable charts over decorative complexity. Aggregate excessive categories or data points before charting.
 - Never invent missing data. Briefly state important conclusions outside the chart block.
-The application renders these JSON blocks as interactive charts directly in the chat.`,
+Only validated tool results are rendered as interactive charts directly in the chat.`,
   version: "1.0.0",
 };
 

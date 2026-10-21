@@ -11,6 +11,7 @@ export const toolPreviewActionClass =
 
 export function ToolPreviewCard({
   actions,
+  appearance = "card",
   badge,
   children,
   defaultOpen = true,
@@ -18,6 +19,7 @@ export function ToolPreviewCard({
   title,
 }: {
   actions?: ReactNode;
+  appearance?: "card" | "inline";
   badge: string;
   children: ReactNode;
   defaultOpen?: boolean;
@@ -25,33 +27,55 @@ export function ToolPreviewCard({
   title: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const inline = appearance === "inline";
 
   return (
     <section
-      className="my-5 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#171717]"
+      className={cn(
+        "min-w-0",
+        inline
+          ? "my-4"
+          : "my-5 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#171717]",
+      )}
       data-markai-tool-preview={badge.toLowerCase()}
     >
       <header
         className={cn(
-          "flex min-h-12 flex-wrap items-center justify-between gap-2 px-3 py-1.5",
-          open && "border-b border-gray-100 dark:border-white/[0.08]",
+          "flex flex-wrap items-center justify-between gap-2",
+          inline ? "min-h-8 py-1" : "min-h-12 px-3 py-1.5",
+          !inline && open && "border-b border-gray-100 dark:border-white/[0.08]",
         )}
       >
         <button
           aria-expanded={open}
           aria-label={open ? `收起${title}` : `展开${title}`}
-          className="flex min-w-[140px] flex-1 items-center gap-2 rounded-md py-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+          className={cn(
+            "flex flex-1 items-center gap-2 rounded-md py-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
+            inline ? "min-w-0" : "min-w-[140px]",
+          )}
           data-markai-tooltip={open ? "收起" : "展开"}
           onClick={() => setOpen((value) => !value)}
           type="button"
         >
-          <Icon className="shrink-0 text-primary" size={17} />
-          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+          <Icon
+            className={cn("shrink-0", inline ? "text-gray-400" : "text-primary")}
+            size={inline ? 14 : 17}
+          />
+          <span
+            className={cn(
+              "min-w-0 flex-1 truncate",
+              inline
+                ? "text-xs font-medium text-gray-500 dark:text-gray-400"
+                : "text-sm font-semibold text-gray-900 dark:text-gray-100",
+            )}
+          >
             {title}
           </span>
-          <span className="hidden shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-400 sm:inline dark:bg-white/[0.06]">
-            {badge}
-          </span>
+          {!inline && (
+            <span className="hidden shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-400 sm:inline dark:bg-white/[0.06]">
+              {badge}
+            </span>
+          )}
           <ChevronDown
             className={cn(
               "shrink-0 text-gray-400 transition-transform duration-200",

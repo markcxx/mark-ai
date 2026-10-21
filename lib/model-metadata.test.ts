@@ -7,6 +7,13 @@ import {
 } from "./model-metadata";
 
 const configuredModelExpectations = [
+  ["glm-5.3-prime", "glm-5.3-prime", 1_000_000, false],
+  ["glm-5.2-fast-preview", "glm-5.2-fast-preview", 1_000_000, false],
+  ["qwen3.8-27b", "qwen3.8-27b", 1_000_000, true],
+  ["qwen3.8-2.4t-a95b", "qwen3.8-2.4t-a95b", 1_000_000, false],
+  ["qwen3.7-flash", "qwen3.7-flash", 1_000_000, true],
+  ["qwen3.7-flash-2026-07-15", "qwen3.7-flash", 1_000_000, true],
+  ["qwen3-coder-flash", "qwen3-coder-flash", 1_000_000, false],
   ["xiaomi/mimo-v2.6-pro", "mimo-v2.6-pro", 1_048_576, true],
   ["xiaomi/mimo-v2.6-flash", "mimo-v2.6-flash", 1_048_576, true],
   ["minimax/minimax-m3.1-flash", "minimax-m3.1-flash", 1_000_000, true],
@@ -34,6 +41,9 @@ const configuredModelExpectations = [
   ["qwen3.8-max", "qwen3.8-max", 1_000_000, true],
   ["qwen3.8-max-0902", "qwen3.8-max", 1_000_000, true],
   ["deepseek-flash", "deepseek-v4.1-flash", 1_048_576, true],
+  ["deepseek-v4-1-flash-260910", "deepseek-v4-1-flash-260910", 1_048_576, true],
+  ["deepseek-v4-1-flash-261017", "deepseek-v4-1-flash-261017", 1_048_576, true],
+  ["doubao-seed-2-1-lite-260915", "doubao-seed-2.1-lite", 1_048_576, true],
   ["XiaomiMiMo/MiMo-V2.5", "mimo-v2.5", 1_000_000, true],
   ["zai-org/GLM-5.3", "glm-5.3", 1_000_000, false],
   ["glm-5.3", "glm-5.3", 1_000_000, false],
@@ -69,6 +79,7 @@ const configuredModelExpectations = [
   ["deepseek-ai/DeepSeek-V4-Flash", "deepseek-v4-flash", 1_048_576, false],
   ["deepseek-v4-pro-260425", "deepseek-v4-pro", 1_048_576, false],
   ["deepseek-v4-flash-260425", "deepseek-v4-flash", 1_048_576, false],
+  ["deepseek-v4-flash-ga-260731", "deepseek-v4-flash-ga-260731", 1_048_576, false],
   ["deepseek-ai/DeepSeek-V3.2", "deepseek-v3.2", 163_840, false],
   ["deepseek-v3", "deepseek-v3", 131_072, false],
   ["deepseek-ai/DeepSeek-R1", "deepseek-r1", 131_072, false],
