@@ -3,7 +3,8 @@ import {
   getThinkingPolicy,
   type ThinkingCapability,
 } from "./model-thinking";
-export type ModelRuntime = "gemini" | "openai-compatible";
+import { normalizeModelRuntime, resolveModelRuntime, type ModelRuntime } from "./model-runtime";
+export type { ModelRuntime } from "./model-runtime";
 
 export type ConfiguredModel = {
   id: string;
@@ -25,6 +26,12 @@ type ProviderEnvConfig = {
 };
 
 const BUILTIN_PROVIDERS: ProviderEnvConfig[] = [
+  {
+    prefix: "ANTHROPIC",
+    provider: "anthropic",
+    runtime: "anthropic",
+    defaultBaseUrl: "https://api.anthropic.com/v1",
+  },
   {
     prefix: "GEMINI",
     provider: "gemini",
@@ -75,13 +82,10 @@ const envPrefix = (provider: string) =>
     .replace(/[^a-zA-Z0-9]+/g, "_")
     .toUpperCase();
 
-const normalizeRuntime = (value?: string): ModelRuntime => {
-  const runtime = value?.trim().toLowerCase();
-  return runtime === "gemini" ? "gemini" : "openai-compatible";
-};
+const normalizeRuntime = normalizeModelRuntime;
 
 const getDefaultRuntime = (provider: string): ModelRuntime => {
-  return provider.toLowerCase() === "gemini" ? "gemini" : "openai-compatible";
+  return normalizeModelRuntime(provider);
 };
 
 const getDefaultBaseUrl = (provider: string) => {
@@ -221,17 +225,20 @@ export const getConfiguredModels = (): ConfiguredModel[] => {
 
   const seen = new Set<string>();
 
-  return models.filter((model) => {
-    const key = `${model.provider}:${model.id}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  return models
+    .map((model) => ({ ...model, runtime: resolveModelRuntime(model) }))
+    .filter((model) => {
+      const key = `${model.provider}:${model.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 };
 
 const isMarkProvider = (provider: string) => provider.startsWith("mark") && provider !== "markai";
 
 const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
+  anthropic: "Anthropic",
   bailian: "阿里云百炼",
   deepseek: "DeepSeek",
   gemini: "Google Gemini",

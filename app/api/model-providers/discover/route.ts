@@ -1,3 +1,4 @@
+import { normalizeModelRuntime } from "@/lib/model-runtime";
 import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { authorizeApiRequest, enforceRateLimit } from "@/lib/api/security";
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
         baseUrl,
         apiKey:
           suppliedKey || (saved?.apiKeyEncrypted ? decryptCredential(saved.apiKeyEncrypted) : ""),
-        runtime: template?.runtime || saved?.runtime || "openai-compatible",
+        runtime: template?.runtime || normalizeModelRuntime(body.runtime || saved?.runtime),
       };
     }
     if (!config?.apiKey) throw new Error("请先填写 API Key，再获取模型列表");

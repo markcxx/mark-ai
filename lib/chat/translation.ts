@@ -1,3 +1,4 @@
+import { generateAnthropicText } from "./server/anthropic-runtime";
 import { readProviderResponseError } from "./generation-error";
 import { GoogleGenAI } from "@google/genai";
 
@@ -25,6 +26,20 @@ export const generateTranslation = async ({
 }) => {
   const task = `<target_language>${language}</target_language>\n<source_text>\n${content}\n</source_text>`;
 
+  if (model.runtime === "anthropic") {
+    const translated = extractTranslation(
+      await generateAnthropicText(
+        model,
+        [
+          { role: "system", content: TRANSLATION_PROMPT },
+          { role: "user", content: task },
+        ],
+        65536,
+      ),
+    );
+    if (!translated) throw new Error("模型没有返回译文");
+    return translated;
+  }
   if (model.runtime === "openai-compatible") {
     const endpoint = toOpenAIChatEndpoint(model.baseUrl);
     if (!endpoint) throw new Error("模型接口地址未配置");

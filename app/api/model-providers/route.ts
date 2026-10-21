@@ -1,3 +1,4 @@
+import { normalizeModelRuntime } from "@/lib/model-runtime";
 import { and, eq } from "drizzle-orm";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
@@ -247,8 +248,7 @@ export async function PUT(req: NextRequest) {
   const isCustom = !template;
   const name =
     typeof body?.name === "string" ? body.name.trim().slice(0, 60) : template?.name || provider;
-  const runtime: ModelRuntime =
-    template?.runtime || (body?.runtime === "gemini" ? "gemini" : "openai-compatible");
+  const runtime: ModelRuntime = template?.runtime || normalizeModelRuntime(body?.runtime);
   const baseUrl = await normalizeBaseUrl(body?.baseUrl || template?.defaultBaseUrl);
   const models = normalizeModels(body?.models);
   const apiKey = typeof body?.apiKey === "string" ? body.apiKey.trim() : "";

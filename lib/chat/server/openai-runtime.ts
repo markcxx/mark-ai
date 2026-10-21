@@ -61,6 +61,7 @@ export const createOpenAICompatibleStream = async (
     userId: string;
   },
   thinking?: { policy?: ThinkingPolicy; enabled?: boolean },
+  requestTransport: typeof fetchWithDevelopmentProxy = fetchWithDevelopmentProxy,
 ) => {
   const thinkingActive = thinking?.enabled ?? thinking?.policy?.defaultEnabled;
   const preserveReasoning = Boolean(thinking?.policy && thinkingActive);
@@ -139,7 +140,7 @@ export const createOpenAICompatibleStream = async (
             : {}),
         });
         const sendRequest = (includeUsage: boolean, enforceRequiredTools = true) =>
-          fetchWithDevelopmentProxy(endpoint, {
+          requestTransport(endpoint, {
             body: JSON.stringify(createRequestBody(includeUsage, enforceRequiredTools)),
             headers: {
               Authorization: `Bearer ${apiKey}`,

@@ -1,3 +1,4 @@
+import { normalizeModelRuntime, resolveModelRuntime } from "./model-runtime";
 import { getPublicThinkingCapability } from "./model-thinking";
 import { and, eq } from "drizzle-orm";
 
@@ -18,8 +19,7 @@ export type PublicUserModelProvider = {
   runtime: ModelRuntime;
 };
 
-const normalizeRuntime = (runtime: string): ModelRuntime =>
-  runtime === "gemini" ? "gemini" : "openai-compatible";
+const normalizeRuntime = normalizeModelRuntime;
 
 export const listUserModelProviders = async (
   userId: string,
@@ -64,7 +64,7 @@ export const getUserConfiguredModels = async (userId: string): Promise<Configure
       baseUrl: row.baseUrl,
       id,
       provider: row.provider,
-      runtime: normalizeRuntime(row.runtime),
+      runtime: resolveModelRuntime({ id, baseUrl: row.baseUrl, runtime: row.runtime }),
     }));
   });
 };

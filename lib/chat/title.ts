@@ -1,3 +1,4 @@
+import { generateAnthropicText } from "./server/anthropic-runtime";
 import { describeGenerationError, readProviderResponseError } from "./generation-error";
 import { GoogleGenAI } from "@google/genai";
 
@@ -116,6 +117,19 @@ ${transcript}
 </conversation>`;
 
   try {
+    if (selectedModel.runtime === "anthropic") {
+      const title = sanitizeTitle(
+        await generateAnthropicText(
+          selectedModel,
+          [
+            { role: "system", content: TITLE_PROMPT },
+            { role: "user", content: titleTask },
+          ],
+          128,
+        ),
+      );
+      return { title: title || fallback, titleModel: { ...titleModel, used: Boolean(title) } };
+    }
     if (selectedModel.runtime === "openai-compatible") {
       const endpoint = toOpenAIChatEndpoint(selectedModel.baseUrl);
       if (!endpoint)

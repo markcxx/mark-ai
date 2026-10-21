@@ -11,6 +11,14 @@ export type ModelProviderTemplate = {
 
 export const MODEL_PROVIDER_TEMPLATES: ModelProviderTemplate[] = [
   {
+    defaultBaseUrl: "https://api.anthropic.com/v1",
+    defaultModels: [],
+    description: "Anthropic Messages 原生接口",
+    id: "anthropic",
+    name: "Anthropic",
+    runtime: "anthropic",
+  },
+  {
     defaultBaseUrl: "https://generativelanguage.googleapis.com",
     defaultModels: ["gemini-2.5-flash", "gemini-2.5-pro"],
     description: "Google Gemini 原生接口",

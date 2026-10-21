@@ -1,3 +1,4 @@
+import { createAnthropicStream } from "@/lib/chat/server/anthropic-runtime";
 import { describeGenerationError } from "@/lib/chat/generation-error";
 import { getThinkingPolicy } from "@/lib/model-thinking";
 import { NextRequest, NextResponse } from "next/server";
@@ -174,10 +175,10 @@ export async function POST(req: NextRequest) {
     const runtimeSystemPrompt = getRuntimeSystemPrompt({
       skillPrompt,
       timezone,
-      webSearchEnabled: selectedModel.runtime === "openai-compatible" && Boolean(webSearchEnabled),
+      webSearchEnabled: selectedModel.runtime !== "gemini" && Boolean(webSearchEnabled),
     });
     const contextOverheadTokens =
-      selectedModel.runtime === "openai-compatible"
+      selectedModel.runtime !== "gemini"
         ? estimateTextTokens(
             JSON.stringify({
               messages: [{ content: runtimeSystemPrompt, role: "system" }],
@@ -212,8 +213,12 @@ export async function POST(req: NextRequest) {
       : undefined;
     const preparedMessages = contextPreparation?.messages || resolvedMessages;
 
-    if (selectedModel.runtime === "openai-compatible") {
-      return createOpenAICompatibleStream(
+    if (selectedModel.runtime !== "gemini") {
+      const createStream =
+        selectedModel.runtime === "anthropic"
+          ? createAnthropicStream
+          : createOpenAICompatibleStream;
+      return createStream(
         preparedMessages,
         selectedModel.id,
         selectedModel.apiKey,

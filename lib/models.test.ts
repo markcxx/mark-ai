@@ -39,6 +39,14 @@ afterEach(() => {
 });
 
 describe("MarkAI model channels", () => {
+  it("selects Messages only for Claude in a mixed CommandCode channel", () => {
+    process.env.AI_PROVIDERS = "markchannela";
+    process.env.MARKCHANNELA_API_KEY = "test-key";
+    process.env.MARKCHANNELA_BASE_URL = "https://api.commandcode.ai/provider/v1";
+    process.env.MARKCHANNELA_MODELS = "claude-haiku-5-5,gpt-6-luna";
+    expect(findConfiguredModel("claude-haiku-5-5", "markchannela")?.runtime).toBe("anthropic");
+    expect(findConfiguredModel("gpt-6-luna", "markchannela")?.runtime).toBe("openai-compatible");
+  });
   it("auto-discovers an isolated channel without sharing its key pool with the original channel", () => {
     process.env.MARKCHANNELA_API_KEY = "key-one,key-two";
     process.env.MARKCHANNELA_BASE_URL = "https://channel.example/v1";

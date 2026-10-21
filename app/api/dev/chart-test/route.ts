@@ -1,3 +1,4 @@
+import { toAnthropicMessagesEndpoint } from "@/lib/chat/server/anthropic-transport";
 import { NextRequest, NextResponse } from "next/server";
 
 import { authorizeApiRequest, enforceRateLimit } from "@/lib/api/security";
@@ -31,7 +32,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "所选文字模型不可用" }, { status: 400 });
 
   const withRoute = (response: Response) => {
-    let endpoint = model.baseUrl || "";
+    let endpoint =
+      model.runtime === "anthropic"
+        ? toAnthropicMessagesEndpoint(model.baseUrl)
+        : model.baseUrl || "";
     if (model.runtime === "openai-compatible" && !endpoint.endsWith("/chat/completions"))
       endpoint = endpoint.replace(/\/+$/, "") + "/chat/completions";
     try {

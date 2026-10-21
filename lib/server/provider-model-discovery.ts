@@ -104,22 +104,39 @@ export async function discoverProviderModels(config: {
   runtime: string;
 }) {
   const gemini = config.runtime === "gemini";
+  const anthropic = config.runtime === "anthropic";
   const base = (
     config.baseUrl ||
-    (gemini ? "https://generativelanguage.googleapis.com/v1beta" : "https://api.openai.com/v1")
-  ).replace(/\/+$/, "");
+    (gemini
+      ? "https://generativelanguage.googleapis.com/v1beta"
+      : anthropic
+        ? "https://api.anthropic.com/v1"
+        : "https://api.openai.com/v1")
+  )
+    .replace(/\/+$/, "")
+    .replace(anthropic ? /\/messages$/ : /$^/, "");
   const endpoint = new URL(
-    `${base}${gemini && !/\/v1(?:beta)?$/.test(base) ? "/v1beta" : ""}/models`,
+    `${base}${gemini && !/\/v1(?:beta)?$/.test(base) ? "/v1beta" : anthropic && base === "https://api.anthropic.com" ? "/v1" : ""}/models`,
   );
   const headers: Record<string, string> = gemini
     ? { "x-goog-api-key": config.apiKey }
-    : { Authorization: `Bearer ${config.apiKey}` };
+    : anthropic
+      ? {
+          "x-api-key": config.apiKey,
+          "anthropic-version": "2023-06-01",
+          ...(endpoint.hostname !== "api.anthropic.com"
+            ? { Authorization: `Bearer ${config.apiKey}` }
+            : {}),
+        }
+      : { Authorization: `Bearer ${config.apiKey}` };
   const ids = new Set<string>();
   for (let page = 0; page < 20; page++) {
     const data = await readModels(endpoint, headers);
     parseDiscoveredModels(data, gemini).forEach((id) => ids.add(id));
-    if (!gemini || !data.nextPageToken) return [...ids].sort();
-    endpoint.searchParams.set("pageToken", data.nextPageToken);
+    if (gemini && data.nextPageToken) endpoint.searchParams.set("pageToken", data.nextPageToken);
+    else if (anthropic && data.has_more && data.last_id)
+      endpoint.searchParams.set("after_id", data.last_id);
+    else return [...ids].sort();
   }
   throw new Error("模型分页过多，请手动配置所需模型");
 }

@@ -1,3 +1,4 @@
+import { createAnthropicStream } from "./anthropic-runtime";
 import type { ConfiguredModel } from "@/lib/models";
 import { getThinkingPolicy } from "@/lib/model-thinking";
 import { getToolSystemPrompt } from "@/lib/tools/registry";
@@ -44,7 +45,9 @@ export async function runChartTest({
       signal,
       toolRuntime,
     });
-  return createOpenAICompatibleStream(
+  const createStream =
+    model.runtime === "anthropic" ? createAnthropicStream : createOpenAICompatibleStream;
+  return createStream(
     messages,
     model.id,
     model.apiKey,

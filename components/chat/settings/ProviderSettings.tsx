@@ -22,6 +22,7 @@ import { AppSelect } from "@/components/ui/AppSelect";
 import { IconButton } from "@/components/ui/IconButton";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
+import type { ModelRuntime } from "@/lib/model-runtime";
 import { MODEL_PROVIDER_TEMPLATES } from "@/lib/model-provider-registry";
 import {
   getModelMetadata,
@@ -38,7 +39,7 @@ type ProviderTemplate = {
   description: string;
   id: string;
   name: string;
-  runtime: "gemini" | "openai-compatible";
+  runtime: ModelRuntime;
 };
 type UserProvider = {
   baseUrl: string;
@@ -49,7 +50,7 @@ type UserProvider = {
   models: string[];
   name: string;
   provider: string;
-  runtime: "gemini" | "openai-compatible";
+  runtime: ModelRuntime;
 };
 type SiteProvider = {
   models: string[];
@@ -63,7 +64,7 @@ type ProviderForm = {
   models: string;
   name: string;
   provider: string;
-  runtime: "gemini" | "openai-compatible";
+  runtime: ModelRuntime;
 };
 
 function ProviderLogo({
@@ -300,7 +301,7 @@ export function ProviderSettings() {
       .map((item) => ({
         id: item.provider,
         name: item.name,
-        description: "个人添加的 OpenAI 兼容模型服务。",
+        description: "个人添加的模型服务。",
       })),
   ].map((item) => {
     const configured = providerMap.get(item.id);
@@ -377,7 +378,12 @@ export function ProviderSettings() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
           form
-            ? { provider: form.provider, apiKey: form.apiKey, baseUrl: form.baseUrl }
+            ? {
+                provider: form.provider,
+                apiKey: form.apiKey,
+                baseUrl: form.baseUrl,
+                runtime: form.runtime,
+              }
             : { provider: selected, site: true },
         ),
       });
@@ -627,6 +633,23 @@ export function ProviderSettings() {
                         provider: event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"),
                       })
                     }
+                  />
+                </div>
+                <div className={rowClass}>
+                  <label htmlFor="provider-runtime" className="text-sm font-medium">
+                    接口协议
+                  </label>
+                  <AppSelect<ModelRuntime>
+                    id="provider-runtime"
+                    className={controlClass}
+                    disabled={templates.some((item) => item.id === form.provider)}
+                    value={form.runtime}
+                    onChange={(runtime) => setForm({ ...form, runtime })}
+                    options={[
+                      { label: "OpenAI Chat Completions", value: "openai-compatible" },
+                      { label: "Anthropic Messages", value: "anthropic" },
+                      { label: "Google Gemini", value: "gemini" },
+                    ]}
                   />
                 </div>
                 <div className={rowClass}>
