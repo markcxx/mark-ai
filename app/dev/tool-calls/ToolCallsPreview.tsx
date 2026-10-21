@@ -23,6 +23,8 @@ const visualizationMessage: Message = {
   content: [
     "下面是资料整理进度与知识库结构。数据均为界面演示用的固定示例。",
     "",
+    "向量排版示例：(a⃗ × b⃗)·c⃗ = [a⃗, b⃗, c⃗]。",
+    "",
     "```echarts",
     JSON.stringify({
       title: { text: "资料整理进度", show: false },

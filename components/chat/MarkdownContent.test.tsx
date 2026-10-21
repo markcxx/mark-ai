@@ -1,10 +1,57 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { renderToString } from "katex";
 
 import { MarkdownContent } from "./MarkdownContent";
 
 describe("MarkdownContent math rendering", () => {
+  it("uses the same KaTeX layout classes as the version supplying our stylesheet", () => {
+    const reference = renderToString(String.raw`\vec{a}`);
+    const html = renderToStaticMarkup(<MarkdownContent>{String.raw`$\vec{a}$`}</MarkdownContent>);
+    const referenceClasses = [...reference.matchAll(/class="([^"]+)"/g)].map((match) => match[1]);
+    for (const className of referenceClasses) {
+      expect(html).toContain(`class="${className}"`);
+    }
+  });
+  it("renders the screenshot's Unicode vector arrows as SVG accents in prose, lists and tables", () => {
+    const source = "(a⃗ × b⃗)·c⃗\n\n- 轮换不变：[a⃗,b⃗,c⃗]\n\n| 式子 |\n| --- |\n| a⃗ + b⃗ |";
+    const html = renderToStaticMarkup(<MarkdownContent>{source}</MarkdownContent>);
+    expect(html.match(/class="katex"/g)).toHaveLength(8);
+    expect(html.match(/<mover accent="true">/g)).toHaveLength(8);
+    expect(html).not.toContain("katex-error");
+    expect(html).toContain("轮换不变");
+  });
+
+  it("normalizes Unicode accents inside both math delimiters without breaking LaTeX commands", () => {
+    const source = String.raw`$a⃗ + \alpha⃗$ 和 \(b⃗\) 和 $\vec{c} + \overrightarrow{AB}$`;
+    const html = renderToStaticMarkup(<MarkdownContent>{source}</MarkdownContent>);
+    expect(html.match(/class="katex"/g)).toHaveLength(3);
+    expect(html.match(/<svg/g)).toHaveLength(5);
+    expect(html).toContain(String.raw`\vec{\alpha}`);
+    expect(html).not.toContain("katex-error");
+  });
+
+  it("leaves literal code, link targets and streamed math intact", () => {
+    const source = "`a⃗`\n\n```text\nb⃗\n```\n\n[链接](https://example.com/a⃗)\n\n向量 c⃗";
+    const html = renderToStaticMarkup(
+      <MarkdownContent animation="fade" streaming>
+        {source}
+      </MarkdownContent>,
+    );
+    expect(html).toContain("a⃗");
+    expect(html).toContain("b⃗");
+    expect(decodeURI(html.match(/href="([^"]+)"/)?.[1] || "")).toBe("https://example.com/a⃗");
+    expect(html.match(/class="katex"/g)).toHaveLength(1);
+    expect(html).not.toMatch(/katex[^>]*>\s*<span class="stream-char"/);
+  });
+  it("keeps vectors inside TeX text groups valid", () => {
+    const html = renderToStaticMarkup(
+      <MarkdownContent>{String.raw`$\text{向量 a⃗} + b⃗$`}</MarkdownContent>,
+    );
+    expect(html).not.toContain("katex-error");
+    expect(html.match(/<mover accent="true">/g)).toHaveLength(2);
+  });
   it("renders inline and block LaTeX with KaTeX", () => {
     const html = renderToStaticMarkup(
       <MarkdownContent>{`行内公式 $d_{ff}=2048$。
@@ -152,19 +199,19 @@ it("preserves display content in containers and surrounding prose", () => {
 });
 
 describe("HTML preview lifecycle", () => {
-  const source = '```html\n<html><head><title>示例网页</title></head><body>你好</body></html>\n```';
+  const source = "```html\n<html><head><title>示例网页</title></head><body>你好</body></html>\n```";
 
   it("keeps HTML visible as code while streaming", () => {
     const html = renderToStaticMarkup(<MarkdownContent streaming>{source}</MarkdownContent>);
-    expect(html).toContain('&lt;html&gt;');
-    expect(html).not.toContain('打开网页预览');
+    expect(html).toContain("&lt;html&gt;");
+    expect(html).not.toContain("打开网页预览");
   });
 
   it("shows a compact website entry after generation", () => {
     const html = renderToStaticMarkup(<MarkdownContent>{source}</MarkdownContent>);
-    expect(html).toContain('打开网页预览：示例网页');
-    expect(html).toContain('网站');
-    expect(html).not.toContain('打开方式');
-    expect(html).not.toContain('&lt;html&gt;');
+    expect(html).toContain("打开网页预览：示例网页");
+    expect(html).toContain("网站");
+    expect(html).not.toContain("打开方式");
+    expect(html).not.toContain("&lt;html&gt;");
   });
 });

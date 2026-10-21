@@ -7,6 +7,7 @@ import { getNextThinkingText } from "@/lib/chat/constants";
 import { createSmoothTextController, parseChatStreamLine } from "@/lib/chat/client/streaming";
 import { extractThinkingFromText, getMessageContentForModel } from "@/lib/chat/helpers";
 import { isImageGenerationModel } from "@/lib/chat/image-models";
+import { prepareRequestHistory } from "@/lib/chat/request-history";
 import {
   estimateMessageTokens,
   estimateMessagesTokens,
@@ -47,13 +48,21 @@ export const createStreamAssistantMessage =
     const startedAt = Date.now();
     const settings = useSettingsStore.getState().general;
     const responseAnimation = settings.reduceMotion ? "none" : settings.responseAnimation;
+    const mappedHistory = historyMessages.map((m) => ({
+      attachments: m.attachments,
+      reasoning: m.reasoning,
+      content: getMessageContentForModel(m),
+      generatedImageIds: m.segments
+        ?.filter((segment) => segment.type === "generated-image")
+        .map((segment) => segment.generatedImage.file.id),
+      role: m.role,
+    }));
+    // Image editing also uses empty image-only assistant turns to locate generated files.
+    const requestHistory = isImageGenerationModel(modelConfig.id)
+      ? mappedHistory
+      : prepareRequestHistory(mappedHistory);
     let plainContent = options.initialContent || "";
-    let inputTokens = estimateMessagesTokens(
-      historyMessages.map((message) => ({
-        ...message,
-        content: getMessageContentForModel(message),
-      })),
-    );
+    let inputTokens = estimateMessagesTokens(requestHistory);
     let outputTokens = 0;
     let totalTokens: number | undefined;
     let tokenUsageSource: Message["tokenUsageSource"] = "estimated";
@@ -111,15 +120,7 @@ export const createStreamAssistantMessage =
 
       const response = await fetch("/api/chat", {
         body: JSON.stringify({
-          messages: historyMessages.map((m) => ({
-            attachments: m.attachments,
-            reasoning: m.reasoning,
-            content: getMessageContentForModel(m),
-            generatedImageIds: m.segments
-              ?.filter((segment) => segment.type === "generated-image")
-              .map((segment) => segment.generatedImage.file.id),
-            role: m.role,
-          })),
+          messages: requestHistory,
           model: modelConfig.id,
           provider: modelConfig.provider,
           sessionId: options.sessionId,

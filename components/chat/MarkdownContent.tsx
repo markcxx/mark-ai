@@ -13,6 +13,7 @@ import type { WebCitation } from "@/lib/chat/citations";
 import type { GeneralSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import { remarkLatexDelimiters } from "@/lib/markdown/remark-latex-delimiters";
+import { remarkUnicodeVectors } from "@/lib/markdown/remark-unicode-vectors";
 import { rehypeStreamAnimated } from "@/lib/markdown/rehype-stream-animated";
 
 import { HtmlPreviewBlock } from "./HtmlPreviewBlock";
@@ -309,7 +310,13 @@ export function MarkdownContent({
               ]
             : [[rehypeKatex, { strict: "ignore", throwOnError: false }]]
         }
-        remarkPlugins={[remarkGfm, remarkMath, remarkLatexDelimiters, citationPlugin]}
+        remarkPlugins={[
+          remarkGfm,
+          remarkMath,
+          remarkLatexDelimiters,
+          remarkUnicodeVectors,
+          citationPlugin,
+        ]}
       >
         {children}
       </ReactMarkdown>

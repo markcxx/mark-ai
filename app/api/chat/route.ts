@@ -7,6 +7,7 @@ import { authorizeApiRequest, enforceRateLimit } from "@/lib/api/security";
 import { LOCAL_STORAGE_OWNER_ID } from "@/lib/auth-helpers";
 import { findAvailableModel } from "@/lib/available-models";
 import { prepareMessagesForContext } from "@/lib/chat/context-window";
+import { prepareRequestHistory } from "@/lib/chat/request-history";
 import { estimateTextTokens } from "@/lib/chat/metrics";
 import { isImageGenerationModel } from "@/lib/chat/image-models";
 import { getChatSession } from "@/lib/chat/storage";
@@ -164,9 +165,14 @@ export async function POST(req: NextRequest) {
     const retainReasoning = Boolean(
       thinkingPolicy && (thinkingEnabled ?? thinkingPolicy.defaultEnabled),
     );
+    // Also sanitize on the server for older web/mobile clients and already affected sessions.
+    const requestHistory = prepareRequestHistory(messages as ChatMessage[]);
+    if (!requestHistory.length || requestHistory.at(-1)?.role !== "user") {
+      return NextResponse.json({ error: "缺少有效的用户消息，请重新发送" }, { status: 400 });
+    }
     const fileMessages = storageOwnerId
-      ? await injectFileContexts(messages as ChatMessage[], storageOwnerId)
-      : (messages as ChatMessage[]);
+      ? await injectFileContexts(requestHistory, storageOwnerId)
+      : requestHistory;
     const resolvedMessages = fileMessages.map((message) => ({
       ...message,
       reasoning: retainReasoning && message.role === "model" ? message.reasoning : undefined,
