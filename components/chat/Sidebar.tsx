@@ -1,6 +1,6 @@
 "use client";
 
-import { LoaderCircle, PanelLeftClose, Plus, Puzzle, Search } from "lucide-react";
+import { LoaderCircle, LogIn, PanelLeftClose, Plus, Puzzle, Search } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
@@ -51,6 +51,8 @@ function SessionSkeletonList() {
 
 export function Sidebar({
   activeSessionId,
+  guest = false,
+  onSignIn,
   isOpen,
   isResizing,
   isLoadingSessions,
@@ -70,6 +72,8 @@ export function Sidebar({
   width,
 }: {
   activeSessionId: string | null;
+  guest?: boolean;
+  onSignIn?: () => void;
   hasMoreSessions: boolean;
   isOpen: boolean;
   isResizing: boolean;
@@ -236,8 +240,13 @@ export function Sidebar({
               历史
             </div>
             <div className="flex flex-col gap-1">
-              {isLoadingSessions && <SessionSkeletonList />}
-              {!isLoadingSessions && sessions.length === 0 && (
+              {guest && (
+                <div className="px-3 py-2 text-sm leading-6 text-gray-400">
+                  登录后可查看和同步历史对话
+                </div>
+              )}
+              {!guest && isLoadingSessions && <SessionSkeletonList />}
+              {!guest && !isLoadingSessions && sessions.length === 0 && (
                 <div className="px-3 py-2 text-sm text-gray-400">暂无历史对话</div>
               )}
               {groupedSessions.map((group) => {
@@ -270,7 +279,27 @@ export function Sidebar({
           </div>
 
           <div className="mt-auto border-t border-gray-200/50 p-3 dark:border-gray-700/50">
-            <UserAccountMenu />
+            {guest ? (
+              <button
+                className="flex h-11 w-full items-center gap-3 rounded-lg px-2 text-left transition-colors hover:bg-black/[0.045] dark:hover:bg-white/[0.07]"
+                onClick={onSignIn}
+                type="button"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-200/80 text-gray-500 dark:bg-white/[0.08] dark:text-gray-300">
+                  <LogIn size={17} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    登录 / 注册
+                  </span>
+                  <span className="block truncate text-xs text-gray-400">
+                    同步会话、文件与个性化设置
+                  </span>
+                </span>
+              </button>
+            ) : (
+              <UserAccountMenu />
+            )}
           </div>
         </div>
         <ConfirmDialog

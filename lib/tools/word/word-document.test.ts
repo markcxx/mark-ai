@@ -320,7 +320,12 @@ describe("stepwise Word document jobs", () => {
     } finally {
       if (previousDatabasePath === undefined) delete process.env.MARKAI_SQLITE_PATH;
       else process.env.MARKAI_SQLITE_PATH = previousDatabasePath;
-      rmSync(temporaryDirectory, { force: true, recursive: true });
+      try {
+        rmSync(temporaryDirectory, { force: true, recursive: true });
+      } catch (error) {
+        // Windows keeps the cached SQLite handle locked until the worker exits.
+        if ((error as NodeJS.ErrnoException).code !== "EPERM") throw error;
+      }
     }
   });
 });

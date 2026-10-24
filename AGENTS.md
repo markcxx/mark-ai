@@ -118,15 +118,16 @@ Dark mode is not a simple inversion. Use the existing near-black surfaces (`#0e0
 
 - Use skeletons when the final layout is known. Avoid generic centered spinners that replace a stable work surface.
 - Do not force a long splash delay. `AppBootSplash` should leave as soon as the route is ready, subject only to its short anti-flash minimum.
-- On authenticated chat routes, `AppBootSplash` must remain visible until the initial model list and session history requests have both settled. The root `/` route is not an exception. `GuestChatApp` explicitly releases the splash because it must not call those protected APIs.
+- On authenticated chat routes, `AppBootSplash` must remain visible until the initial model list and session history requests have both settled. The root `/` route is not an exception. In guest mode `ChatApp` waits only for the public model list, because guests must not call protected APIs.
 - User-facing errors must be Chinese and actionable. A failed assistant generation is an interrupted message with continue/regenerate options, not a normal English assistant reply.
 - Toasts should be brief except for operations whose completion time is unknown. A translation loading toast must use infinite duration and be replaced by the success/error toast with the same toast ID.
 - Never expose an enabled control that silently does nothing. Existing placeholder controls intentionally show `NOT_IMPLEMENTED_TOAST`; do not remove them without explicit product direction.
 
 ## Authentication And Guest Experience
 
-- Cloud-mode anonymous access to `/` renders `GuestChatApp`; it must not immediately redirect to `/login`.
-- A guest may type a draft. Sending, attaching a file, selecting a model, enabling search, or opening protected history prompts for authentication.
+- Cloud-mode anonymous access to `/` renders `ChatApp` with `guest`; it must not immediately redirect to `/login`.
+- Guest mode is the normal workbench without data: an empty history with a sign-in entry, the public model list (`/api/public/models`), and a read-only plugin catalog (`/api/public/tools`). Guests may type a draft, browse and select models, and browse plugins.
+- Sending, attaching a file, enabling search, installing a plugin, or opening history search, files, or settings prompts for authentication through `requestGuestSignIn` in `lib/client/guest-mode.ts`. Stores check `isGuestMode()` so guests never call protected APIs; settings and the selected model stay in local storage.
 - Save a guest draft under `markai:guest-draft`; authenticated `ChatApp` restores and removes it.
 - Explicit protected URLs, including session URLs and protected API routes, still require authentication.
 - Login and registration share the full-frame auth layout in `app/(auth)/layout.tsx`.
@@ -144,7 +145,7 @@ Use the existing ownership boundaries before adding abstractions.
 - `components/chat/TopHeader.tsx`: active-session title and conversation-level actions.
 - `components/chat/ChatInput.tsx`: composer, attachments, tools, web search, model selection, and send/stop controls.
 - `components/chat/WelcomePanel.tsx`: authenticated empty state.
-- `components/guest/GuestChatApp.tsx`: anonymous shell that does not call protected data APIs.
+- `lib/client/guest-mode.ts`: guest-mode flag and sign-in prompt shared by `ChatApp` and the stores.
 
 ### Message Rendering
 

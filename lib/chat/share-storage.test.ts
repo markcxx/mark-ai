@@ -20,7 +20,13 @@ beforeAll(async () => {
 });
 afterAll(() => {
   vi.unstubAllEnvs();
-  fs.rmSync(directory, { recursive: true, force: true });
+  try {
+    fs.rmSync(directory, { recursive: true, force: true });
+  } catch (error) {
+    // Windows keeps the cached SQLite handle locked until the worker exits; the
+    // OS temp directory is cleaned up later, so a locked file is not a failure.
+    if ((error as NodeJS.ErrnoException).code !== "EPERM") throw error;
+  }
 });
 const snapshot = {
   title: "测试快照",

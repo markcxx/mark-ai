@@ -19,6 +19,7 @@ import toast from "react-hot-toast";
 
 import { IconButton } from "@/components/ui/IconButton";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
+import { isGuestMode, requestGuestSignIn } from "@/lib/client/guest-mode";
 import type { BuiltinToolCatalogItem } from "@/lib/tools/types";
 import { cn } from "@/lib/utils";
 import { useToolStore } from "@/stores/useToolStore";
@@ -48,6 +49,7 @@ function PluginCard({ tool }: { tool: BuiltinToolCatalogItem }) {
 
   const updateInstallation = async (installed: boolean) => {
     if (planned || working || installed === tool.installed) return;
+    if (isGuestMode()) return requestGuestSignIn();
     setWorking(true);
     try {
       if (installed) {
@@ -219,7 +221,9 @@ export function PluginCenterDrawer({ onClose, open }: { onClose: () => void; ope
                       </button>
                     ))}
                   </div>
-                  <p className="text-xs text-gray-400">在具体对话中按需启用已安装工具</p>
+                  <p className="text-xs text-gray-400">
+                    {isGuestMode() ? "登录后即可安装并在对话中启用" : "在具体对话中按需启用已安装工具"}
+                  </p>
                 </div>
 
                 {isLoading && catalog.length === 0 ? (

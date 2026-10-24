@@ -60,7 +60,7 @@ export function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchStat
           <div className="px-3 pb-3">
             <div className="mb-3 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
               <Icon size={14} strokeWidth={1.5} />
-              <span>
+              <span className="markai-text-shimmer">
                 {isWebpageRead
                   ? "正在读取网页、提取正文和页面信息..."
                   : "正在检索网页、整理摘要和来源..."}

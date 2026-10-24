@@ -147,6 +147,94 @@ const getProviderAsset = (provider?: string) => {
   return BRAND_ASSETS[PROVIDER_ASSET_KEYS[normalized] || normalized];
 };
 
+/** Model-making company, used to filter models independently of the API provider. */
+export type ModelVendor = { key: string; label: string; slug: string };
+
+const MODEL_VENDORS: Record<string, { label: string; slug: string }> = {
+  anthropic: { label: "Anthropic", slug: "claude" },
+  bytedance: { label: "字节跳动", slug: "doubao" },
+  deepseek: { label: "DeepSeek", slug: "deepseek" },
+  google: { label: "Google", slug: "gemini" },
+  meta: { label: "Meta", slug: "meta" },
+  minimax: { label: "MiniMax", slug: "minimax" },
+  mistral: { label: "Mistral", slug: "mistral" },
+  moonshot: { label: "月之暗面", slug: "moonshot" },
+  openai: { label: "OpenAI", slug: "openai" },
+  qwen: { label: "通义千问", slug: "qwen" },
+  xai: { label: "xAI", slug: "grok" },
+  xiaomi: { label: "小米", slug: "xiaomimimo" },
+  zhipu: { label: "智谱", slug: "zhipu" },
+};
+
+const ASSET_VENDOR_KEYS: Record<string, string> = {
+  anthropic: "anthropic",
+  bytedance: "bytedance",
+  chatglm: "zhipu",
+  claude: "anthropic",
+  deepseek: "deepseek",
+  doubao: "bytedance",
+  gemini: "google",
+  gemma: "google",
+  glmv: "zhipu",
+  grok: "xai",
+  jimeng: "bytedance",
+  meta: "meta",
+  minimax: "minimax",
+  mistral: "mistral",
+  moonshot: "moonshot",
+  nanobanana: "google",
+  openai: "openai",
+  qwen: "qwen",
+  xai: "xai",
+  xiaomimimo: "xiaomi",
+  zai: "zhipu",
+  zhipu: "zhipu",
+};
+
+export const getModelVendor = (model?: string, provider?: string): ModelVendor | undefined => {
+  const normalizedProvider = provider?.trim().toLowerCase() || "";
+  const assetKey =
+    getModelAssetKey(model) || PROVIDER_ASSET_KEYS[normalizedProvider] || normalizedProvider;
+  const key = ASSET_VENDOR_KEYS[assetKey];
+  return key ? { key, ...MODEL_VENDORS[key] } : undefined;
+};
+
+/** Colored circular brand avatar for a company, matching the model icons. */
+export function VendorIcon({
+  className,
+  size = 18,
+  slug,
+}: {
+  className?: string;
+  size?: number;
+  slug: string;
+}) {
+  const asset = BRAND_ASSETS[slug];
+  if (!asset) return null;
+  const glyphSize = Math.round(size * (asset.scale || 0.75));
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full ring-1 ring-black/5 dark:ring-white/10",
+        className,
+      )}
+      style={{ background: asset.background, color: asset.foreground, height: size, width: size }}
+    >
+      {asset.avatarSlug ? (
+        <Image
+          alt=""
+          height={glyphSize}
+          src={`/images/model-icons/${asset.avatarSlug}.svg`}
+          width={glyphSize}
+        />
+      ) : (
+        <span style={{ ...getMaskStyle(asset.slug), height: glyphSize, width: glyphSize }} />
+      )}
+    </span>
+  );
+}
+
 export const getModelAssetKey = (model?: string) => {
   const normalizedModel = model?.trim().toLowerCase() || "";
   return MODEL_ASSET_RULES.find((rule) => rule.pattern.test(normalizedModel))?.key;

@@ -7,7 +7,7 @@ vi.mock("./NewModelsBar", () => ({
 }));
 vi.mock("./ModelSelectorDialog", () => ({ ModelSelectorDialog: () => null }));
 vi.mock("./FilePreviewDialog", () => ({ FilePreviewDialog: () => null }));
-vi.mock("./ToolMenu", () => ({ ToolMenu: () => null }));
+vi.mock("./ComposerMenu", () => ({ ComposerMenu: () => null }));
 vi.mock("./ComposerAttachments", () => ({ ComposerAttachments: () => null }));
 import { ChatInput } from "./ChatInput";
 
@@ -43,7 +43,6 @@ function render(placement: "center" | "bottom") {
       onKeyDown: vi.fn(),
       onPaste: vi.fn(),
       onClearQuote: vi.fn(),
-      onMic: vi.fn(),
       onCancelQueuedMessage: vi.fn(),
       onSendQueuedMessageNow: vi.fn(),
       onSend: vi.fn(),

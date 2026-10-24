@@ -1,7 +1,5 @@
 "use client";
 
-import { ThinkingToggle } from "./ThinkingToggle";
-
 import type { RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
@@ -9,10 +7,7 @@ import {
   ArrowDown,
   ChevronRight,
   CornerDownRight,
-  Globe,
   LoaderCircle,
-  Mic,
-  Paperclip,
   SendHorizontal,
   Square,
   X,
@@ -28,14 +23,12 @@ import type {
 import { getModelDisplayName } from "@/lib/chat/helpers";
 import { isImageGenerationModel } from "@/lib/chat/image-models";
 import { cn } from "@/lib/utils";
-import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
-import { GlobeOffIcon } from "@/components/icons/GlobeOffIcon";
+import { ComposerMenu } from "./ComposerMenu";
 import { ContextWindowIndicator } from "./ContextWindowIndicator";
 import { FilePreviewDialog } from "./FilePreviewDialog";
 import { NewModelsBar } from "./NewModelsBar";
 import { ModelSelectorDialog } from "./ModelSelectorDialog";
 import { ModelBrandIcon } from "./ModelBrandIcon";
-import { ToolMenu } from "./ToolMenu";
 import { ComposerAttachments } from "./ComposerAttachments";
 import type { AttachmentUpload } from "@/hooks/use-chat-attachments";
 
@@ -59,7 +52,6 @@ export function ChatInput({
   onPaste,
   onClearQuote,
   onScrollToBottom,
-  onMic,
   onCancelQueuedMessage,
   onSendQueuedMessageNow,
   onSend,
@@ -95,7 +87,6 @@ export function ChatInput({
   onPaste: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void;
   onClearQuote: () => void;
   onScrollToBottom?: () => void;
-  onMic: () => void;
   onCancelQueuedMessage: () => void;
   onSendQueuedMessageNow: () => void;
   onSend: () => void;
@@ -120,6 +111,7 @@ export function ChatInput({
   const stopping = isLoading && !hasDraft;
   const imageGenerationModel = isImageGenerationModel(selectedModel?.id);
   const composerRef = useRef<HTMLDivElement>(null);
+  const modelButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (placement !== "bottom" || !composerRef.current) return;
@@ -291,55 +283,16 @@ export function ChatInput({
             />
 
             <div className="flex flex-wrap items-center justify-between gap-y-1 px-2.5 pb-2.5 pt-1 md:px-3 md:pb-3">
-              <div className="flex items-center gap-1">
-                <button
-                  className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-200 md:h-9 md:w-9"
-                  onClick={onAttachment}
-                  disabled={attachmentUploading || attachments.length + uploads.length >= 4}
-                  title="添加附件"
-                  type="button"
-                >
-                  <Paperclip size={20} />
-                </button>
-                <button
-                  className="hidden h-11 w-11 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-200 md:flex md:h-9 md:w-9"
-                  onClick={onMic}
-                  title="语音输入"
-                  type="button"
-                >
-                  <Mic size={20} />
-                </button>
-                <ToolMenu disabled={isLoading || imageGenerationModel} />
-                <ThinkingToggle model={selectedModel} disabled={isLoading} />
-                <button
-                  className={cn(
-                    "flex h-11 items-center gap-1.5 rounded-lg px-2 text-sm transition-colors md:h-9",
-                    webSearchEnabled
-                      ? "text-primary hover:bg-primary/5 dark:text-primary dark:hover:bg-primary/10"
-                      : "text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-200",
-                    (isLoading || imageGenerationModel) && "cursor-not-allowed opacity-60",
-                  )}
-                  data-markai-tooltip={
-                    imageGenerationModel ? "图片生成模型暂不支持联网搜索" : undefined
-                  }
-                  disabled={isLoading || imageGenerationModel}
-                  onClick={onToggleWebSearch}
-                  title={
-                    imageGenerationModel
-                      ? "图片生成模型暂不支持联网搜索"
-                      : webSearchEnabled
-                        ? "关闭联网搜索"
-                        : "开启联网搜索"
-                  }
-                  type="button"
-                >
-                  {webSearchEnabled ? <Globe size={18} /> : <GlobeOffIcon size={18} />}
-                  <span className="hidden text-sm lg:inline">联网搜索</span>
-                  <span className="hidden sm:inline-flex">
-                    <ToggleSwitch checked={webSearchEnabled} disabled={isLoading} />
-                  </span>
-                </button>
-              </div>
+              <ComposerMenu
+                attachmentDisabled={
+                  attachmentUploading || attachments.length + uploads.length >= 4
+                }
+                disabled={isLoading}
+                model={selectedModel}
+                onAttachment={onAttachment}
+                onToggleWebSearch={onToggleWebSearch}
+                webSearchEnabled={webSearchEnabled}
+              />
               <div className="ml-auto flex min-w-0 items-center gap-0.5 sm:gap-2">
                 {messages.length > 0 && (
                   <span className="shrink-0">
@@ -355,9 +308,11 @@ export function ChatInput({
                 <button
                   className="flex h-11 max-w-[240px] items-center gap-2 rounded-lg px-2.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:text-gray-300 dark:hover:bg-gray-700 md:h-9"
                   disabled={isLoadingModels || availableModels.length === 0}
+                  aria-expanded={isModelDialogOpen}
                   onClick={() => {
-                    if (availableModels.length > 0) setIsModelDialogOpen(true);
+                    if (availableModels.length > 0) setIsModelDialogOpen((value) => !value);
                   }}
+                  ref={modelButtonRef}
                   title="选择模型"
                   type="button"
                 >
@@ -424,6 +379,7 @@ export function ChatInput({
       </div>
 
       <ModelSelectorDialog
+        anchorRef={modelButtonRef}
         availableModels={availableModels}
         modelSearchKeyword={modelSearchKeyword}
         onClose={() => {

@@ -3,6 +3,7 @@ import { subscribeWithSelector } from "zustand/middleware";
 
 import type { ConfiguredModel, Message } from "@/lib/chat/types";
 import { getModelKey } from "@/lib/chat/helpers";
+import { isGuestMode, requestGuestSignIn } from "@/lib/client/guest-mode";
 
 interface UIState {
   isAppReady: boolean;
@@ -187,7 +188,9 @@ export const useUIStore = create<UIStore>()(
 
     loadModels: async () => {
       try {
-        const response = await fetch("/api/models", { cache: "no-store" });
+        const response = await fetch(isGuestMode() ? "/api/public/models" : "/api/models", {
+          cache: "no-store",
+        });
         if (response.status === 401) {
           const callbackUrl = `${window.location.pathname}${window.location.search}`;
           window.location.replace(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
@@ -241,6 +244,8 @@ export const useUIStore = create<UIStore>()(
       } catch {
         // Database persistence remains the primary signed-in storage.
       }
+      // Guests keep the choice locally; it is restored after signing in.
+      if (isGuestMode()) return;
 
       void fetch("/api/models", {
         body: JSON.stringify({ id: model.id, provider: model.provider }),
@@ -260,8 +265,18 @@ export const useUIStore = create<UIStore>()(
     toggleWebSearch: () => set((s) => ({ webSearchEnabled: !s.webSearchEnabled })),
     setPluginCenterOpen: (open) => set({ pluginCenterOpen: open }),
     setCommandCenterOpen: (open) => set({ commandCenterOpen: open }),
-    setSessionSearchOpen: (open) => set({ sessionSearchOpen: open }),
-    setFileManagerOpen: (open) => set({ fileManagerOpen: open }),
-    setSettingsOpen: (open) => set({ settingsOpen: open }),
+    // History, files and account settings are protected; guests are asked to sign in.
+    setSessionSearchOpen: (open) => {
+      if (open && isGuestMode()) return requestGuestSignIn();
+      set({ sessionSearchOpen: open });
+    },
+    setFileManagerOpen: (open) => {
+      if (open && isGuestMode()) return requestGuestSignIn();
+      set({ fileManagerOpen: open });
+    },
+    setSettingsOpen: (open) => {
+      if (open && isGuestMode()) return requestGuestSignIn();
+      set({ settingsOpen: open });
+    },
   })),
 );

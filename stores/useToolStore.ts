@@ -1,5 +1,6 @@
 import { create } from "zustand";
 
+import { isGuestMode } from "@/lib/client/guest-mode";
 import type { BuiltinToolCatalogItem } from "@/lib/tools/types";
 
 type ToolStore = {
@@ -45,7 +46,9 @@ export const useToolStore = create<ToolStore>((set, get) => ({
     set({ isCatalogLoading: true });
     catalogPromise = (async () => {
       try {
-        const response = await fetch("/api/tools", { cache: "no-store" });
+        const response = await fetch(isGuestMode() ? "/api/public/tools" : "/api/tools", {
+          cache: "no-store",
+        });
         if (!response.ok) throw new Error("加载工具失败");
         const data = await response.json();
         set({ catalog: Array.isArray(data.tools) ? data.tools : [] });

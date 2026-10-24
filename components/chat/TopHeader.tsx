@@ -7,6 +7,7 @@ import {
   FileJson,
   ImageDown,
   Link2,
+  LogIn,
   MoreVertical,
   PanelLeftOpen,
   PencilLine,
@@ -42,6 +43,7 @@ export function TopHeader({
   isSidebarOpen,
   isWideChatMode,
   onOpenSidebar,
+  onSignIn,
   smartRenameSession,
   toggleFavorite,
   toggleWideChatMode,
@@ -58,6 +60,8 @@ export function TopHeader({
   isSidebarOpen: boolean;
   isWideChatMode: boolean;
   onOpenSidebar: () => void;
+  /** Guest mode: replaces session actions with a sign-in entry. */
+  onSignIn?: () => void;
   smartRenameSession: () => void;
   toggleFavorite: () => void;
   toggleWideChatMode: () => void;
@@ -134,18 +138,20 @@ export function TopHeader({
               </h2>
             )}
 
-            <IconButton
-              onClick={() => {
-                setShareMenuOpen(false);
-                setMenuOpen((open) => !open);
-              }}
-              size="sm"
-              title="会话操作"
-            >
-              <MoreVertical size={17} />
-            </IconButton>
+            {!onSignIn && (
+              <IconButton
+                onClick={() => {
+                  setShareMenuOpen(false);
+                  setMenuOpen((open) => !open);
+                }}
+                size="sm"
+                title="会话操作"
+              >
+                <MoreVertical size={17} />
+              </IconButton>
+            )}
 
-            {menuOpen && (
+            {menuOpen && !onSignIn && (
               <DropdownSurface className="absolute left-0 top-11 w-56">
                 <MenuAction
                   icon={Sparkles}
@@ -197,6 +203,16 @@ export function TopHeader({
 
         <div className="flex items-center gap-1 md:gap-2">
           <ThemeToggle />
+          {onSignIn ? (
+            <button
+              className="inline-flex h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/[0.07] md:h-9"
+              onClick={onSignIn}
+              type="button"
+            >
+              <LogIn size={17} />
+              登录
+            </button>
+          ) : (
           <div className="relative" ref={shareMenuRef}>
             <IconButton
               onClick={() => {
@@ -247,6 +263,7 @@ export function TopHeader({
               </DropdownSurface>
             )}
           </div>
+          )}
         </div>
       </header>
 

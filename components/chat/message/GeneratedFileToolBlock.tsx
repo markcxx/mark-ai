@@ -10,7 +10,6 @@ import {
   FileText,
   FolderOpen,
   ListTree,
-  Loader2,
   Paintbrush,
   Table2,
   Wrench,
@@ -125,9 +124,10 @@ export function GeneratedFileToolBlock({
         )}
 
         {running && (
-          <div className="mt-2 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-            <Loader2 className="animate-spin" size={13} />
-            {WORD_RUNNING_LABELS[generatedFile.toolName] || "正在执行，请稍候…"}
+          <div className="mt-2 text-xs">
+            <span className="markai-text-shimmer">
+              {WORD_RUNNING_LABELS[generatedFile.toolName] || "正在执行，请稍候…"}
+            </span>
           </div>
         )}
 
@@ -139,10 +139,16 @@ export function GeneratedFileToolBlock({
 
         {livePreview && !file && !failed && (
           <div className="mt-2.5 flex items-center justify-between gap-3">
-            <span className="flex min-w-0 items-center gap-1.5 text-xs text-primary">
-              {running ? <Loader2 className="animate-spin" size={13} /> : <Check size={14} />}
-              {running ? "正在刷新右侧实时预览" : "右侧实时预览已更新"}
-            </span>
+            {running ? (
+              <span className="markai-text-shimmer min-w-0 truncate text-xs">
+                正在刷新右侧实时预览
+              </span>
+            ) : (
+              <span className="flex min-w-0 items-center gap-1.5 text-xs text-primary">
+                <Check size={14} />
+                右侧实时预览已更新
+              </span>
+            )}
             {htmlPreview && (
               <button
                 className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-primary dark:text-gray-300 dark:hover:bg-white/[0.06] dark:hover:text-primary"

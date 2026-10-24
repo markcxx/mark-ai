@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState, type ReactNode } from "react";
-import { ChevronRight, CircleAlert, LoaderCircle, type LucideIcon } from "lucide-react";
+import { ChevronRight, CircleAlert, type LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -18,6 +18,7 @@ export function ToolCallDisclosure({
   status: "running" | "done" | "error";
 }) {
   const failed = status === "error";
+  const running = status === "running";
   const [expanded, setExpanded] = useState(false);
   const contentId = useId();
 
@@ -40,9 +41,7 @@ export function ToolCallDisclosure({
             failed ? "text-red-600 dark:text-red-400" : "text-neutral-500 dark:text-neutral-400",
           )}
         >
-          {status === "running" ? (
-            <LoaderCircle className="animate-spin" size={14} strokeWidth={1.5} />
-          ) : failed ? (
+          {failed ? (
             <CircleAlert size={14} strokeWidth={1.5} />
           ) : (
             <Icon size={14} strokeWidth={1.5} />
@@ -51,7 +50,11 @@ export function ToolCallDisclosure({
         <span
           className={cn(
             "min-w-0 truncate",
-            failed ? "text-red-600 dark:text-red-300" : "text-inherit",
+            failed
+              ? "text-red-600 dark:text-red-300"
+              : running
+                ? "markai-text-shimmer"
+                : "text-inherit",
           )}
         >
           {label}

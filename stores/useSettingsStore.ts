@@ -1,5 +1,6 @@
 import { create } from "zustand";
 
+import { isGuestMode } from "@/lib/client/guest-mode";
 import {
   DEFAULT_SETTINGS,
   mergeSettings,
@@ -68,6 +69,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
     // not leave the dialog showing a long-running "saving" state.
     writeLocalSettings(settings);
     set({ saveState: "saved" });
+    if (isGuestMode()) return;
     saveTimer = setTimeout(() => {
       void fetch("/api/settings", {
         body: JSON.stringify(settings),
@@ -93,6 +95,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
     loadSettings: async () => {
       const local = readLocalSettings();
       if (local) set({ ...local });
+      if (isGuestMode()) {
+        set({ ...(local || DEFAULT_SETTINGS), isLoaded: true, saveState: "idle" });
+        return;
+      }
       try {
         const response = await fetch("/api/settings", { cache: "no-store" });
         if (!response.ok) throw new Error("加载设置失败");

@@ -1,3 +1,24 @@
+/**
+ * Relative 0-100 scores shown on the model picker radar. Fill these only from a
+ * cited evaluation; models without ratings simply hide the radar.
+ */
+export type ModelRatings = {
+  agentic: number;
+  design: number;
+  intelligence: number;
+  /** Higher means cheaper. */
+  price: number;
+  speed: number;
+};
+
+/** Official list price per million tokens. */
+export type ModelPricing = {
+  cachedInput?: number;
+  currency: "CNY" | "USD";
+  input: number;
+  output: number;
+};
+
 export type ModelMetadata = {
   aliases?: string[];
   contextWindowTokens?: number;
@@ -7,6 +28,8 @@ export type ModelMetadata = {
   id: string;
   knowledgeCutoff?: string;
   maxOutputTokens?: number;
+  pricing?: ModelPricing;
+  ratings?: ModelRatings;
   sourceUrl: string;
   supportsReasoning?: boolean;
   supportsToolCalling?: boolean;

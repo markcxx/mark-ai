@@ -13,6 +13,11 @@ import {
 } from "@/lib/chat/client/chat-controller";
 import { getModelKey } from "@/lib/chat/helpers";
 import { isImageGenerationModel } from "@/lib/chat/image-models";
+import {
+  GUEST_DRAFT_STORAGE_KEY,
+  requestGuestSignIn,
+  setGuestMode,
+} from "@/lib/client/guest-mode";
 import { useChatAttachments } from "@/hooks/use-chat-attachments";
 import { useConversationScroll } from "@/hooks/use-conversation-scroll";
 import { usePreviewResize } from "@/hooks/use-preview-resize";
@@ -91,7 +96,16 @@ function MessageSkeletonList() {
   );
 }
 
-export default function ChatApp({ initialSessionId }: { initialSessionId?: string }) {
+export default function ChatApp({
+  guest = false,
+  initialSessionId,
+}: {
+  /** Anonymous cloud visitor: public models and plugins only, no protected data APIs. */
+  guest?: boolean;
+  initialSessionId?: string;
+}) {
+  // Set during render so child effects (tool menu, plugin center) already see it.
+  setGuestMode(guest, () => useChatStore.getState().input);
   const { setTheme } = useTheme();
   const generalSettings = useSettingsStore((s) => s.general);
   const settingsLoaded = useSettingsStore((s) => s.isLoaded);
@@ -166,11 +180,12 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
   const [exportDialogMode, setExportDialogMode] = useState<ExportMode>("image");
 
   useEffect(() => {
-    const guestDraft = window.localStorage.getItem("markai:guest-draft")?.trim();
+    if (guest) return;
+    const guestDraft = window.localStorage.getItem(GUEST_DRAFT_STORAGE_KEY)?.trim();
     if (!guestDraft || useChatStore.getState().input) return;
     useChatStore.getState().setInput(guestDraft);
-    window.localStorage.removeItem("markai:guest-draft");
-  }, []);
+    window.localStorage.removeItem(GUEST_DRAFT_STORAGE_KEY);
+  }, [guest]);
 
   // Derived
   const selectedModel = availableModels.find((m) => getModelKey(m) === selectedModelKey);
@@ -259,7 +274,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
           return;
         }
 
-        const totalTasks = initialSessionId ? 4 : 3;
+        const totalTasks = guest ? 1 : initialSessionId ? 4 : 3;
         let completedTasks = 0;
         const finishTask = (message: string) => {
           completedTasks += 1;
@@ -269,6 +284,15 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
         };
 
         uiStore.setBootProgress(12, "正在加载模型与会话…");
+        if (guest) {
+          // Guests have no history; only the public model catalog is loaded.
+          useSessionStore.setState({ hasMoreSessions: false, isLoadingSessions: false });
+          await Promise.allSettled([
+            useSettingsStore.getState().loadSettings(),
+            uiStore.loadModels().then(() => finishTask("模型配置已加载")),
+          ]);
+          return;
+        }
         await Promise.allSettled([
           useSettingsStore
             .getState()
@@ -302,7 +326,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
     return () => {
       cancelled = true;
     };
-  }, [initialSessionId, handleLoadSession]);
+  }, [guest, initialSessionId, handleLoadSession]);
 
   // Mobile uses the sidebar as a temporary drawer instead of a persistent column.
   useEffect(() => {
@@ -419,6 +443,10 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
         : event.key === "Enter" && (event.ctrlKey || event.metaKey);
     if (shouldSend) {
       event.preventDefault();
+      if (guest) {
+        if (useChatStore.getState().input.trim()) requestGuestSignIn();
+        return;
+      }
       if (attachmentUploading) return;
       useChatStore.getState().sendMessage();
     }
@@ -433,10 +461,22 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
     const files = clipboardFiles.length > 0 ? clipboardFiles : itemFiles;
     if (files.length === 0) return;
     event.preventDefault();
+    if (guest) return requestGuestSignIn();
     void uploadAttachmentFiles(files);
   };
 
+  const handleAttachmentClick = () => {
+    if (guest) return requestGuestSignIn();
+    fileInputRef.current?.click();
+  };
+
+  const handleDropFiles = async (files: File[] | FileList) => {
+    if (guest) return requestGuestSignIn();
+    await uploadAttachmentFiles(files);
+  };
+
   const handleSend = () => {
+    if (guest) return requestGuestSignIn();
     if (attachmentUploading) return;
     if (isLoading && !useChatStore.getState().input.trim() && pendingAttachments.length === 0) {
       useChatStore.getState().abortStreaming();
@@ -604,6 +644,8 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
 
           <Sidebar
             activeSessionId={activeSessionId}
+            guest={guest}
+            onSignIn={requestGuestSignIn}
             hasMoreSessions={hasMoreSessions}
             isOpen={isSidebarOpen}
             isResizing={isResizingSidebar}
@@ -719,6 +761,7 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                 isSidebarOpen={isSidebarOpen}
                 isWideChatMode={wideChatMode}
                 onOpenSidebar={() => useUIStore.getState().setSidebarOpen(true)}
+                onSignIn={guest ? requestGuestSignIn : undefined}
                 smartRenameSession={() => {
                   if (!activeSessionId) {
                     toast.error("当前没有可重命名的会话");
@@ -774,18 +817,18 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                       isLoadingModels={isLoadingModels}
                       modelSearchKeyword={modelSearchKeyword}
                       messages={messages}
-                      onAttachment={() => fileInputRef.current?.click()}
-                      onDropFiles={uploadAttachmentFiles}
+                      onAttachment={handleAttachmentClick}
+                      onDropFiles={handleDropFiles}
                       onCancelQueuedMessage={() => useChatStore.getState().cancelQueuedMessage()}
                       onInput={handleInput}
                       onKeyDown={handleKeyDown}
                       onPaste={handleAttachmentPaste}
                       onClearQuote={() => useChatStore.getState().setPendingQuote(null)}
-                      onMic={() => toast(NOT_IMPLEMENTED_TOAST)}
                       onRemoveAttachment={removeAttachment}
                       onSend={handleSend}
                       onSendQueuedMessageNow={() => useChatStore.getState().sendQueuedMessageNow()}
                       onToggleWebSearch={() => {
+                        if (guest) return requestGuestSignIn();
                         const enabled = !useUIStore.getState().webSearchEnabled;
                         useUIStore.getState().setWebSearchEnabled(enabled);
                         useSettingsStore.getState().updateGeneral({
@@ -883,19 +926,19 @@ export default function ChatApp({ initialSessionId }: { initialSessionId?: strin
                   isLoadingModels={isLoadingModels}
                   modelSearchKeyword={modelSearchKeyword}
                   messages={messages}
-                  onAttachment={() => fileInputRef.current?.click()}
-                  onDropFiles={uploadAttachmentFiles}
+                  onAttachment={handleAttachmentClick}
+                  onDropFiles={handleDropFiles}
                   onCancelQueuedMessage={() => useChatStore.getState().cancelQueuedMessage()}
                   onInput={handleInput}
                   onKeyDown={handleKeyDown}
                   onPaste={handleAttachmentPaste}
                   onClearQuote={() => useChatStore.getState().setPendingQuote(null)}
                   onScrollToBottom={() => scrollToBottom(true)}
-                  onMic={() => toast(NOT_IMPLEMENTED_TOAST)}
                   onRemoveAttachment={removeAttachment}
                   onSend={handleSend}
                   onSendQueuedMessageNow={() => useChatStore.getState().sendQueuedMessageNow()}
                   onToggleWebSearch={() => {
+                    if (guest) return requestGuestSignIn();
                     const enabled = !useUIStore.getState().webSearchEnabled;
                     useUIStore.getState().setWebSearchEnabled(enabled);
                     useSettingsStore.getState().updateGeneral({
