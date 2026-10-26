@@ -311,6 +311,19 @@ export const findConfiguredModel = (
     });
   }
 
+  // Keep a provider/model reference valid after its credentials are split into
+  // provider_key1, provider_key2, etc. An existing exact route always wins.
+  if (!found && provider) {
+    const prefix = `${provider}_key`;
+    const candidates = models.filter(
+      (model) =>
+        model.id === modelId &&
+        model.provider.startsWith(prefix) &&
+        /^\d+$/.test(model.provider.slice(prefix.length)),
+    );
+    if (candidates.length) found = candidates[Math.floor(Math.random() * candidates.length)];
+  }
+
   if (!found) return undefined;
   return { ...found, apiKey: pickRandomKey(found.apiKey) };
 };

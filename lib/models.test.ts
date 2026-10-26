@@ -3,6 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { findConfiguredModel, getPublicConfiguredModels } from "./models";
 
 const TEST_ENV_KEYS = [
+  "MARKCHANNELA_KEY1_API_KEY",
+  "MARKCHANNELA_KEY1_BASE_URL",
+  "MARKCHANNELA_KEY1_MODELS",
+  "MARKCHANNELA_KEY2_API_KEY",
+  "MARKCHANNELA_KEY2_BASE_URL",
+  "MARKCHANNELA_KEY2_MODELS",
   "AI_MODEL_CONFIGS",
   "AI_PROVIDERS",
   "MARKCHANNELA_API_KEY",
@@ -107,5 +113,40 @@ describe("MarkAI model channels", () => {
     expect(findConfiguredModel("shared-model", "markai")?.baseUrl).toBe(
       "https://channel-b.example/v1",
     );
+  });
+});
+
+describe("split credential routes", () => {
+  const configure = () => {
+    process.env.MARKCHANNELA_KEY1_API_KEY = "first-route-key";
+    process.env.MARKCHANNELA_KEY1_BASE_URL = "https://first.example/v1";
+    process.env.MARKCHANNELA_KEY1_MODELS = "shared-model,first-only";
+    process.env.MARKCHANNELA_KEY2_API_KEY = "second-route-key";
+    process.env.MARKCHANNELA_KEY2_BASE_URL = "https://second.example/v1";
+    process.env.MARKCHANNELA_KEY2_MODELS = "shared-model";
+    vi.spyOn(Math, "random").mockReturnValue(0.999);
+  };
+  it("resolves a legacy provider to its split key routes without including unrelated providers", () => {
+    configure();
+    process.env.AI_MODEL_CONFIGS = JSON.stringify([
+      { provider: "unrelated", id: "shared-model", apiKey: "unrelated-key" },
+    ]);
+    expect(findConfiguredModel("shared-model", "markchannela")).toMatchObject({
+      provider: "markchannela_key2",
+      apiKey: "second-route-key",
+      baseUrl: "https://second.example/v1",
+    });
+    expect(findConfiguredModel("first-only", "markchannela")?.provider).toBe("markchannela_key1");
+    expect(findConfiguredModel("shared-model", "unknown")).toBeUndefined();
+  });
+  it("keeps an existing exact provider or explicit key route authoritative", () => {
+    configure();
+    process.env.MARKCHANNELA_API_KEY = "original-key";
+    process.env.MARKCHANNELA_MODELS = "shared-model";
+    expect(findConfiguredModel("shared-model", "markchannela")?.apiKey).toBe("original-key");
+    expect(findConfiguredModel("shared-model", "markchannela_key1")?.apiKey).toBe(
+      "first-route-key",
+    );
+    expect(findConfiguredModel("first-only", "markchannela_key2")).toBeUndefined();
   });
 });

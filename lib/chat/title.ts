@@ -27,7 +27,7 @@ const toOpenAIChatEndpoint = (baseUrl?: string) => {
 };
 
 type TitleModelResolution = {
-  matchedBy?: "exact" | "model-id";
+  matchedBy?: "exact" | "provider-group" | "model-id";
   model?: ReturnType<typeof getConfiguredModels>[number];
   reason?: string;
   requested?: string;
@@ -49,7 +49,11 @@ const resolveTitleModelConfig = (): TitleModelResolution => {
   const exactModel = findConfiguredModel(modelId, provider);
 
   if (exactModel) {
-    return { matchedBy: "exact", model: exactModel, requested: raw };
+    return {
+      matchedBy: exactModel.provider === provider ? "exact" : "provider-group",
+      model: exactModel,
+      requested: raw,
+    };
   }
 
   const sameIdModels = getConfiguredModels().filter((model) => model.id === modelId);
@@ -60,8 +64,8 @@ const resolveTitleModelConfig = (): TitleModelResolution => {
   return {
     reason:
       sameIdModels.length > 1
-        ? `Model id "${modelId}" is configured by multiple providers`
-        : `No configured model matches "${raw}"`,
+        ? `未找到标题模型线路「${provider}」；模型「${modelId}」同时存在于 ${sameIdModels.map((model) => model.provider).join("、")}，请指定其中一个线路`
+        : `未匹配到标题模型「${raw}」，请检查线路名和模型 ID`,
     requested: raw,
   };
 };
