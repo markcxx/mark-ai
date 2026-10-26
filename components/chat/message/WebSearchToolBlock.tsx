@@ -2,6 +2,7 @@
 
 import { ExternalLink, Image, ScanText, Search } from "lucide-react";
 
+import { webToolSummary } from "@/lib/chat/tool-summary";
 import type { WebCitation } from "@/lib/chat/citations";
 import type { WebSearchResult, WebSearchState } from "@/lib/chat/types";
 
@@ -35,30 +36,12 @@ export function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchStat
         : "联网搜索";
   const argumentLabel = isWebpageRead ? "url:" : "query:";
   const argumentValue = isWebpageRead ? webSearch.url || webSearch.query : webSearch.query;
-  const summaryLabel = isFind
-    ? searching
-      ? "正在查找页内内容"
-      : failed
-        ? "页内查找失败"
-        : `已查找网页 · ${webSearch.page?.matches?.length || 0} 处匹配`
-    : isImages
-      ? searching
-        ? "正在整理图片"
-        : "图片展示失败"
-      : searching
-        ? isWebpageRead
-          ? "正在读取网页"
-          : "正在搜索网页"
-        : failed
-          ? `${toolLabel}调用失败`
-          : isWebpageRead
-            ? "已读取网页"
-            : "已搜索网页";
+  const summaryLabel = webToolSummary(webSearch);
 
   return (
     <ToolCallDisclosure
       icon={Icon}
-      label={summaryLabel}
+      {...summaryLabel}
       status={searching ? "running" : failed ? "error" : "done"}
     >
       <div className="min-w-0 pl-4">

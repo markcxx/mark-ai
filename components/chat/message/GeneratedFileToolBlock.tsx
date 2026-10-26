@@ -19,6 +19,7 @@ import {
 import { isFilePreviewable } from "@/components/chat/FilePreviewDialog";
 import { useFileUrl } from "../FileAccessContext";
 import { useHtmlPreview } from "@/components/chat/HtmlPreviewContext";
+import { generatedToolSummary } from "@/lib/chat/tool-summary";
 import type { GeneratedFileState } from "@/lib/chat/types";
 import { getBuiltinTool } from "@/lib/tools/registry";
 import { ToolCallDisclosure } from "./ToolCallDisclosure";
@@ -43,12 +44,6 @@ const WORD_STEP_ICONS: Record<string, LucideIcon> = {
   word_document_inspect: FileCheck2,
   word_document_finalize: FileDown,
 };
-const TOOL_LABELS: Record<string, { running: string; done: string; error: string }> = {
-  calculator: { running: "正在计算", done: "已完成计算", error: "计算失败" },
-  "data-visualization": { running: "正在校验图表", done: "已生成图表", error: "图表校验失败" },
-  "excel-workbook": { running: "正在生成表格", done: "已生成表格", error: "表格生成失败" },
-};
-
 const WORD_RUNNING_LABELS: Record<string, string> = {
   word_document_append: "正在构建下一个章节",
   word_document_begin: "正在规划文档结构",
@@ -73,18 +68,13 @@ export function GeneratedFileToolBlock({
   const file = generatedFile.file;
   const progress = generatedFile.progress;
   const livePreview = generatedFile.preview;
-  const toolLabel = getBuiltinTool(generatedFile.toolId)?.name || "文件生成";
-  const labels = TOOL_LABELS[generatedFile.toolId];
+  const toolLabel = getBuiltinTool(generatedFile.toolId)?.name;
   const icon =
     WORD_STEP_ICONS[generatedFile.toolName] || TOOL_ICONS[generatedFile.toolId] || Wrench;
-  const summaryLabel = running
-    ? WORD_RUNNING_LABELS[generatedFile.toolName] || labels?.running || `正在使用${toolLabel}`
-    : failed
-      ? labels?.error || `${toolLabel}执行失败`
-      : progress?.label || labels?.done || `已使用${toolLabel}`;
+  const summaryLabel = generatedToolSummary(generatedFile, toolLabel);
 
   return (
-    <ToolCallDisclosure icon={icon} label={summaryLabel} status={generatedFile.status}>
+    <ToolCallDisclosure icon={icon} {...summaryLabel} status={generatedFile.status}>
       <div className="min-w-0 pl-[22px] pb-2 pt-1">
         <div className="flex min-w-0 items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
           <span className="shrink-0 font-mono text-[11px] text-gray-400 dark:text-gray-500">

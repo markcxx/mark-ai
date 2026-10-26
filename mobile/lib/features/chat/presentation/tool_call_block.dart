@@ -6,6 +6,7 @@ import '../../../shared/widgets/ui_icon.dart';
 import '../../../shared/widgets/source_favicon.dart';
 import 'message_sources.dart';
 import 'web_image_gallery.dart';
+import 'tool_summary.dart';
 
 /// Native counterpart of WebSearchToolBlock and GeneratedFileToolBlock.
 class ToolCallBlock extends StatefulWidget {
@@ -86,13 +87,9 @@ class _ToolCallBlockState extends State<ToolCallBlock> {
         ? '网页读取'
         : '联网搜索';
     final progress = jsonMap(data['progress']);
-    final title = running
-        ? (widget.generatedFile ? wordLabels[data['toolName']] : null) ??
-              '正在调用$label'
-        : failed
-        ? '$label调用失败'
-        : (widget.generatedFile ? progress['label'] as String? : null) ??
-              '已调用$label';
+    final summary = widget.generatedFile
+        ? generatedToolSummary(data, toolLabel: widget.toolLabel)
+        : webToolSummary(data);
     final primary = Theme.of(context).colorScheme.primary;
     final statusColor = failed
         ? (dark ? const Color(0xfffca5a5) : const Color(0xffdc2626))
@@ -158,15 +155,36 @@ class _ToolCallBlockState extends State<ToolCallBlock> {
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: text(
-                          title,
-                          color: failed
-                              ? statusColor
-                              : dark
-                              ? const Color(0xffd1d5db)
-                              : const Color(0xff4b5563),
-                          weight: FontWeight.w500,
-                          lines: 1,
+                        child: Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: summary.label,
+                                style: TextStyle(
+                                  color: failed ? statusColor : muted,
+                                ),
+                              ),
+                              if (summary.detail != null)
+                                TextSpan(
+                                  text: ' ${summary.detail}',
+                                  style: TextStyle(
+                                    color: failed
+                                        ? statusColor.withValues(alpha: .7)
+                                        : dark
+                                        ? const Color(0xff6b7280)
+                                        : const Color(0xff9ca3af),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          semanticsLabel: summary.text,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            height: 1.6,
+                            fontWeight: FontWeight.w400,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),

@@ -10,13 +10,16 @@ export function ToolCallDisclosure({
   children,
   icon: Icon,
   label,
+  detail,
   status,
 }: {
   children: ReactNode;
   icon: LucideIcon;
   label: string;
+  detail?: string;
   status: "running" | "done" | "error";
 }) {
+  const fullLabel = detail ? `${label} ${detail}` : label;
   const failed = status === "error";
   const running = status === "running";
   const [expanded, setExpanded] = useState(false);
@@ -28,6 +31,8 @@ export function ToolCallDisclosure({
       data-tool-call-status={status}
     >
       <button
+        aria-label={fullLabel}
+        data-markai-tooltip={fullLabel}
         aria-controls={contentId}
         aria-expanded={expanded}
         className="group/tool-summary flex min-h-[26px] w-fit max-w-full cursor-pointer items-center gap-1.5 rounded-md py-0 font-sans text-left text-[length:calc(var(--chat-font-size)_-_1px)] font-normal leading-[22px] tracking-normal text-neutral-500 transition-colors hover:text-neutral-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-neutral-400 dark:hover:text-neutral-200 [@media(pointer:coarse)]:min-h-10"
@@ -47,17 +52,30 @@ export function ToolCallDisclosure({
             <Icon size={14} strokeWidth={1.5} />
           )}
         </span>
-        <span
-          className={cn(
-            "min-w-0 truncate",
-            failed
-              ? "text-red-600 dark:text-red-300"
-              : running
-                ? "markai-text-shimmer"
-                : "text-inherit",
+        <span className="min-w-0 truncate">
+          <span
+            className={cn(
+              failed
+                ? "text-red-600 dark:text-red-300"
+                : running
+                  ? "markai-text-shimmer"
+                  : "text-inherit",
+            )}
+          >
+            {label}
+          </span>
+          {detail && (
+            <span
+              className={cn(
+                failed
+                  ? "text-red-400 dark:text-red-400"
+                  : "text-neutral-400 dark:text-neutral-500",
+              )}
+            >
+              {" "}
+              {detail}
+            </span>
           )}
-        >
-          {label}
         </span>
         <ChevronRight
           aria-hidden="true"

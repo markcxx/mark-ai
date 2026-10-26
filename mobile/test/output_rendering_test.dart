@@ -254,8 +254,8 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('已调用联网搜索'));
-      await tester.tap(find.text('Word 文档生成调用失败'));
+      await tester.tap(find.text('已搜索 Flutter 公式', findRichText: true));
+      await tester.tap(find.text('文档打包失败', findRichText: true));
       await tester.tap(find.text('已深度思考 (1.2 秒)'));
       await tester.pumpAndSettle();
       expect(find.byType(Math), findsNWidgets(2));
