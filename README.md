@@ -102,6 +102,8 @@ MarkAI 将正文、推理、工具调用、生成文件和翻译保存为带类�
 
 ### 统一的模型接入
 
+模型详情支持带来源的规格、AA 评测雷达、输入输出和缓存参考价格。配置服务端 `ARTIFICIAL_ANALYSIS_API_KEY` 可后台更新，也可运行 `npm run models:sync` 更新公开快照；详见[模型资料与评测维护](docs/model-catalog.md)。
+
 模型设置将站点提供商、用户自定义提供商和模型列表统一到同一界面。云端用户可以独立启用提供商、修改 Base URL、保存加密 API Key，并设置默认聊天模型和翻译模型。
 
 - 原生支持 Google Gemini。

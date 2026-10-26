@@ -2,21 +2,28 @@
  * Relative 0-100 scores shown on the model picker radar. Fill these only from a
  * cited evaluation; models without ratings simply hide the radar.
  */
-export type ModelRatings = {
-  agentic: number;
-  design: number;
-  intelligence: number;
+export type ModelCapabilityScores = Partial<
+  Record<"finance" | "strategy" | "legal" | "healthcare" | "engineering" | "economics", number>
+>;
+
+export type ModelRatings = ModelCapabilityScores & {
+  agentic?: number;
+  coding?: number;
+  intelligence?: number;
   /** Higher means cheaper. */
-  price: number;
-  speed: number;
+  price?: number;
+  speed?: number;
 };
 
-/** Official list price per million tokens. */
+/** Sourced reference price per million tokens; not necessarily this route's bill. */
 export type ModelPricing = {
   cachedInput?: number;
+  cacheWrite?: number;
   currency: "CNY" | "USD";
   input: number;
   output: number;
+  sourceUrl?: string;
+  sourceLabel?: string;
 };
 
 export type ModelMetadata = {
@@ -30,6 +37,18 @@ export type ModelMetadata = {
   maxOutputTokens?: number;
   pricing?: ModelPricing;
   ratings?: ModelRatings;
+  benchmark?: {
+    sourceUrl: string;
+    updatedAt: string;
+    indexVersion: string;
+    modelName: string;
+    intelligence?: number;
+    coding?: number;
+    agentic?: number;
+    capabilities?: ModelCapabilityScores;
+    outputTokensPerSecond?: number;
+    timeToFirstTokenSeconds?: number;
+  };
   sourceUrl: string;
   supportsReasoning?: boolean;
   supportsToolCalling?: boolean;
@@ -49,6 +68,56 @@ const DOUBAO_SOURCE_URL = "https://www.volcengine.com/docs/82379/1330310";
 // Keep this list deliberately conservative. Unknown/custom models remain unknown instead of
 // inheriting an unsafe context limit from a similarly named model.
 export const MODEL_METADATA: ModelMetadata[] = [
+  {
+    id: "gpt-6.1-sol",
+    displayName: "GPT-6.1 Sol",
+    family: "GPT-6.1",
+    description: "支持长上下文、视觉理解和工具调用的推理模型。",
+    contextWindowTokens: 1_050_000,
+    maxOutputTokens: 128_000,
+    sourceUrl: "https://models.dev/?search=gpt-6.1-sol",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVision: true,
+  },
+  {
+    id: "claude-sonnet-5-5",
+    aliases: ["claude-sonnet-5.5", "claude-sonnet-5.5-thinking"],
+    displayName: "Claude Sonnet 5.5",
+    family: "Claude Sonnet",
+    description: "支持长上下文、视觉理解、推理和工具调用的 Claude Sonnet 模型。",
+    contextWindowTokens: 1_000_000,
+    maxOutputTokens: 128_000,
+    sourceUrl: "https://models.dev/?search=claude-sonnet-5-5",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVision: true,
+  },
+  {
+    id: "claude-sonnet-5",
+    displayName: "Claude Sonnet 5",
+    family: "Claude Sonnet",
+    description: "支持百万上下文、视觉理解、推理和工具调用的 Claude Sonnet 模型。",
+    contextWindowTokens: 1_000_000,
+    maxOutputTokens: 128_000,
+    sourceUrl: "https://models.dev/?search=claude-sonnet-5",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVision: true,
+  },
+  {
+    id: "claude-haiku-4-5",
+    aliases: ["claude-haiku-4-5-20251001", "claude-haiku-4-5-20251001-thinking"],
+    displayName: "Claude Haiku 4.5",
+    family: "Claude Haiku",
+    description: "面向低延迟对话、分类和轻量代理任务的 Claude Haiku 模型。",
+    contextWindowTokens: 200_000,
+    maxOutputTokens: 64_000,
+    sourceUrl: "https://models.dev/?search=claude-haiku-4-5",
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVision: true,
+  },
   {
     id: "glm-5.3-prime",
     displayName: "GLM-5.3-Prime",
@@ -568,6 +637,7 @@ export const MODEL_METADATA: ModelMetadata[] = [
     contextWindowTokens: 1_048_576,
     description: "火山方舟的 DeepSeek V4.1 Flash 多模态快照，支持百万级上下文、推理和工具调用。",
     displayName: "DeepSeek V4.1 Flash · 261017",
+    aliases: ["deepseek-v4.1-flash-1017"],
     family: "DeepSeek V4.1",
     id: "deepseek-v4-1-flash-261017",
     maxOutputTokens: 393_216,
@@ -591,7 +661,7 @@ export const MODEL_METADATA: ModelMetadata[] = [
     supportsVision: true,
   },
   {
-    aliases: ["deepseek-v4-pro-260425"],
+    aliases: ["deepseek-v4-pro-260425", "deepseek-v4-pro-0813"],
     contextWindowTokens: 1_048_576,
     description: "DeepSeek V4 系列旗舰模型，支持百万级上下文、多档推理强度和代理任务。",
     displayName: "DeepSeek V4 Pro",
@@ -614,7 +684,7 @@ export const MODEL_METADATA: ModelMetadata[] = [
     supportsToolCalling: true,
   },
   {
-    aliases: ["deepseek-v4-flash-260425"],
+    aliases: ["deepseek-v4-flash-260425", "deepseek-v4-flash-0731"],
     contextWindowTokens: 1_048_576,
     description: "DeepSeek V4 系列高效预览模型，支持百万级上下文、推理和代理任务。",
     displayName: "DeepSeek V4 Flash",
@@ -1450,10 +1520,9 @@ export const MODEL_METADATA: ModelMetadata[] = [
     sourceUrl: "https://docs.anthropic.com/en/docs/about-claude/models/overview",
   },
   {
-    aliases: ["claude-opus-4-5", "claude-haiku-4-5"],
     contextWindowTokens: 200_000,
     description: "Anthropic 通用长上下文模型，支持编码、视觉与扩展思考。",
-    displayName: "Claude 4.5",
+    displayName: "Claude Sonnet 4.5",
     family: "Claude 4.5",
     id: "claude-sonnet-4-5",
     maxOutputTokens: 64_000,

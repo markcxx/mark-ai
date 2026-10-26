@@ -5,8 +5,9 @@ import { Popover } from "@base-ui/react/popover";
 
 import { estimateDraftContextTokens } from "@/lib/chat/context-window";
 import { estimateTextTokens } from "@/lib/chat/metrics";
-import type { FileAttachment, Message } from "@/lib/chat/types";
-import { formatTokenCount, getModelMetadata, hasKnownContextWindow } from "@/lib/model-metadata";
+import type { ConfiguredModel, FileAttachment, Message } from "@/lib/chat/types";
+import { getConfiguredModelMetadata } from "@/lib/model-catalog";
+import { formatTokenCount, hasKnownContextWindow } from "@/lib/model-metadata";
 import { cn } from "@/lib/utils";
 import { getToolFunctions, getToolSystemPrompt } from "@/lib/tools/registry";
 import { useToolStore } from "@/stores/useToolStore";
@@ -16,16 +17,18 @@ export function ContextWindowIndicator({
   draft,
   messages,
   modelId,
+  model,
   webSearchEnabled,
 }: {
   attachments: FileAttachment[];
   draft: string;
   messages: Message[];
   modelId?: string;
+  model?: ConfiguredModel;
   webSearchEnabled: boolean;
 }) {
   const enabledToolIds = useToolStore((state) => state.enabledToolIds);
-  const metadata = getModelMetadata(modelId);
+  const metadata = getConfiguredModelMetadata(model || (modelId ? { id: modelId } : undefined));
   const toolContextTokens = useMemo(
     () =>
       estimateTextTokens(

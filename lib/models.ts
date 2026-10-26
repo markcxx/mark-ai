@@ -15,6 +15,7 @@ export type ConfiguredModel = {
 };
 
 export type PublicConfiguredModel = Pick<ConfiguredModel, "id" | "provider"> & {
+  metadata?: import("./model-metadata").ModelMetadata;
   thinking?: ThinkingCapability;
 };
 

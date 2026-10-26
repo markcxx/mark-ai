@@ -301,6 +301,7 @@ export function ChatInput({
                       draft={pendingQuote ? `${pendingQuote.content}\n\n${input}` : input}
                       messages={messages}
                       modelId={selectedModel?.id}
+                      model={selectedModel}
                       webSearchEnabled={webSearchEnabled}
                     />
                   </span>
@@ -325,6 +326,7 @@ export function ChatInput({
                       />
                       <span className="hidden max-w-[160px] truncate text-[13px] sm:inline">
                         {selectedModel.presentation?.displayName ||
+                          selectedModel.metadata?.displayName ||
                           getModelDisplayName(selectedModel.id)}
                       </span>
                     </>

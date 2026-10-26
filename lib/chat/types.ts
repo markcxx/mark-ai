@@ -178,6 +178,7 @@ export type ChatStreamEvent = {
 };
 
 export type ConfiguredModel = {
+  metadata?: import("@/lib/model-metadata").ModelMetadata;
   thinking?: import("@/lib/model-thinking").ThinkingCapability;
   id: string;
   provider: string;

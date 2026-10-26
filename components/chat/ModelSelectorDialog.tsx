@@ -3,11 +3,13 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronDown, Eye, ImagePlus, Search, Wrench } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Eye, ImagePlus, Info, Search, Wrench } from "lucide-react";
+import { IconButton } from "@/components/ui/IconButton";
 
 import type { ConfiguredModel } from "@/lib/chat/types";
 import { getModelDisplayName, getModelKey } from "@/lib/chat/helpers";
-import { formatContextWindow, getModelMetadata, hasKnownContextWindow } from "@/lib/model-metadata";
+import { formatContextWindow, hasKnownContextWindow } from "@/lib/model-metadata";
+import { getConfiguredModelMetadata } from "@/lib/model-catalog";
 import { isImageGenerationModel } from "@/lib/chat/image-models";
 import { compareModelProviders, sortModelsByFamily } from "@/lib/model-sorting";
 import { isNewModel } from "@/lib/model-presentation";
@@ -43,7 +45,9 @@ const matchesKeyword = (model: ConfiguredModel, keyword: string) =>
   model.id.toLowerCase().includes(keyword) ||
   getModelDisplayName(model.id).toLowerCase().includes(keyword) ||
   Boolean(model.presentation?.displayName.toLowerCase().includes(keyword)) ||
-  Boolean(model.presentation?.description.toLowerCase().includes(keyword));
+  Boolean(model.presentation?.description.toLowerCase().includes(keyword)) ||
+  Boolean(model.metadata?.displayName.toLowerCase().includes(keyword)) ||
+  Boolean(model.metadata?.description.toLowerCase().includes(keyword));
 
 const OTHER_VENDOR: ModelVendor = { key: "other", label: "其他", slug: "" };
 const vendorOf = (model: ConfiguredModel) =>
@@ -82,6 +86,8 @@ export function ModelSelectorDialog({
   const [activeKey, setActiveKey] = useState(selectedModelKey);
   const [placement, setPlacement] = useState<Placement | null>(null);
   const [sheet, setSheet] = useState(false);
+  const [detailKey, setDetailKey] = useState<string | null>(null);
+  const detailModel = availableModels.find((model) => getModelKey(model) === detailKey);
   const keyword = modelSearchKeyword.trim().toLowerCase();
   const hasImageModels = availableModels.some((model) => isImageGenerationModel(model.id));
 
@@ -112,13 +118,11 @@ export function ModelSelectorDialog({
       for (const model of models) {
         byProvider.set(model.provider, [...(byProvider.get(model.provider) || []), model]);
       }
-      return [...byProvider.keys()].sort(compareModelProviders).map(
-        (provider): ModelGroup => ({
-          key: provider,
-          label: providerNames[provider] || provider,
-          models: sortModelsByFamily(byProvider.get(provider)!),
-        }),
-      );
+      return [...byProvider.keys()].sort(compareModelProviders).map((provider): ModelGroup => ({
+        key: provider,
+        label: providerNames[provider] || provider,
+        models: sortModelsByFamily(byProvider.get(provider)!),
+      }));
     };
     const result: ModelSection[] = [];
     if (typeFilter !== "image") {
@@ -156,6 +160,7 @@ export function ModelSelectorDialog({
     setVendorFilter("all");
     setVendorMenuOpen(false);
     setPlacement(null);
+    setDetailKey(null);
   }, [open, selectedModelKey]);
 
   useEffect(() => {
@@ -173,7 +178,12 @@ export function ModelSelectorDialog({
       const mobile = viewportWidth < 640;
       setSheet(mobile);
       if (mobile) {
-        setPlacement({ detailLeft: null, height: Math.round(viewportHeight * 0.78), left: 0, top: 0 });
+        setPlacement({
+          detailLeft: null,
+          height: Math.round(viewportHeight * 0.78),
+          left: 0,
+          top: 0,
+        });
         return;
       }
       const anchor = anchorRef?.current?.getBoundingClientRect();
@@ -266,7 +276,7 @@ export function ModelSelectorDialog({
         <div aria-hidden="true" className="fixed inset-0 z-[60] bg-black/25" onClick={onClose} />
       )}
       <div
-        aria-label="选择模型"
+        aria-label={detailModel ? "模型资料" : "选择模型"}
         className={cn(
           "fixed z-[61] flex flex-col overflow-hidden",
           surfaceClassName,
@@ -288,7 +298,10 @@ export function ModelSelectorDialog({
               }
         }
       >
-        <div className="shrink-0 space-y-2 border-b border-gray-100 p-2 dark:border-white/[0.07]">
+        <div
+          className="shrink-0 space-y-2 border-b border-gray-100 p-2 dark:border-white/[0.07]"
+          inert={Boolean(detailModel)}
+        >
           <label className="flex h-10 items-center gap-2 rounded-lg bg-gray-100/80 px-2.5 text-gray-400 focus-within:bg-gray-100 dark:bg-white/[0.06] dark:focus-within:bg-white/[0.08] md:h-9">
             <Search aria-hidden="true" className="shrink-0" size={15} />
             <input
@@ -355,7 +368,10 @@ export function ModelSelectorDialog({
                   {activeVendor?.slug && <VendorIcon size={16} slug={activeVendor.slug} />}
                   <span className="truncate">{activeVendor?.label || "全部提供商"}</span>
                   <ChevronDown
-                    className={cn("shrink-0 text-gray-400 transition-transform", vendorMenuOpen && "rotate-180")}
+                    className={cn(
+                      "shrink-0 text-gray-400 transition-transform",
+                      vendorMenuOpen && "rotate-180",
+                    )}
                     size={13}
                   />
                 </button>
@@ -368,35 +384,36 @@ export function ModelSelectorDialog({
                     role="listbox"
                     aria-label="按提供商筛选"
                   >
-                    {[{ count: availableModels.length, key: "all", label: "全部提供商", slug: "" }, ...vendors].map(
-                      (vendor) => (
-                        <button
-                          aria-selected={vendorFilter === vendor.key}
-                          className="flex h-10 w-full items-center gap-2 rounded-md px-2 text-left text-[13px] text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/[0.06] md:h-8"
-                          key={vendor.key}
-                          onClick={() => {
-                            setVendorFilter(vendor.key);
-                            setVendorMenuOpen(false);
-                          }}
-                          role="option"
-                          type="button"
-                        >
-                          {vendor.slug ? (
-                            <VendorIcon size={18} slug={vendor.slug} />
-                          ) : (
-                            <span className="h-[18px] w-[18px] shrink-0 rounded-full bg-gray-200 dark:bg-white/10" />
-                          )}
-                          <span className="min-w-0 flex-1 truncate">{vendor.label}</span>
-                          <span className="font-jakarta text-[11px] tabular-nums text-gray-400">
-                            {vendor.count}
-                          </span>
-                          <Check
-                            className={cn("shrink-0", vendorFilter !== vendor.key && "opacity-0")}
-                            size={13}
-                          />
-                        </button>
-                      ),
-                    )}
+                    {[
+                      { count: availableModels.length, key: "all", label: "全部提供商", slug: "" },
+                      ...vendors,
+                    ].map((vendor) => (
+                      <button
+                        aria-selected={vendorFilter === vendor.key}
+                        className="flex h-10 w-full items-center gap-2 rounded-md px-2 text-left text-[13px] text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/[0.06] md:h-8"
+                        key={vendor.key}
+                        onClick={() => {
+                          setVendorFilter(vendor.key);
+                          setVendorMenuOpen(false);
+                        }}
+                        role="option"
+                        type="button"
+                      >
+                        {vendor.slug ? (
+                          <VendorIcon size={18} slug={vendor.slug} />
+                        ) : (
+                          <span className="h-[18px] w-[18px] shrink-0 rounded-full bg-gray-200 dark:bg-white/10" />
+                        )}
+                        <span className="min-w-0 flex-1 truncate">{vendor.label}</span>
+                        <span className="font-jakarta text-[11px] tabular-nums text-gray-400">
+                          {vendor.count}
+                        </span>
+                        <Check
+                          className={cn("shrink-0", vendorFilter !== vendor.key && "opacity-0")}
+                          size={13}
+                        />
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
@@ -408,7 +425,7 @@ export function ModelSelectorDialog({
           aria-label="可用模型"
           className="markai-scrollbar-auto-hide min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5"
           id="model-selector-list"
-          onMouseLeave={() => setActiveKey(selectedModelKey)}
+          inert={Boolean(detailModel)}
           ref={listRef}
           role="listbox"
         >
@@ -433,73 +450,103 @@ export function ModelSelectorDialog({
                   {group.models.map((model) => {
                     const key = getModelKey(model);
                     const selected = key === selectedModelKey;
-                    const metadata = getModelMetadata(model.id);
+                    const metadata = getConfiguredModelMetadata(model);
                     const imageModel = isImageGenerationModel(model.id);
                     const ratings = metadata?.ratings;
                     return (
-                      <button
-                        aria-selected={selected}
-                        className={cn(
-                          "flex h-11 w-full items-center gap-2.5 rounded-lg px-2 text-left transition-colors md:h-9",
-                          key === activeKey && "bg-gray-100 dark:bg-white/[0.07]",
-                        )}
-                        data-model-key={key}
-                        data-model-selected={selected}
-                        id={`model-option-${key}`}
-                        key={key}
-                        onClick={() => selectModel(key)}
-                        onMouseEnter={() => setActiveKey(key)}
-                        role="option"
-                        tabIndex={-1}
-                        type="button"
-                      >
-                        <ModelBrandIcon model={model.id} provider={model.provider} size={20} />
-                        <span
+                      <div className="flex min-w-0 items-center" key={key} role="none">
+                        <button
+                          aria-selected={selected}
                           className={cn(
-                            "min-w-0 truncate font-jakarta text-[13px]",
-                            selected
-                              ? "font-semibold text-gray-950 dark:text-white"
-                              : "text-gray-800 dark:text-gray-200",
+                            "flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 text-left transition-colors md:h-9",
+                            key === activeKey && "bg-gray-100 dark:bg-white/[0.07]",
                           )}
+                          data-model-key={key}
+                          data-model-selected={selected}
+                          id={`model-option-${key}`}
+                          key={key}
+                          onClick={() => selectModel(key)}
+                          onMouseEnter={() => setActiveKey(key)}
+                          role="option"
+                          tabIndex={-1}
+                          type="button"
                         >
-                          {model.presentation?.displayName || getModelDisplayName(model.id)}
-                        </span>
-                        <span className="flex shrink-0 items-center gap-1 text-gray-400 dark:text-gray-500">
-                          {imageModel && <ImagePlus aria-label="图片生成" size={13} />}
-                          {!imageModel && metadata?.supportsVision && (
-                            <Eye aria-label="视觉识别" size={13} />
-                          )}
-                          {metadata?.supportsToolCalling && <Wrench aria-label="工具调用" size={12} />}
-                          {isNewModel(model.presentation, now) && (
-                            <span className="rounded px-1 text-[10px] leading-4 text-blue-600 ring-1 ring-inset ring-blue-600/20 dark:text-blue-300 dark:ring-blue-300/25">
-                              新
-                            </span>
-                          )}
-                        </span>
-                        <span className="ml-auto flex shrink-0 items-center gap-2 pl-2">
-                          {ratings && (
-                            <span aria-hidden="true" className="hidden items-center gap-1 sm:flex">
-                              <span className="h-1 w-6 overflow-hidden rounded-full bg-gray-200 dark:bg-white/10">
-                                <span className="block h-full rounded-full bg-blue-500" style={{ width: `${ratings.intelligence}%` }} />
-                              </span>
-                              <span className="h-1 w-6 overflow-hidden rounded-full bg-gray-200 dark:bg-white/10">
-                                <span className="block h-full rounded-full bg-emerald-500" style={{ width: `${ratings.speed}%` }} />
-                              </span>
-                            </span>
-                          )}
-                          <span className="min-w-9 text-right font-jakarta text-[11px] tabular-nums text-gray-400 dark:text-gray-500">
-                            {hasKnownContextWindow(metadata)
-                              ? formatContextWindow(metadata.contextWindowTokens)
-                              : ""}
+                          <ModelBrandIcon model={model.id} provider={model.provider} size={20} />
+                          <span
+                            className={cn(
+                              "min-w-0 truncate font-jakarta text-[13px]",
+                              selected
+                                ? "font-semibold text-gray-950 dark:text-white"
+                                : "text-gray-800 dark:text-gray-200",
+                            )}
+                          >
+                            {model.presentation?.displayName ||
+                              metadata?.displayName ||
+                              getModelDisplayName(model.id)}
                           </span>
-                          <Check
-                            aria-hidden="true"
-                            className={cn("text-gray-900 dark:text-gray-100", !selected && "opacity-0")}
-                            size={14}
-                            strokeWidth={2.2}
-                          />
-                        </span>
-                      </button>
+                          <span className="flex shrink-0 items-center gap-1 text-gray-400 dark:text-gray-500">
+                            {imageModel && <ImagePlus aria-label="图片生成" size={13} />}
+                            {!imageModel && metadata?.supportsVision && (
+                              <Eye aria-label="视觉识别" size={13} />
+                            )}
+                            {metadata?.supportsToolCalling && (
+                              <Wrench aria-label="工具调用" size={12} />
+                            )}
+                            {isNewModel(model.presentation, now) && (
+                              <span className="rounded px-1 text-[10px] leading-4 text-blue-600 ring-1 ring-inset ring-blue-600/20 dark:text-blue-300 dark:ring-blue-300/25">
+                                新
+                              </span>
+                            )}
+                          </span>
+                          <span className="ml-auto flex shrink-0 items-center gap-2 pl-2">
+                            {ratings?.intelligence !== undefined && ratings.speed !== undefined && (
+                              <span
+                                aria-label={`蓝色：智能 ${ratings.intelligence}，绿色：输出速度 ${ratings.speed}；同批评测百分位，越高越好`}
+                                className="hidden items-center gap-1 sm:flex"
+                                data-markai-tooltip={`蓝色：智能 ${ratings.intelligence}，绿色：输出速度 ${ratings.speed}；同批评测百分位，越高越好`}
+                                role="img"
+                              >
+                                <span className="h-1 w-6 overflow-hidden rounded-full bg-gray-200 dark:bg-white/10">
+                                  <span
+                                    className="block h-full rounded-full bg-blue-500"
+                                    style={{ width: `${ratings.intelligence}%` }}
+                                  />
+                                </span>
+                                <span className="h-1 w-6 overflow-hidden rounded-full bg-gray-200 dark:bg-white/10">
+                                  <span
+                                    className="block h-full rounded-full bg-emerald-500"
+                                    style={{ width: `${ratings.speed}%` }}
+                                  />
+                                </span>
+                              </span>
+                            )}
+                            <span className="min-w-9 text-right font-jakarta text-[11px] tabular-nums text-gray-400 dark:text-gray-500">
+                              {hasKnownContextWindow(metadata)
+                                ? formatContextWindow(metadata.contextWindowTokens)
+                                : ""}
+                            </span>
+                            <Check
+                              aria-hidden="true"
+                              className={cn(
+                                "text-gray-900 dark:text-gray-100",
+                                !selected && "opacity-0",
+                              )}
+                              size={14}
+                              strokeWidth={2.2}
+                            />
+                          </span>
+                        </button>
+                        {(sheet || placement?.detailLeft == null) && (
+                          <IconButton
+                            aria-label={`查看 ${metadata?.displayName || model.id} 的模型资料`}
+                            data-markai-tooltip="模型资料与评测"
+                            onClick={() => setDetailKey(key)}
+                            shape="rounded"
+                          >
+                            <Info aria-hidden="true" size={16} />
+                          </IconButton>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
@@ -507,6 +554,33 @@ export function ModelSelectorDialog({
             </div>
           ))}
         </div>
+        {detailModel && (
+          <div className="absolute inset-0 flex flex-col bg-[var(--chat-popover-bg)]">
+            <div className="flex shrink-0 items-center gap-2 border-b border-gray-100 p-2 dark:border-white/10">
+              <IconButton
+                aria-label="返回模型列表"
+                autoFocus
+                data-markai-tooltip="返回模型列表"
+                onClick={() => setDetailKey(null)}
+              >
+                <ArrowLeft aria-hidden="true" size={18} />
+              </IconButton>
+              <span className="text-sm font-medium">模型资料</span>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              <ModelDetailCard model={detailModel} />
+            </div>
+            <div className="shrink-0 border-t border-gray-100 p-3 dark:border-white/10">
+              <button
+                className="h-11 w-full rounded-lg bg-primary text-sm font-medium text-white dark:text-gray-950"
+                onClick={() => selectModel(getModelKey(detailModel))}
+                type="button"
+              >
+                使用此模型
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {!sheet && placement?.detailLeft != null && activeModel && (
@@ -518,8 +592,8 @@ export function ModelSelectorDialog({
           ref={detailRef}
           style={{
             left: placement.detailLeft,
-            maxHeight: placement.height,
-            top: placement.top,
+            maxHeight: `calc(100dvh - ${MARGIN * 2}px)`,
+            top: MARGIN,
             width: DETAIL_WIDTH,
           }}
         >

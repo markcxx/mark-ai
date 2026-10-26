@@ -4,6 +4,11 @@ import 'model_metadata_data.dart';
 String modelDisplayName(String id) => id.split('/').last;
 bool isImageGenerationModel(String id) =>
     imageGenerationModelIds.contains(id.trim().toLowerCase());
+Map<String, dynamic>? metadataForModelRef(ModelRef model) {
+  final resolved = jsonMap(model.metadata['metadata']);
+  return resolved.isNotEmpty ? resolved : metadataForModel(model.id);
+}
+
 Map<String, dynamic>? metadataForModel(String id) {
   final normalized =
       id

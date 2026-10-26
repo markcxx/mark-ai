@@ -22,7 +22,8 @@ import {
 import type { ChatMessage } from "@/lib/chat/server/types";
 import type { FileAttachment } from "@/lib/chat/types";
 import { isLocalMode } from "@/lib/env";
-import { getModelMetadata, hasKnownContextWindow } from "@/lib/model-metadata";
+import { hasKnownContextWindow } from "@/lib/model-metadata";
+import { getServerModelMetadata } from "@/lib/server/model-catalog";
 import { injectFileContexts } from "@/lib/storage/file-context";
 import {
   getAvailableBuiltinTool,
@@ -177,7 +178,7 @@ export async function POST(req: NextRequest) {
       ...message,
       reasoning: retainReasoning && message.role === "model" ? message.reasoning : undefined,
     }));
-    const modelMetadata = getModelMetadata(selectedModel.id);
+    const modelMetadata = await getServerModelMetadata(selectedModel);
     const runtimeSystemPrompt = getRuntimeSystemPrompt({
       skillPrompt,
       timezone,

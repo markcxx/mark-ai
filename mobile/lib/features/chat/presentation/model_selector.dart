@@ -308,7 +308,7 @@ class _ModelSelectorState extends State<ModelSelector> {
                               Builder(
                                 builder: (context) {
                                   final selected = model.key == c.model?.key,
-                                      metadata = metadataForModel(model.id),
+                                      metadata = metadataForModelRef(model),
                                       tokens =
                                           metadata?['contextWindowTokens']
                                               as num?;
@@ -348,7 +348,9 @@ class _ModelSelectorState extends State<ModelSelector> {
                                             const SizedBox(width: 10),
                                             Expanded(
                                               child: Text(
-                                                modelDisplayName(model.id),
+                                                metadata?['displayName']
+                                                        as String? ??
+                                                    modelDisplayName(model.id),
                                                 overflow: TextOverflow.ellipsis,
                                                 style: const TextStyle(
                                                   fontSize: 14,

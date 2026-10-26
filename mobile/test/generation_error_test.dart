@@ -62,8 +62,33 @@ void main() {
     );
     expect(
       metadataForModel('qwen3.8-max-preview')?['contextWindowTokens'],
-      isNull,
+      1000000,
     );
     expect(metadataForModel('gemini-3.8-flash')?['maxOutputTokens'], 65536);
   });
+  test(
+    'server model metadata is scoped to each provider and keeps local fallback',
+    () {
+      final first = ModelRef.fromJson({
+        'id': 'shared-model',
+        'provider': 'first',
+        'metadata': {'contextWindowTokens': 128000},
+      });
+      final second = ModelRef.fromJson({
+        'id': 'shared-model',
+        'provider': 'second',
+        'metadata': {'contextWindowTokens': 64000},
+      });
+      expect(metadataForModelRef(first)?['contextWindowTokens'], 128000);
+      expect(metadataForModelRef(second)?['contextWindowTokens'], 64000);
+      expect(
+        metadataForModelRef(
+          ModelRef('gpt-6.1-sol', 'proxy'),
+        )?['contextWindowTokens'],
+        1050000,
+      );
+      expect(metadataForModel('claude-haiku-4-5')?['id'], 'claude-haiku-4-5');
+      expect(metadataForModel('claude-sonnet-4-5')?['id'], 'claude-sonnet-4-5');
+    },
+  );
 }

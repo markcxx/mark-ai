@@ -4,6 +4,7 @@ import { enforceRateLimit } from "@/lib/api/security";
 import { getAvailableProviderNames, getAvailablePublicModels } from "@/lib/available-models";
 import { readModelPresentations } from "@/lib/model-presentation-server";
 import { withModelPresentations } from "@/lib/model-presentation";
+import { withModelCatalog } from "@/lib/server/model-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json(
-    { models: presentedModels, providerNames },
+    { models: await withModelCatalog(presentedModels), providerNames },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

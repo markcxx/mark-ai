@@ -235,6 +235,7 @@ Development-memory rules:
 - Increasing `NODE_OPTIONS=--max-old-space-size=6144` is a temporary mitigation, not the primary fix. It moves the 80% restart threshold to roughly 4.9 GB but does not shrink the graph.
 - Do not disable Next's memory watcher as a normal solution; that converts a controlled restart into a possible out-of-memory crash.
 - Never run `next build` and `next dev` concurrently in the same checkout because both write `.next` and can corrupt manifests/chunks. Stop the dev server first, use a separate worktree/dist directory, or let the user run the server/build.
+- Keep the development server on port 3000 running for the user's ongoing previews and feedback. Do not stop or replace it after validation; use lint and non-incremental TypeScript checks while this preview server owns the checkout.
 - Agents must not start the dev server or run a production build when the user says they own the running port. Use `npm run lint` and `npx tsc --noEmit --incremental false` for non-mutating validation in that case.
 
 Recommended investigation order for memory regressions:

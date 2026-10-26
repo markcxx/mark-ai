@@ -7,6 +7,7 @@ import { readModelPresentations } from "@/lib/model-presentation-server";
 import { withModelPresentations } from "@/lib/model-presentation";
 import { listUserModelProviders } from "@/lib/user-model-providers";
 import { userSettings } from "@/lib/db/schema";
+import { withModelCatalog } from "@/lib/server/model-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -63,7 +64,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json(
     {
-      models: presentedModels,
+      models: await withModelCatalog(presentedModels),
       providerNames,
       selectedModel,
     },

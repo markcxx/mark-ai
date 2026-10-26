@@ -31,6 +31,7 @@ import {
 } from "@/lib/model-metadata";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/useUIStore";
+import { getConfiguredModelMetadata } from "@/lib/model-catalog";
 import { ProviderBrandIcon } from "../ModelBrandIcon";
 
 type ProviderTemplate = {
@@ -326,8 +327,17 @@ export function ProviderSettings() {
         .filter(Boolean),
     ),
   ];
+  const availableModels = useUIStore((state) => state.availableModels);
+  const metadataForId = (id: string) => {
+    const configured = availableModels.find(
+      (model) =>
+        model.id === id &&
+        (selected === "markai" || model.provider === (form?.provider || selected)),
+    );
+    return configured ? getConfiguredModelMetadata(configured) : getModelMetadata(id);
+  };
   const filteredModels = modelIds.filter((id) =>
-    `${id} ${getModelMetadata(id)?.displayName || ""}`
+    `${id} ${metadataForId(id)?.displayName || ""}`
       .toLowerCase()
       .includes(modelQuery.trim().toLowerCase()),
   );
@@ -747,7 +757,7 @@ export function ProviderSettings() {
               )}
               <div className="divide-y divide-gray-100 dark:divide-white/[0.06]">
                 {filteredModels.slice((currentPage - 1) * 10, currentPage * 10).map((id) => {
-                  const metadata = getModelMetadata(id);
+                  const metadata = metadataForId(id);
                   return (
                     <div key={id} className="flex min-w-0 items-center gap-3 py-4">
                       <ProviderBrandIcon
