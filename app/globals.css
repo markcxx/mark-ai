@@ -47,117 +47,59 @@ html[data-reduce-motion="true"] *::after {
   transition-duration: 0.01ms !important;
 }
 
-@keyframes image-generation-spectrum {
+@keyframes image-generation-highlight {
   0% {
-    background-position: 0% 50%;
-    transform: scale(1.08) rotate(-3deg);
-  }
-  50% {
-    background-position: 100% 50%;
-    transform: scale(1.18) rotate(3deg);
+    transform: translateX(-120%);
   }
   100% {
-    background-position: 0% 50%;
-    transform: scale(1.08) rotate(-3deg);
-  }
-}
-
-@keyframes image-generation-glow {
-  0%,
-  100% {
-    opacity: 0.42;
-    transform: translate3d(-24%, -18%, 0) scale(0.9);
-  }
-  50% {
-    opacity: 0.72;
-    transform: translate3d(22%, 18%, 0) scale(1.14);
+    transform: translateX(120%);
   }
 }
 
 .image-generation-skeleton {
-  background:
-    radial-gradient(circle at 18% 20%, rgba(255, 236, 109, 0.95), transparent 32%),
-    radial-gradient(circle at 82% 22%, rgba(255, 87, 196, 0.88), transparent 38%),
-    radial-gradient(circle at 74% 82%, rgba(76, 110, 245, 0.92), transparent 38%),
-    radial-gradient(circle at 18% 78%, rgba(45, 212, 191, 0.9), transparent 36%),
-    linear-gradient(125deg, #ff8f70, #f56ad8, #7c6cff, #38d9d0, #ffd66b);
-  background-size: 190% 190%;
-  clip-path: inset(0 round 11px);
+  --image-skeleton-highlight: rgba(255, 255, 255, 0.75);
+  background: linear-gradient(135deg, #f4f4f4, #ededed);
   isolation: isolate;
   position: relative;
 }
 
-.image-generation-skeleton::before {
-  animation: image-generation-spectrum 7s ease-in-out infinite;
-  backdrop-filter: blur(28px) saturate(125%);
-  background: inherit;
-  content: "";
-  inset: -12%;
-  position: absolute;
-  border-radius: inherit;
-  z-index: 0;
+.dark .image-generation-skeleton {
+  --image-skeleton-highlight: rgba(255, 255, 255, 0.07);
+  background: linear-gradient(135deg, #202020, #191919);
 }
 
 .image-generation-skeleton::after {
+  animation: image-generation-highlight 2.6s ease-in-out infinite;
   background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.22),
-    transparent 45%,
-    rgba(255, 255, 255, 0.08)
+    110deg,
+    transparent 20%,
+    var(--image-skeleton-highlight) 48%,
+    transparent 76%
   );
   content: "";
   inset: 0;
+  pointer-events: none;
   position: absolute;
-}
-
-.image-generation-skeleton-glow {
-  animation: image-generation-glow 5.5s ease-in-out infinite;
-  background: rgba(255, 255, 255, 0.78);
-  border-radius: 999px;
-  filter: blur(54px);
-  height: 52%;
-  left: 20%;
-  position: absolute;
-  top: 22%;
-  width: 62%;
+  transform: translateX(-120%);
+  z-index: 1;
 }
 
 .image-generation-skeleton-icon {
-  align-items: center;
-  backdrop-filter: blur(12px);
-  background: rgba(17, 24, 39, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.12);
-  color: rgba(255, 255, 255, 0.94);
-  display: flex;
-  height: 58px;
-  justify-content: center;
+  color: #d0d0d0;
   left: 50%;
   position: absolute;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 58px;
-  z-index: 1;
 }
 
-.image-generation-skeleton-label {
-  backdrop-filter: blur(10px);
-  background: rgba(17, 24, 39, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 8px;
-  bottom: 14px;
-  color: white;
-  font-size: 12px;
-  font-weight: 600;
-  left: 14px;
-  letter-spacing: 0.02em;
-  line-height: 1.4;
-  max-width: calc(100% - 28px);
-  padding: 7px 10px;
-  position: absolute;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.2);
-  z-index: 1;
+.dark .image-generation-skeleton-icon {
+  color: #424242;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .image-generation-skeleton::after {
+    animation: none;
+  }
 }
 
 html,

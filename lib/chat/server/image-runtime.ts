@@ -2,6 +2,7 @@ import { readProviderResponseError } from "../generation-error";
 import { getStoredFileBytes, getStoredFilesByIds } from "@/lib/storage/file-storage";
 import { saveGeneratedFile } from "@/lib/tools/generated-file";
 import { fetchWithDevelopmentProxy } from "@/lib/server/development-proxy";
+import { generateDashScopeImage, usesDashScopeImageApi } from "./dashscope-image";
 
 import type { GeneratedImageState } from "../types";
 import type { ChatMessage } from "./types";
@@ -109,42 +110,59 @@ export const generateOrEditImage = async ({
   if (!latestPrompt) throw new Error("请描述你想生成或修改的图片");
 
   const sourceImage = await findSourceImage(messages, userId);
-  let response: Response;
+  let item: NonNullable<ImageApiPayload["data"]>[number] | undefined;
 
-  if (sourceImage) {
-    const bytes = await getStoredFileBytes(sourceImage);
-    const imageBody = new ArrayBuffer(bytes.byteLength);
-    new Uint8Array(imageBody).set(bytes);
-    const form = new FormData();
-    form.append(
-      "image",
-      new Blob([imageBody], { type: sourceImage.contentType }),
-      sourceImage.originalName,
-    );
-    form.append("model", model);
-    form.append("prompt", latestPrompt);
-    response = await fetchWithDevelopmentProxy(getOpenAIImageEndpoint(baseUrl, "edits"), {
-      body: form,
-      headers: { Authorization: `Bearer ${apiKey}` },
-      method: "POST",
+  if (usesDashScopeImageApi(model, baseUrl)) {
+    item = await generateDashScopeImage({
+      apiKey,
+      baseUrl,
+      model,
+      prompt: latestPrompt,
+      sourceImage: sourceImage
+        ? {
+            bytes: await getStoredFileBytes(sourceImage),
+            contentType: sourceImage.contentType,
+          }
+        : undefined,
       signal,
     });
   } else {
-    response = await fetchWithDevelopmentProxy(getOpenAIImageEndpoint(baseUrl, "generations"), {
-      body: JSON.stringify({ model, n: 1, prompt: latestPrompt }),
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      method: "POST",
-      signal,
-    });
+    let response: Response;
+    if (sourceImage) {
+      const bytes = await getStoredFileBytes(sourceImage);
+      const imageBody = new ArrayBuffer(bytes.byteLength);
+      new Uint8Array(imageBody).set(bytes);
+      const form = new FormData();
+      form.append(
+        "image",
+        new Blob([imageBody], { type: sourceImage.contentType }),
+        sourceImage.originalName,
+      );
+      form.append("model", model);
+      form.append("prompt", latestPrompt);
+      response = await fetchWithDevelopmentProxy(getOpenAIImageEndpoint(baseUrl, "edits"), {
+        body: form,
+        headers: { Authorization: `Bearer ${apiKey}` },
+        method: "POST",
+        signal,
+      });
+    } else {
+      response = await fetchWithDevelopmentProxy(getOpenAIImageEndpoint(baseUrl, "generations"), {
+        body: JSON.stringify({ model, n: 1, prompt: latestPrompt }),
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+        signal,
+      });
+    }
+
+    if (!response.ok) throw await readProviderResponseError(response, [apiKey]);
+
+    const payload = (await response.json()) as ImageApiPayload;
+    item = payload.data?.[0];
   }
-
-  if (!response.ok) throw await readProviderResponseError(response, [apiKey]);
-
-  const payload = (await response.json()) as ImageApiPayload;
-  const item = payload.data?.[0];
   if (!item) throw new Error("图片服务未返回生成结果");
   const bytes = await readGeneratedBytes(item, signal);
   const format = detectGeneratedImageFormat(bytes);

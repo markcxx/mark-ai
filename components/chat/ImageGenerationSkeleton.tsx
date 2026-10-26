@@ -1,33 +1,19 @@
 "use client";
 
 import { Image as ImageIcon } from "lucide-react";
-import { useEffect, useState } from "react";
 
-const SLOW_GENERATION_NOTICE_DELAY = 12_000;
-
-export function ImageGenerationSkeleton() {
-  const [showSlowNotice, setShowSlowNotice] = useState(false);
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => setShowSlowNotice(true), SLOW_GENERATION_NOTICE_DELAY);
-    return () => window.clearTimeout(timeout);
-  }, []);
-
-  const statusText = showSlowNotice ? "图片生成通常需要较长时间，请耐心等待" : "正在构思画面…";
-
+export function ImageGenerationSkeleton({ label = "正在生成图片" }: { label?: string }) {
   return (
-    <div className="w-full max-w-[400px] overflow-hidden rounded-xl border border-black/[0.08] bg-[var(--chat-panel-bg)] p-px shadow-sm dark:border-white/10">
+    <div className="w-full max-w-[400px] overflow-hidden rounded-xl border border-black/[0.04] dark:border-white/[0.06]">
       <div
-        aria-label={statusText}
+        aria-label={label}
         aria-live="polite"
-        className="image-generation-skeleton aspect-square overflow-hidden rounded-[11px]"
+        className="image-generation-skeleton aspect-square overflow-hidden"
         role="status"
       >
-        <span aria-hidden="true" className="image-generation-skeleton-glow" />
         <span aria-hidden="true" className="image-generation-skeleton-icon">
-          <ImageIcon size={30} strokeWidth={1.7} />
+          <ImageIcon size={36} strokeWidth={1.25} />
         </span>
-        <span className="image-generation-skeleton-label">{statusText}</span>
       </div>
     </div>
   );

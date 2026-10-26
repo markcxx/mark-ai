@@ -103,15 +103,19 @@ const getEnvBaseUrl = (prefix: string, fallback?: string) => {
 
 const getProviderModels = ({ provider, prefix, runtime, defaultBaseUrl }: ProviderEnvConfig) => {
   const apiKey = process.env[`${prefix}_API_KEY`]?.trim();
-  const modelIds = parseModelIds(process.env[`${prefix}_MODELS`]);
+  const imageModelIds = new Set(parseModelIds(process.env[`${prefix}_IMAGE_MODEL_IDS`]));
+  const modelIds = [
+    ...new Set([...parseModelIds(process.env[`${prefix}_MODELS`]), ...imageModelIds]),
+  ];
 
   if (!apiKey || modelIds.length === 0) return [];
 
   const baseUrl = getEnvBaseUrl(prefix, defaultBaseUrl);
+  const imageUrl = process.env[`${prefix}_IMAGE_URL`]?.trim();
 
   return modelIds.map((id) => ({
     apiKey,
-    baseUrl,
+    baseUrl: imageModelIds.has(id) ? imageUrl || baseUrl : baseUrl,
     id,
     provider,
     runtime,
@@ -145,7 +149,11 @@ const getAutoDiscoveredProviderModels = () => {
 
     const prefix = match[1];
     if (builtinPrefixes.has(prefix) || explicitPrefixes.has(prefix)) continue;
-    if (!process.env[`${prefix}_MODELS`]?.trim()) continue;
+    if (
+      !process.env[`${prefix}_MODELS`]?.trim() &&
+      !process.env[`${prefix}_IMAGE_MODEL_IDS`]?.trim()
+    )
+      continue;
 
     discoveredPrefixes.add(prefix);
   }

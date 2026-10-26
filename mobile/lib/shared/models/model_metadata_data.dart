@@ -1529,4 +1529,9 @@ const imageGenerationModelIds = [
   "gpt-image-2",
   "gpt-image-2.5-sunburst",
   "gpt-image-2.5-flare",
+  "wan2.7-image",
+  "wan2.7-image-pro",
+  "qwen-image-2.0",
+  "qwen-image-2.0-pro",
+  "qwen-image-3.0-pro",
 ];
