@@ -53,7 +53,11 @@ List<Json> collectMessageCitations(ChatMessage message) {
 class CitationSyntax extends md.InlineSyntax {
   final Set<int> ids;
   CitationSyntax(this.ids)
-    : super(ids.isEmpty ? r'(?!)' : r'\[(' + ids.join('|') + r')\](?![\[(])');
+    : super(
+        ids.isEmpty
+            ? r'(?!)'
+            : r'\[(?:citation:\s*)?(' + ids.join('|') + r')\](?![\[(])',
+      );
   @override
   bool onMatch(md.InlineParser parser, Match match) {
     parser.addNode(md.Element.text('citation', match[1]!));

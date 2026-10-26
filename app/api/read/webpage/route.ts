@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorizeApiRequest, enforceRateLimit } from "@/lib/api/security";
 import { readWebpage } from "@/lib/search/webpage";
+import { getPageExcerpt } from "@/lib/chat/server/web-tools";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
     }
 
     const data = await readWebpage({ signal: req.signal, url });
-    return NextResponse.json(data);
+    return NextResponse.json({ ...data, ...getPageExcerpt(data, body.startLine, body.maxLines) });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       return NextResponse.json({ error: "网页读取已取消" }, { status: 499 });

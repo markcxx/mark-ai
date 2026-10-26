@@ -7,6 +7,7 @@ import { authorizeApiRequest, enforceRateLimit } from "@/lib/api/security";
 import { LOCAL_STORAGE_OWNER_ID } from "@/lib/auth-helpers";
 import { findAvailableModel } from "@/lib/available-models";
 import { prepareMessagesForContext } from "@/lib/chat/context-window";
+import { normalizeWebResourceContext } from "@/lib/chat/web-context";
 import { prepareRequestHistory } from "@/lib/chat/request-history";
 import { estimateTextTokens } from "@/lib/chat/metrics";
 import { isImageGenerationModel } from "@/lib/chat/image-models";
@@ -14,11 +15,7 @@ import { getChatSession } from "@/lib/chat/storage";
 import { createGeminiStream } from "@/lib/chat/server/gemini-runtime";
 import { generateOrEditImage } from "@/lib/chat/server/image-runtime";
 import { createOpenAICompatibleStream } from "@/lib/chat/server/openai-runtime";
-import {
-  getRuntimeSystemPrompt,
-  READ_WEBPAGE_TOOL,
-  WEB_SEARCH_TOOL,
-} from "@/lib/chat/server/runtime-prompt";
+import { getRuntimeSystemPrompt, WEB_TOOLS } from "@/lib/chat/server/runtime-prompt";
 import type { ChatMessage } from "@/lib/chat/server/types";
 import type { FileAttachment } from "@/lib/chat/types";
 import { isLocalMode } from "@/lib/env";
@@ -167,7 +164,12 @@ export async function POST(req: NextRequest) {
       thinkingPolicy && (thinkingEnabled ?? thinkingPolicy.defaultEnabled),
     );
     // Also sanitize on the server for older web/mobile clients and already affected sessions.
-    const requestHistory = prepareRequestHistory(messages as ChatMessage[]);
+    const requestHistory = prepareRequestHistory(
+      (messages as ChatMessage[]).map((message) => ({
+        ...message,
+        webContext: normalizeWebResourceContext(message.webContext),
+      })),
+    );
     if (!requestHistory.length || requestHistory.at(-1)?.role !== "user") {
       return NextResponse.json({ error: "缺少有效的用户消息，请重新发送" }, { status: 400 });
     }
@@ -182,7 +184,7 @@ export async function POST(req: NextRequest) {
     const runtimeSystemPrompt = getRuntimeSystemPrompt({
       skillPrompt,
       timezone,
-      webSearchEnabled: selectedModel.runtime !== "gemini" && Boolean(webSearchEnabled),
+      webSearchEnabled: Boolean(webSearchEnabled),
     });
     const contextOverheadTokens =
       selectedModel.runtime !== "gemini"
@@ -192,10 +194,7 @@ export async function POST(req: NextRequest) {
               ...(webSearchEnabled || builtinToolSchemas.length > 0
                 ? {
                     tool_choice: "auto",
-                    tools: [
-                      ...(webSearchEnabled ? [WEB_SEARCH_TOOL, READ_WEBPAGE_TOOL] : []),
-                      ...builtinToolSchemas,
-                    ],
+                    tools: [...(webSearchEnabled ? WEB_TOOLS : []), ...builtinToolSchemas],
                   }
                 : {}),
             }),
@@ -206,10 +205,15 @@ export async function POST(req: NextRequest) {
                 { role: "user", parts: [{ text: runtimeSystemPrompt }] },
                 { role: "model", parts: [{ text: "了解。" }] },
               ],
-              ...(builtinToolSchemas.length > 0
+              ...(builtinToolSchemas.length > 0 || webSearchEnabled
                 ? {
                     tools: [
-                      { functionDeclarations: builtinToolSchemas.map((tool) => tool.function) },
+                      {
+                        functionDeclarations: [
+                          ...(webSearchEnabled ? WEB_TOOLS.map((tool) => tool.function) : []),
+                          ...builtinToolSchemas.map((tool) => tool.function),
+                        ],
+                      },
                     ],
                   }
                 : {}),
@@ -254,6 +258,7 @@ export async function POST(req: NextRequest) {
       model: selectedModel.id,
       signal: req.signal,
       systemPrompt: runtimeSystemPrompt,
+      webSearchEnabled: Boolean(webSearchEnabled),
       toolRuntime:
         typeof sessionId === "string" && sessionId
           ? { enabledToolIds, sessionId, userId: storageOwnerId }

@@ -1,3 +1,4 @@
+import { finishPendingWebTools } from "./web-context";
 import type { Message } from "./types";
 
 export const SHARE_DURATIONS = [
@@ -21,19 +22,21 @@ export const toReadonlyMessages = (messages: Message[]): Message[] =>
     ...message,
     isStreaming: false,
     isReasoning: false,
-    segments: message.segments?.map((segment) => {
-      if (segment.type === "thinking") return { ...segment, isActive: false };
-      if (segment.type === "generated-file") {
-        const { preview: _preview, ...generatedFile } = segment.generatedFile;
-        return {
-          ...segment,
-          generatedFile: {
-            ...generatedFile,
-            file: generatedFile.file ? { ...generatedFile.file, url: "" } : undefined,
-            status: generatedFile.status === "running" ? "error" : generatedFile.status,
-          },
-        };
-      }
-      return segment;
-    }),
+    segments:
+      message.segments &&
+      finishPendingWebTools(message.segments, "分享快照中的工具未完成").map((segment) => {
+        if (segment.type === "thinking") return { ...segment, isActive: false };
+        if (segment.type === "generated-file") {
+          const { preview: _preview, ...generatedFile } = segment.generatedFile;
+          return {
+            ...segment,
+            generatedFile: {
+              ...generatedFile,
+              file: generatedFile.file ? { ...generatedFile.file, url: "" } : undefined,
+              status: generatedFile.status === "running" ? "error" : generatedFile.status,
+            },
+          };
+        }
+        return segment;
+      }),
   }));

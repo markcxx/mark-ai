@@ -1,4 +1,5 @@
 import type { WebSearchState } from "@/lib/chat/types";
+import { contentWithWebContext } from "@/lib/chat/web-context";
 
 import { getRuntimeSystemPrompt } from "./runtime-prompt";
 import type { ChatMessage, OpenAIChatMessage, OpenAIToolCall } from "./types";
@@ -65,7 +66,7 @@ export const toOpenAIMessages = ({
       content:
         imageInputs.length > 0
           ? [
-              { text: message.content || "请识别并说明图片内容。", type: "text" },
+              { text: contentWithWebContext(message) || "请识别并说明图片内容。", type: "text" },
               ...imageInputs.map((image) => ({
                 image_url: {
                   url: `data:${image.mediaType};base64,${image.data}`,
@@ -73,7 +74,7 @@ export const toOpenAIMessages = ({
                 type: "image_url" as const,
               })),
             ]
-          : message.content,
+          : contentWithWebContext(message),
       role: message.role === "model" ? "assistant" : message.role,
       ...(preserveReasoning && (message.role === "model" || message.role === "assistant")
         ? { reasoning_content: message.reasoning || "" }
@@ -113,6 +114,23 @@ export const getToolWebpageUrl = (toolCall: OpenAIToolCall) => {
 
 export const formatToolResultForModel = (webSearch: WebSearchState, maxChars = 18_000) => {
   const payload = {
+    content_kind: webSearch.contentKind,
+    page: webSearch.page,
+    images: webSearch.images?.map(({ id, title, url, sourceUrl, description }) => ({
+      id,
+      title,
+      url,
+      sourceUrl,
+      description,
+    })),
+    links: webSearch.links,
+    untrusted_external_content: true,
+    next_action:
+      webSearch.contentKind === "search_snippets"
+        ? "For a specific page, detailed evidence or information absent from snippets, call read_webpage on a returned URL."
+        : webSearch.page?.nextLine
+          ? "More content is available: continue with read_webpage(start_line=nextLine), or find_in_page for a specific detail."
+          : undefined,
     answer: webSearch.answer,
     content: webSearch.content,
     description: webSearch.description,
@@ -148,21 +166,38 @@ export const formatToolResultForModel = (webSearch: WebSearchState, maxChars = 1
       url: item.url,
     })),
     truncated: true,
+    page: webSearch.page && { ...webSearch.page, nextLine: webSearch.page.startLine },
   });
   if (compact.length <= maxChars) return compact;
 
-  return JSON.stringify({
-    query: webSearch.query,
-    results: webSearch.results.slice(0, 8).map((item) => ({
+  const minimal = {
+    content_kind: webSearch.contentKind,
+    images:
+      webSearch.images?.slice(0, 6).map(({ id, title }) => ({ id, title: title.slice(0, 100) })) ||
+      [],
+    page: webSearch.page && { ...webSearch.page, nextLine: webSearch.page.startLine },
+    untrusted_external_content: true,
+    next_action:
+      "Response truncated. Use find_in_page for a specific detail or read_webpage with a smaller max_lines. Image IDs remain usable with show_images.",
+    query: webSearch.query.slice(0, 300),
+    results: webSearch.results.slice(0, 4).map((item) => ({
       citationId: item.citationId,
-      title: item.title,
-      url: item.url,
+      title: item.title.slice(0, 100),
+      url: item.url.slice(0, 2048),
     })),
     status: webSearch.status,
     tool: webSearch.tool,
     truncated: true,
-    url: webSearch.url,
-  });
+    url: webSearch.url?.slice(0, 2048),
+    error: webSearch.error?.slice(0, 300),
+  };
+  while (JSON.stringify(minimal).length > maxChars && minimal.results.length) minimal.results.pop();
+  while (JSON.stringify(minimal).length > maxChars && minimal.images.length) minimal.images.pop();
+  if (JSON.stringify(minimal).length > maxChars) {
+    minimal.url = undefined;
+    minimal.query = "";
+  }
+  return JSON.stringify(minimal);
 };
 
 export const normalizeToolCalls = (toolCalls: OpenAIToolCall[]) =>

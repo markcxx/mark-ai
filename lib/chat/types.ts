@@ -136,7 +136,34 @@ export type WebSearchResult = {
   url: string;
 };
 
+export type WebImage = {
+  id: string;
+  url: string;
+  title: string;
+  description?: string;
+  sourceUrl?: string;
+};
+
+export type WebPagePosition = {
+  truncated?: boolean;
+  startLine: number;
+  endLine: number;
+  totalLines: number;
+  nextLine?: number;
+  matches?: number[];
+};
+
+export type WebResourceContext = {
+  images: WebImage[];
+  sources: Pick<WebSearchResult, "title" | "url">[];
+};
+
 export type WebSearchState = {
+  links?: string[];
+  callId?: string;
+  images?: WebImage[];
+  page?: WebPagePosition;
+  contentKind?: "search_snippets" | "page" | "page_matches" | "image_selection";
   answer?: string;
   completedAt?: number;
   content?: string;
@@ -147,7 +174,7 @@ export type WebSearchState = {
   siteName?: string;
   results: WebSearchResult[];
   title?: string;
-  tool?: "web_search" | "read_webpage";
+  tool?: "web_search" | "read_webpage" | "find_in_page" | "show_images";
   status: "searching" | "done" | "error";
   url?: string;
 };

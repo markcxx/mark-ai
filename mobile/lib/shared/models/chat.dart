@@ -40,6 +40,7 @@ class ChatMessage {
   ChatMessage copy() => ChatMessage(data);
   Json toJson() => cloneJson(data);
   Json toPrompt() => {
+    if (webContext != null) 'webContext': webContext,
     'role': role,
     if (data['reasoning'] is String) 'reasoning': data['reasoning'],
     'content': [
@@ -53,6 +54,35 @@ class ChatMessage {
         .whereType<String>()
         .toList(),
   };
+
+  Json? get webContext {
+    final tools = segments
+        .where((segment) => segment['type'] == 'tool')
+        .map((segment) => jsonMap(segment['webSearch']))
+        .toList();
+    final images = tools
+        .where(
+          (tool) => tool['tool'] == 'show_images' && tool['status'] == 'done',
+        )
+        .expand((tool) => jsonList(tool['images']))
+        .toList();
+    final sources = <String, Json>{};
+    for (final tool in tools) {
+      for (final source in jsonList(tool['results'])) {
+        if (source['url'] is String) {
+          sources[source['url'] as String] = {
+            'title': source['title'],
+            'url': source['url'],
+          };
+        }
+      }
+    }
+    if (images.isEmpty && sources.isEmpty) return null;
+    return {
+      'images': images.skip(images.length > 6 ? images.length - 6 : 0).toList(),
+      'sources': sources.values.take(8).toList(),
+    };
+  }
 }
 
 class ChatSession {

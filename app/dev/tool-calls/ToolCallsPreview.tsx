@@ -13,8 +13,11 @@ import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/useUIStore";
 import { ChartGenerationTest, type GeneratedTestChart } from "./ChartGenerationTest";
 
+import { WebResearchTest, type WebTestResult } from "./WebResearchTest";
+import { webResearchMessage } from "./web-research-fixture";
+
 type Scenario = "done" | "running" | "error";
-type PreviewView = "calls" | "visuals";
+type PreviewView = "calls" | "visuals" | "web";
 
 const visualizationMessage: Message = {
   id: "mock-visualization-results",
@@ -234,8 +237,12 @@ export function ToolCallsPreview({
   const { setTheme } = useTheme();
   const [scenario, setScenario] = useState<Scenario>(parseScenario(initialScenario));
   const [mobile, setMobile] = useState(false);
-  const [view, setView] = useState<PreviewView>(initialView === "calls" ? "calls" : "visuals");
+  const [view, setView] = useState<PreviewView>(
+    initialView === "web" ? "web" : initialView === "calls" ? "calls" : "visuals",
+  );
   const [generatedChart, setGeneratedChart] = useState<GeneratedTestChart | null>(null);
+  const [generatedWeb, setGeneratedWeb] = useState<WebTestResult | null>(null);
+  const [webTestOpen, setWebTestOpen] = useState(false);
   const [modelTestOpen, setModelTestOpen] = useState(false);
   const [previewTheme, setPreviewTheme] = useState(initialTheme === "dark" ? "dark" : "light");
 
@@ -250,14 +257,14 @@ export function ToolCallsPreview({
   const mobileFrameRef = useRef<HTMLIFrameElement>(null);
   const syncMobileChart = () => {
     mobileFrameRef.current?.contentWindow?.postMessage(
-      { type: "markai:chart-preview", chart: generatedChart },
+      { type: "markai:chart-preview", chart: generatedChart, web: generatedWeb },
       window.location.origin,
     );
   };
   useEffect(() => {
     if (!embedded) {
       mobileFrameRef.current?.contentWindow?.postMessage(
-        { type: "markai:chart-preview", chart: generatedChart },
+        { type: "markai:chart-preview", chart: generatedChart, web: generatedWeb },
         window.location.origin,
       );
       return;
@@ -277,10 +284,12 @@ export function ToolCallsPreview({
           typeof chart?.model === "string")
       )
         setGeneratedChart(chart);
+      if (event.data.web === null || typeof event.data.web?.message?.content === "string")
+        setGeneratedWeb(event.data.web);
     };
     window.addEventListener("message", receive);
     return () => window.removeEventListener("message", receive);
-  }, [embedded, generatedChart]);
+  }, [embedded, generatedChart, generatedWeb]);
 
   const dark = previewTheme === "dark";
   return (
@@ -296,9 +305,11 @@ export function ToolCallsPreview({
             <div className="flex items-center gap-2.5">
               <Image alt="MarkAI" height={24} src="/images/markai.svg" width={24} />
               <div>
-                <h1 className="text-sm font-medium">工具与图表预览</h1>
+                <h1 className="text-sm font-medium">工具、图表与联网预览</h1>
                 <p className="mt-0.5 text-xs text-gray-400">
-                  默认展示模拟消息 · 点击测试按钮可调用所选模型
+                  {view === "web"
+                    ? "默认展示真实网页回放 · 展开测试可调用所选模型"
+                    : "默认展示模拟消息 · 点击测试按钮可调用所选模型"}
                 </p>
               </div>
             </div>
@@ -309,6 +320,7 @@ export function ToolCallsPreview({
                 options={[
                   { label: "工具调用", value: "calls" },
                   { label: "图表与脑图", value: "visuals" },
+                  { label: "网页与图片", value: "web" },
                 ]}
                 value={view}
               />
@@ -367,11 +379,23 @@ export function ToolCallsPreview({
                   {modelTestOpen && <ChartGenerationTest onChart={setGeneratedChart} />}
                 </details>
               )}
+              {view === "web" && !embedded && (
+                <details
+                  className="text-sm text-gray-500 dark:text-gray-400"
+                  onToggle={(event) => setWebTestOpen(event.currentTarget.open)}
+                >
+                  <summary className="cursor-pointer py-2">真实联网测试（需要登录）</summary>
+                  {webTestOpen && <WebResearchTest onResult={setGeneratedWeb} />}
+                </details>
+              )}
               <div className="flex justify-end">
                 <p className="max-w-[85%] rounded-2xl rounded-tr-sm bg-[var(--chat-user-bubble-bg)] px-4 py-3 text-sm">
-                  {view === "visuals"
-                    ? generatedChart?.prompt || "用图表展示资料整理进度，再画一张团队知识库的脑图。"
-                    : "请检索团队知识库的建设方法，再整理成三章的文档。"}
+                  {view === "web"
+                    ? generatedWeb?.prompt || "阅读故宫博物院太和殿页面，核对正文，并展示页面配图。"
+                    : view === "visuals"
+                      ? generatedChart?.prompt ||
+                        "用图表展示资料整理进度，再画一张团队知识库的脑图。"
+                      : "请检索团队知识库的建设方法，再整理成三章的文档。"}
                 </p>
               </div>
               <MessageItem
@@ -383,9 +407,11 @@ export function ToolCallsPreview({
                 isSelected={false}
                 loadingText="正在等待模型响应…"
                 message={
-                  view === "visuals"
-                    ? generatedChart?.message || visualizationMessage
-                    : createPreviewMessage(scenario)
+                  view === "web"
+                    ? generatedWeb?.message || webResearchMessage
+                    : view === "visuals"
+                      ? generatedChart?.message || visualizationMessage
+                      : createPreviewMessage(scenario)
                 }
                 multiSelectMode={false}
                 openMenuMessageId={null}

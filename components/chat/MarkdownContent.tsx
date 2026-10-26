@@ -68,7 +68,7 @@ const createCitationPlugin = (citationIds: Set<number>) => () => (tree: Markdown
       }
 
       const parts: MarkdownNode[] = [];
-      const pattern = /\[(\d+)\]/g;
+      const pattern = /\[(?:citation:\s*)?(\d+)\]/g;
       let cursor = 0;
       let match: RegExpExecArray | null;
 

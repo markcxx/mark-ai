@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
       maxResults: body.maxResults,
       query,
       searchDepth: body.searchDepth,
+      includeImages: body.includeImages === true,
       signal: req.signal,
     });
 

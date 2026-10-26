@@ -11,12 +11,17 @@ import {
 import type { ContextPreparation } from "@/lib/chat/context-window";
 import { estimateTextTokens } from "@/lib/chat/metrics";
 import {
+  encodeToolEvent,
   encodeGeneratedFileEvent,
   encodeStreamEvent,
   encodeUsageEvent,
   getContextHeaders,
 } from "@/lib/chat/server/stream-protocol";
 import type { ChatMessage } from "@/lib/chat/server/types";
+import { WEB_TOOLS } from "./runtime-prompt";
+import { WEB_TOOL_NAMES, WebToolSession } from "./web-tools";
+import { formatToolResultForModel } from "./openai-helpers";
+import { contentWithWebContext } from "../web-context";
 import {
   getUsageNumber,
   resolveTokenUsage,
@@ -36,6 +41,7 @@ export const createGeminiStream = async ({
   signal,
   systemPrompt,
   toolRuntime,
+  webSearchEnabled = false,
 }: {
   apiKey: string;
   baseUrl?: string;
@@ -44,6 +50,7 @@ export const createGeminiStream = async ({
   model: string;
   signal?: AbortSignal;
   systemPrompt: string;
+  webSearchEnabled?: boolean;
   toolRuntime?: {
     enabledToolIds: string[];
     debugChartAttempts?: boolean;
@@ -57,7 +64,7 @@ export const createGeminiStream = async ({
   });
 
   const toGeminiParts = (message: ChatMessage) => [
-    { text: message.content || "请识别并说明图片内容。" },
+    { text: contentWithWebContext(message) || "请识别并说明图片内容。" },
     ...(message.imageInputs || []).map((image) => ({
       inlineData: { data: image.data, mimeType: image.mediaType },
     })),
@@ -74,13 +81,22 @@ export const createGeminiStream = async ({
     ...history,
     { role: "user", parts: toGeminiParts(prompt) },
   ];
-  const builtinFunctions = getToolFunctions(toolRuntime?.enabledToolIds || []);
+  const builtinFunctions = [
+    ...getToolFunctions(toolRuntime?.enabledToolIds || []),
+    ...(webSearchEnabled ? WEB_TOOLS.map((tool) => tool.function) : []),
+  ];
+  const allowedNames = new Set(builtinFunctions.map((tool) => tool.name));
+  const toolResultMaxChars = contextPreparation
+    ? Math.min(18_000, Math.max(2000, Math.floor(contextPreparation.inputBudgetTokens * 0.4)))
+    : 18_000;
+  const streamTools = Boolean(toolRuntime?.debugChartAttempts || webSearchEnabled);
 
-  if (builtinFunctions.length > 0 && toolRuntime) {
+  if (builtinFunctions.length > 0) {
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
         const toolRuntimeState = new Map<string, unknown>();
+        const webTools = new WebToolSession(messages, signal);
         let chartAttemptIndex = 0;
         const toolContents = [...contents] as any[];
         let outputText = "";
@@ -93,8 +109,10 @@ export const createGeminiStream = async ({
             (toolFunction) => toolFunction.name === "word_document_begin",
           )
             ? 32
-            : 5;
-          for (let round = 0; round < maxToolRounds; round += 1) {
+            : webSearchEnabled
+              ? 8
+              : 5;
+          for (let round = 0; round < maxToolRounds + (webSearchEnabled ? 1 : 0); round += 1) {
             const request: GenerateContentParameters = {
               config: {
                 abortSignal: signal,
@@ -108,20 +126,23 @@ export const createGeminiStream = async ({
                       },
                     }
                   : {}),
-                tools: [
-                  {
-                    functionDeclarations: builtinFunctions.map((toolFunction) => ({
-                      description: toolFunction.description,
-                      name: toolFunction.name,
-                      parametersJsonSchema: toolFunction.parameters,
-                    })),
-                  },
-                ],
+                tools:
+                  round >= maxToolRounds
+                    ? []
+                    : [
+                        {
+                          functionDeclarations: builtinFunctions.map((toolFunction) => ({
+                            description: toolFunction.description,
+                            name: toolFunction.name,
+                            parametersJsonSchema: toolFunction.parameters,
+                          })),
+                        },
+                      ],
               },
               contents: toolContents,
               model,
             };
-            const response = toolRuntime.debugChartAttempts
+            const response = streamTools
               ? await (async () => {
                   const chunks = await ai.models.generateContentStream({
                     ...request,
@@ -177,8 +198,9 @@ export const createGeminiStream = async ({
 
             const functionCalls = (response.functionCalls || []).filter(
               (functionCall) =>
-                requiredWordToolNames.length === 0 ||
-                requiredWordToolNames.includes(functionCall.name || ""),
+                allowedNames.has(functionCall.name || "") &&
+                (requiredWordToolNames.length === 0 ||
+                  requiredWordToolNames.includes(functionCall.name || "")),
             );
             const passUsage = resolveTokenUsage({
               estimatedInputTokens: estimateTextTokens(
@@ -193,7 +215,7 @@ export const createGeminiStream = async ({
             if (functionCalls.length === 0) {
               if (requiredWordToolNames.length === 0) {
                 outputText = response.text || "";
-                if (outputText && !toolRuntime.debugChartAttempts) {
+                if (outputText && !streamTools) {
                   controller.enqueue(encodeStreamEvent(encoder, "content", outputText));
                 }
                 break;
@@ -224,8 +246,21 @@ export const createGeminiStream = async ({
               const name = functionCall.name || "";
               const builtinTool = getBuiltinToolByFunction(name);
               const callId = functionCall.id || `gemini-tool-${round}-${index}`;
-              if (!builtinTool) continue;
               const functionArgs = functionCall.args || {};
+              if (webSearchEnabled && WEB_TOOL_NAMES.has(name)) {
+                const result = await webTools.execute(name, functionArgs, callId, (state) =>
+                  controller.enqueue(encodeToolEvent(encoder, state)),
+                );
+                responseParts.push({
+                  functionResponse: {
+                    id: functionCall.id,
+                    name,
+                    response: JSON.parse(formatToolResultForModel(result, toolResultMaxChars)),
+                  },
+                });
+                continue;
+              }
+              if (!builtinTool || !toolRuntime) continue;
 
               const runningState = {
                 artifactId:

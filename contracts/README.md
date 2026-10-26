@@ -24,3 +24,19 @@ the same JSON fields to the existing routes; it does not call model providers.
 
 `fixtures/chat-stream.ndjson` is deterministic synthetic data for protocol tests,
 not captured user content. Unknown message fields are retained on round trips.
+
+## Web research additions
+
+`tool.webSearch.tool` supports `web_search`, `read_webpage`, `find_in_page` and
+`show_images`. Optional fields include `callId`, `contentKind`, `images`, `links`
+and `page` (`startLine`, `endLine`, `totalLines`, `nextLine`, `matches`, `truncated`).
+Match updates by `callId`; older events fall back to tool/query identity.
+
+`images` entries carry `id`, `url`, `title`, optional `description` and `sourceUrl`.
+Only completed `show_images` segments render a gallery. Persist the full tool
+segment, including errors and page metadata, through session and variant writes.
+
+Request messages may carry optional `webContext: { images, sources }` derived
+from prior tool segments. The server normalizes/bounds this field and includes it
+in context accounting. Image-only assistant turns remain valid when this context
+contains displayed images. No database migration or protocol-version bump is needed.

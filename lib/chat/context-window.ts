@@ -1,6 +1,7 @@
-import type { FileAttachment, Message } from "@/lib/chat/types";
+import type { FileAttachment, Message, WebResourceContext } from "@/lib/chat/types";
 import type { ModelMetadataWithContext } from "@/lib/model-metadata";
 import { getMessageContentForModel } from "./helpers";
+import { contentWithWebContext } from "./web-context";
 import { estimateTextTokens } from "./metrics";
 
 const MIN_OUTPUT_RESERVE_TOKENS = 2048;
@@ -8,6 +9,7 @@ const MAX_OUTPUT_RESERVE_TOKENS = 32_768;
 const TRUNCATION_MARKER = "\n\n[较早内容因上下文限制已截断]";
 
 type ContextMessage = {
+  webContext?: WebResourceContext;
   reasoning?: string;
   content: string;
   role: string;
@@ -27,7 +29,7 @@ export const estimateContextMessagesTokens = (messages: ContextMessage[]) =>
   estimateTextTokens(
     JSON.stringify(
       messages.map((message) => ({
-        content: message.content,
+        content: contentWithWebContext(message),
         role: message.role,
         ...(message.reasoning ? { reasoning_content: message.reasoning } : {}),
       })),

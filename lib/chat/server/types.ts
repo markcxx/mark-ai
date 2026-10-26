@@ -1,4 +1,5 @@
 import type { FileAttachment } from "@/lib/chat/types";
+import type { WebResourceContext } from "@/lib/chat/types";
 
 export type ModelImageInput = {
   data: string;
@@ -7,6 +8,7 @@ export type ModelImageInput = {
 };
 
 export type ChatMessage = {
+  webContext?: WebResourceContext;
   reasoning?: string;
   attachments?: FileAttachment[];
   content: string;

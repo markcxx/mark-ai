@@ -8,14 +8,13 @@ import { estimateTextTokens } from "@/lib/chat/metrics";
 import {
   formatToolResultForModel,
   getChoiceText,
-  getToolSearchQuery,
-  getToolWebpageUrl,
   isUnsupportedStreamUsageError,
   normalizeToolCalls,
   toOpenAIChatEndpoint,
   toOpenAIMessages,
 } from "@/lib/chat/server/openai-helpers";
-import { READ_WEBPAGE_TOOL, WEB_SEARCH_TOOL } from "@/lib/chat/server/runtime-prompt";
+import { WEB_TOOLS } from "@/lib/chat/server/runtime-prompt";
+import { WEB_TOOL_NAMES, WebToolSession } from "./web-tools";
 import {
   ThinkingTagStreamParser,
   type ThinkingTagStreamEvent,
@@ -34,10 +33,7 @@ import {
   type ResolvedTokenUsage,
   type TokenUsage,
 } from "@/lib/chat/token-usage";
-import type { WebSearchState } from "@/lib/chat/types";
-import { searchTavily } from "@/lib/search/tavily";
 import { fetchWithDevelopmentProxy } from "@/lib/server/development-proxy";
-import { readWebpage } from "@/lib/search/webpage";
 import { executeBuiltinTool } from "@/lib/tools/executors";
 import { getBuiltinToolByFunction, getToolFunctions } from "@/lib/tools/registry";
 import { getWordContinuationPrompt, getWordContinuationToolNames } from "@/lib/tools/word/workflow";
@@ -84,7 +80,7 @@ export const createOpenAICompatibleStream = async (
   });
   const builtinFunctions = getToolFunctions(toolRuntime?.enabledToolIds || []);
   const availableTools = [
-    ...(webSearchEnabled ? [WEB_SEARCH_TOOL, READ_WEBPAGE_TOOL] : []),
+    ...(webSearchEnabled ? WEB_TOOLS : []),
     ...builtinFunctions.map((toolFunction) => ({ function: toolFunction, type: "function" })),
   ];
   const allowedToolNames = new Set(availableTools.map((tool) => tool.function.name));
@@ -93,20 +89,7 @@ export const createOpenAICompatibleStream = async (
     async start(controller) {
       const toolRuntimeState = new Map<string, unknown>();
       let chartAttemptIndex = 0;
-      const citationIdsByUrl = new Map<string, number>();
-      let nextCitationId = 1;
-
-      const assignCitationIds = (results: WebSearchState["results"]) =>
-        results.map((result) => {
-          const key = result.url.trim();
-          let citationId = citationIdsByUrl.get(key);
-          if (!citationId) {
-            citationId = nextCitationId;
-            nextCitationId += 1;
-            citationIdsByUrl.set(key, citationId);
-          }
-          return { ...result, citationId };
-        });
+      const webTools = new WebToolSession(messages, signal);
 
       const requestUpstream = async (
         requestMessages: OpenAIChatMessage[],
@@ -380,7 +363,10 @@ export const createOpenAICompatibleStream = async (
           (toolFunction) => toolFunction.name === "word_document_begin",
         )
           ? 32
-          : 5;
+          : webSearchEnabled
+            ? 8
+            : 5;
+        let needsFinalAnswer = false;
         let currentMessages = openAIMessages;
         let latestUsage: ResolvedTokenUsage | undefined;
         let requiredWordToolNames: string[] = [];
@@ -400,6 +386,7 @@ export const createOpenAICompatibleStream = async (
                 requiredWordToolNames.includes(toolCall.function.name)),
           );
 
+          needsFinalAnswer = executableToolCalls.length > 0;
           if (executableToolCalls.length === 0) {
             if (requiredWordToolNames.length === 0) break;
             wordProtocolRetries += 1;
@@ -521,103 +508,21 @@ export const createOpenAICompatibleStream = async (
               continue;
             }
 
-            if (toolCall.function.name === "read_webpage") {
-              const url = getToolWebpageUrl(toolCall);
-              const readingState: WebSearchState = {
-                query: url,
-                results: [],
-                status: "searching",
-                tool: "read_webpage",
-                url,
-              };
-              controller.enqueue(encodeToolEvent(encoder, readingState));
-
+            if (webSearchEnabled && WEB_TOOL_NAMES.has(toolCall.function.name)) {
+              let args: Record<string, unknown> = {};
               try {
-                const result = await readWebpage({ signal, url });
-                const doneState: WebSearchState = {
-                  completedAt: Date.now(),
-                  content: result.content,
-                  costTime: result.costTime,
-                  description: result.description,
-                  query: result.url,
-                  results: assignCitationIds([
-                    {
-                      content: result.description || result.content.slice(0, 600),
-                      favicon: result.favicon,
-                      title: result.title,
-                      url: result.url,
-                    },
-                  ]),
-                  siteName: result.siteName,
-                  status: "done",
-                  title: result.title,
-                  tool: "read_webpage",
-                  url: result.url,
-                };
-                controller.enqueue(encodeToolEvent(encoder, doneState));
-                toolResultMessages.push({
-                  content: formatToolResultForModel(doneState, toolResultMaxChars),
-                  role: "tool",
-                  tool_call_id: toolCall.id,
-                });
-              } catch (error) {
-                const errorState: WebSearchState = {
-                  completedAt: Date.now(),
-                  error: error instanceof Error ? error.message : "网页读取失败",
-                  query: url,
-                  results: [],
-                  status: "error",
-                  tool: "read_webpage",
-                  url,
-                };
-                controller.enqueue(encodeToolEvent(encoder, errorState));
-                toolResultMessages.push({
-                  content: formatToolResultForModel(errorState, toolResultMaxChars),
-                  role: "tool",
-                  tool_call_id: toolCall.id,
-                });
+                args = JSON.parse(toolCall.function.arguments || "{}");
+              } catch {
+                /* Surface validation through the tool result. */
               }
-              continue;
-            }
-
-            const query = getToolSearchQuery(toolCall);
-            const searchingState: WebSearchState = {
-              query,
-              results: [],
-              status: "searching",
-              tool: "web_search",
-            };
-            controller.enqueue(encodeToolEvent(encoder, searchingState));
-
-            try {
-              const result = await searchTavily({ query, signal });
-              const doneState: WebSearchState = {
-                answer: result.answer,
-                completedAt: Date.now(),
-                costTime: result.costTime,
-                query: result.query,
-                results: assignCitationIds(result.results),
-                status: "done",
-                tool: "web_search",
-              };
-              controller.enqueue(encodeToolEvent(encoder, doneState));
+              const result = await webTools.execute(
+                toolCall.function.name,
+                args || {},
+                toolCall.id,
+                (state) => controller.enqueue(encodeToolEvent(encoder, state)),
+              );
               toolResultMessages.push({
-                content: formatToolResultForModel(doneState, toolResultMaxChars),
-                role: "tool",
-                tool_call_id: toolCall.id,
-              });
-            } catch (error) {
-              const errorState: WebSearchState = {
-                completedAt: Date.now(),
-                error: error instanceof Error ? error.message : "联网搜索失败",
-                query,
-                results: [],
-                status: "error",
-                tool: "web_search",
-              };
-              controller.enqueue(encodeToolEvent(encoder, errorState));
-              toolResultMessages.push({
-                content: formatToolResultForModel(errorState, toolResultMaxChars),
+                content: formatToolResultForModel(result, toolResultMaxChars),
                 role: "tool",
                 tool_call_id: toolCall.id,
               });
@@ -633,6 +538,10 @@ export const createOpenAICompatibleStream = async (
           );
         }
 
+        if (needsFinalAnswer && requiredWordToolNames.length === 0) {
+          const final = await streamModelResponse(currentMessages, false, []);
+          latestUsage = final.usage;
+        }
         if (latestUsage) {
           controller.enqueue(encodeUsageEvent(encoder, latestUsage));
         }

@@ -1,10 +1,13 @@
-import { ExternalLink, ScanText, Search } from "lucide-react";
+"use client";
+
+import { ExternalLink, Image, ScanText, Search } from "lucide-react";
 
 import type { WebCitation } from "@/lib/chat/citations";
 import type { WebSearchResult, WebSearchState } from "@/lib/chat/types";
 
 import { SourceFavicon, SourcePopover } from "./MessageSources";
 import { ToolCallDisclosure } from "./ToolCallDisclosure";
+import { WebImageGallery } from "./WebImageGallery";
 
 const toCitation = (result: WebSearchResult, fallbackId: number): WebCitation => ({
   ...result,
@@ -13,24 +16,44 @@ const toCitation = (result: WebSearchResult, fallbackId: number): WebCitation =>
 });
 
 export function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchState }) {
+  if (webSearch.tool === "show_images" && webSearch.status === "done")
+    return <WebImageGallery images={webSearch.images || []} />;
   const searching = webSearch.status === "searching";
   const failed = webSearch.status === "error";
   const done = webSearch.status === "done";
-  const isWebpageRead = webSearch.tool === "read_webpage";
-  const Icon = isWebpageRead ? ScanText : Search;
-  const toolName = isWebpageRead ? "read_webpage" : "web_search";
-  const toolLabel = isWebpageRead ? "网页读取" : "联网搜索";
+  const isFind = webSearch.tool === "find_in_page";
+  const isImages = webSearch.tool === "show_images";
+  const isWebpageRead = webSearch.tool === "read_webpage" || isFind;
+  const Icon = isImages ? Image : isWebpageRead ? ScanText : Search;
+  const toolName = webSearch.tool || "web_search";
+  const toolLabel = isFind
+    ? "页内查找"
+    : isImages
+      ? "图片展示"
+      : isWebpageRead
+        ? "网页读取"
+        : "联网搜索";
   const argumentLabel = isWebpageRead ? "url:" : "query:";
   const argumentValue = isWebpageRead ? webSearch.url || webSearch.query : webSearch.query;
-  const summaryLabel = searching
-    ? isWebpageRead
-      ? "正在读取网页"
-      : "正在搜索网页"
-    : failed
-      ? `${toolLabel}调用失败`
-      : isWebpageRead
-        ? "已读取网页"
-        : "已搜索网页";
+  const summaryLabel = isFind
+    ? searching
+      ? "正在查找页内内容"
+      : failed
+        ? "页内查找失败"
+        : `已查找网页 · ${webSearch.page?.matches?.length || 0} 处匹配`
+    : isImages
+      ? searching
+        ? "正在整理图片"
+        : "图片展示失败"
+      : searching
+        ? isWebpageRead
+          ? "正在读取网页"
+          : "正在搜索网页"
+        : failed
+          ? `${toolLabel}调用失败`
+          : isWebpageRead
+            ? "已读取网页"
+            : "已搜索网页";
 
   return (
     <ToolCallDisclosure
@@ -82,7 +105,7 @@ export function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchStat
               {webSearch.error || (isWebpageRead ? "网页读取服务暂时不可用" : "搜索服务暂时不可用")}
             </div>
             <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              已跳过{toolLabel}结果，继续使用当前模型回复。
+              未获取到这次结果，后续回答会保留这一限制。
             </div>
           </div>
         ) : isWebpageRead ? (
@@ -135,6 +158,12 @@ export function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchStat
                 {webSearch.content.length > 2400 ? "\n\n..." : ""}
               </pre>
             )}
+            {webSearch.page && (
+              <p className="mt-1 text-[11px] text-gray-400">
+                第 {webSearch.page.startLine}–{webSearch.page.endLine} 行 · 共{" "}
+                {webSearch.page.totalLines} 行{webSearch.page.nextLine ? " · 仍有后续内容" : ""}
+              </p>
+            )}
           </div>
         ) : (
           <div className="px-1 pb-2">
@@ -182,6 +211,11 @@ export function WebSearchToolBlockItem({ webSearch }: { webSearch: WebSearchStat
           </div>
         )}
       </div>
+      {done && !isImages && Boolean(webSearch.images?.length) && (
+        <p className="pl-7 pb-2 text-[11px] text-gray-400">
+          已发现 {webSearch.images!.length} 张候选图片
+        </p>
+      )}
     </ToolCallDisclosure>
   );
 }

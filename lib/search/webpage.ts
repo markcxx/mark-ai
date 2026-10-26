@@ -1,5 +1,12 @@
 import dns from "node:dns/promises";
 import net from "node:net";
+import {
+  extractWebImages,
+  extractWebLinks,
+  publicResourceUrl,
+  normalizeWebImages,
+  type WebImageCandidate,
+} from "./web-assets";
 
 export type WebpageReadResponse = {
   content: string;
@@ -9,13 +16,16 @@ export type WebpageReadResponse = {
   siteName?: string;
   title: string;
   url: string;
+  images?: WebImageCandidate[];
+  links?: string[];
+  truncated?: boolean;
 };
 
 const FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v2/scrape";
 const TAVILY_EXTRACT_ENDPOINT = "https://api.tavily.com/extract";
 const REQUEST_TIMEOUT_MS = 20_000;
 const MAX_HTML_BYTES = 2_000_000;
-const MAX_CONTENT_CHARS = 18_000;
+const MAX_CONTENT_CHARS = 240_000;
 const MAX_REDIRECTS = 5;
 const ACCESS_DENIED_STATUS = new Set([401, 403, 418, 429]);
 
@@ -38,6 +48,7 @@ const isPrivateIPv4 = (ip: string) => {
     (a === 169 && b === 254) ||
     (a === 172 && b >= 16 && b <= 31) ||
     (a === 192 && b === 168) ||
+    (a === 100 && b >= 64 && b <= 127) ||
     a >= 224
   );
 };
@@ -49,7 +60,8 @@ const isPrivateIPv6 = (ip: string) => {
     normalized === "::" ||
     normalized.startsWith("fc") ||
     normalized.startsWith("fd") ||
-    normalized.startsWith("fe80:")
+    normalized.startsWith("fe80:") ||
+    normalized.startsWith("::ffff:")
   );
 };
 
@@ -72,8 +84,14 @@ const assertPublicHttpUrl = async (rawUrl: string) => {
     throw new Error("只支持 http/https 网页");
   }
 
-  const hostname = url.hostname.toLowerCase();
-  if (!hostname || PRIVATE_HOSTNAMES.has(hostname) || hostname.endsWith(".local")) {
+  if (url.username || url.password) throw new Error("网页 URL 不能包含账号或密码");
+
+  const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (
+    !hostname ||
+    PRIVATE_HOSTNAMES.has(hostname) ||
+    /\.(local|internal|localhost)$/.test(hostname)
+  ) {
     throw new Error("不允许读取本机或内网地址");
   }
 
@@ -211,6 +229,7 @@ const parseReaderMarkdown = (markdown: string, fallbackUrl: URL) => {
 };
 
 const readViaReader = async (url: URL, startedAt: number, signal?: AbortSignal) => {
+  signal?.throwIfAborted();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   const abortRequest = () => controller.abort();
@@ -239,6 +258,9 @@ const readViaReader = async (url: URL, startedAt: number, signal?: AbortSignal) 
 
     return {
       content,
+      images: extractWebImages(parsed.content, url.toString()),
+      links: extractWebLinks(parsed.content, url.toString()),
+      truncated: parsed.content.length > MAX_CONTENT_CHARS,
       costTime: Date.now() - startedAt,
       title: parsed.title,
       url: parsed.url,
@@ -270,6 +292,7 @@ const getProviderErrorMessage = async (response: Response, fallback: string) => 
 };
 
 const withTimeoutSignal = (signal: AbortSignal | undefined, timeoutMs: number) => {
+  signal?.throwIfAborted();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   const abortRequest = () => controller.abort();
@@ -299,7 +322,7 @@ const readViaFirecrawl = async (url: URL, startedAt: number, signal?: AbortSigna
       const response = await fetch(FIRECRAWL_ENDPOINT, {
         body: JSON.stringify({
           blockAds: true,
-          formats: ["markdown"],
+          formats: ["markdown", "links"],
           onlyCleanContent: true,
           onlyMainContent: true,
           proxy: "auto",
@@ -342,8 +365,24 @@ const readViaFirecrawl = async (url: URL, startedAt: number, signal?: AbortSigna
         continue;
       }
 
+      const sourceUrl = publicResourceUrl(pageUrl) || url.toString();
+      const bodyImages = extractWebImages(String(page.markdown || page.html || ""), sourceUrl);
       return {
         content,
+        images: bodyImages.length
+          ? bodyImages
+          : normalizeWebImages([metadata.ogImage].filter(Boolean), sourceUrl),
+        links: extractWebLinks(String(page.markdown || ""), url.toString()).concat(
+          Array.isArray(page.links)
+            ? page.links
+                .flatMap((link: unknown) => {
+                  const safe = publicResourceUrl(link, url.toString());
+                  return safe ? [safe] : [];
+                })
+                .slice(0, 50)
+            : [],
+        ),
+        truncated: String(page.markdown || page.text || page.html || "").length > MAX_CONTENT_CHARS,
         costTime: Date.now() - startedAt,
         description: metadata.description || metadata.ogDescription,
         favicon: metadata.favicon,
@@ -376,7 +415,7 @@ const readViaTavilyExtract = async (url: URL, startedAt: number, signal?: AbortS
           extract_depth: "advanced",
           format: "markdown",
           include_favicon: true,
-          include_images: false,
+          include_images: true,
           timeout: 30,
           urls: url.toString(),
         }),
@@ -412,6 +451,16 @@ const readViaTavilyExtract = async (url: URL, startedAt: number, signal?: AbortS
 
       return {
         content,
+        images: extractWebImages(
+          String(result?.raw_content || result?.content || ""),
+          url.toString(),
+          Array.isArray(result?.images) ? result.images : [],
+        ),
+        links: extractWebLinks(
+          String(result?.raw_content || result?.content || ""),
+          url.toString(),
+        ),
+        truncated: String(result?.raw_content || result?.content || "").length > MAX_CONTENT_CHARS,
         costTime: Date.now() - startedAt,
         favicon: result?.favicon,
         title,
@@ -432,22 +481,26 @@ export async function readWebpage({
   signal?: AbortSignal;
   url: string;
 }): Promise<WebpageReadResponse> {
+  signal?.throwIfAborted();
   const startedAt = Date.now();
   let currentUrl = await assertPublicHttpUrl(url.trim());
 
   try {
     return await readViaFirecrawl(currentUrl, startedAt, signal);
   } catch {
+    signal?.throwIfAborted();
     // Fall back to Tavily Extract, then direct fetch/Jina reader below.
   }
 
   try {
     return await readViaTavilyExtract(currentUrl, startedAt, signal);
   } catch {
+    signal?.throwIfAborted();
     // Fall back to direct fetch/Jina reader below.
   }
 
   for (let redirect = 0; redirect <= MAX_REDIRECTS; redirect += 1) {
+    signal?.throwIfAborted();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     const abortRequest = () => controller.abort();
@@ -494,7 +547,8 @@ export async function readWebpage({
       const description =
         getMetaContent(html, "description") || getMetaContent(html, "og:description");
       const siteName = getMetaContent(html, "og:site_name");
-      const content = stripHtmlToText(html).slice(0, MAX_CONTENT_CHARS);
+      const fullContent = stripHtmlToText(html);
+      const content = fullContent.slice(0, MAX_CONTENT_CHARS);
 
       if (!content || looksLikeBlockedPage(content, title)) {
         throw new Error("未能从网页中提取可读正文");
@@ -502,6 +556,9 @@ export async function readWebpage({
 
       return {
         content,
+        images: extractWebImages(html, currentUrl.toString()),
+        links: extractWebLinks(html, currentUrl.toString()),
+        truncated: fullContent.length > MAX_CONTENT_CHARS,
         costTime: Date.now() - startedAt,
         description,
         siteName,

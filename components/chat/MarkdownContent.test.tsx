@@ -215,3 +215,17 @@ describe("HTML preview lifecycle", () => {
     expect(html).not.toContain("&lt;html&gt;");
   });
 });
+
+it("renders provider citation variants only for registered sources", () => {
+  const html = renderToStaticMarkup(
+    <MarkdownContent
+      citations={[
+        { citationId: 1, structured: true, title: "官方来源", url: "https://example.com/article" },
+      ]}
+    >
+      {"依据 [1] 与 [citation:1]；未知来源 [citation:9]。"}
+    </MarkdownContent>,
+  );
+  expect(html.match(/aria-label="查看来源 1：官方来源"/g)).toHaveLength(2);
+  expect(html).toContain("[citation:9]");
+});

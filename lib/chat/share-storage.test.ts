@@ -81,3 +81,60 @@ describe("conversation shares", () => {
     expect(message.segments?.[0]).toMatchObject({ isActive: false });
   });
 });
+
+it("persists webpage images and provenance in a readonly share snapshot", async () => {
+  db.prepare("INSERT INTO chat_sessions (id,title,created_at,updated_at) VALUES (?,?,?,?)").run(
+    "web-session",
+    "网页图片",
+    Date.now(),
+    Date.now(),
+  );
+  const messages = toReadonlyMessages([
+    {
+      id: "web",
+      role: "model",
+      content: "",
+      segments: [
+        {
+          type: "tool",
+          webSearch: {
+            tool: "show_images",
+            callId: "show-1",
+            query: "图片",
+            status: "done",
+            results: [],
+            images: [
+              {
+                id: "img_1",
+                title: "正文图",
+                url: "https://example.com/photo.jpg",
+                sourceUrl: "https://example.com/article",
+              },
+            ],
+          },
+        },
+        {
+          type: "tool",
+          webSearch: {
+            tool: "read_webpage",
+            callId: "read-2",
+            query: "https://example.com/article",
+            status: "searching",
+            results: [],
+          },
+        },
+      ],
+    },
+  ]);
+  const saved = await storage.saveConversationShare(
+    "web-session",
+    "local",
+    { title: "网页图片", messages },
+    3600,
+  );
+  const restored = (await storage.getConversationShare(saved.token))!.snapshot.messages[0];
+  expect(restored.segments?.[0]).toMatchObject({
+    webSearch: { images: [{ id: "img_1", sourceUrl: "https://example.com/article" }] },
+  });
+  expect(restored.segments?.[1]).toMatchObject({ webSearch: { status: "error" } });
+});

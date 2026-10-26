@@ -5,6 +5,7 @@ import '../../../shared/models/chat.dart';
 import '../../../shared/widgets/ui_icon.dart';
 import '../../../shared/widgets/source_favicon.dart';
 import 'message_sources.dart';
+import 'web_image_gallery.dart';
 
 /// Native counterpart of WebSearchToolBlock and GeneratedFileToolBlock.
 class ToolCallBlock extends StatefulWidget {
@@ -30,7 +31,8 @@ class _ToolCallBlockState extends State<ToolCallBlock> {
   bool get failed => data['status'] == 'error';
   bool get running =>
       data['status'] == 'running' || data['status'] == 'searching';
-  bool get readPage => data['tool'] == 'read_webpage';
+  bool get readPage =>
+      data['tool'] == 'read_webpage' || data['tool'] == 'find_in_page';
   static const wordLabels = {
     'word_document_append': '正在构建下一个章节',
     'word_document_begin': '正在规划文档结构',
@@ -68,9 +70,18 @@ class _ToolCallBlockState extends State<ToolCallBlock> {
   );
   @override
   Widget build(BuildContext context) {
+    if (!widget.generatedFile &&
+        data['tool'] == 'show_images' &&
+        data['status'] == 'done') {
+      return WebImageGallery(images: jsonList(data['images']));
+    }
     dark = Theme.of(context).brightness == Brightness.dark;
     final label = widget.generatedFile
         ? widget.toolLabel ?? '文件生成'
+        : data['tool'] == 'find_in_page'
+        ? '页内查找'
+        : data['tool'] == 'show_images'
+        ? '图片展示'
         : readPage
         ? '网页读取'
         : '联网搜索';
@@ -228,7 +239,7 @@ class _ToolCallBlockState extends State<ToolCallBlock> {
           child: Row(
             children: [
               text(
-                readPage ? 'read_webpage' : 'web_search',
+                data['tool'] as String? ?? 'web_search',
                 size: 11,
                 mono: true,
                 color: const Color(0xff9ca3af),
@@ -343,7 +354,10 @@ class _ToolCallBlockState extends State<ToolCallBlock> {
                   ),
                 for (final entry in results.take(readPage ? 1 : 8).indexed)
                   resultRow(
-                    {...entry.$2, 'citationId': entry.$2['citationId'] ?? entry.$1 + 1},
+                    {
+                      ...entry.$2,
+                      'citationId': entry.$2['citationId'] ?? entry.$1 + 1,
+                    },
                     last: entry.$1 == results.take(readPage ? 1 : 8).length - 1,
                   ),
                 if (readPage && results.isEmpty && data['url'] is String)

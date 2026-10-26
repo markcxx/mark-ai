@@ -58,3 +58,29 @@ it("ends active thoughts and pending tools when stopped", () => {
     generatedFile: { status: "error" },
   });
 });
+
+it("keeps separate reads of the same URL and stops pending web calls", () => {
+  const state = {
+    tool: "read_webpage" as const,
+    query: "https://example.com/a",
+    results: [],
+    status: "searching" as const,
+  };
+  let message = applyChartPreviewEvent(initial(), {
+    type: "tool",
+    webSearch: { ...state, callId: "first" },
+  });
+  message = applyChartPreviewEvent(message, {
+    type: "tool",
+    webSearch: { ...state, callId: "first", status: "done" },
+  });
+  message = applyChartPreviewEvent(message, {
+    type: "tool",
+    webSearch: { ...state, callId: "next" },
+  });
+  expect(message.segments).toHaveLength(2);
+  expect(finishChartPreviewMessage(message).segments).toMatchObject([
+    { webSearch: { callId: "first", status: "done" } },
+    { webSearch: { callId: "next", status: "error" } },
+  ]);
+});

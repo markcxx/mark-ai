@@ -1,8 +1,10 @@
-import type { GeneratedFileState, Message, MessageSegment } from "./types";
+import type { GeneratedFileState, Message, MessageSegment, WebSearchState } from "./types";
+import { finishPendingWebTools } from "./web-context";
 
 export type ChartPreviewEvent =
   | { type: "content" | "reasoning" | "error"; text: string }
   | { type: "file"; generatedFile: GeneratedFileState }
+  | { type: "tool"; webSearch: WebSearchState }
   | { type: "usage"; inputTokens?: number; outputTokens?: number; totalTokens?: number };
 
 export function applyChartPreviewEvent(message: Message, event: ChartPreviewEvent): Message {
@@ -50,6 +52,21 @@ export function applyChartPreviewEvent(message: Message, event: ChartPreviewEven
     else segments.push(segment);
     return { ...message, isReasoning: false, segments };
   }
+  if (event.type === "tool") {
+    closeThinking();
+    const index = segments.findIndex(
+      (segment) =>
+        segment.type === "tool" &&
+        (event.webSearch.callId
+          ? segment.webSearch.callId === event.webSearch.callId
+          : segment.webSearch.tool === event.webSearch.tool &&
+            segment.webSearch.query === event.webSearch.query),
+    );
+    const segment: MessageSegment = { type: "tool", webSearch: event.webSearch };
+    if (index >= 0) segments[index] = segment;
+    else segments.push(segment);
+    return { ...message, isReasoning: false, segments };
+  }
   if (event.type === "error") {
     closeThinking();
     segments.push({ type: "error", content: event.text });
@@ -69,19 +86,20 @@ export function finishChartPreviewMessage(message: Message): Message {
     ...message,
     isStreaming: false,
     isReasoning: false,
-    segments: message.segments?.map((segment) =>
-      segment.type === "thinking"
-        ? { ...segment, isActive: false }
-        : segment.type === "generated-file" && segment.generatedFile.status === "running"
-          ? {
-              ...segment,
-              generatedFile: {
-                ...segment.generatedFile,
-                status: "error",
-                error: "请求已结束，工具未完成",
-              },
-            }
-          : segment,
+    segments: finishPendingWebTools(message.segments || [], "请求已结束，工具未完成，请重试").map(
+      (segment) =>
+        segment.type === "thinking"
+          ? { ...segment, isActive: false }
+          : segment.type === "generated-file" && segment.generatedFile.status === "running"
+            ? {
+                ...segment,
+                generatedFile: {
+                  ...segment.generatedFile,
+                  status: "error",
+                  error: "请求已结束，工具未完成",
+                },
+              }
+            : segment,
     ),
   };
 }

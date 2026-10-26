@@ -8,6 +8,7 @@ import { createSmoothTextController, parseChatStreamLine } from "@/lib/chat/clie
 import { extractThinkingFromText, getMessageContentForModel } from "@/lib/chat/helpers";
 import { isImageGenerationModel } from "@/lib/chat/image-models";
 import { prepareRequestHistory } from "@/lib/chat/request-history";
+import { finishPendingWebTools, getWebResourceContext } from "@/lib/chat/web-context";
 import {
   estimateMessageTokens,
   estimateMessagesTokens,
@@ -49,6 +50,7 @@ export const createStreamAssistantMessage =
     const settings = useSettingsStore.getState().general;
     const responseAnimation = settings.reduceMotion ? "none" : settings.responseAnimation;
     const mappedHistory = historyMessages.map((m) => ({
+      webContext: getWebResourceContext(m),
       attachments: m.attachments,
       reasoning: m.reasoning,
       content: getMessageContentForModel(m),
@@ -286,7 +288,10 @@ export const createStreamAssistantMessage =
           const ws = event.webSearch;
           const existingIdx = segments.findIndex(
             (s) =>
-              s.type === "tool" && s.webSearch.tool === ws.tool && s.webSearch.query === ws.query,
+              s.type === "tool" &&
+              (ws.callId
+                ? s.webSearch.callId === ws.callId
+                : s.webSearch.tool === ws.tool && s.webSearch.query === ws.query),
           );
           if (existingIdx >= 0) {
             (segments[existingIdx] as Extract<MessageSegment, { type: "tool" }>).webSearch = ws;
@@ -365,6 +370,11 @@ export const createStreamAssistantMessage =
       if (isStructuredStream && buffer) handleStreamLine(buffer);
       await reasoningController?.finish();
       await contentController?.finish();
+      segments.splice(
+        0,
+        segments.length,
+        ...finishPendingWebTools(segments, "请求已结束，工具未完成，请重试"),
+      );
       finishCurrentReasoning();
 
       const extracted = extractThinkingFromText(plainContent);
@@ -395,6 +405,11 @@ export const createStreamAssistantMessage =
         webSearch: allWebSearch.length > 0 ? allWebSearch : undefined,
       };
     } catch (error) {
+      segments.splice(
+        0,
+        segments.length,
+        ...finishPendingWebTools(segments, "请求已停止，工具结果未完成，请重试"),
+      );
       if (error instanceof DOMException && error.name === "AbortError") {
         outcome = "aborted";
         contentController?.flush();

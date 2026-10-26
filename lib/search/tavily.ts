@@ -1,4 +1,5 @@
 import type { WebSearchResult } from "@/lib/chat/types";
+import { normalizeWebImages, publicResourceUrl, type WebImageCandidate } from "./web-assets";
 
 type TavilyResult = {
   content?: string;
@@ -16,6 +17,7 @@ export type TavilySearchResponse = {
   query: string;
   resultNumbers: number;
   results: WebSearchResult[];
+  images?: WebImageCandidate[];
 };
 
 const TAVILY_ENDPOINT = "https://api.tavily.com/search";
@@ -51,11 +53,13 @@ export async function searchTavily({
   query,
   searchDepth,
   signal,
+  includeImages = false,
 }: {
   maxResults?: unknown;
   query: string;
   searchDepth?: unknown;
   signal?: AbortSignal;
+  includeImages?: boolean;
 }): Promise<TavilySearchResponse> {
   const apiKeys = getApiKeys();
   if (apiKeys.length === 0) {
@@ -69,7 +73,10 @@ export async function searchTavily({
 
   const startedAt = Date.now();
   const requestBody = JSON.stringify({
-    include_answer: true,
+    include_answer: false,
+    include_images: includeImages,
+    include_image_descriptions: includeImages,
+    safe_search: true,
     include_favicon: true,
     include_raw_content: false,
     max_results: toPositiveInteger(maxResults, DEFAULT_MAX_RESULTS),
@@ -80,6 +87,7 @@ export async function searchTavily({
   let lastError: { detail?: string; error: string; status: number } | undefined;
 
   for (const apiKey of apiKeys) {
+    signal?.throwIfAborted();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     const abortRequest = () => controller.abort();
@@ -115,13 +123,15 @@ export async function searchTavily({
               publishedDate: item.published_date || undefined,
               score: typeof item.score === "number" ? item.score : undefined,
               title: item.title || item.url || "Untitled",
-              url: item.url || "",
+              url: publicResourceUrl(item.url) || "",
             }))
             .filter((item: { url: string }) => item.url)
         : [];
 
       return {
-        answer: typeof data.answer === "string" ? data.answer : undefined,
+        images: includeImages
+          ? normalizeWebImages(Array.isArray(data.images) ? data.images : [])
+          : [],
         costTime: Date.now() - startedAt,
         query: cleanQuery,
         resultNumbers: results.length,

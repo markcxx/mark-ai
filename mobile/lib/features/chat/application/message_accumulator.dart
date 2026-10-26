@@ -69,7 +69,10 @@ class MessageAccumulator {
             (type == 'file'
                 ? old['callId'] == value['callId']
                 : type == 'tool'
-                ? old['tool'] == value['tool'] && old['query'] == value['query']
+                ? value['callId'] != null
+                      ? old['callId'] == value['callId']
+                      : old['tool'] == value['tool'] &&
+                            old['query'] == value['query']
                 : false);
       });
       final next = {
@@ -87,6 +90,19 @@ class MessageAccumulator {
 
   void finish({bool interrupted = false}) {
     _finishThinking();
+    message.segments = message.segments.map((segment) {
+      final tool = jsonMap(segment['webSearch']);
+      return segment['type'] == 'tool' && tool['status'] == 'searching'
+          ? {
+              ...segment,
+              'webSearch': {
+                ...tool,
+                'status': 'error',
+                'error': '请求已结束，工具未完成，请重试',
+              },
+            }
+          : segment;
+    }).toList();
     elapsed.stop();
     message.data.addAll({
       'isStreaming': false,
