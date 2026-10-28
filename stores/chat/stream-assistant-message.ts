@@ -151,6 +151,7 @@ export const createStreamAssistantMessage =
       const response = await fetch("/api/chat", {
         body: JSON.stringify({
           messages: requestHistory,
+          languageModel: useSettingsStore.getState().languageModel,
           model: modelConfig.id,
           provider: modelConfig.provider,
           sessionId: options.sessionId,

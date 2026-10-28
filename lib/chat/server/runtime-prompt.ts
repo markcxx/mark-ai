@@ -1,3 +1,5 @@
+import { getPersonalizationPrompt } from "@/lib/settings/personalization";
+
 export const WEB_SEARCH_TOOL = {
   function: {
     description:
@@ -148,14 +150,21 @@ const getCurrentDatePrompt = (timezone?: unknown) => {
 };
 
 export const getRuntimeSystemPrompt = ({
+  personalization,
   skillPrompt,
   timezone,
   webSearchEnabled,
 }: {
+  personalization?: unknown;
   skillPrompt?: string;
   timezone?: unknown;
   webSearchEnabled: boolean;
 }) =>
-  [getCurrentDatePrompt(timezone), webSearchEnabled ? WEB_SEARCH_SYSTEM_PROMPT : "", skillPrompt]
+  [
+    getCurrentDatePrompt(timezone),
+    webSearchEnabled ? WEB_SEARCH_SYSTEM_PROMPT : "",
+    skillPrompt,
+    getPersonalizationPrompt(personalization),
+  ]
     .filter(Boolean)
     .join("\n\n");

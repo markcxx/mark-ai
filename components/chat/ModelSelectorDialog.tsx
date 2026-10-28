@@ -3,7 +3,17 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, Check, ChevronDown, Eye, ImagePlus, Info, Search, Wrench } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  Eye,
+  ImagePlus,
+  Info,
+  Search,
+  Wrench,
+  SlidersHorizontal,
+} from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 
 import type { ConfiguredModel } from "@/lib/chat/types";
@@ -18,6 +28,9 @@ import { cn } from "@/lib/utils";
 
 import { ModelDetailCard } from "./ModelDetailCard";
 import { getModelVendor, ModelBrandIcon, VendorIcon, type ModelVendor } from "./ModelBrandIcon";
+
+export type ModelSelectionOption = { key: string; label: string; description?: string };
+const EMPTY_SELECTION_OPTIONS: ModelSelectionOption[] = [];
 
 type ModelTypeFilter = "all" | "image" | "text";
 type ModelGroup = { key: string; label: string; models: ConfiguredModel[] };
@@ -63,9 +76,11 @@ export function ModelSelectorDialog({
   selectedModelKey,
   setModelSearchKeyword,
   setSelectedModelKey,
+  selectionOptions = EMPTY_SELECTION_OPTIONS,
 }: {
   /** Trigger the popover attaches to; without one it is centered in the viewport. */
   anchorRef?: RefObject<HTMLElement | null>;
+  selectionOptions?: ModelSelectionOption[];
   availableModels: ConfiguredModel[];
   modelSearchKeyword: string;
   onClose: () => void;
@@ -146,10 +161,22 @@ export function ModelSelectorDialog({
     () => sections.flatMap((section) => section.groups.flatMap((group) => group.models)),
     [sections],
   );
-  const orderedKeys = useMemo(() => orderedModels.map(getModelKey), [orderedModels]);
-  const activeModel =
-    orderedModels.find((model) => getModelKey(model) === activeKey) ||
-    availableModels.find((model) => getModelKey(model) === selectedModelKey);
+  const matchingOptions = useMemo(
+    () =>
+      selectionOptions.filter(
+        (option) =>
+          !keyword || `${option.label} ${option.description || ""}`.toLowerCase().includes(keyword),
+      ),
+    [keyword, selectionOptions],
+  );
+  const orderedKeys = useMemo(
+    () => [...matchingOptions.map((option) => option.key), ...orderedModels.map(getModelKey)],
+    [matchingOptions, orderedModels],
+  );
+  const activeModel = selectionOptions.some((option) => option.key === activeKey)
+    ? undefined
+    : orderedModels.find((model) => getModelKey(model) === activeKey) ||
+      availableModels.find((model) => getModelKey(model) === selectedModelKey);
 
   useEffect(() => {
     if (open) {
@@ -305,7 +332,9 @@ export function ModelSelectorDialog({
           <label className="flex h-10 items-center gap-2 rounded-lg bg-gray-100/80 px-2.5 text-gray-400 focus-within:bg-gray-100 dark:bg-white/[0.06] dark:focus-within:bg-white/[0.08] md:h-9">
             <Search aria-hidden="true" className="shrink-0" size={15} />
             <input
-              aria-activedescendant={activeKey ? `model-option-${activeKey}` : undefined}
+              aria-activedescendant={
+                orderedKeys.includes(activeKey) ? `model-option-${activeKey}` : undefined
+              }
               aria-controls="model-selector-list"
               aria-expanded="true"
               aria-label="搜索模型"
@@ -429,7 +458,34 @@ export function ModelSelectorDialog({
           ref={listRef}
           role="listbox"
         >
-          {sections.length === 0 && (
+          {matchingOptions.map((option) => (
+            <button
+              key={option.key}
+              id={`model-option-${option.key}`}
+              data-model-key={option.key}
+              data-model-selected={option.key === selectedModelKey}
+              role="option"
+              aria-selected={option.key === selectedModelKey}
+              tabIndex={-1}
+              type="button"
+              onClick={() => selectModel(option.key)}
+              onMouseEnter={() => setActiveKey(option.key)}
+              className={cn(
+                "flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-[13px] hover:bg-gray-100 dark:hover:bg-white/[0.07]",
+                activeKey === option.key && "bg-gray-100 dark:bg-white/[0.07]",
+              )}
+            >
+              <SlidersHorizontal size={20} className="shrink-0 text-gray-400" />
+              <span className="min-w-0 flex-1">
+                <span className="block">{option.label}</span>
+                {option.description && (
+                  <span className="block text-xs text-gray-400">{option.description}</span>
+                )}
+              </span>
+              {selectedModelKey === option.key && <Check size={16} className="shrink-0" />}
+            </button>
+          ))}
+          {sections.length === 0 && matchingOptions.length === 0 && (
             <div className="flex flex-col items-center px-4 py-12 text-center">
               <p className="text-sm text-gray-500 dark:text-gray-400">没有匹配的模型</p>
               <p className="mt-1 text-xs text-gray-400">换个关键词或筛选条件试试</p>

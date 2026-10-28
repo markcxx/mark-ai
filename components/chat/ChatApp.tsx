@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useTheme } from "next-themes";
+import { useAppliedSettings } from "@/hooks/useAppliedSettings";
 import toast, { Toaster } from "react-hot-toast";
 
 import { getNextThinkingText, NOT_IMPLEMENTED_TOAST } from "@/lib/chat/constants";
@@ -13,16 +13,11 @@ import {
 } from "@/lib/chat/client/chat-controller";
 import { getModelKey } from "@/lib/chat/helpers";
 import { isImageGenerationModel } from "@/lib/chat/image-models";
-import {
-  GUEST_DRAFT_STORAGE_KEY,
-  requestGuestSignIn,
-  setGuestMode,
-} from "@/lib/client/guest-mode";
+import { GUEST_DRAFT_STORAGE_KEY, requestGuestSignIn, setGuestMode } from "@/lib/client/guest-mode";
 import { useChatAttachments } from "@/hooks/use-chat-attachments";
 import { useConversationScroll } from "@/hooks/use-conversation-scroll";
 import { usePreviewResize } from "@/hooks/use-preview-resize";
 import { useSidebarResize } from "@/hooks/use-sidebar-resize";
-import { PRIMARY_COLOR_VALUES } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import { useChatStore } from "@/stores/useChatStore";
 import { useSessionStore } from "@/stores/useSessionStore";
@@ -106,9 +101,7 @@ export default function ChatApp({
 }) {
   // Set during render so child effects (tool menu, plugin center) already see it.
   setGuestMode(guest, () => useChatStore.getState().input);
-  const { setTheme } = useTheme();
   const generalSettings = useSettingsStore((s) => s.general);
-  const settingsLoaded = useSettingsStore((s) => s.isLoaded);
   // UI Store
   const isSidebarOpen = useUIStore((s) => s.isSidebarOpen);
   const sidebarWidth = useUIStore((s) => s.sidebarWidth);
@@ -225,29 +218,7 @@ export default function ChatApp({
 
   // PLACEHOLDER_EFFECTS
 
-  useEffect(() => {
-    if (!settingsLoaded) return;
-    const root = document.documentElement;
-    root.dataset.primaryColor = generalSettings.primaryColor;
-    if (generalSettings.primaryColor === "black") {
-      root.style.removeProperty("--color-primary");
-      root.style.removeProperty("--color-primary-container");
-    } else {
-      root.style.setProperty("--color-primary", PRIMARY_COLOR_VALUES[generalSettings.primaryColor]);
-      root.style.setProperty(
-        "--color-primary-container",
-        PRIMARY_COLOR_VALUES[generalSettings.primaryColor],
-      );
-    }
-    root.style.setProperty("--chat-font-size", `${generalSettings.chatFontSize}px`);
-    root.dataset.density = generalSettings.density;
-    root.dataset.reduceMotion = generalSettings.reduceMotion ? "true" : "false";
-    setTheme(generalSettings.themeMode);
-    useUIStore.getState().setWebSearchEnabled(generalSettings.defaultWebSearch);
-    useUIStore.getState().setWideChatMode(generalSettings.wideChatMode);
-    useUIStore.getState().setSidebarWidth(generalSettings.sidebarWidth);
-    useUIStore.getState().setPreviewWidth(generalSettings.previewWidth);
-  }, [generalSettings, setTheme, settingsLoaded]);
+  useAppliedSettings();
 
   // Auto-scroll on new messages
   useEffect(() => {

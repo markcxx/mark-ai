@@ -167,7 +167,6 @@ body {
   overflow-x: auto;
   overflow-y: hidden;
   padding: 0.2em 0;
-  scrollbar-width: thin;
 }
 
 .markdown-content .katex-display > .katex {
@@ -208,49 +207,111 @@ html.dark[data-primary-color="black"] {
   --color-primary-container: #f5f5f5;
 }
 
-/* Custom scrollbar */
+/* One neutral, overlay-style scrollbar for all scrollable app surfaces. */
+:root {
+  --app-scrollbar-size: 4px;
+  --app-scrollbar-thumb: rgba(0, 0, 0, 0.18);
+  --app-scrollbar-thumb-hover: rgba(0, 0, 0, 0.32);
+  --settings-divider: #ededed;
+}
+.dark {
+  --app-scrollbar-thumb: rgba(255, 255, 255, 0.2);
+  --app-scrollbar-thumb-hover: rgba(255, 255, 255, 0.34);
+  --settings-divider: rgba(255, 255, 255, 0.09);
+}
 * {
-  scrollbar-color: var(--color-outline-variant) transparent;
+  scrollbar-color: var(--app-scrollbar-thumb) transparent;
   scrollbar-width: thin;
 }
-
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+*::-webkit-scrollbar {
+  width: var(--app-scrollbar-size);
+  height: var(--app-scrollbar-size);
 }
-::-webkit-scrollbar-track {
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-corner {
   background: transparent;
 }
-::-webkit-scrollbar-thumb {
-  background: var(--color-outline-variant);
-  border-radius: 9999px;
+*::-webkit-scrollbar-thumb {
+  background-color: var(--app-scrollbar-thumb);
+  border-radius: 999px;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-outline);
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--app-scrollbar-thumb-hover);
 }
-
 @media (hover: hover) and (pointer: fine) {
-  .markai-scrollbar-auto-hide {
+  * {
     scrollbar-color: transparent transparent;
   }
-
-  .markai-scrollbar-auto-hide:hover,
-  .markai-scrollbar-auto-hide:focus-within {
-    scrollbar-color: var(--color-outline-variant) transparent;
+  *:hover,
+  *:focus-within {
+    scrollbar-color: var(--app-scrollbar-thumb) transparent;
   }
-
-  .markai-scrollbar-auto-hide::-webkit-scrollbar-thumb {
-    background: transparent;
+  *::-webkit-scrollbar-thumb {
+    background-color: transparent;
   }
-
-  .markai-scrollbar-auto-hide:hover::-webkit-scrollbar-thumb,
-  .markai-scrollbar-auto-hide:focus-within::-webkit-scrollbar-thumb {
-    background: var(--color-outline-variant);
+  *:hover::-webkit-scrollbar-thumb,
+  *:focus-within::-webkit-scrollbar-thumb {
+    background-color: var(--app-scrollbar-thumb);
   }
-
-  .markai-scrollbar-auto-hide::-webkit-scrollbar-thumb:hover {
-    background: var(--color-outline);
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--app-scrollbar-thumb-hover);
   }
+}
+
+/* Chromium/WebKit: standard thin/color otherwise overrides pixel-sized thumbs.
+   Firefox retains its native thin fallback from the shared rules above. */
+@supports selector(::-webkit-scrollbar) {
+  *,
+  *:hover,
+  *:focus-within {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+}
+
+/* A missing border-color must not inherit black text in settings. */
+@layer base {
+  .markai-settings-workspace :where(*) {
+    border-color: var(--settings-divider);
+  }
+}
+.markai-settings-divider {
+  height: 0;
+  margin-block: 24px;
+  border: 0;
+  border-top: 1px solid var(--settings-divider);
+}
+.markai-settings-divider[data-dashed="true"] {
+  border-top-style: dashed;
+}
+
+/* The first-party provider uses a distinct brand surface, matching the reference. */
+.markai-provider-brand-card {
+  isolation: isolate;
+  position: relative;
+  overflow: hidden;
+}
+.markai-provider-brand-card::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -36px -16px auto 26%;
+  height: 80px;
+  opacity: 0.62;
+  filter: blur(20px);
+  background: linear-gradient(
+    100deg,
+    #d8eaff,
+    #7cc8ff 22%,
+    #80dfba 43%,
+    #f9e55b 64%,
+    #ffb77b 84%,
+    #ffb4aa
+  );
+  pointer-events: none;
+}
+.dark .markai-provider-brand-card::before {
+  opacity: 0.3;
 }
 
 ::selection {
@@ -809,27 +870,4 @@ html[data-reduce-motion="true"] .markai-text-shimmer {
 
 .dark .markdown-body .markdown-table-copy:active {
   color: #ffffff;
-}
-
-/* Match the full-screen bottom drawer used by FileManagerDrawer. */
-.markai-dialog-viewport.markai-settings-drawer-viewport {
-  padding: 0;
-  justify-content: center;
-}
-.markai-dialog-panel.markai-settings-drawer {
-  width: 100%;
-  height: 100dvh;
-  max-width: 100vw;
-  max-height: 100dvh;
-  border-radius: 0;
-  border-width: 0;
-  box-shadow: 0 -24px 80px rgba(0, 0, 0, 0.18);
-  transition: transform 340ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-.markai-dialog-panel.markai-settings-drawer[data-starting-style],
-.markai-dialog-panel.markai-settings-drawer[data-ending-style] {
-  transform: translateY(100%);
-  opacity: 1;
-  transition-duration: 340ms;
-  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }

@@ -48,7 +48,7 @@ export function NewModelsBar({
       aria-label="上新模型"
     >
       <span className="shrink-0 text-[13px] text-gray-500 dark:text-gray-400">上新</span>
-      <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
         {modelsToShow.map((model) => {
           const key = getModelKey(model);
           const name = model.id;

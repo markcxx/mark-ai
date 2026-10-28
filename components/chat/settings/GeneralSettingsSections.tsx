@@ -10,15 +10,18 @@ import {
 const CodeThemePreview = dynamic(() => import("./CodeThemePreview"), { ssr: false });
 const DiagramThemePreview = dynamic(() => import("./DiagramThemePreview"), { ssr: false });
 
+import { SettingRow, SettingsGroup } from "./SettingsPrimitives";
+import { ThemeModeChoices } from "./ThemeModeChoices";
+
 import { Check } from "lucide-react";
 import { useTheme } from "next-themes";
-import type { ReactNode } from "react";
 
 import { AppSelect } from "@/components/ui/AppSelect";
 import { AppNumberInput } from "@/components/ui/AppNumberInput";
 import { AppSliderWithInput } from "@/components/ui/AppSliderWithInput";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
-import { getModelKey } from "@/lib/chat/helpers";
+import { ModelSelect } from "../ModelSelect";
+import { isImageGenerationModel } from "@/lib/chat/image-models";
 import { SPEECH_VOICES, SYSTEM_SPEECH_VOICE } from "@/lib/chat/speech-voices";
 import type { CodeTheme, PrimaryColor } from "@/lib/settings";
 import { cn } from "@/lib/utils";
@@ -48,28 +51,6 @@ const codeThemes: Array<{ id: CodeTheme; label: string }> = [
   ...CODE_THEMES,
 ];
 
-function SettingRow({
-  children,
-  description,
-  title,
-}: {
-  children: ReactNode;
-  description?: string;
-  title: string;
-}) {
-  return (
-    <div className="flex flex-col gap-3 border-b border-gray-100 py-4 last:border-0 dark:border-white/[0.07] sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0 pr-4">
-        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{title}</div>
-        {description && (
-          <div className="mt-1 text-xs leading-relaxed text-gray-400">{description}</div>
-        )}
-      </div>
-      <div className="shrink-0">{children}</div>
-    </div>
-  );
-}
-
 export function AppearanceSettings() {
   const general = useSettingsStore((state) => state.general);
   const update = useSettingsStore((state) => state.updateGeneral);
@@ -77,142 +58,139 @@ export function AppearanceSettings() {
 
   return (
     <div>
-      <SettingRow description="可跟随操作系统自动切换" title="主题模式">
-        <AppSelect
-          onChange={(value) => {
-            if (typeof value !== "string") return;
-            const themeMode = value as typeof general.themeMode;
-            update({ themeMode });
-            setTheme(themeMode);
-          }}
-          options={[
-            { label: "跟随系统", value: "system" },
-            { label: "亮色", value: "light" },
-            { label: "暗色", value: "dark" },
-          ]}
-          value={general.themeMode}
-        />
-      </SettingRow>
-      <SettingRow description="用于按钮、链接和交互高亮" title="主题色">
-        <div className="flex flex-wrap justify-end gap-2">
-          {primaryColors.map((item) => (
-            <button
-              aria-label={item.label}
-              className={cn(
-                "flex h-7 w-7 items-center justify-center rounded-full ring-offset-2 ring-offset-white transition-transform hover:scale-110 dark:ring-offset-gray-900",
-                general.primaryColor === item.id && "ring-2 ring-gray-400 dark:ring-gray-500",
-              )}
-              key={item.id}
-              onClick={() => update({ primaryColor: item.id })}
-              style={{ backgroundColor: item.color }}
-              title={item.label}
-              type="button"
-            >
-              {general.primaryColor === item.id && <Check className="text-white" size={14} />}
-            </button>
-          ))}
+      <SettingsGroup title="界面外观">
+        <SettingRow description="可跟随操作系统自动切换" title="主题模式">
+          <ThemeModeChoices
+            value={general.themeMode}
+            onChange={(themeMode) => {
+              update({ themeMode });
+              setTheme(themeMode);
+            }}
+          />
+        </SettingRow>
+        <SettingRow description="用于按钮、链接和交互高亮" title="主题色">
+          <div className="flex flex-wrap justify-end gap-2">
+            {primaryColors.map((item) => (
+              <button
+                aria-label={item.label}
+                className={cn(
+                  "flex h-9 w-9 items-center justify-center rounded-full ring-offset-2 ring-offset-white transition-transform hover:scale-110 dark:ring-offset-gray-900",
+                  general.primaryColor === item.id && "ring-2 ring-gray-400 dark:ring-gray-500",
+                )}
+                key={item.id}
+                onClick={() => update({ primaryColor: item.id })}
+                style={{ backgroundColor: item.color }}
+                data-markai-tooltip={item.label}
+                type="button"
+              >
+                {general.primaryColor === item.id && <Check className="text-white" size={14} />}
+              </button>
+            ))}
+          </div>
+        </SettingRow>
+        <SettingRow description="影响 AI 回复正文，不影响导航栏" title="对话字号">
+          <AppSliderWithInput
+            max={20}
+            min={12}
+            onChange={(value) => update({ chatFontSize: Number(value) })}
+            style={{ width: 240 }}
+            value={general.chatFontSize}
+          />
+        </SettingRow>
+        <SettingRow title="界面密度">
+          <AppSelect
+            onChange={(value) => {
+              if (typeof value === "string") update({ density: value as typeof general.density });
+            }}
+            options={[
+              { label: "紧凑", value: "compact" },
+              { label: "默认", value: "comfortable" },
+              { label: "宽松", value: "spacious" },
+            ]}
+            value={general.density}
+          />
+        </SettingRow>
+        <SettingRow description="关闭大部分装饰性动画" title="减少动画">
+          <ToggleSwitch
+            checked={general.reduceMotion}
+            onChange={(reduceMotion) => update({ reduceMotion })}
+          />
+        </SettingRow>
+      </SettingsGroup>
+      <SettingsGroup title="代码与图表" description="预览与对话中的显示效果同步更新">
+        <SettingRow description="下方预览与对话代码块同步更新" title="代码高亮主题">
+          <AppSelect
+            aria-label="代码高亮主题"
+            onChange={(value) => {
+              if (typeof value === "string") update({ codeTheme: value as CodeTheme });
+            }}
+            options={codeThemes.map((item) => ({ label: item.label, value: item.id }))}
+            value={general.codeTheme}
+          />
+        </SettingRow>
+        <div className="py-4">
+          <CodeThemePreview />
         </div>
-      </SettingRow>
-      <SettingRow description="影响 AI 回复正文，不影响导航栏" title="对话字号">
-        <AppSliderWithInput
-          max={20}
-          min={12}
-          onChange={(value) => update({ chatFontSize: Number(value) })}
-          style={{ width: 240 }}
-          value={general.chatFontSize}
-        />
-      </SettingRow>
-      <SettingRow title="界面密度">
-        <AppSelect
-          onChange={(value) => {
-            if (typeof value === "string") update({ density: value as typeof general.density });
-          }}
-          options={[
-            { label: "紧凑", value: "compact" },
-            { label: "默认", value: "comfortable" },
-            { label: "宽松", value: "spacious" },
-          ]}
-          value={general.density}
-        />
-      </SettingRow>
-      <SettingRow description="关闭大部分装饰性动画" title="减少动画">
-        <ToggleSwitch
-          checked={general.reduceMotion}
-          onChange={(reduceMotion) => update({ reduceMotion })}
-        />
-      </SettingRow>
-      <SettingRow description="下方预览与对话代码块同步更新" title="代码高亮主题">
-        <AppSelect
-          aria-label="代码高亮主题"
-          onChange={(value) => {
-            if (typeof value === "string") update({ codeTheme: value as CodeTheme });
-          }}
-          options={codeThemes.map((item) => ({ label: item.label, value: item.id }))}
-          value={general.codeTheme}
-        />
-      </SettingRow>
-      <div className="py-4">
-        <CodeThemePreview />
-      </div>
-      <SettingRow
-        description="适用于 One、VS Code 等自适应主题；其他主题使用各自的明暗配色"
-        title="代码块明暗模式"
-      >
-        <AppSelect
-          disabled={
-            !["one", "vscode", "material", "gruvbox", "solarized", "github", "duotone"].includes(
-              general.codeTheme,
-            )
-          }
-          onChange={(value) => {
-            if (typeof value === "string") {
-              update({ codeColorMode: value as typeof general.codeColorMode });
+        <SettingRow
+          description="适用于 One、VS Code 等自适应主题；其他主题使用各自的明暗配色"
+          title="代码块明暗模式"
+        >
+          <AppSelect
+            disabled={
+              !["one", "vscode", "material", "gruvbox", "solarized", "github", "duotone"].includes(
+                general.codeTheme,
+              )
             }
-          }}
-          options={[
-            { label: "跟随界面", value: "auto" },
-            { label: "固定亮色", value: "light" },
-            { label: "固定暗色", value: "dark" },
-          ]}
-          value={general.codeColorMode}
-        />
-      </SettingRow>
-      <SettingRow title="显示代码行号">
-        <ToggleSwitch
-          checked={general.codeLineNumbers}
-          onChange={(codeLineNumbers) => update({ codeLineNumbers })}
-        />
-      </SettingRow>
-      <SettingRow title="代码自动换行">
-        <ToggleSwitch checked={general.codeWrap} onChange={(codeWrap) => update({ codeWrap })} />
-      </SettingRow>
-      <SettingRow description="设为 0 表示永不自动折叠" title="长代码折叠阈值">
-        <AppNumberInput
-          max={100}
-          min={0}
-          onChange={(value) => update({ codeCollapseLines: Number(value) })}
-          style={{ width: 100 }}
-          value={general.codeCollapseLines}
-        />
-      </SettingRow>
-      <SettingRow title="Mermaid 图表主题" description="应用于流程图、时序图、脑图及导出图片">
-        <AppSelect
-          aria-label="Mermaid 图表主题"
-          value={general.mermaidTheme}
-          onChange={(value) => update({ mermaidTheme: value as MermaidTheme })}
-          options={[
-            { label: "跟随界面", value: "auto" },
-            ...Object.keys(MERMAID_PALETTES).map((id) => ({
-              value: id,
-              label: id
-                .split("-")
-                .map((word) => word[0].toUpperCase() + word.slice(1))
-                .join(" "),
-            })),
-          ]}
-        />
-      </SettingRow>
-      <DiagramThemePreview />
+            onChange={(value) => {
+              if (typeof value === "string") {
+                update({ codeColorMode: value as typeof general.codeColorMode });
+              }
+            }}
+            options={[
+              { label: "跟随界面", value: "auto" },
+              { label: "固定亮色", value: "light" },
+              { label: "固定暗色", value: "dark" },
+            ]}
+            value={general.codeColorMode}
+          />
+        </SettingRow>
+        <SettingRow title="显示代码行号">
+          <ToggleSwitch
+            checked={general.codeLineNumbers}
+            onChange={(codeLineNumbers) => update({ codeLineNumbers })}
+          />
+        </SettingRow>
+        <SettingRow title="代码自动换行">
+          <ToggleSwitch checked={general.codeWrap} onChange={(codeWrap) => update({ codeWrap })} />
+        </SettingRow>
+        <SettingRow description="设为 0 表示永不自动折叠" title="长代码折叠阈值">
+          <AppNumberInput
+            max={100}
+            min={0}
+            onChange={(value) => update({ codeCollapseLines: Number(value) })}
+            style={{ width: 100 }}
+            value={general.codeCollapseLines}
+          />
+        </SettingRow>
+        <SettingRow title="Mermaid 图表主题" description="应用于流程图、时序图、脑图及导出图片">
+          <AppSelect
+            aria-label="Mermaid 图表主题"
+            value={general.mermaidTheme}
+            onChange={(value) => update({ mermaidTheme: value as MermaidTheme })}
+            options={[
+              { label: "跟随界面", value: "auto" },
+              ...Object.keys(MERMAID_PALETTES).map((id) => ({
+                value: id,
+                label: id
+                  .split("-")
+                  .map((word) => word[0].toUpperCase() + word.slice(1))
+                  .join(" "),
+              })),
+            ]}
+          />
+        </SettingRow>
+        <DiagramThemePreview />
+      </SettingsGroup>
     </div>
   );
 }
@@ -220,11 +198,9 @@ export function AppearanceSettings() {
 export function ChatSettings() {
   const general = useSettingsStore((state) => state.general);
   const update = useSettingsStore((state) => state.updateGeneral);
-  const availableModels = useUIStore((state) => state.availableModels);
-  const providerNames = useUIStore((state) => state.providerNames);
 
   return (
-    <div>
+    <SettingsGroup title="对话行为">
       <SettingRow title="流式输出自动滚动">
         <ToggleSwitch
           checked={general.autoScroll}
@@ -273,60 +249,10 @@ export function ChatSettings() {
           onChange={(showMessageStats) => update({ showMessageStats })}
         />
       </SettingRow>
-      <SettingRow
-        description="系统默认由服务端配置；也可以跟随消息或固定到指定模型"
-        title="翻译模型"
-      >
-        <AppSelect
-          onChange={(value) => {
-            if (typeof value === "string") update({ translationModelKey: value });
-          }}
-          options={[
-            { label: "系统默认", value: "__system__" },
-            { label: "跟随消息模型", value: "" },
-            ...availableModels.map((model) => ({
-              label: `${model.id} · ${providerNames[model.provider] || model.provider}`,
-              value: getModelKey(model),
-            })),
-          ]}
-          value={general.translationModelKey}
-        />
-      </SettingRow>
       <SettingRow title="默认启用联网搜索">
         <ToggleSwitch
           checked={general.defaultWebSearch}
           onChange={(defaultWebSearch) => update({ defaultWebSearch })}
-        />
-      </SettingRow>
-      <SettingRow title="发送快捷键">
-        <AppSelect
-          onChange={(value) => {
-            if (typeof value === "string") {
-              update({ sendShortcut: value as typeof general.sendShortcut });
-            }
-          }}
-          options={[
-            { label: "Enter 发送", value: "enter" },
-            { label: "Ctrl / Cmd + Enter", value: "mod-enter" },
-          ]}
-          value={general.sendShortcut}
-        />
-      </SettingRow>
-      <SettingRow description="Windows 和 Linux 使用 Ctrl，macOS 使用 Cmd" title="命令中心快捷键">
-        <AppSelect
-          onChange={(value) => {
-            if (typeof value === "string") {
-              update({
-                commandCenterShortcut: value as typeof general.commandCenterShortcut,
-              });
-            }
-          }}
-          options={[
-            { label: "Ctrl / Cmd + K", value: "mod-k" },
-            { label: "Ctrl / Cmd + Shift + K", value: "mod-shift-k" },
-            { label: "Ctrl / Cmd + /", value: "mod-slash" },
-          ]}
-          value={general.commandCenterShortcut}
         />
       </SettingRow>
       <SettingRow title="默认宽屏对话">
@@ -335,7 +261,7 @@ export function ChatSettings() {
           onChange={(wideChatMode) => update({ wideChatMode })}
         />
       </SettingRow>
-    </div>
+    </SettingsGroup>
   );
 }
 
@@ -344,7 +270,7 @@ export function SpeechSettings() {
   const update = useSettingsStore((state) => state.updateSpeech);
 
   return (
-    <div>
+    <SettingsGroup title="语音朗读">
       <SettingRow description="用于消息语音朗读，修改后会自动保存" title="默认音色">
         <AppSelect
           classNames={{ item: "min-h-9", list: "max-h-[min(480px,var(--available-height))]" }}
@@ -362,6 +288,88 @@ export function SpeechSettings() {
           value={speech.voice}
         />
       </SettingRow>
-    </div>
+    </SettingsGroup>
+  );
+}
+
+export function ServiceModelSettings() {
+  const general = useSettingsStore((state) => state.general);
+  const update = useSettingsStore((state) => state.updateGeneral);
+  const availableModels = useUIStore((state) => state.availableModels);
+  const providerNames = useUIStore((state) => state.providerNames);
+  const loading = useUIStore((state) => state.isLoadingModels);
+  return (
+    <SettingsGroup title="辅助模型" description="用于对话之外的辅助任务，不会替换当前聊天模型。">
+      <SettingRow
+        description="系统默认由服务端配置；也可以跟随消息或固定到指定模型"
+        title="翻译模型"
+      >
+        <ModelSelect
+          label="翻译模型"
+          value={general.translationModelKey}
+          onChange={(translationModelKey) => update({ translationModelKey })}
+          models={availableModels.filter((model) => !isImageGenerationModel(model.id))}
+          providerNames={providerNames}
+          loading={loading}
+          options={[
+            { key: "__system__", label: "系统默认", description: "使用服务端配置的翻译模型" },
+            { key: "", label: "跟随消息模型", description: "使用生成原消息的模型" },
+          ]}
+        />
+      </SettingRow>
+    </SettingsGroup>
+  );
+}
+
+export function HotkeySettings() {
+  const general = useSettingsStore((state) => state.general);
+  const update = useSettingsStore((state) => state.updateGeneral);
+  return (
+    <>
+      <SettingsGroup title="自定义快捷键">
+        <SettingRow title="发送快捷键">
+          <AppSelect
+            onChange={(value) => {
+              if (typeof value === "string") {
+                update({ sendShortcut: value as typeof general.sendShortcut });
+              }
+            }}
+            options={[
+              { label: "Enter 发送", value: "enter" },
+              { label: "Ctrl / Cmd + Enter", value: "mod-enter" },
+            ]}
+            value={general.sendShortcut}
+          />
+        </SettingRow>
+        <SettingRow description="Windows 和 Linux 使用 Ctrl，macOS 使用 Cmd" title="命令中心快捷键">
+          <AppSelect
+            onChange={(value) => {
+              if (typeof value === "string") {
+                update({
+                  commandCenterShortcut: value as typeof general.commandCenterShortcut,
+                });
+              }
+            }}
+            options={[
+              { label: "Ctrl / Cmd + K", value: "mod-k" },
+              { label: "Ctrl / Cmd + Shift + K", value: "mod-shift-k" },
+              { label: "Ctrl / Cmd + /", value: "mod-slash" },
+            ]}
+            value={general.commandCenterShortcut}
+          />
+        </SettingRow>
+      </SettingsGroup>
+      <SettingsGroup title="基础操作">
+        <SettingRow title="输入换行">
+          <kbd className="text-xs text-gray-500">Shift + Enter</kbd>
+        </SettingRow>
+        <SettingRow title="关闭弹窗">
+          <kbd className="text-xs text-gray-500">Esc</kbd>
+        </SettingRow>
+        <SettingRow title="移动焦点">
+          <kbd className="text-xs text-gray-500">Tab / Shift + Tab</kbd>
+        </SettingRow>
+      </SettingsGroup>
+    </>
   );
 }

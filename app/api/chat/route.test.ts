@@ -108,3 +108,25 @@ it("never reads private configuration or starts inference for an unauthorized us
   expect(mocks.tools).not.toHaveBeenCalled();
   expect(mocks.stream).not.toHaveBeenCalled();
 });
+
+it("passes opt-in personalization without adding a settings database read", async () => {
+  const languageModel = {
+    personalizationEnabled: true,
+    preferredName: "小王",
+    responseLength: "concise",
+  };
+  const response = await POST(
+    new NextRequest("https://example.com/api/chat", {
+      method: "POST",
+      body: JSON.stringify({
+        messages: [{ role: "user", content: "你好" }],
+        model: "test",
+        provider: "test",
+        sessionId: "s",
+        languageModel,
+      }),
+    }),
+  );
+  expect(response.status).toBe(200);
+  expect(mocks.stream.mock.calls[0][11]).toEqual(languageModel);
+});

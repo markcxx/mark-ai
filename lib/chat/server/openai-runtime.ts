@@ -60,6 +60,7 @@ export const createOpenAICompatibleStream = async (
   },
   thinking?: { policy?: ThinkingPolicy; enabled?: boolean },
   requestTransport: typeof fetchWithDevelopmentProxy = fetchWithDevelopmentProxy,
+  personalization?: unknown,
 ) => {
   const thinkingActive = thinking?.enabled ?? thinking?.policy?.defaultEnabled;
   const preserveReasoning = Boolean(thinking?.policy && thinkingActive);
@@ -74,6 +75,7 @@ export const createOpenAICompatibleStream = async (
     ? Math.min(18_000, Math.max(2000, Math.floor(contextPreparation.inputBudgetTokens * 0.4)))
     : 18_000;
   const openAIMessages = toOpenAIMessages({
+    personalization,
     messages,
     preserveReasoning,
     skillPrompt: toolRuntime?.skillPrompt,

@@ -48,12 +48,14 @@ export const isUnsupportedStreamUsageError = (status: number, detail: string) =>
   );
 
 export const toOpenAIMessages = ({
+  personalization,
   messages,
   preserveReasoning = false,
   skillPrompt,
   timezone,
   webSearchEnabled,
 }: {
+  personalization?: unknown;
   messages: ChatMessage[];
   preserveReasoning?: boolean;
   skillPrompt?: string;
@@ -84,7 +86,7 @@ export const toOpenAIMessages = ({
 
   return [
     {
-      content: getRuntimeSystemPrompt({ skillPrompt, timezone, webSearchEnabled }),
+      content: getRuntimeSystemPrompt({ skillPrompt, timezone, webSearchEnabled, personalization }),
       role: "system",
     },
     ...openAIMessages,

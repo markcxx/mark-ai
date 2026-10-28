@@ -108,7 +108,7 @@ export function ChatMiniMap({
       >
         <div
           className={cn(
-            "flex max-h-[50vh] flex-col items-end overflow-y-auto transition-opacity duration-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+            "flex max-h-[50vh] flex-col items-end overflow-y-auto transition-opacity duration-200",
             hovered && "pointer-events-none opacity-0",
           )}
           role="group"
@@ -144,7 +144,7 @@ export function ChatMiniMap({
             hovered && "pointer-events-auto scale-100 opacity-100",
           )}
         >
-          <div className="flex max-h-[60vh] w-full flex-col gap-0.5 overflow-y-auto p-1 [scrollbar-width:thin]">
+          <div className="flex max-h-[60vh] w-full flex-col gap-0.5 overflow-y-auto p-1">
             {items.map((item, position) => {
               const active = activePosition === position;
 

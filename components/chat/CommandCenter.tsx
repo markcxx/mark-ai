@@ -1,5 +1,7 @@
 "use client";
 
+import { useOpenSettings } from "@/hooks/useOpenSettings";
+
 import {
   Expand,
   FileText,
@@ -32,6 +34,7 @@ export function CommandCenter({
   onFocusComposer: () => void;
   onNewChat: () => void;
 }) {
+  const openSettings = useOpenSettings();
   const open = useUIStore((state) => state.commandCenterOpen);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -109,10 +112,10 @@ export function CommandCenter({
         id: "settings",
         keywords: "设置 偏好 settings",
         label: "打开设置",
-        onSelect: () => useUIStore.getState().setSettingsOpen(true),
+        onSelect: () => openSettings(),
       },
     ],
-    [onFocusComposer, onNewChat],
+    [onFocusComposer, onNewChat, openSettings],
   );
 
   const filteredCommands = useMemo(() => {

@@ -16,6 +16,7 @@ export async function GET() {
       fullName: users.fullName,
       profileCompleted: users.profileCompleted,
       role: users.role,
+      username: users.username,
     })
     .from(users)
     .where(eq(users.id, userId))

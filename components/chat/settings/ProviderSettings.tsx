@@ -13,9 +13,10 @@ import {
   Brain,
   Video,
 } from "lucide-react";
-import Image from "@/components/ui/AppImage";
+import { SettingsSplitView } from "./SettingsSplitView";
+import { ProviderCard, ProviderWordmark } from "./ProviderCard";
 import { ModelDiscoveryDialog } from "./ModelDiscoveryDialog";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { AppInput, AppPasswordInput, AppTextArea } from "@/components/ui/AppInput";
 import { AppSelect } from "@/components/ui/AppSelect";
@@ -67,40 +68,6 @@ type ProviderForm = {
   provider: string;
   runtime: ModelRuntime;
 };
-
-function ProviderLogo({
-  disabled = false,
-  name,
-  provider,
-}: {
-  disabled?: boolean;
-  name: string;
-  provider: string;
-}) {
-  if (provider === "markai") {
-    return (
-      <div
-        className={cn(
-          "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/5",
-          disabled && "opacity-45",
-        )}
-      >
-        <Image alt="MarkAI" height={28} src="/images/markai.svg" width={28} />
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={cn(
-        "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-800 dark:bg-white/[0.06] dark:text-gray-100",
-        disabled && "opacity-45",
-      )}
-    >
-      <ProviderBrandIcon colorful className="text-sm" name={name} provider={provider} size={23} />
-    </div>
-  );
-}
 
 const readResponse = async (response: Response) => {
   const text = await response.text();
@@ -278,6 +245,7 @@ export function ProviderSettings() {
 
   const [discovering, setDiscovering] = useState(false);
   const [discovered, setDiscovered] = useState<string[] | null>(null);
+  const detailScroll = useRef<HTMLElement>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [modelQuery, setModelQuery] = useState("");
@@ -290,7 +258,10 @@ export function ProviderSettings() {
       .map((item) => ({
         id: item.provider,
         name: item.name,
-        description: "由管理员配置的模型服务，可直接使用已提供的模型。",
+        description:
+          item.provider === "markai"
+            ? "MarkAI 为你提供统一的模型服务，无需单独配置密钥即可开始对话。可用模型由站点管理员维护。"
+            : "由站点管理员配置的模型服务，可直接使用已提供的模型，也可以添加个人配置。",
       })),
     ...providers
       .filter(
@@ -304,18 +275,21 @@ export function ProviderSettings() {
         name: item.name,
         description: "个人添加的模型服务。",
       })),
-  ].map((item) => {
-    const configured = providerMap.get(item.id);
-    const site = siteProviderMap.get(item.id);
-    const personal = Boolean(configured?.hasApiKey && configured.models.length);
-    return {
-      ...item,
-      name: configured?.name || item.name,
-      enabled: configured?.enabled !== false && (personal || Boolean(site)),
-      models: personal ? configured!.models : site?.models || [],
-      personal,
-    };
-  });
+  ]
+    .map((item) => {
+      const configured = providerMap.get(item.id);
+      const site = siteProviderMap.get(item.id);
+      const personal = Boolean(configured?.hasApiKey && configured.models.length);
+      return {
+        ...item,
+        name: configured?.name || item.name,
+        enabled: configured?.enabled !== false && (personal || Boolean(site)),
+        models: personal ? configured!.models : site?.models || [],
+        personal,
+        custom: Boolean(configured?.isCustom),
+      };
+    })
+    .sort((a, b) => (a.id === "markai" ? -1 : b.id === "markai" ? 1 : 0));
   const filteredEntries = entries.filter((item) =>
     `${item.name} ${item.id}`.toLowerCase().includes(query.trim().toLowerCase()),
   );
@@ -345,6 +319,7 @@ export function ProviderSettings() {
   const currentPage = Math.min(page, pages);
   const currentProvider = form ? providerMap.get(form.provider) : undefined;
   const openProvider = (id: string) => {
+    detailScroll.current?.scrollTo({ top: 0 });
     setSelected(id);
     setPage(1);
     setModelQuery("");
@@ -408,87 +383,87 @@ export function ProviderSettings() {
   const detail = selected !== null || form !== null;
   const controlClass = "w-full lg:max-w-[360px]";
   const rowClass =
-    "grid gap-3 py-5 lg:grid-cols-[minmax(140px,1fr)_minmax(220px,1fr)] lg:items-center lg:gap-8";
+    "grid gap-3 border-b border-gray-100 py-4 last:border-0 dark:border-white/[0.07] lg:grid-cols-[minmax(140px,1fr)_minmax(220px,1fr)] lg:items-center lg:gap-8";
   const buttonClass =
     "rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium transition-colors hover:bg-gray-50 disabled:opacity-40 dark:border-white/10 dark:hover:bg-white/5";
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col md:flex-row text-gray-900 dark:text-gray-100">
-      <aside
-        className={cn(
-          "max-h-52 w-full shrink-0 overflow-y-auto border-r md:max-h-none border-gray-100 bg-gray-50/40 dark:border-white/[0.07] dark:bg-white/[0.015] md:w-52",
-          detail && "hidden md:block",
-        )}
-      >
-        <div className="sticky top-0 z-10 flex items-center gap-1 border-b border-gray-100 bg-[var(--chat-panel-bg)] p-3 dark:border-white/[0.07]">
-          <AppInput
-            aria-label="搜索提供商"
-            placeholder="搜索提供商…"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            className="min-w-0 text-xs"
-          />
-          <IconButton
-            aria-label="添加提供商"
-            data-markai-tooltip="添加提供商"
-            size="sm"
-            disabled={!cloudPersistence || saving || loading || loadError}
-            onClick={addProvider}
-          >
-            <Plus size={17} />
-          </IconButton>
-        </div>
-        <nav aria-label="提供商目录" className="space-y-1 p-2">
-          <button
-            type="button"
-            onClick={overview}
-            disabled={saving || discovering}
-            className={cn(
-              "flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm",
-              !detail && "bg-gray-100 font-medium dark:bg-white/[0.07]",
-            )}
-          >
-            <LayoutGrid size={17} />
-            全部<span className="ml-auto text-xs text-gray-400">{entries.length}</span>
-          </button>
-          {[true, false].map((enabled) => (
-            <div key={String(enabled)}>
-              <div className="px-3 pb-2 pt-5 text-xs text-gray-400">
-                {enabled ? "已启用" : "未启用"} ·{" "}
-                {filteredEntries.filter((item) => item.enabled === enabled).length}
-              </div>
-              {filteredEntries
-                .filter((item) => item.enabled === enabled)
-                .map((item) => (
-                  <button
-                    type="button"
-                    key={item.id}
-                    disabled={saving || discovering}
-                    aria-current={selected === item.id ? "page" : undefined}
-                    onClick={() => openProvider(item.id)}
-                    className={cn(
-                      "flex w-full min-w-0 items-center gap-2.5 rounded-lg px-3 py-3 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/5",
-                      selected === item.id && "bg-gray-100 dark:bg-white/[0.07]",
-                    )}
-                  >
-                    <ProviderBrandIcon colorful name={item.name} provider={item.id} size={20} />
-                    <span className="min-w-0 flex-1 truncate">{item.name}</span>
-                    <span
-                      aria-label={item.enabled ? "已启用" : "未启用"}
-                      className={cn(
-                        "h-1.5 w-1.5 shrink-0 rounded-full",
-                        item.enabled ? "bg-emerald-500" : "bg-gray-300 dark:bg-gray-600",
-                      )}
-                    />
-                  </button>
-                ))}
+    <>
+      <SettingsSplitView
+        contentRef={detailScroll}
+        showDetail={detail}
+        sidebar={
+          <>
+            <div className="sticky top-0 z-10 flex items-center gap-1 border-b border-gray-100 bg-[var(--chat-panel-bg)] p-2 dark:border-white/[0.07]">
+              <AppInput
+                aria-label="搜索提供商"
+                placeholder="搜索提供商…"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                className="min-w-0 border-transparent bg-transparent text-sm"
+              />
+              <IconButton
+                aria-label="添加提供商"
+                data-markai-tooltip="添加提供商"
+                size="sm"
+                disabled={!cloudPersistence || saving || loading || loadError}
+                onClick={addProvider}
+              >
+                <Plus size={17} />
+              </IconButton>
             </div>
-          ))}
-          {!filteredEntries.length && (
-            <p className="px-3 py-8 text-center text-xs text-gray-400">没有匹配的提供商</p>
-          )}
-        </nav>
-      </aside>
-      <section className="min-w-0 flex-1 overflow-y-auto px-5 py-5 lg:px-8">
+            <nav aria-label="提供商目录" className="space-y-1 p-2">
+              <button
+                type="button"
+                onClick={overview}
+                disabled={saving || discovering}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm",
+                  !detail && "bg-gray-100 dark:bg-white/[0.07]",
+                )}
+              >
+                <LayoutGrid size={17} />
+                全部<span className="ml-auto text-xs text-gray-400">{entries.length}</span>
+              </button>
+              {[true, false].map((enabled) => (
+                <div key={String(enabled)}>
+                  <div className="px-3 pb-2 pt-5 text-xs text-gray-400">
+                    {enabled ? "已启用" : "未启用"} ·{" "}
+                    {filteredEntries.filter((item) => item.enabled === enabled).length}
+                  </div>
+                  {filteredEntries
+                    .filter((item) => item.enabled === enabled)
+                    .map((item) => (
+                      <button
+                        type="button"
+                        key={item.id}
+                        disabled={saving || discovering}
+                        aria-current={selected === item.id ? "page" : undefined}
+                        onClick={() => openProvider(item.id)}
+                        className={cn(
+                          "flex w-full min-w-0 items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-white/5",
+                          selected === item.id && "bg-gray-100 dark:bg-white/[0.07]",
+                        )}
+                      >
+                        <ProviderBrandIcon colorful name={item.name} provider={item.id} size={18} />
+                        <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                        <span
+                          aria-label={item.enabled ? "已启用" : "未启用"}
+                          className={cn(
+                            "h-1.5 w-1.5 shrink-0 rounded-full",
+                            item.enabled ? "bg-emerald-500" : "bg-gray-300 dark:bg-gray-600",
+                          )}
+                        />
+                      </button>
+                    ))}
+                </div>
+              ))}
+              {!filteredEntries.length && (
+                <p className="px-3 py-8 text-center text-xs text-gray-400">没有匹配的提供商</p>
+              )}
+            </nav>
+          </>
+        }
+      >
         {!cloudPersistence && (
           <p className="mb-5 rounded-lg bg-gray-50 p-3 text-xs leading-6 text-gray-500 dark:bg-white/5">
             当前可使用管理员预置模型。登录云端模式后，可保存个人提供商配置。
@@ -522,55 +497,41 @@ export function ProviderSettings() {
           </div>
         ) : !detail ? (
           <>
-            {[true, false].map((enabled) => {
-              const group = filteredEntries.filter((item) => item.enabled === enabled);
-              if (!group.length) return null;
+            {(["enabled", "custom", "disabled"] as const).map((category) => {
+              const group = filteredEntries.filter((item) =>
+                category === "enabled"
+                  ? item.enabled
+                  : category === "custom"
+                    ? !item.enabled && item.custom
+                    : !item.enabled && !item.custom,
+              );
+              if (!group.length && category !== "enabled") return null;
               return (
-                <div className="mb-8" key={String(enabled)}>
-                  <h3 className="mb-5 flex items-center gap-2 text-base font-semibold">
-                    {enabled ? "已启用提供商" : "未启用提供商"}
+                <div className="mb-9" key={category}>
+                  <h3 className="mb-6 flex items-center gap-2 text-lg font-semibold">
+                    {category === "enabled"
+                      ? "已启用的 AI 服务商"
+                      : category === "custom"
+                        ? "自定义 AI 服务商"
+                        : "未启用的 AI 服务商"}
                     <span className="rounded-md bg-gray-100 px-2 py-0.5 text-xs font-normal text-gray-500 dark:bg-white/5">
                       {group.length}
                     </span>
                   </h3>
-                  <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,260px),1fr))] gap-4">
                     {group.map((item) => (
-                      <article
+                      <ProviderCard
                         key={item.id}
-                        className="flex min-w-0 flex-col rounded-xl border border-gray-200 dark:border-white/10"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => openProvider(item.id)}
-                          className="flex flex-1 flex-col p-5 text-left transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.025]"
-                        >
-                          <div className="mb-4 flex w-full min-w-0 items-center gap-3">
-                            <ProviderLogo name={item.name} provider={item.id} />
-                            <span className="truncate text-base font-semibold">{item.name}</span>
-                          </div>
-                          <p className="line-clamp-2 min-h-10 text-xs leading-5 text-gray-500 dark:text-gray-400">
-                            {item.description}
-                          </p>
-                        </button>
-                        <div className="mx-5 flex items-center justify-between gap-2 border-t border-gray-100 py-3 dark:border-white/[0.07]">
-                          <span className="text-xs text-gray-400">
-                            {item.models.length} 个模型 ·{" "}
-                            {item.personal
-                              ? "个人配置"
-                              : siteProviderMap.has(item.id)
-                                ? "站点配置"
-                                : "待配置"}
-                          </span>
-                          <ToggleSwitch
-                            aria-label={`启用 ${item.name}`}
-                            checked={item.enabled}
-                            disabled={
-                              !cloudPersistence || togglingProvider !== null || loading || loadError
-                            }
-                            onChange={(value) => changeEnabled(item.id, value)}
-                          />
-                        </div>
-                      </article>
+                        id={item.id}
+                        name={item.name}
+                        description={item.description}
+                        enabled={item.enabled}
+                        disabled={
+                          !cloudPersistence || togglingProvider !== null || loading || loadError
+                        }
+                        onSelect={() => openProvider(item.id)}
+                        onToggle={(value) => changeEnabled(item.id, value)}
+                      />
                     ))}
                   </div>
                 </div>
@@ -591,13 +552,13 @@ export function ProviderSettings() {
               >
                 <ArrowLeft size={18} />
               </IconButton>
-              <ProviderLogo
-                name={form?.name || active?.name || "提供商"}
-                provider={form?.provider || selected || ""}
-              />
-              <h3 className="min-w-0 flex-1 truncate text-lg font-semibold">
-                {form?.name || active?.name || "添加提供商"}
-              </h3>
+              <div className="min-w-0 flex-1">
+                <ProviderWordmark
+                  large
+                  name={form?.name || active?.name || "添加提供商"}
+                  provider={form?.provider || selected || ""}
+                />
+              </div>
               <ToggleSwitch
                 aria-label="启用此提供商"
                 checked={form ? form.enabled : Boolean(active?.enabled)}
@@ -609,8 +570,15 @@ export function ProviderSettings() {
                 }
               />
             </header>
+            <p className="my-5 text-sm leading-6 text-gray-500">
+              {active?.description ||
+                "配置服务名称、API 地址和访问密钥，将个人模型服务接入 MarkAI。"}
+            </p>
             {form ? (
-              <fieldset disabled={saving || discovering}>
+              <fieldset
+                className="rounded-lg border border-gray-200 px-4 dark:border-white/10"
+                disabled={saving || discovering}
+              >
                 <div className={rowClass}>
                   <label htmlFor="provider-name" className="text-sm font-medium">
                     显示名称
@@ -768,10 +736,14 @@ export function ProviderSettings() {
                       />
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium">
-                          {metadata?.displayName || id}
+                          {metadata?.displayName && metadata.displayName !== id
+                            ? metadata.displayName
+                            : active?.name || form?.name}
                         </div>
                         <div className="mt-1 truncate font-mono text-[11px] text-gray-400">
-                          {id}
+                          {metadata?.displayName && metadata.displayName !== id
+                            ? metadata.displayName
+                            : active?.name || form?.name}
                         </div>
                       </div>
                       <div className="flex shrink-0 items-center gap-2 text-gray-400">
@@ -875,7 +847,7 @@ export function ProviderSettings() {
             )}
           </>
         )}
-      </section>
+      </SettingsSplitView>
       {discovered && (
         <ModelDiscoveryDialog
           models={discovered}
@@ -901,6 +873,6 @@ export function ProviderSettings() {
           overview();
         }}
       />
-    </div>
+    </>
   );
 }

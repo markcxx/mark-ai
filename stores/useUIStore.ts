@@ -30,7 +30,6 @@ interface UIState {
   commandCenterOpen: boolean;
   sessionSearchOpen: boolean;
   fileManagerOpen: boolean;
-  settingsOpen: boolean;
 }
 
 interface UIActions {
@@ -60,7 +59,6 @@ interface UIActions {
   setCommandCenterOpen: (open: boolean) => void;
   setSessionSearchOpen: (open: boolean) => void;
   setFileManagerOpen: (open: boolean) => void;
-  setSettingsOpen: (open: boolean) => void;
 }
 
 export type UIStore = UIState & UIActions;
@@ -98,7 +96,6 @@ export const useUIStore = create<UIStore>()(
     commandCenterOpen: false,
     sessionSearchOpen: false,
     fileManagerOpen: false,
-    settingsOpen: false,
 
     setAppReady: (ready) => set({ isAppReady: ready }),
     setBootProgress: (progress, message) =>
@@ -273,10 +270,6 @@ export const useUIStore = create<UIStore>()(
     setFileManagerOpen: (open) => {
       if (open && isGuestMode()) return requestGuestSignIn();
       set({ fileManagerOpen: open });
-    },
-    setSettingsOpen: (open) => {
-      if (open && isGuestMode()) return requestGuestSignIn();
-      set({ settingsOpen: open });
     },
   })),
 );

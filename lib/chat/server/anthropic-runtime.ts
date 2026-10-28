@@ -19,6 +19,7 @@ export function createAnthropicStream(...args: Parameters<typeof createOpenAICom
     tools,
     thinking,
     createAnthropicTransport({ apiKey, baseUrl }),
+    args[11],
   );
 }
 

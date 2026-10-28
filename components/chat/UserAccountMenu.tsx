@@ -1,5 +1,7 @@
 "use client";
 
+import { useOpenSettings } from "@/hooks/useOpenSettings";
+
 import {
   ChevronUp,
   CircleUserRound,
@@ -18,13 +20,12 @@ import { useUIStore } from "@/stores/useUIStore";
 
 import { FileManagerDrawer } from "./FileManagerDrawer";
 import { ProfileDialog } from "./ProfileDialog";
-import { SettingsDialog } from "./SettingsDialog";
 import type { UserProfile } from "./ProfileDialog";
 
 export function UserAccountMenu() {
   const { data } = useSession();
   const fileManagerOpen = useUIStore((state) => state.fileManagerOpen);
-  const settingsOpen = useUIStore((state) => state.settingsOpen);
+  const openSettings = useOpenSettings();
   const [isAdmin, setIsAdmin] = useState(false);
   const [open, setOpen] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -54,6 +55,12 @@ export function UserAccountMenu() {
         .then((data) => setIsAdmin(!!data?.admin)),
     ]).catch(() => undefined);
   }, [user]);
+
+  useEffect(() => {
+    const refreshProfile = (event: Event) => setProfile((event as CustomEvent<UserProfile>).detail);
+    window.addEventListener("markai:profile-updated", refreshProfile);
+    return () => window.removeEventListener("markai:profile-updated", refreshProfile);
+  }, []);
 
   if (!user) return null;
 
@@ -103,7 +110,7 @@ export function UserAccountMenu() {
                 className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-gray-700 transition-all hover:bg-gray-100 active:scale-[0.98] dark:text-gray-200 dark:hover:bg-white/[0.07]"
                 onClick={() => {
                   setOpen(false);
-                  useUIStore.getState().setSettingsOpen(true);
+                  openSettings();
                 }}
                 type="button"
               >
@@ -186,9 +193,6 @@ export function UserAccountMenu() {
           onProfileUpdated={setProfile}
           profile={profile}
         />
-      )}
-      {settingsOpen && (
-        <SettingsDialog onClose={() => useUIStore.getState().setSettingsOpen(false)} />
       )}
     </>
   );

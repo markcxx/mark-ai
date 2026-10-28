@@ -180,6 +180,7 @@ export async function POST(req: NextRequest) {
       reasoning: retainReasoning && message.role === "model" ? message.reasoning : undefined,
     }));
     const runtimeSystemPrompt = getRuntimeSystemPrompt({
+      personalization: body.languageModel,
       skillPrompt,
       timezone,
       webSearchEnabled: Boolean(webSearchEnabled),
@@ -246,6 +247,8 @@ export async function POST(req: NextRequest) {
               }
             : undefined,
           { policy: thinkingPolicy, enabled: thinkingEnabled },
+          undefined,
+          body.languageModel,
         ),
       );
     }
