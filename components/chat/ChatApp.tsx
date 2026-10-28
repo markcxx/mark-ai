@@ -131,6 +131,7 @@ export default function ChatApp({
   // Session Store
   const sessions = useSessionStore((s) => s.sessions);
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
+  const sessionNavigationTargetId = useSessionStore((s) => s.sessionNavigationTargetId);
   const hasMoreSessions = useSessionStore((s) => s.hasMoreSessions);
   const isLoadingSessions = useSessionStore((s) => s.isLoadingSessions);
   const isLoadingMoreSessions = useSessionStore((s) => s.isLoadingMoreSessions);
@@ -643,7 +644,7 @@ export default function ChatApp({
           />
 
           <Sidebar
-            activeSessionId={activeSessionId}
+            activeSessionId={sessionNavigationTargetId ?? activeSessionId}
             guest={guest}
             onSignIn={requestGuestSignIn}
             hasMoreSessions={hasMoreSessions}

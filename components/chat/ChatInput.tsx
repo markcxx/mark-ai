@@ -20,7 +20,6 @@ import type {
   QueuedChatMessage,
   QuotedSelection,
 } from "@/lib/chat/types";
-import { getModelDisplayName } from "@/lib/chat/helpers";
 import { isImageGenerationModel } from "@/lib/chat/image-models";
 import { cn } from "@/lib/utils";
 import { ComposerMenu } from "./ComposerMenu";
@@ -122,7 +121,10 @@ export function ChatInput({
     const updateHeight = () => {
       panel.style.setProperty("--chat-composer-height", `${composer.offsetHeight}px`);
       if (scrollArea) {
-        panel.style.setProperty("--chat-scrollbar-width", `${scrollArea.offsetWidth - scrollArea.clientWidth}px`);
+        panel.style.setProperty(
+          "--chat-scrollbar-width",
+          `${scrollArea.offsetWidth - scrollArea.clientWidth}px`,
+        );
       }
     };
     updateHeight();
@@ -284,9 +286,7 @@ export function ChatInput({
 
             <div className="flex flex-wrap items-center justify-between gap-y-1 px-2.5 pb-2.5 pt-1 md:px-3 md:pb-3">
               <ComposerMenu
-                attachmentDisabled={
-                  attachmentUploading || attachments.length + uploads.length >= 4
-                }
+                attachmentDisabled={attachmentUploading || attachments.length + uploads.length >= 4}
                 disabled={isLoading}
                 model={selectedModel}
                 onAttachment={onAttachment}
@@ -314,7 +314,10 @@ export function ChatInput({
                     if (availableModels.length > 0) setIsModelDialogOpen((value) => !value);
                   }}
                   ref={modelButtonRef}
-                  title="选择模型"
+                  aria-label={selectedModel ? `选择模型，当前 ${selectedModel.id}` : "选择模型"}
+                  data-markai-tooltip={
+                    selectedModel ? `${selectedModel.id} · ${selectedModel.provider}` : "选择模型"
+                  }
                   type="button"
                 >
                   {selectedModel ? (
@@ -325,9 +328,7 @@ export function ChatInput({
                         size={20}
                       />
                       <span className="hidden max-w-[160px] truncate text-[13px] sm:inline">
-                        {selectedModel.presentation?.displayName ||
-                          selectedModel.metadata?.displayName ||
-                          getModelDisplayName(selectedModel.id)}
+                        {selectedModel.id}
                       </span>
                     </>
                   ) : (

@@ -89,6 +89,24 @@ it("only displays registered images and carries selected assets into a reloaded 
   ).toBe("done");
 });
 
+it.each([[4], [5, 1], [5, 3, 1, 0, 2]])(
+  "preserves the model's selected image count and order: %j",
+  async (...selectedIndexes) => {
+    vi.mocked(readWebpage).mockResolvedValue({
+      ...page(),
+      images: Array.from({ length: 6 }, (_, index) => ({
+        url: `https://images.example.com/${index}.jpg`, title: `配图 ${index}`, sourceUrl: url,
+      })),
+    });
+    const session = new WebToolSession([{ role: "user", content: url }]);
+    const read = await execute(session, "read_webpage", { url });
+    const selected = selectedIndexes.map((index) => read.images![index]);
+    const shown = await execute(session, "show_images", { image_ids: selected.map((image) => image.id) });
+    expect(shown.status).toBe("done");
+    expect(shown.images).toEqual(selected);
+  },
+);
+
 it("preserves cursors and valid bounded JSON under a small model context", () => {
   const excerpt = getPageExcerpt({ ...page(), content: "长内容".repeat(25000) });
   expect(excerpt.content.length).toBeLessThanOrEqual(12000);

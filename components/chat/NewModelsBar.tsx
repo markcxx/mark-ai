@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import type { ConfiguredModel } from "@/lib/chat/types";
-import { getModelDisplayName, getModelKey } from "@/lib/chat/helpers";
+import { getModelKey } from "@/lib/chat/helpers";
 import { getNewModels, getNewModelToken, hasUndismissedModels } from "@/lib/model-presentation";
 import { useModelPresentationTime } from "@/hooks/useModelPresentationTime";
 import { cn } from "@/lib/utils";
@@ -51,14 +51,14 @@ export function NewModelsBar({
       <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {modelsToShow.map((model) => {
           const key = getModelKey(model);
-          const name = model.presentation?.displayName || getModelDisplayName(model.id);
+          const name = model.id;
           return (
             <button
               type="button"
               key={key}
               aria-label={`选择 ${name}（${model.provider}）`}
               aria-pressed={key === selectedModelKey}
-              data-markai-tooltip={model.presentation?.description || `${name} · ${model.provider}`}
+              data-markai-tooltip={`${name} · ${model.provider}`}
               onClick={() => onSelect(key)}
               className={cn(
                 "flex min-h-11 max-w-[220px] shrink-0 items-center gap-2 rounded-lg px-2.5 text-gray-700 transition-colors hover:bg-gray-100 md:min-h-8 dark:text-gray-200 dark:hover:bg-white/[0.06]",

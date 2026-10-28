@@ -15,13 +15,16 @@ export function SessionGroupHeader({
 }) {
   return (
     <button
-      className="mt-1 flex h-7 items-center gap-1 rounded-md px-2 text-left text-xs font-medium text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+      aria-expanded={!collapsed}
+      aria-label={`${label}，${count} 个会话，${collapsed ? "展开" : "收起"}`}
+      className="group flex h-10 items-center gap-1 rounded-lg px-3 text-left text-xs font-medium text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300 md:h-8"
       onClick={onToggle}
       type="button"
     >
-      {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
       <span>{label}</span>
-      <span className="ml-auto tabular-nums">{count}</span>
+      <span className="ml-auto opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-visible:opacity-100">
+        {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+      </span>
     </button>
   );
 }

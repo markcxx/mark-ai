@@ -1,16 +1,7 @@
 "use client";
 
 import type { RefObject } from "react";
-import {
-  CircleAlert,
-  Copy,
-  Hash,
-  MoreHorizontal,
-  PencilLine,
-  Star,
-  Trash2,
-  Wand2,
-} from "lucide-react";
+import { CircleAlert, Copy, MoreHorizontal, PencilLine, Star, Trash2, Wand2 } from "lucide-react";
 
 import { DropdownSurface } from "@/components/ui/DropdownSurface";
 import { IconButton } from "@/components/ui/IconButton";
@@ -63,10 +54,10 @@ export function SessionRow({
     <div className="relative" ref={menuOpen ? menuRef : undefined}>
       <div
         className={cn(
-          "group flex min-h-11 min-w-0 items-center gap-2 overflow-hidden rounded-lg px-1 text-sm transition-colors md:min-h-9",
+          "group flex min-h-11 min-w-0 items-center gap-1 overflow-hidden rounded-xl pl-3 pr-1 text-sm transition-colors md:min-h-10",
           active
-            ? "bg-[#eceef0] text-gray-900 dark:bg-gray-800 dark:text-gray-100"
-            : "text-gray-700 hover:bg-[#f0f1f2] dark:text-gray-300 dark:hover:bg-gray-800/60",
+            ? "bg-gray-200/50 text-gray-900 dark:bg-white/[0.08] dark:text-gray-100"
+            : "text-gray-800 hover:bg-gray-200/40 dark:text-gray-300 dark:hover:bg-white/[0.05]",
         )}
         onClick={onSelect}
         onKeyDown={(event) => {
@@ -78,10 +69,6 @@ export function SessionRow({
         role="button"
         tabIndex={0}
       >
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center text-gray-400">
-          <Hash size={15} />
-        </span>
-
         {editing ? (
           <InlineTextEdit
             className="h-7 min-w-0 flex-1 px-2 text-sm"
@@ -126,8 +113,8 @@ export function SessionRow({
         ) : (
           <IconButton
             className={cn(
-              "opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100",
-              menuOpen && "opacity-100",
+              "h-10 w-10 opacity-100 transition-opacity md:h-7 md:w-7 md:group-hover:opacity-100 md:group-focus-within:opacity-100",
+              !active && !menuOpen && "md:opacity-0 [@media(hover:none)]:opacity-100",
             )}
             onClick={(event) => {
               event.preventDefault();
@@ -136,7 +123,8 @@ export function SessionRow({
             }}
             shape="rounded"
             size="xs"
-            title="更多"
+            aria-label="更多"
+            data-markai-tooltip="更多"
           >
             <MoreHorizontal size={15} />
           </IconButton>
@@ -144,7 +132,7 @@ export function SessionRow({
       </div>
 
       {menuOpen && (
-        <DropdownSurface className="absolute right-1 top-8 min-w-36 rounded-lg border-gray-200 bg-white py-1 text-sm shadow-[0_12px_32px_rgba(0,0,0,0.12)] dark:border-gray-700 dark:bg-gray-800">
+        <DropdownSurface className="absolute right-1 top-full mt-1 min-w-36 rounded-lg border-gray-200 bg-white py-1 text-sm shadow-[0_12px_32px_rgba(0,0,0,0.12)] dark:border-gray-700 dark:bg-gray-800">
           <MenuAction icon={Wand2} label="自动命名" onClick={onAutoRename} />
           <MenuAction icon={PencilLine} label="重命名" onClick={onStartRename} />
           <MenuAction

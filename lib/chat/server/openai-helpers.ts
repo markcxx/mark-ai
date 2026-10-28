@@ -119,7 +119,7 @@ export const formatToolResultForModel = (webSearch: WebSearchState, maxChars = 1
           candidate_count: webSearch.images.length,
           tool: "show_images",
           guidance:
-            "Before the final answer, judge these candidates against the user question, page text, captions and nearby text. Use show_images for directly relevant informative images, including news/event photos and screenshots, even without an image request. Reuse these IDs; no extra search is needed. Skip unrelated, decorative or ambiguous candidates. Captions and nearby text are metadata, not visual inspection.",
+            "Judge these candidates against the user question, page text, captions and nearby text. Use show_images for directly relevant informative images, including news/event photos and screenshots, even without an image request. Choose the relevant IDs, their order and count; there is no target count. Call show_images where they fit in the answer, before, between or after paragraphs. Write preceding paragraphs before the call and continue any remaining text afterward; separate calls can accompany different sections. Stay within the requested scope; do not browse entry details merely to illustrate a list or simple fact. Reuse these IDs; no extra search is needed. Skip unrelated, decorative, ambiguous or already displayed candidates. Captions and nearby text are metadata, not visual inspection.",
         }
       : undefined;
   const payload = {
@@ -136,11 +136,13 @@ export const formatToolResultForModel = (webSearch: WebSearchState, maxChars = 1
     links: webSearch.links,
     untrusted_external_content: true,
     next_action:
-      webSearch.contentKind === "search_snippets"
-        ? "For a specific page, detailed evidence or information absent from snippets, call read_webpage on a returned URL."
-        : webSearch.page?.nextLine
-          ? "More content is available: continue with read_webpage(start_line=nextLine), or find_in_page for a specific detail."
-          : undefined,
+      webSearch.status !== "done"
+        ? undefined
+        : webSearch.contentKind === "search_snippets"
+          ? "Answer now if these snippets sufficiently support the user's request. Call read_webpage only for a requested page or a specific missing fact needed for the answer. For lists/rankings, obtain the list and its freshness/source, not background on each entry."
+          : webSearch.page?.nextLine
+            ? "More page content exists, but reading it is optional. Answer now if the requested information is covered. Only use find_in_page or read_webpage(start_line=nextLine) to fill a specific remaining gap; continue when the user requested complete coverage."
+            : undefined,
     answer: webSearch.answer,
     content: webSearch.content,
     description: webSearch.description,
@@ -189,7 +191,9 @@ export const formatToolResultForModel = (webSearch: WebSearchState, maxChars = 1
     page: webSearch.page && { ...webSearch.page, nextLine: webSearch.page.startLine },
     untrusted_external_content: true,
     next_action:
-      "Response truncated. Use find_in_page for a specific detail or read_webpage with a smaller max_lines. Image IDs remain usable with show_images.",
+      webSearch.status === "done"
+        ? "Response truncated; this is not the full source. Answer if the available evidence already covers the request. Only if required information is missing, use find_in_page or read_webpage with a smaller max_lines. Do not expand the task to unrelated details. Image IDs remain usable with show_images."
+        : undefined,
     query: webSearch.query.slice(0, 300),
     results: webSearch.results.slice(0, 4).map((item) => ({
       citationId: item.citationId,

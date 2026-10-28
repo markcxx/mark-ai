@@ -456,6 +456,7 @@ export function ModelSelectorDialog({
                     return (
                       <div className="flex min-w-0 items-center" key={key} role="none">
                         <button
+                          aria-label={`${model.id} · ${providerNames[model.provider] || model.provider}`}
                           aria-selected={selected}
                           className={cn(
                             "flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 text-left transition-colors md:h-9",
@@ -473,6 +474,7 @@ export function ModelSelectorDialog({
                         >
                           <ModelBrandIcon model={model.id} provider={model.provider} size={20} />
                           <span
+                            data-markai-tooltip={model.id}
                             className={cn(
                               "min-w-0 truncate font-jakarta text-[13px]",
                               selected
@@ -480,9 +482,7 @@ export function ModelSelectorDialog({
                                 : "text-gray-800 dark:text-gray-200",
                             )}
                           >
-                            {model.presentation?.displayName ||
-                              metadata?.displayName ||
-                              getModelDisplayName(model.id)}
+                            {model.id}
                           </span>
                           <span className="flex shrink-0 items-center gap-1 text-gray-400 dark:text-gray-500">
                             {imageModel && <ImagePlus aria-label="图片生成" size={13} />}
@@ -538,7 +538,7 @@ export function ModelSelectorDialog({
                         </button>
                         {(sheet || placement?.detailLeft == null) && (
                           <IconButton
-                            aria-label={`查看 ${metadata?.displayName || model.id} 的模型资料`}
+                            aria-label={`查看 ${model.id} 的模型资料`}
                             data-markai-tooltip="模型资料与评测"
                             onClick={() => setDetailKey(key)}
                             shape="rounded"

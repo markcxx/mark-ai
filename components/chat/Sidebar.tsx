@@ -1,6 +1,13 @@
 "use client";
 
-import { LoaderCircle, LogIn, PanelLeftClose, Plus, Puzzle, Search } from "lucide-react";
+import {
+  LoaderCircle,
+  LogIn,
+  MessageCirclePlus,
+  PanelLeftClose,
+  Puzzle,
+  Search,
+} from "lucide-react";
 import Image from "@/components/ui/AppImage";
 import { useEffect, useRef, useState } from "react";
 
@@ -31,8 +38,8 @@ const getSessionTimeGroup = (updatedAt: number) => {
 const SESSION_GROUPS = [
   { key: "today", label: "今天" },
   { key: "yesterday", label: "昨天" },
-  { key: "week", label: "近 7 天" },
-  { key: "month", label: "近 30 天" },
+  { key: "week", label: "7 天内" },
+  { key: "month", label: "30 天内" },
   { key: "earlier", label: "更早" },
 ];
 
@@ -40,9 +47,8 @@ function SessionSkeletonList() {
   return (
     <div className="flex flex-col gap-0.5">
       {Array.from({ length: 3 }).map((_, index) => (
-        <div className="flex h-9 items-center gap-2 rounded-lg px-1 py-1.5" key={index}>
-          <div className="h-7 w-7 shrink-0 animate-pulse rounded-md bg-gray-200/80 dark:bg-gray-700/80" />
-          <div className="h-4 flex-1 animate-pulse rounded-md bg-gray-200/70 dark:bg-gray-700/70" />
+        <div className="flex h-11 items-center rounded-xl px-3 md:h-10" key={index}>
+          <div className="h-4 w-3/4 animate-pulse rounded-md bg-gray-200/70 dark:bg-gray-700/70" />
         </div>
       ))}
     </div>
@@ -177,46 +183,49 @@ export function Sidebar({
         style={isOpen ? { width } : undefined}
       >
         <div className="flex h-full w-full flex-col">
-          <div className="mb-2 flex items-center justify-between p-3">
-            <div className="ml-2 mt-1 flex items-center gap-3">
+          <div className="mb-2 flex items-center justify-between gap-2 px-4 py-4">
+            <div className="flex min-w-0 items-center gap-2.5">
               <Image alt="MarkAI" height={32} priority src="/images/markai.svg" width={32} />
-              <div>
-                <h1 className="text-lg font-bold leading-tight text-gray-900 dark:text-gray-100">
+              <div className="min-w-0">
+                <h1 className="truncate font-jakarta text-lg font-bold leading-tight text-gray-900 dark:text-gray-100">
                   MarkAI
                 </h1>
               </div>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex shrink-0 items-center gap-1">
               <IconButton
                 onClick={() => useUIStore.getState().setSessionSearchOpen(true)}
                 shape="rounded"
                 size="sm"
-                title="搜索会话"
+                aria-label="搜索会话"
+                data-markai-tooltip="搜索会话"
               >
                 <Search size={17} />
               </IconButton>
-              <IconButton onClick={onClose} shape="rounded" size="sm" title="收起侧栏">
+              <IconButton
+                onClick={onClose}
+                shape="rounded"
+                size="sm"
+                aria-label="收起侧栏"
+                data-markai-tooltip="收起侧栏"
+              >
                 <PanelLeftClose size={18} />
               </IconButton>
             </div>
           </div>
 
-          <div className="mb-6 mt-2 px-4">
+          <div className="mb-4 px-3">
             <button
-              className="group flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-[#f3f4f5] dark:bg-gray-800 px-3 text-sm font-medium text-gray-900 dark:text-gray-100 transition-colors hover:bg-[#eceef0] dark:hover:bg-gray-700"
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-full border border-gray-200/60 bg-white px-3 text-sm font-medium text-gray-900 shadow-sm transition-colors hover:bg-gray-50 dark:border-white/[0.08] dark:bg-[#191919] dark:text-gray-100 dark:hover:bg-white/[0.1]"
               onClick={onNewChat}
               type="button"
             >
-              <Plus size={20} />
-              <span>开启新话题</span>
+              <MessageCirclePlus size={19} />
+              <span>开启新对话</span>
             </button>
-
           </div>
 
-          <div className="mb-4 px-3">
-            <div className="mb-2 px-3 font-jakarta text-xs font-semibold uppercase tracking-wider text-gray-400">
-              视图
-            </div>
+          <div className="mb-2 px-3">
             <nav className="flex flex-col gap-1">
               <SidebarNavItem
                 icon={Puzzle}
@@ -236,10 +245,7 @@ export function Sidebar({
               }
             }}
           >
-            <div className="mb-2 mt-4 px-3 font-jakarta text-xs font-semibold uppercase tracking-wider text-gray-400">
-              历史
-            </div>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-4 pt-2">
               {guest && (
                 <div className="px-3 py-2 text-sm leading-6 text-gray-400">
                   登录后可查看和同步历史对话
@@ -252,7 +258,7 @@ export function Sidebar({
               {groupedSessions.map((group) => {
                 const collapsed = collapsedGroups.includes(group.key);
                 return (
-                  <div className="flex flex-col gap-1" key={group.key}>
+                  <div className="flex flex-col gap-0.5" key={group.key}>
                     <SessionGroupHeader
                       collapsed={collapsed}
                       count={group.sessions.length}

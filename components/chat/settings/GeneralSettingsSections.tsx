@@ -18,7 +18,7 @@ import { AppSelect } from "@/components/ui/AppSelect";
 import { AppNumberInput } from "@/components/ui/AppNumberInput";
 import { AppSliderWithInput } from "@/components/ui/AppSliderWithInput";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
-import { getModelDisplayName, getModelKey } from "@/lib/chat/helpers";
+import { getModelKey } from "@/lib/chat/helpers";
 import { SPEECH_VOICES, SYSTEM_SPEECH_VOICE } from "@/lib/chat/speech-voices";
 import type { CodeTheme, PrimaryColor } from "@/lib/settings";
 import { cn } from "@/lib/utils";
@@ -285,7 +285,7 @@ export function ChatSettings() {
             { label: "系统默认", value: "__system__" },
             { label: "跟随消息模型", value: "" },
             ...availableModels.map((model) => ({
-              label: `${getModelDisplayName(model.id)} · ${providerNames[model.provider] || model.provider}`,
+              label: `${model.id} · ${providerNames[model.provider] || model.provider}`,
               value: getModelKey(model),
             })),
           ]}
