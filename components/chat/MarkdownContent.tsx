@@ -1,5 +1,7 @@
 "use client";
 
+import AppImage from "@/components/ui/AppImage";
+
 import React from "react";
 import { Check, Copy } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -227,6 +229,19 @@ const markdownComponents = {
       {...props}
     />
   ),
+  img: ({ src, alt, title }: React.ImgHTMLAttributes<HTMLImageElement>) =>
+    typeof src === "string" && src ? (
+      <AppImage
+        native
+        src={src}
+        alt={alt || ""}
+        title={title}
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        containerClassName="max-w-full overflow-hidden rounded-lg"
+        className="h-auto max-w-full object-contain"
+      />
+    ) : null,
   p: ({ children }: { children?: React.ReactNode }) => renderAdmonitionParagraph(children),
   pre: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
   table: MarkdownTable,

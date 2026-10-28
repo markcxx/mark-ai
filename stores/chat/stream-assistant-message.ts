@@ -1,3 +1,6 @@
+import { createFirstResponseTiming } from "@/lib/chat/client/first-response-timing";
+import { stageSessionMessages } from "@/lib/chat/client/pending-session";
+import { ExecutionStreamState, finishPendingExecutionTools } from "@/lib/chat/client/execution";
 import { GenerationError } from "@/lib/chat/generation-error";
 import { resolveThinkingEnabled } from "@/lib/model-thinking";
 import toast from "react-hot-toast";
@@ -8,7 +11,7 @@ import { createSmoothTextController, parseChatStreamLine } from "@/lib/chat/clie
 import { extractThinkingFromText, getMessageContentForModel } from "@/lib/chat/helpers";
 import { isImageGenerationModel } from "@/lib/chat/image-models";
 import { prepareRequestHistory } from "@/lib/chat/request-history";
-import { finishPendingWebTools, getWebResourceContext } from "@/lib/chat/web-context";
+import { getWebResourceContext } from "@/lib/chat/web-context";
 import {
   estimateMessageTokens,
   estimateMessagesTokens,
@@ -46,6 +49,7 @@ export const createStreamAssistantMessage =
     get: StoreApi<ChatStore>["getState"],
   ): ChatStore["streamAssistantMessage"] =>
   async (historyMessages, modelMessageId, modelConfig, options = {}) => {
+    const firstResponseTiming = createFirstResponseTiming(options.sendStartedAt);
     const startedAt = Date.now();
     const settings = useSettingsStore.getState().general;
     const responseAnimation = settings.reduceMotion ? "none" : settings.responseAnimation;
@@ -68,7 +72,19 @@ export const createStreamAssistantMessage =
     let outputTokens = 0;
     let totalTokens: number | undefined;
     let tokenUsageSource: Message["tokenUsageSource"] = "estimated";
-    const segments: MessageSegment[] = [];
+    const segments: MessageSegment[] = structuredClone(options.initialSegments || []);
+    const initialSegmentText = segments
+      .filter((segment) => segment.type === "content")
+      .map((segment) => segment.content)
+      .join("");
+    if (plainContent.startsWith(initialSegmentText)) {
+      const remainder = plainContent.slice(initialSegmentText.length);
+      if (remainder) segments.push({ type: "content", content: remainder });
+    } else if (plainContent) {
+      // Legacy messages may not have segments matching their edited body.
+      segments.splice(0, segments.length, { type: "content", content: plainContent });
+    }
+    const execution = new ExecutionStreamState();
     let currentReasoningStart: number | undefined;
     let currentThinkingSegment: Extract<MessageSegment, { type: "thinking" }> | undefined;
 
@@ -111,6 +127,17 @@ export const createStreamAssistantMessage =
     let contentController: ReturnType<typeof createSmoothTextController> | undefined;
     let reasoningController: ReturnType<typeof createSmoothTextController> | undefined;
     set({ abortController: controller });
+    const preserveOnPageHide = () => {
+      if (!sessionId || useSessionStore.getState().activeSessionId !== sessionId) return;
+      contentController?.flush();
+      reasoningController?.flush();
+      stageSessionMessages(
+        sessionId,
+        get().messages,
+        useSessionStore.getState().sessions?.find((session) => session.id === sessionId)?.revision,
+      );
+    };
+    if (typeof window !== "undefined") window.addEventListener("pagehide", preserveOnPageHide);
 
     try {
       set((s) => {
@@ -120,6 +147,7 @@ export const createStreamAssistantMessage =
         };
       });
 
+      firstResponseTiming.request();
       const response = await fetch("/api/chat", {
         body: JSON.stringify({
           messages: requestHistory,
@@ -138,6 +166,7 @@ export const createStreamAssistantMessage =
         signal: controller.signal,
       });
 
+      firstResponseTiming.headers(response);
       if (!response.ok) {
         const errorText = await response.text().catch(() => "");
         let detail = errorText;
@@ -182,6 +211,7 @@ export const createStreamAssistantMessage =
       const isAnyThinkingActive = () => segments.some((s) => s.type === "thinking" && s.isActive);
 
       const updateStreamingMessage = () => {
+        if (sessionId && useSessionStore.getState().activeSessionId !== sessionId) return;
         const extracted = extractThinkingFromText(plainContent);
         const eventReasoning = getAllReasoning();
         const reasoning = `${eventReasoning}${extracted.reasoning}`;
@@ -206,6 +236,7 @@ export const createStreamAssistantMessage =
               : m,
           ),
         }));
+        if (extracted.content.trim() || reasoning.trim()) firstResponseTiming.committed();
       };
 
       updateStreamingMessage();
@@ -222,10 +253,15 @@ export const createStreamAssistantMessage =
           const newPart = cleanContent.slice(prevContentLength);
           if (newPart) {
             const lastSeg = segments[segments.length - 1];
-            if (lastSeg && lastSeg.type === "content") {
+            if (lastSeg && lastSeg.type === "content" && lastSeg.stepId === execution.stepId) {
               lastSeg.content = lastSeg.content + newPart;
             } else {
-              segments.push({ type: "content", content: newPart });
+              segments.push({
+                type: "content",
+                content: newPart,
+                stepId: execution.stepId,
+                phase: execution.contentPhase,
+              });
             }
           }
         }
@@ -251,6 +287,7 @@ export const createStreamAssistantMessage =
       }
 
       const appendContent = (chunk: string) => {
+        if (chunk.trim()) firstResponseTiming.text();
         reasoningController?.flush();
         if (contentController) {
           contentController.push(chunk);
@@ -260,6 +297,7 @@ export const createStreamAssistantMessage =
       };
 
       const appendReasoning = (chunk: string) => {
+        if (chunk.trim()) firstResponseTiming.text();
         contentController?.flush();
         if (reasoningController) {
           reasoningController.push(chunk);
@@ -272,6 +310,15 @@ export const createStreamAssistantMessage =
         const event = parseChatStreamLine(line);
         if (!event) return;
         if (event.type === "error") throw new GenerationError(event.text || "生成失败，请重试");
+        if (event.type === "step" || event.type === "complete") {
+          contentController?.flush();
+          reasoningController?.flush();
+          finishCurrentReasoning();
+          currentThinkingSegment = undefined;
+          execution.accept(event, segments);
+          updateStreamingMessage();
+          return;
+        }
         if (event.type === "usage") {
           inputTokens = event.inputTokens ?? inputTokens;
           outputTokens = event.outputTokens ?? outputTokens;
@@ -296,7 +343,7 @@ export const createStreamAssistantMessage =
           if (existingIdx >= 0) {
             (segments[existingIdx] as Extract<MessageSegment, { type: "tool" }>).webSearch = ws;
           } else {
-            segments.push({ type: "tool", webSearch: ws });
+            segments.push({ type: "tool", stepId: execution.toolStepId, webSearch: ws });
           }
           updateStreamingMessage();
           return;
@@ -317,6 +364,7 @@ export const createStreamAssistantMessage =
               segments[existingIdx] as Extract<MessageSegment, { type: "generated-file" }>
             ).generatedFile;
             segments[existingIdx] = {
+              stepId: execution.toolStepId,
               generatedFile: {
                 ...previous,
                 ...generatedFile,
@@ -330,7 +378,7 @@ export const createStreamAssistantMessage =
               type: "generated-file",
             };
           } else {
-            segments.push({ generatedFile, type: "generated-file" });
+            segments.push({ generatedFile, type: "generated-file", stepId: execution.toolStepId });
           }
           updateStreamingMessage();
           return;
@@ -368,12 +416,14 @@ export const createStreamAssistantMessage =
       }
 
       if (isStructuredStream && buffer) handleStreamLine(buffer);
+      execution.assertComplete();
+      controller.signal.throwIfAborted();
       await reasoningController?.finish();
       await contentController?.finish();
       segments.splice(
         0,
         segments.length,
-        ...finishPendingWebTools(segments, "请求已结束，工具未完成，请重试"),
+        ...finishPendingExecutionTools(segments, "请求已结束，工具未完成，请重试"),
       );
       finishCurrentReasoning();
 
@@ -408,7 +458,7 @@ export const createStreamAssistantMessage =
       segments.splice(
         0,
         segments.length,
-        ...finishPendingWebTools(segments, "请求已停止，工具结果未完成，请重试"),
+        ...finishPendingExecutionTools(segments, "请求已停止，工具结果未完成，请重试"),
       );
       if (error instanceof DOMException && error.name === "AbortError") {
         outcome = "aborted";
@@ -448,6 +498,7 @@ export const createStreamAssistantMessage =
       }
       contentController?.flush();
       reasoningController?.flush();
+      finishCurrentReasoning();
       outcome = "failed";
       console.error("Chat error:", error);
       const failureMessage =
@@ -462,7 +513,8 @@ export const createStreamAssistantMessage =
       }
       set((s) => ({
         messages: s.messages.map((m) =>
-          m.id === modelMessageId
+          m.id === modelMessageId &&
+          (!sessionId || useSessionStore.getState().activeSessionId === sessionId)
             ? {
                 ...m,
                 content: segments
@@ -506,6 +558,7 @@ export const createStreamAssistantMessage =
           ),
       };
     } finally {
+      if (typeof window !== "undefined") window.removeEventListener("pagehide", preserveOnPageHide);
       if (sessionId && sessionStreamControllers.get(sessionId) === controller) {
         sessionStreamControllers.delete(sessionId);
         const sessionStore = useSessionStore.getState();
@@ -524,7 +577,16 @@ export const createStreamAssistantMessage =
       set((s) => ({
         ...(s.abortController === controller ? { isLoading: false, abortController: null } : {}),
         messages: s.messages.map((m) =>
-          m.id === modelMessageId ? { ...m, isReasoning: false, isStreaming: false } : m,
+          m.id === modelMessageId &&
+          s.abortController === controller &&
+          (!sessionId || useSessionStore.getState().activeSessionId === sessionId)
+            ? {
+                ...m,
+                isReasoning: false,
+                isStreaming: false,
+                ...(outcome !== "completed" ? { interrupted: true } : {}),
+              }
+            : m,
         ),
       }));
     }

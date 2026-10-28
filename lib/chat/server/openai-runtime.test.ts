@@ -139,3 +139,128 @@ it("delivers the provider location restriction through the response stream", asy
     text: 'HTTP 400\n[{"error":{"code":400,"message":"User location is not supported for the API use.","status":"FAILED_PRECONDITION"}}]',
   });
 });
+
+describe("answer completion", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const run = () =>
+    createOpenAICompatibleStream(
+      [{ role: "user", content: "查询最新新闻并给出汇总" }],
+      "test",
+      "secret",
+      "https://test.invalid/v1",
+      true,
+    );
+
+  const exhaustSearchRounds = () => {
+    for (let round = 0; round < 12; round++) {
+      vi.mocked(fetchWithDevelopmentProxy).mockResolvedValueOnce(
+        upstream({
+          content: "我再核实一下。",
+          tool_calls: [
+            {
+              index: 0,
+              id: `search-${round}`,
+              type: "function",
+              function: { name: "web_search", arguments: '{"query":"test"}' },
+            },
+          ],
+        }),
+      );
+    }
+  };
+
+  it("continues beyond the former limit with tools available until a final answer", async () => {
+    exhaustSearchRounds();
+    vi.mocked(fetchWithDevelopmentProxy).mockResolvedValueOnce(upstream({ content: "新闻汇总" }));
+    const output = await (await run()).text();
+    const calls = vi.mocked(fetchWithDevelopmentProxy).mock.calls;
+    expect(calls).toHaveLength(13);
+    const finalRequest = JSON.parse(calls[12][1]!.body as string);
+    expect(finalRequest.tools.length).toBeGreaterThan(0);
+    expect(finalRequest.messages.at(-1)).toMatchObject({
+      role: "tool",
+    });
+    expect(finalRequest.messages.some((message: { role: string }) => message.role === "tool")).toBe(
+      true,
+    );
+    expect(output).toContain("新闻汇总");
+    expect(output).not.toContain('"type":"error"');
+    expect(JSON.parse(output.trim().split("\n").at(-1)!)).toMatchObject({ type: "complete" });
+  });
+
+  it("does not count earlier progress text as a final answer when the last pass only reasons", async () => {
+    exhaustSearchRounds();
+    vi.mocked(fetchWithDevelopmentProxy).mockResolvedValueOnce(
+      upstream({ reasoning_content: "Let me do two more searches." }),
+    );
+    const events = (await (await run()).text())
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(events).toContainEqual({ type: "content", text: "我再核实一下。" });
+    expect(events.at(-1)).toMatchObject({
+      type: "error",
+      text: expect.stringContaining("未返回回答正文"),
+    });
+  });
+
+  it.each([{}, { reasoning_content: "仍在思考" }, { content: "<think>仍在思考</think>" }])(
+    "reports an empty answer instead of silently completing (%j)",
+    async (delta) => {
+      vi.mocked(fetchWithDevelopmentProxy).mockResolvedValueOnce(upstream(delta));
+      const output = await (await run()).text();
+      expect(output).toContain('"type":"error"');
+      expect(output).toContain("未返回回答正文");
+    },
+  );
+});
+
+it("does not report a silently truncated upstream response as completed", async () => {
+  vi.mocked(fetchWithDevelopmentProxy).mockResolvedValueOnce(
+    new Response('data: {"choices":[{"delta":{"content":"部分回答"}}]}\n\n'),
+  );
+  const output = await (
+    await createOpenAICompatibleStream(
+      [{ role: "user", content: "搜索" }],
+      "test",
+      "secret",
+      "https://test.invalid/v1",
+      true,
+    )
+  ).text();
+  expect(output).toContain("部分回答");
+  expect(output).toContain('"type":"error"');
+  expect(output).not.toContain('"type":"complete"');
+});
+
+it("honors cancellation between tool steps without starting another model request", async () => {
+  vi.mocked(fetchWithDevelopmentProxy).mockClear();
+  const abort = new AbortController();
+  vi.mocked(fetchWithDevelopmentProxy).mockImplementationOnce(async () => {
+    abort.abort();
+    return upstream({
+      tool_calls: [
+        {
+          index: 0,
+          id: "stop",
+          type: "function",
+          function: { name: "web_search", arguments: '{"query":"test"}' },
+        },
+      ],
+    });
+  });
+  const output = await (
+    await createOpenAICompatibleStream(
+      [{ role: "user", content: "搜索" }],
+      "test",
+      "secret",
+      "https://test.invalid/v1",
+      true,
+      undefined,
+      abort.signal,
+    )
+  ).text();
+  expect(fetchWithDevelopmentProxy).toHaveBeenCalledTimes(1);
+  expect(output).not.toContain('"type":"complete"');
+});

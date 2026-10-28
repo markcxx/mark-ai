@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import AppImage from "@/components/ui/AppImage";
 
 import { cn } from "@/lib/utils";
 
@@ -22,37 +22,20 @@ export function FluentEmoji({
   emoji: string;
   size?: number;
 }) {
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    setFailed(false);
-  }, [emoji]);
-
-  if (failed) {
-    return (
-      <span
-        aria-label={emoji}
-        className={cn("inline-flex items-center justify-center align-middle", className)}
-        role="img"
-        style={{ fontSize: size, height: size, width: size }}
-      >
-        {emoji}
-      </span>
-    );
-  }
-
   return (
-    // The source is the same static asset CDN previously used by @lobehub/fluent-emoji.
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
+    <AppImage
+      native
       alt={emoji}
-      className={cn("shrink-0", className)}
-      decoding="async"
+      width={size}
       height={size}
       loading="lazy"
-      onError={() => setFailed(true)}
       src={`${FLUENT_EMOJI_CDN}/${emojiToUnicode(emoji)}.webp`}
-      width={size}
+      containerClassName={cn("shrink-0", className)}
+      fallback={
+        <span aria-label={emoji} role="img" style={{ fontSize: size }}>
+          {emoji}
+        </span>
+      }
     />
   );
 }

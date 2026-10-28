@@ -3,16 +3,6 @@ import {
   executeConvertUnits,
   executeSummarizeNumbers,
 } from "./calculator";
-import { executeCreateExcel } from "./excel";
-import {
-  executeAppendWordDocument,
-  executeBeginWordDocument,
-  executeFinalizeWordDocument,
-  executeInspectWordDocument,
-  executeOpenWordDocument,
-  executeRestyleWordDocument,
-  executeReviseWordDocument,
-} from "./word";
 
 import type { ToolExecutionContext, ToolExecutionResult } from "../types";
 import {
@@ -51,21 +41,21 @@ export const executeBuiltinTool = async (
       };
     }
     case "word_document_begin":
-      return executeBeginWordDocument(args, context);
+      return (await import("./word")).executeBeginWordDocument(args, context);
     case "word_document_open":
-      return executeOpenWordDocument(args, context);
+      return (await import("./word")).executeOpenWordDocument(args, context);
     case "word_document_append":
-      return executeAppendWordDocument(args, context);
+      return (await import("./word")).executeAppendWordDocument(args, context);
     case "word_document_revise":
-      return executeReviseWordDocument(args, context);
+      return (await import("./word")).executeReviseWordDocument(args, context);
     case "word_document_restyle":
-      return executeRestyleWordDocument(args, context);
+      return (await import("./word")).executeRestyleWordDocument(args, context);
     case "word_document_inspect":
-      return executeInspectWordDocument(args, context);
+      return (await import("./word")).executeInspectWordDocument(args, context);
     case "word_document_finalize":
-      return executeFinalizeWordDocument(args, context);
+      return (await import("./word")).executeFinalizeWordDocument(args, context);
     case "create_excel_workbook":
-      return executeCreateExcel(args, context);
+      return (await import("./excel")).executeCreateExcel(args, context);
     case "calculate_expression":
       return executeCalculateExpression(args);
     case "summarize_numbers":

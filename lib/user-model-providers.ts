@@ -29,7 +29,12 @@ export const listUserModelProviders = async (
     .from(userModelProviders)
     .where(eq(userModelProviders.userId, userId));
 
-  return rows.map((row) => ({
+  return toPublicProviders(rows);
+};
+
+type ProviderRow = typeof userModelProviders.$inferSelect;
+const toPublicProviders = (rows: ProviderRow[]): PublicUserModelProvider[] =>
+  rows.map((row) => ({
     baseUrl: row.baseUrl,
     enabled: row.enabled,
     hasApiKey: Boolean(row.apiKeyEncrypted),
@@ -40,17 +45,10 @@ export const listUserModelProviders = async (
     provider: row.provider,
     runtime: normalizeRuntime(row.runtime),
   }));
-};
 
-export const getUserConfiguredModels = async (userId: string): Promise<ConfiguredModel[]> => {
-  const rows = await getDb()
-    .select()
-    .from(userModelProviders)
-    .where(and(eq(userModelProviders.userId, userId), eq(userModelProviders.enabled, true)));
-
-  return rows.flatMap((row) => {
-    if (!row.apiKeyEncrypted) return [];
-
+const toConfiguredModels = (rows: ProviderRow[]): ConfiguredModel[] =>
+  rows.flatMap((row) => {
+    if (!row.enabled || !row.apiKeyEncrypted) return [];
     let apiKey = "";
     try {
       apiKey = decryptCredential(row.apiKeyEncrypted);
@@ -58,7 +56,6 @@ export const getUserConfiguredModels = async (userId: string): Promise<Configure
       console.error(`Failed to decrypt provider ${row.provider}:`, error);
       return [];
     }
-
     return (Array.isArray(row.models) ? row.models : []).map((id) => ({
       apiKey,
       baseUrl: row.baseUrl,
@@ -67,6 +64,22 @@ export const getUserConfiguredModels = async (userId: string): Promise<Configure
       runtime: resolveModelRuntime({ id, baseUrl: row.baseUrl, runtime: row.runtime }),
     }));
   });
+
+export const getUserConfiguredModels = async (userId: string): Promise<ConfiguredModel[]> => {
+  const rows = await getDb()
+    .select()
+    .from(userModelProviders)
+    .where(and(eq(userModelProviders.userId, userId), eq(userModelProviders.enabled, true)));
+  return toConfiguredModels(rows);
+};
+
+/** Resolve configured models and provider overrides from one consistent database read. */
+export const getUserModelConfiguration = async (userId: string) => {
+  const rows = await getDb()
+    .select()
+    .from(userModelProviders)
+    .where(eq(userModelProviders.userId, userId));
+  return { models: toConfiguredModels(rows), providers: toPublicProviders(rows) };
 };
 
 export const getPublicUserModels = async (userId: string): Promise<PublicConfiguredModel[]> =>

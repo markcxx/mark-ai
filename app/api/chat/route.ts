@@ -1,7 +1,7 @@
-import { createAnthropicStream } from "@/lib/chat/server/anthropic-runtime";
+import { createRequestTiming } from "@/lib/chat/server/request-timing";
 import { describeGenerationError } from "@/lib/chat/generation-error";
 import { getThinkingPolicy } from "@/lib/model-thinking";
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 
 import { authorizeApiRequest, enforceRateLimit } from "@/lib/api/security";
 import { LOCAL_STORAGE_OWNER_ID } from "@/lib/auth-helpers";
@@ -12,30 +12,29 @@ import { prepareRequestHistory } from "@/lib/chat/request-history";
 import { estimateTextTokens } from "@/lib/chat/metrics";
 import { isImageGenerationModel } from "@/lib/chat/image-models";
 import { getChatSession } from "@/lib/chat/storage";
-import { createGeminiStream } from "@/lib/chat/server/gemini-runtime";
-import { generateOrEditImage } from "@/lib/chat/server/image-runtime";
-import { createOpenAICompatibleStream } from "@/lib/chat/server/openai-runtime";
 import { getRuntimeSystemPrompt, WEB_TOOLS } from "@/lib/chat/server/runtime-prompt";
 import type { ChatMessage } from "@/lib/chat/server/types";
 import type { FileAttachment } from "@/lib/chat/types";
 import { isLocalMode } from "@/lib/env";
 import { hasKnownContextWindow } from "@/lib/model-metadata";
 import { getServerModelMetadata } from "@/lib/server/model-catalog";
-import { injectFileContexts } from "@/lib/storage/file-context";
 import {
   getAvailableBuiltinTool,
   getToolFunctions,
   getToolSystemPrompt,
 } from "@/lib/tools/registry";
-import { listInstalledToolIds, listSessionEnabledToolIds } from "@/lib/tools/storage";
+import { listUsableSessionToolIds } from "@/lib/tools/storage";
 
 const MAX_CHAT_MESSAGES = 200;
 const MAX_CHAT_MESSAGE_CHARS = 200_000;
 const MAX_CHAT_PAYLOAD_BYTES = 2_000_000;
 
 export async function POST(req: NextRequest) {
+  const timing = createRequestTiming();
   try {
-    const authorization = await authorizeApiRequest(req);
+    const authorization = await timing.measure("auth", () =>
+      authorizeApiRequest(req, { deferPlatformRecord: after }),
+    );
     if (!authorization.authorized) return authorization.response;
     const limited = enforceRateLimit({ key: authorization.key, limit: 30, scope: "chat" });
     if (limited) return limited;
@@ -54,24 +53,6 @@ export async function POST(req: NextRequest) {
       body;
     if (thinkingEnabled !== undefined && typeof thinkingEnabled !== "boolean") {
       return NextResponse.json({ error: "思考模式参数无效，请刷新后重试" }, { status: 400 });
-    }
-    const selectedModel = await findAvailableModel(
-      model,
-      provider,
-      authorization.userId,
-      thinkingEnabled !== undefined,
-    );
-
-    if (!selectedModel) {
-      return NextResponse.json(
-        {
-          error:
-            thinkingEnabled !== undefined
-              ? "所选模型暂无支持思考切换的可用线路，请刷新模型列表后重试"
-              : "所选模型尚未配置或不可用",
-        },
-        { status: 400 },
-      );
     }
 
     if (
@@ -111,13 +92,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "无法确认当前存储用户，请重新登录" }, { status: 401 });
     }
 
-    if (typeof sessionId === "string" && sessionId) {
-      const session = await getChatSession(sessionId, authorization.userId);
-      if (!session) return NextResponse.json({ error: "会话不存在或无权访问" }, { status: 404 });
-    }
+    const hasSession = typeof sessionId === "string" && Boolean(sessionId);
+    const [selectedModel, session, sessionToolIds] = await Promise.all([
+      timing.measure("model", () =>
+        findAvailableModel(model, provider, authorization.userId, thinkingEnabled !== undefined),
+      ),
+      timing.measure("session", () =>
+        hasSession ? getChatSession(sessionId, authorization.userId) : undefined,
+      ),
+      timing.measure("tools", () =>
+        hasSession ? listUsableSessionToolIds(storageOwnerId, sessionId) : [],
+      ),
+    ]);
+    if (!selectedModel)
+      return NextResponse.json(
+        {
+          error:
+            thinkingEnabled !== undefined
+              ? "所选模型暂无支持思考切换的可用线路，请刷新模型列表后重试"
+              : "所选模型尚未配置或不可用",
+        },
+        { status: 400 },
+      );
+    if (hasSession && !session)
+      return NextResponse.json({ error: "会话不存在或无权访问" }, { status: 404 });
 
     if (isImageGenerationModel(selectedModel.id)) {
       try {
+        const { generateOrEditImage } = await import("@/lib/chat/server/image-runtime");
         const generatedImage = await generateOrEditImage({
           apiKey: selectedModel.apiKey,
           baseUrl: selectedModel.baseUrl,
@@ -142,17 +144,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    let enabledToolIds: string[] = [];
-    if (typeof sessionId === "string" && sessionId) {
-      const [sessionToolIds, installedToolIds] = await Promise.all([
-        listSessionEnabledToolIds(storageOwnerId, sessionId),
-        listInstalledToolIds(storageOwnerId),
-      ]);
-      const installed = new Set(installedToolIds);
-      enabledToolIds = sessionToolIds.filter(
-        (toolId) => installed.has(toolId) && Boolean(getAvailableBuiltinTool(toolId)),
-      );
-    }
+    const enabledToolIds = sessionToolIds.filter((toolId) =>
+      Boolean(getAvailableBuiltinTool(toolId)),
+    );
 
     const skillPrompt = getToolSystemPrompt(enabledToolIds);
     const builtinToolSchemas = getToolFunctions(enabledToolIds).map((toolFunction) => ({
@@ -173,14 +167,18 @@ export async function POST(req: NextRequest) {
     if (!requestHistory.length || requestHistory.at(-1)?.role !== "user") {
       return NextResponse.json({ error: "缺少有效的用户消息，请重新发送" }, { status: 400 });
     }
-    const fileMessages = storageOwnerId
-      ? await injectFileContexts(requestHistory, storageOwnerId)
-      : requestHistory;
+    const [fileMessages, modelMetadata] = await Promise.all([
+      timing.measure("files", async () => {
+        if (!requestHistory.some((message) => message.attachments?.length)) return requestHistory;
+        const { injectFileContexts } = await import("@/lib/storage/file-context");
+        return injectFileContexts(requestHistory, storageOwnerId);
+      }),
+      timing.measure("metadata", () => getServerModelMetadata(selectedModel)),
+    ]);
     const resolvedMessages = fileMessages.map((message) => ({
       ...message,
       reasoning: retainReasoning && message.role === "model" ? message.reasoning : undefined,
     }));
-    const modelMetadata = await getServerModelMetadata(selectedModel);
     const runtimeSystemPrompt = getRuntimeSystemPrompt({
       skillPrompt,
       timezone,
@@ -227,43 +225,49 @@ export async function POST(req: NextRequest) {
     if (selectedModel.runtime !== "gemini") {
       const createStream =
         selectedModel.runtime === "anthropic"
-          ? createAnthropicStream
-          : createOpenAICompatibleStream;
-      return createStream(
-        preparedMessages,
-        selectedModel.id,
-        selectedModel.apiKey,
-        selectedModel.baseUrl,
-        Boolean(webSearchEnabled),
-        timezone,
-        req.signal,
-        contextPreparation,
-        typeof sessionId === "string" && sessionId
-          ? {
-              enabledToolIds,
-              sessionId,
-              skillPrompt,
-              userId: storageOwnerId,
-            }
-          : undefined,
-        { policy: thinkingPolicy, enabled: thinkingEnabled },
+          ? (await import("@/lib/chat/server/anthropic-runtime")).createAnthropicStream
+          : (await import("@/lib/chat/server/openai-runtime")).createOpenAICompatibleStream;
+      return timing.response(
+        await createStream(
+          preparedMessages,
+          selectedModel.id,
+          selectedModel.apiKey,
+          selectedModel.baseUrl,
+          Boolean(webSearchEnabled),
+          timezone,
+          req.signal,
+          contextPreparation,
+          typeof sessionId === "string" && sessionId
+            ? {
+                enabledToolIds,
+                sessionId,
+                skillPrompt,
+                userId: storageOwnerId,
+              }
+            : undefined,
+          { policy: thinkingPolicy, enabled: thinkingEnabled },
+        ),
       );
     }
 
-    return await createGeminiStream({
-      apiKey: selectedModel.apiKey,
-      baseUrl: selectedModel.baseUrl,
-      contextPreparation,
-      messages: preparedMessages,
-      model: selectedModel.id,
-      signal: req.signal,
-      systemPrompt: runtimeSystemPrompt,
-      webSearchEnabled: Boolean(webSearchEnabled),
-      toolRuntime:
-        typeof sessionId === "string" && sessionId
-          ? { enabledToolIds, sessionId, userId: storageOwnerId }
-          : undefined,
-    });
+    const { createGeminiStream } = await import("@/lib/chat/server/gemini-runtime");
+    return timing.response(
+      await createGeminiStream({
+        apiKey: selectedModel.apiKey,
+        baseUrl: selectedModel.baseUrl,
+        contextPreparation,
+        includeThoughts: modelMetadata?.supportsReasoning !== false,
+        messages: preparedMessages,
+        model: selectedModel.id,
+        signal: req.signal,
+        systemPrompt: runtimeSystemPrompt,
+        webSearchEnabled: Boolean(webSearchEnabled),
+        toolRuntime:
+          typeof sessionId === "string" && sessionId
+            ? { enabledToolIds, sessionId, userId: storageOwnerId }
+            : undefined,
+      }),
+    );
   } catch (error) {
     console.error("Chat error:", error);
     return NextResponse.json({ error: describeGenerationError(error) }, { status: 500 });

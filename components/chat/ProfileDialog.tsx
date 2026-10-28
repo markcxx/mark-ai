@@ -1,7 +1,7 @@
 "use client";
 
 import { CakeSlice, Camera, LoaderCircle, Mail, ShieldCheck, UserRound } from "lucide-react";
-import Image from "next/image";
+import Image from "@/components/ui/AppImage";
 import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 

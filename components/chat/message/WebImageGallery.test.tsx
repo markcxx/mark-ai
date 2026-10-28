@@ -24,7 +24,9 @@ it("renders selected pictures without captions or URLs outside collapsed tool de
     />,
   );
   expect(html).toContain('aria-label="网页图片"');
-  expect(html).toContain('src="https://images.example.com/body.jpg"');
+  expect(html).toContain(
+    'src="/api/public/web-image?url=https%3A%2F%2Fimages.example.com%2Fbody.jpg&amp;source=https%3A%2F%2Fexample.com"',
+  );
   expect(html).not.toContain("<figcaption");
   expect(html).not.toContain("<a ");
   expect(html).toContain('referrerPolicy="no-referrer"');

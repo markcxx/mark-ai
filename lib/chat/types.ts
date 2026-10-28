@@ -11,12 +11,16 @@ export type ThinkingSegment = {
 
 export type ToolSegment = {
   type: "tool";
+  stepId?: string;
   webSearch: WebSearchState;
 };
 
 export type ContentSegment = {
   type: "content";
   content: string;
+  /** Assigned by the runtime, never inferred from the wording of the text. */
+  stepId?: string;
+  phase?: "progress" | "answering" | "answer";
 };
 
 export type GeneratedFileState = {
@@ -33,6 +37,7 @@ export type GeneratedFileState = {
 
 export type GeneratedFileSegment = {
   type: "generated-file";
+  stepId?: string;
   generatedFile: GeneratedFileState;
 };
 
@@ -193,6 +198,8 @@ export type ChatSession = {
 };
 
 export type ChatStreamEvent = {
+  stepId?: string;
+  status?: "started" | "tool";
   generatedFile?: GeneratedFileState;
   generatedImage?: GeneratedImageState;
   inputTokens?: number;
@@ -200,7 +207,8 @@ export type ChatStreamEvent = {
   text?: string;
   totalTokens?: number;
   tokenUsageSource?: TokenUsageSource;
-  type?: "error" | "content" | "file" | "image" | "reasoning" | "tool" | "usage";
+  type?:
+    "error" | "content" | "file" | "image" | "reasoning" | "tool" | "usage" | "step" | "complete";
   webSearch?: WebSearchState;
 };
 

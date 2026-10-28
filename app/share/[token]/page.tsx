@@ -1,3 +1,4 @@
+import AppImage from "@/components/ui/AppImage";
 import type { Metadata } from "next";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SharedConversationContent } from "@/components/chat/SharedConversationContent";
@@ -23,7 +24,13 @@ export default async function SharedConversationPage({
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--chat-panel-bg)] md:rounded-xl md:border md:border-gray-200 dark:md:border-white/10">
         <header className="flex min-h-16 shrink-0 items-center gap-3 border-b border-gray-200 px-4 py-3 md:px-6 dark:border-white/10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img alt="MarkAI" src="/images/markai.svg" className="size-7 shrink-0" />
+          <AppImage
+            alt="MarkAI"
+            src="/images/markai.svg"
+            width={28}
+            height={28}
+            className="size-7 shrink-0"
+          />
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-sm font-semibold">
               {share?.snapshot.title || "会话分享"}

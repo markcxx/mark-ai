@@ -1,7 +1,7 @@
 "use client";
 
 import { Download, FileJson, ImageDown } from "lucide-react";
-import Image from "next/image";
+import Image from "@/components/ui/AppImage";
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -74,8 +74,8 @@ function ExportPreviewMessage({ message }: { message: Message }) {
             className="my-2 w-fit max-w-full overflow-hidden rounded-xl"
             key={generatedImage.file.id}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Image
+              native
               alt={
                 generatedImage.revisedPrompt || generatedImage.prompt || generatedImage.file.name
               }

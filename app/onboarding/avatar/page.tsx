@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import Image from "@/components/ui/AppImage";
 import { useRouter } from "next/navigation";
 import { Camera, ImagePlus, LoaderCircle, MoveRight, UserRound } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";

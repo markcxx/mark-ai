@@ -134,7 +134,8 @@ export const useToolStore = create<ToolStore>((set, get) => ({
 
   persistDraftToSession: async (sessionId) => {
     const draft = get().draftEnabledToolIds;
-    const saved = await putSessionTools(sessionId, draft);
+    // A newly created session already has no tools; avoid a redundant round trip.
+    const saved = draft.length ? await putSessionTools(sessionId, draft) : [];
     sessionRequestId += 1;
     set({
       activeSessionId: sessionId,

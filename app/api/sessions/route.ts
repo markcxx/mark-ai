@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 
 import { getCurrentUserId } from "@/lib/auth-helpers";
 import { createChatSession, listChatSessions } from "@/lib/chat/storage";
@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const userId = await getCurrentUserId();
+  const userId = await getCurrentUserId({ deferPlatformRecord: after });
   const body = await req.json().catch(() => ({}));
   const session = await createChatSession({
     initialMessage: typeof body.initialMessage === "string" ? body.initialMessage : undefined,

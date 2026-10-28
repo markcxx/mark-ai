@@ -3,6 +3,7 @@
 import { Popover } from "@base-ui/react/popover";
 import { ChevronRight, ExternalLink, Globe } from "lucide-react";
 import { useState } from "react";
+import AppImage from "@/components/ui/AppImage";
 import type { ReactElement } from "react";
 
 import type { WebCitation } from "@/lib/chat/citations";
@@ -26,27 +27,17 @@ const getFaviconUrl = (citation: WebCitation) => {
 };
 
 export function SourceFavicon({ citation, size = 16 }: { citation: WebCitation; size?: number }) {
-  const [failed, setFailed] = useState(false);
-
   return (
-    <span
-      className="flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-white text-gray-400 ring-1 ring-gray-200 dark:bg-[#252525] dark:ring-white/15"
-      style={{ height: size, width: size }}
-    >
-      {failed ? (
-        <Globe size={Math.max(10, size - 5)} />
-      ) : (
-        // eslint-disable-next-line @next/next/no-img-element -- Search results can use arbitrary favicon hosts that cannot be declared in Next image config.
-        <img
-          alt=""
-          className="h-full w-full object-contain p-0.5"
-          height={size}
-          onError={() => setFailed(true)}
-          src={getFaviconUrl(citation)}
-          width={size}
-        />
-      )}
-    </span>
+    <AppImage
+      native
+      src={getFaviconUrl(citation)}
+      alt=""
+      width={size}
+      height={size}
+      containerClassName="shrink-0 overflow-hidden rounded-full bg-white text-gray-400 ring-1 ring-gray-200 dark:bg-[#252525] dark:ring-white/15"
+      className="h-full w-full object-contain p-0.5"
+      fallback={<Globe size={Math.max(10, size - 5)} />}
+    />
   );
 }
 

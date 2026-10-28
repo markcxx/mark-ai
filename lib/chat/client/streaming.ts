@@ -17,6 +17,7 @@ export const createSmoothTextController = (onChunk: (chunk: string) => void) => 
   let finishing = false;
   let lastFrameTime = 0;
   let queue = "";
+  let firstChunk = true;
   const finishResolvers: Array<() => void> = [];
 
   const settle = () => {
@@ -75,6 +76,11 @@ export const createSmoothTextController = (onChunk: (chunk: string) => void) => 
     },
     push: (chunk: string) => {
       if (!chunk) return;
+      if (firstChunk) {
+        firstChunk = false;
+        onChunk(chunk);
+        return;
+      }
       queue += chunk;
       schedule();
     },

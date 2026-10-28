@@ -11,7 +11,6 @@ import { normalizeWebResourceContext } from "../web-context";
 
 export const WEB_TOOL_NAMES = new Set<string>(WEB_TOOLS.map((tool) => tool.function.name));
 const MAX_EXCERPT_CHARS = 12_000;
-const MAX_CALLS = 16;
 
 const positiveInteger = (value: unknown, fallback: number, max: number) =>
   typeof value === "number" && Number.isSafeInteger(value) && value > 0
@@ -65,7 +64,6 @@ export class WebToolSession {
   private documents = new Map<string, WebpageReadResponse>();
   private images = new Map<string, WebImage>();
   private citations = new Map<string, number>();
-  private calls = 0;
 
   constructor(
     messages: ChatMessage[],
@@ -125,8 +123,6 @@ export class WebToolSession {
       throw new Error("请先通过搜索、用户提供的链接或已读页面的链接定位网页，再读取该 URL。");
     let document = this.documents.get(url);
     if (!document) {
-      if (new Set(this.documents.values()).size >= 6)
-        throw new Error("本轮已读取六个页面，请基于已有来源作答。");
       document = await readWebpage({ url, signal: this.signal });
       // Treat the reader's final URL as source metadata, never arbitrary fetch instructions.
       document.url = publicResourceUrl(document.url) || url;
@@ -166,8 +162,6 @@ export class WebToolSession {
     };
     emit(state);
     try {
-      if (++this.calls > MAX_CALLS)
-        throw new Error("本轮联网调用次数已达上限，请基于已有来源作答。");
       let result: WebSearchState;
       if (name === "web_search") {
         if (!query || query.length > 500) throw new Error("请输入不超过 500 个字符的搜索内容");

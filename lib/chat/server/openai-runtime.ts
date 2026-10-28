@@ -20,6 +20,8 @@ import {
   type ThinkingTagStreamEvent,
 } from "@/lib/chat/server/thinking-tag-stream";
 import {
+  encodeCompletionEvent,
+  encodeStepEvent,
   encodeGeneratedFileEvent,
   encodeStreamEvent,
   encodeToolEvent,
@@ -89,6 +91,9 @@ export const createOpenAICompatibleStream = async (
     async start(controller) {
       const toolRuntimeState = new Map<string, unknown>();
       let chartAttemptIndex = 0;
+      const runId = crypto.randomUUID();
+      let stepIndex = 0;
+      let finalStepId = "";
       const webTools = new WebToolSession(messages, signal);
 
       const requestUpstream = async (
@@ -195,6 +200,8 @@ export const createOpenAICompatibleStream = async (
         requiredToolNames: string[] = [],
       ) => {
         const reader = await requestUpstream(requestMessages, allowTools, requiredToolNames);
+        const stepId = `${runId}:${++stepIndex}`;
+        if (availableTools.length) controller.enqueue(encodeStepEvent(encoder, stepId, "started"));
         const decoder = new TextDecoder();
         const toolCallsByIndex = new Map<number, OpenAIToolCall>();
         let assistantContent = "";
@@ -202,6 +209,8 @@ export const createOpenAICompatibleStream = async (
         let buffer = "";
         let providerUsage: TokenUsage | undefined;
         let thinkingParsersFinished = false;
+        let finishReason: string | undefined;
+        let receivedDone = false;
         const thinkingParsers = new Map<number, ThinkingTagStreamParser>();
 
         const emitTextEvent = (event: ThinkingTagStreamEvent) => {
@@ -259,6 +268,7 @@ export const createOpenAICompatibleStream = async (
           }
 
           for (const [fallbackIndex, choice] of choices.entries()) {
+            if (choice.finish_reason) finishReason = choice.finish_reason;
             const reasoning = getChoiceText(choice, [
               "reasoning_content",
               "reasoningContent",
@@ -291,8 +301,15 @@ export const createOpenAICompatibleStream = async (
 
         const getPassResult = () => {
           finishThinkingParsers();
+          if (!receivedDone && !finishReason) {
+            throw new Error("模型连接意外结束，请继续生成或重试。");
+          }
+          if (finishReason === "length" || finishReason === "content_filter") {
+            throw new Error("模型回复未完整生成，请继续生成或切换模型。");
+          }
           const toolCalls = normalizeToolCalls([...toolCallsByIndex.values()]);
           return {
+            stepId,
             assistantContent,
             assistantReasoning,
             toolCalls,
@@ -321,7 +338,8 @@ export const createOpenAICompatibleStream = async (
           if (!trimmed.startsWith("data:")) return false;
 
           const data = trimmed.slice(5).trim();
-          if (!data || data === "[DONE]") return data === "[DONE]";
+          if (data === "[DONE]") receivedDone = true;
+          if (!data || receivedDone) return receivedDone;
 
           let parsed;
           try {
@@ -359,20 +377,13 @@ export const createOpenAICompatibleStream = async (
       };
 
       try {
-        const MAX_TOOL_ROUNDS = builtinFunctions.some(
-          (toolFunction) => toolFunction.name === "word_document_begin",
-        )
-          ? 32
-          : webSearchEnabled
-            ? 8
-            : 5;
-        let needsFinalAnswer = false;
         let currentMessages = openAIMessages;
         let latestUsage: ResolvedTokenUsage | undefined;
         let requiredWordToolNames: string[] = [];
         let wordProtocolRetries = 0;
 
-        for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+        while (true) {
+          signal?.throwIfAborted();
           const pass = await streamModelResponse(
             currentMessages,
             availableTools.length > 0,
@@ -386,9 +397,15 @@ export const createOpenAICompatibleStream = async (
                 requiredWordToolNames.includes(toolCall.function.name)),
           );
 
-          needsFinalAnswer = executableToolCalls.length > 0;
           if (executableToolCalls.length === 0) {
-            if (requiredWordToolNames.length === 0) break;
+            if (requiredWordToolNames.length === 0) {
+              if (!pass.assistantContent.trim()) {
+                throw new Error("模型未返回回答正文，请重试或切换模型。");
+              }
+              finalStepId = pass.stepId;
+              break;
+            }
+            controller.enqueue(encodeStepEvent(encoder, pass.stepId, "tool"));
             wordProtocolRetries += 1;
             if (wordProtocolRetries > 2) {
               throw new Error(
@@ -414,6 +431,7 @@ export const createOpenAICompatibleStream = async (
             continue;
           }
           wordProtocolRetries = 0;
+          controller.enqueue(encodeStepEvent(encoder, pass.stepId, "tool"));
 
           const assistantToolMessage: OpenAIChatMessage = {
             content: pass.assistantContent || null,
@@ -424,6 +442,7 @@ export const createOpenAICompatibleStream = async (
           const toolResultMessages: OpenAIChatMessage[] = [];
 
           for (const toolCall of executableToolCalls) {
+            signal?.throwIfAborted();
             const builtinTool = getBuiltinToolByFunction(toolCall.function.name);
             if (builtinTool && toolRuntime) {
               let args: Record<string, unknown> = {};
@@ -532,19 +551,11 @@ export const createOpenAICompatibleStream = async (
           currentMessages = [...currentMessages, assistantToolMessage, ...toolResultMessages];
         }
 
-        if (requiredWordToolNames.length > 0) {
-          throw new Error(
-            `Word 文档生成超过最大步骤数，尚待执行 ${requiredWordToolNames.join(" 或 ")}`,
-          );
-        }
-
-        if (needsFinalAnswer && requiredWordToolNames.length === 0) {
-          const final = await streamModelResponse(currentMessages, false, []);
-          latestUsage = final.usage;
-        }
         if (latestUsage) {
           controller.enqueue(encodeUsageEvent(encoder, latestUsage));
         }
+        signal?.throwIfAborted();
+        if (availableTools.length) controller.enqueue(encodeCompletionEvent(encoder, finalStepId));
         controller.close();
       } catch (error) {
         console.error("OpenAI compatible chat error:", error);
@@ -558,7 +569,8 @@ export const createOpenAICompatibleStream = async (
 
   return new Response(stream, {
     headers: {
-      "Cache-Control": "no-cache",
+      "Cache-Control": "no-cache, no-transform",
+      "X-Accel-Buffering": "no",
       Connection: "keep-alive",
       "Content-Type": "application/x-ndjson; charset=utf-8",
       ...getContextHeaders(contextPreparation),

@@ -1,3 +1,10 @@
+import {
+  stageSessionMessages,
+  recoverPendingMessages,
+  acknowledgeSessionSave,
+  forgetPendingSession,
+} from "@/lib/chat/client/pending-session";
+import { enqueueSessionWrite } from "@/lib/chat/client/session-write-queue";
 import toast from "react-hot-toast";
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
@@ -235,7 +242,13 @@ export const useSessionStore = create<SessionStore>()(
 
         const data = await response.json();
         if (requestId !== activeSessionLoadRequest) return undefined;
-        const messages: Message[] = Array.isArray(data.messages) ? data.messages : [];
+        const recovered =
+          typeof data.session?.revision === "number"
+            ? recoverPendingMessages(sessionId, data.session.revision)
+            : undefined;
+        const messages: Message[] =
+          recovered || (Array.isArray(data.messages) ? data.messages : []);
+        if (recovered) toast("已恢复尚未保存的消息", { id: `recover-${sessionId}` });
 
         set({
           activeSessionId: data.session?.id || sessionId,
@@ -303,6 +316,7 @@ export const useSessionStore = create<SessionStore>()(
           navigateToNewChat("replace");
         }
 
+        forgetPendingSession(sessionId);
         toast.success("会话已删除");
         return deletingActiveSession;
       } catch (error) {
@@ -387,39 +401,49 @@ export const useSessionStore = create<SessionStore>()(
     },
 
     persistSessionMessages: async (sessionId, messages) => {
-      try {
-        const response = await fetch(`/api/sessions/${sessionId}/messages`, {
-          body: JSON.stringify({ messages }),
-          headers: { "Content-Type": "application/json" },
-          method: "PUT",
-        });
+      const token = stageSessionMessages(
+        sessionId,
+        messages,
+        get().sessions.find((session) => session.id === sessionId)?.revision,
+      );
+      return enqueueSessionWrite(sessionId, async () => {
+        try {
+          const response = await fetch(`/api/sessions/${sessionId}/messages`, {
+            body: JSON.stringify({ messages }),
+            headers: { "Content-Type": "application/json" },
+            method: "PUT",
+          });
 
-        if (!response.ok) {
-          if (
-            response.status === 404 &&
-            !get().sessions.some((session) => session.id === sessionId)
-          ) {
-            return undefined;
+          if (!response.ok) {
+            if (
+              response.status === 404 &&
+              !get().sessions.some((session) => session.id === sessionId)
+            ) {
+              return undefined;
+            }
+            const errorPayload = await response.text();
+            let message = errorPayload || "保存消息失败";
+            try {
+              const parsed = JSON.parse(errorPayload);
+              message = parsed.detail || parsed.error || message;
+            } catch {
+              // Keep raw text
+            }
+            throw new Error(message);
           }
-          const errorPayload = await response.text();
-          let message = errorPayload || "保存消息失败";
-          try {
-            const parsed = JSON.parse(errorPayload);
-            message = parsed.detail || parsed.error || message;
-          } catch {
-            // Keep raw text
+
+          const data = await response.json();
+          if (data.session) {
+            get().upsertSession(data.session);
+            acknowledgeSessionSave(sessionId, token, data.session.revision);
           }
-          throw new Error(message);
+          return data.session as ChatSession | undefined;
+        } catch (error) {
+          console.error("Session save error:", error);
+          toast.error(error instanceof Error ? `保存会话失败：${error.message}` : "保存会话失败");
+          return undefined;
         }
-
-        const data = await response.json();
-        if (data.session) get().upsertSession(data.session);
-        return data.session as ChatSession | undefined;
-      } catch (error) {
-        console.error("Session save error:", error);
-        toast.error(error instanceof Error ? `保存会话失败：${error.message}` : "保存会话失败");
-        return undefined;
-      }
+      });
     },
 
     generateSessionTitle: async (sessionId, messages) => {

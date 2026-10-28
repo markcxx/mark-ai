@@ -55,9 +55,9 @@ import { MessageAudioPlayer } from "./MessageAudioPlayer";
 import { MessageActionButton } from "./MessageActionButton";
 import { MessageSelectionWrapper } from "./MessageSelectionWrapper";
 import { ThinkingPanel } from "./ThinkingPanel";
-import { GeneratedFileToolBlock } from "./message/GeneratedFileToolBlock";
-import { GeneratedImageBlock } from "./message/GeneratedImageBlock";
-import { WebSearchToolBlock, WebSearchToolBlockItem } from "./message/WebSearchToolBlock";
+import { WebSearchToolBlock } from "./message/WebSearchToolBlock";
+import { GenerationErrorCard } from "./message/GenerationErrorCard";
+import { MessageSegments } from "./message/MessageSegments";
 import { MessageSources } from "./message/MessageSources";
 import { isImageGenerationModel } from "@/lib/chat/image-models";
 
@@ -759,55 +759,13 @@ export const MessageItem = memo(function MessageItem({
                       thinking={message.isReasoning}
                     />
                   )}
-                  {contentSegments.map((seg, i) => {
-                    if (seg.type === "translation") return null;
-                    if (seg.type === "error") return null;
-                    if (seg.type === "thinking") {
-                      return (
-                        <ThinkingPanel
-                          content={seg.content}
-                          duration={seg.duration}
-                          key={`seg-${i}`}
-                          thinking={seg.isActive}
-                        />
-                      );
-                    }
-                    if (seg.type === "tool") {
-                      return <WebSearchToolBlockItem key={`seg-${i}`} webSearch={seg.webSearch} />;
-                    }
-                    if (seg.type === "generated-file") {
-                      return (
-                        <GeneratedFileToolBlock
-                          generatedFile={seg.generatedFile}
-                          key={`seg-${i}`}
-                          onPreview={setPreviewFile}
-                        />
-                      );
-                    }
-                    if (seg.type === "generated-image") {
-                      return (
-                        <GeneratedImageBlock
-                          generatedImage={seg.generatedImage}
-                          key={`seg-${i}`}
-                          onPreview={setPreviewFile}
-                        />
-                      );
-                    }
-                    return seg.content ? (
-                      <div key={`seg-${i}`}>
-                        <MarkdownContent
-                          animation={generalSettings.responseAnimation}
-                          citations={citations}
-                          streaming={message.isStreaming && i === contentSegments.length - 1}
-                        >
-                          {seg.content}
-                        </MarkdownContent>
-                        {message.isStreaming && i === contentSegments.length - 1 && (
-                          <span className="ml-1 inline-block h-4 w-2 animate-pulse rounded-full bg-primary align-middle" />
-                        )}
-                      </div>
-                    ) : null;
-                  })}
+                  <MessageSegments
+                    animation={generalSettings.responseAnimation}
+                    citations={citations}
+                    message={message}
+                    onPreview={setPreviewFile}
+                    segments={contentSegments}
+                  />
                 </>
               ) : (
                 <>
@@ -857,13 +815,7 @@ export const MessageItem = memo(function MessageItem({
               {message.segments
                 ?.filter((segment) => segment.type === "error")
                 .map((segment, index) => (
-                  <p
-                    key={`error-${index}`}
-                    role="alert"
-                    className="mt-3 whitespace-pre-wrap break-words text-sm text-red-600 dark:text-red-400"
-                  >
-                    {segment.content}
-                  </p>
+                  <GenerationErrorCard key={`error-${index}`} content={segment.content} />
                 ))}
               {message.interrupted && !readOnly && (
                 <InterruptedHint

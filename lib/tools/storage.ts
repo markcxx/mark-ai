@@ -170,3 +170,34 @@ export const replaceSessionEnabledTools = async (
     );
   }
 };
+
+/** An enabled tool is usable only while it is still installed by this owner. */
+export const listUsableSessionToolIds = async (
+  userId: string,
+  sessionId: string,
+): Promise<string[]> => {
+  if (!isCloudMode()) {
+    return getLocalDatabase()
+      .prepare(
+        `SELECT s.tool_id FROM session_enabled_tools s
+      INNER JOIN user_installed_tools i ON i.user_id = s.user_id AND i.tool_id = s.tool_id
+      WHERE s.user_id = ? AND s.session_id = ? ORDER BY s.enabled_at`,
+      )
+      .all(userId, sessionId)
+      .map((row: any) => String(row.tool_id));
+  }
+  const rows = await getDb()
+    .select({ toolId: sessionEnabledTools.toolId })
+    .from(sessionEnabledTools)
+    .innerJoin(
+      userInstalledTools,
+      and(
+        eq(userInstalledTools.userId, sessionEnabledTools.userId),
+        eq(userInstalledTools.toolId, sessionEnabledTools.toolId),
+      ),
+    )
+    .where(
+      and(eq(sessionEnabledTools.userId, userId), eq(sessionEnabledTools.sessionId, sessionId)),
+    );
+  return rows.map((row) => row.toolId);
+};

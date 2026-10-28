@@ -3,7 +3,7 @@ import { getProviderDisplayName, getPublicConfiguredModels, findConfiguredModel 
 import type { ConfiguredModel, PublicConfiguredModel } from "./models";
 import {
   getPublicUserModels,
-  getUserConfiguredModels,
+  getUserModelConfiguration,
   listUserModelProviders,
 } from "./user-model-providers";
 
@@ -65,10 +65,8 @@ export const findAvailableModel = async (
   if (!modelId) return undefined;
 
   if (userId) {
-    const [userModels, userProviders] = await Promise.all([
-      getUserConfiguredModels(userId),
-      listUserModelProviders(userId),
-    ]);
+    const { models: userModels, providers: userProviders } =
+      await getUserModelConfiguration(userId);
     const userModel = userModels.find(
       (model) => model.id === modelId && (!provider || model.provider === provider),
     );

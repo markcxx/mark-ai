@@ -138,3 +138,73 @@ it("redacts configured retrieval credentials in errors before emitting them", as
     vi.unstubAllEnvs();
   }
 });
+
+it("can select already retrieved images after more than sixteen calls and six distinct pages", async () => {
+  const urls = Array.from({ length: 7 }, (_, index) => `https://example.com/page-${index}`);
+  vi.mocked(readWebpage).mockImplementation(async ({ url: target }) => ({
+    ...page(),
+    url: target,
+  }));
+  const session = new WebToolSession([{ role: "user", content: urls.join("\n") }]);
+  let imageId = "";
+  for (let index = 0; index < 20; index++) {
+    const result = await execute(
+      session,
+      "read_webpage",
+      { url: urls[index % urls.length] },
+      `read-${index}`,
+    );
+    expect(result.status).toBe("done");
+    imageId = result.images![0].id;
+  }
+  expect(readWebpage).toHaveBeenCalledTimes(7);
+  const shown = await execute(session, "show_images", { image_ids: [imageId] });
+  expect(shown.status).toBe("done");
+  expect(shown.images?.[0].id).toBe(imageId);
+  expect(searchTavily).not.toHaveBeenCalled();
+});
+
+it("surfaces displayable image IDs and guidance even when the tool result must be compacted", async () => {
+  const session = new WebToolSession([{ role: "user", content: url }]);
+  const read = await execute(session, "read_webpage", { url });
+  for (const maxChars of [18_000, 2000]) {
+    const output = formatToolResultForModel(
+      { ...read, title: "很长的文章标题".repeat(5000) },
+      maxChars,
+    );
+    expect(output.length).toBeLessThanOrEqual(maxChars);
+    const payload = JSON.parse(output);
+    expect(payload.image_display).toMatchObject({ candidate_count: 1, tool: "show_images" });
+    expect(payload.images[0].id).toBe(read.images![0].id);
+  }
+  const shown = await execute(session, "show_images", { image_ids: [read.images![0].id] });
+  expect(JSON.parse(formatToolResultForModel(shown)).image_display).toBeUndefined();
+  expect(
+    JSON.parse(formatToolResultForModel({ ...read, images: [] })).image_display,
+  ).toBeUndefined();
+  expect(
+    JSON.parse(formatToolResultForModel({ ...read, status: "error" })).image_display,
+  ).toBeUndefined();
+});
+
+it("reuses an unshown image from a previous page read after reload without searching again", async () => {
+  const session = new WebToolSession([{ role: "user", content: url }]);
+  const read = await execute(session, "read_webpage", { url });
+  const restored = JSON.parse(
+    JSON.stringify({
+      id: "m",
+      role: "model",
+      content: "已整理资料",
+      segments: [{ type: "tool", webSearch: read }],
+    }),
+  );
+  const context = getWebResourceContext(restored);
+  expect(context?.images[0].id).toBe(read.images![0].id);
+  const followup = new WebToolSession([
+    { role: "model", content: restored.content, webContext: context },
+  ]);
+  const selected = await execute(followup, "show_images", { image_ids: [context!.images[0].id] });
+  expect(selected.status).toBe("done");
+  expect(readWebpage).toHaveBeenCalledTimes(1);
+  expect(searchTavily).not.toHaveBeenCalled();
+});

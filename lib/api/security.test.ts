@@ -26,3 +26,16 @@ it("records only authenticated non-banned cloud users using their session identi
   await authorizeApiRequest(request);
   expect(mocks.record).not.toHaveBeenCalled();
 });
+
+it("defers optional platform writes without skipping fresh authentication or ban checks", async () => {
+  mocks.session.mockResolvedValue({ user: { id: "u1" } });
+  mocks.record.mockImplementation(() => new Promise(() => {}));
+  const schedule = vi.fn();
+  const req = new NextRequest("https://example.invalid/api/chat");
+  expect((await authorizeApiRequest(req, { deferPlatformRecord: schedule })).authorized).toBe(true);
+  expect(mocks.record).not.toHaveBeenCalled();
+  expect(schedule).toHaveBeenCalledTimes(1);
+  expect(mocks.session.mock.calls.at(-1)?.[0].query).toEqual({ disableCookieCache: true });
+  schedule.mock.calls[0][0]();
+  expect(mocks.record).toHaveBeenCalledWith("u1", req.headers);
+});

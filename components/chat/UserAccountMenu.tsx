@@ -9,7 +9,7 @@ import {
   ShieldCheck,
   Download,
 } from "lucide-react";
-import Image from "next/image";
+import Image from "@/components/ui/AppImage";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 

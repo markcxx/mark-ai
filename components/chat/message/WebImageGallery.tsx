@@ -1,48 +1,41 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, ExternalLink, ImageOff } from "lucide-react";
+import AppImage from "@/components/ui/AppImage";
 import type { WebImage } from "@/lib/chat/types";
-import { publicResourceUrl } from "@/lib/search/web-assets";
-import { AppDialog } from "@/components/ui/AppDialog";
-import { IconButton } from "@/components/ui/IconButton";
+import { normalizeWebImageUrl, webImageDisplayUrl } from "@/lib/chat/web-image-url";
+import { FilePreviewDialog } from "../FilePreviewDialog";
+import { cn } from "@/lib/utils";
 
 function ImageTile({
   image,
   index,
   onOpen,
+  single,
 }: {
   image: WebImage;
   index: number;
   onOpen: () => void;
+  single: boolean;
 }) {
-  const [failed, setFailed] = useState(false);
   return (
-    <figure className="min-w-0 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-white/10 dark:bg-white/[0.025]">
-      <button
-        aria-label={`查看图片 ${index + 1}：${image.title}`}
-        className="relative flex aspect-[3/2] w-full items-center justify-center overflow-hidden bg-gray-100 dark:bg-white/5"
-        onClick={onOpen}
-        type="button"
-      >
-        {failed ? (
-          <span className="flex items-center gap-2 px-3 text-xs text-gray-500">
-            <ImageOff aria-hidden="true" size={18} />
-            图片暂不可用，点击查看来源
-          </span>
-        ) : (
-          // eslint-disable-next-line @next/next/no-img-element -- Public web image hosts are dynamic.
-          <img
-            alt={image.description || image.title}
-            className="h-full w-full object-cover transition-transform duration-200 hover:scale-[1.03]"
-            loading="lazy"
-            onError={() => setFailed(true)}
-            referrerPolicy="no-referrer"
-            src={image.url}
-          />
-        )}
-      </button>
-    </figure>
+    <AppImage
+      native
+      src={webImageDisplayUrl(image.url, image.sourceUrl)!}
+      alt={image.description || image.title}
+      loading="lazy"
+      referrerPolicy="no-referrer"
+      onPreview={onOpen}
+      previewLabel={`查看图片 ${index + 1}`}
+      containerClassName={cn(
+        "w-full overflow-hidden rounded-lg",
+        single ? "max-h-[440px]" : "aspect-[3/2]",
+      )}
+      containerStyle={single ? undefined : { aspectRatio: "3 / 2" }}
+      className={
+        single ? "max-h-[440px] max-w-full object-contain" : "h-full w-full object-contain"
+      }
+    />
   );
 }
 
@@ -51,7 +44,7 @@ export function WebImageGallery({ images }: { images: WebImage[] }) {
   const safeImages = (Array.isArray(images) ? images : [])
     .flatMap((image) => {
       if (!image || typeof image !== "object") return [];
-      const url = publicResourceUrl(image.url);
+      const url = normalizeWebImageUrl(image.url);
       return url ? [{ ...image, url }] : [];
     })
     .slice(0, 6);
@@ -60,61 +53,37 @@ export function WebImageGallery({ images }: { images: WebImage[] }) {
   if (!safeImages.length) return null;
   return (
     <section aria-label="网页图片" className="my-3 min-w-0">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div
+        className={cn(
+          "grid gap-2",
+          safeImages.length === 1
+            ? "grid-cols-1"
+            : safeImages.length === 2
+              ? "grid-cols-2"
+              : "grid-cols-2 sm:grid-cols-3",
+        )}
+      >
         {safeImages.map((image, index) => (
-          <ImageTile image={image} index={index} key={image.id} onOpen={() => setActive(index)} />
+          <ImageTile
+            image={image}
+            index={index}
+            key={image.id}
+            onOpen={() => setActive(index)}
+            single={safeImages.length === 1}
+          />
         ))}
       </div>
-      <AppDialog
-        bodyClassName="p-3"
+      <FilePreviewDialog
+        file={
+          selected
+            ? { id: selected.id, name: selected.title, contentType: "image/*", size: 0 }
+            : null
+        }
+        previewUrl={selected && webImageDisplayUrl(selected.url, selected.sourceUrl)}
+        downloadUrl={selected && webImageDisplayUrl(selected.url, selected.sourceUrl)}
+        showImageDetails={false}
         onClose={() => setActive(null)}
-        open={Boolean(selected)}
-        title={<span className="block truncate">{selected?.title || "网页图片"}</span>}
-        width={960}
-      >
-        {selected && (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element -- Public web image hosts are dynamic. */}
-            <img
-              alt={selected.description || selected.title}
-              className="mx-auto max-h-[65dvh] max-w-full object-contain"
-              referrerPolicy="no-referrer"
-              src={selected.url}
-            />
-            <div className="mt-3 flex items-center justify-between gap-2">
-              <IconButton
-                aria-label="上一张图片"
-                data-markai-tooltip="上一张"
-                disabled={active === 0}
-                onClick={() => setActive((value) => Math.max(0, (value || 0) - 1))}
-              >
-                <ChevronLeft size={18} />
-              </IconButton>
-              <a
-                className="inline-flex min-h-10 min-w-0 items-center gap-1 text-xs text-primary hover:underline"
-                href={publicResourceUrl(selected.sourceUrl) || selected.url}
-                rel="noreferrer"
-                target="_blank"
-              >
-                <ExternalLink className="shrink-0" size={13} />
-                <span className="truncate">
-                  打开来源 · {(active || 0) + 1}/{safeImages.length}
-                </span>
-              </a>
-              <IconButton
-                aria-label="下一张图片"
-                data-markai-tooltip="下一张"
-                disabled={active === safeImages.length - 1}
-                onClick={() =>
-                  setActive((value) => Math.min(safeImages.length - 1, (value || 0) + 1))
-                }
-              >
-                <ChevronRight size={18} />
-              </IconButton>
-            </div>
-          </>
-        )}
-      </AppDialog>
+      />
     </section>
   );
 }

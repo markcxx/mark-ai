@@ -149,6 +149,8 @@ Use the existing ownership boundaries before adding abstractions.
 
 ### Message Rendering
 
+- Web image galleries show only images: no cards, frames, captions, visible image names, domains, or source links. Keep provenance in metadata and accessibility labels; reuse the existing PhotoSwipe image preview in `FilePreviewDialog` for click-to-enlarge, with image details hidden. Do not add a separate card/modal viewer for web images.
+
 - `components/chat/MessageItem.tsx`: message-level composition and actions.
 - `MarkdownContent`, `ThinkingPanel`, `MessageSources`, and the components under `components/chat/message/` own specialized message content.
 - Persist auxiliary message output as typed `MessageSegment` entries when it must survive reloads and exports. Do not add a database column for every new visual block.
@@ -172,6 +174,12 @@ Use the existing ownership boundaries before adding abstractions.
 - `useToolStore`: installed/enabled tools and their active-session binding.
 
 Do not duplicate store state in component state unless the value is strictly local and ephemeral, such as one open dialog, hover state, a temporary form, or an animation handoff.
+
+## Tool Execution Policy
+
+- Product decision (2026-10-28): do not stop tool execution based on a fixed number of model/tool rounds. The user explicitly prefers allowing the agent to continue until the task is complete.
+- Do not introduce a fixed round cap as either the normal stopping condition or a fallback without a new explicit user decision.
+- Distinguish successful completion from cancellation, upstream failure, and an empty final response. Progress narration or reasoning alone must not be treated as a completed answer. Preserve available results when execution is interrupted.
 
 ## Chat And Persistence Invariants
 

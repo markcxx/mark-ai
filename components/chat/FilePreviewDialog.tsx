@@ -1,5 +1,7 @@
 "use client";
 
+import { ImageSkeleton } from "@/components/ui/ImageSkeleton";
+
 import { useFileUrl } from "./FileAccessContext";
 
 import { Download, ExternalLink, FileQuestion, Loader2 } from "lucide-react";
@@ -60,11 +62,13 @@ function PhotoSwipeImagePreview({
   file,
   onClose,
   previewUrl,
+  showImageDetails,
 }: {
   downloadUrl: string;
   file: PreviewFile;
   onClose: () => void;
   previewUrl: string;
+  showImageDetails: boolean;
 }) {
   const lightboxRef = useRef<PhotoSwipeLightbox | null>(null);
   const onCloseRef = useRef(onClose);
@@ -110,6 +114,7 @@ function PhotoSwipeImagePreview({
         });
 
         lightbox.on("uiRegister", () => {
+          if (!showImageDetails) return;
           lightbox.pswp?.ui?.registerElement({
             appendTo: "root",
             className: "markai-pswp-caption",
@@ -144,11 +149,12 @@ function PhotoSwipeImagePreview({
         lightbox.loadAndOpen(0);
       } catch {
         if (!active) return;
-        toast.error("图片加载失败，请下载后查看");
+        toast.error(showImageDetails ? "图片加载失败，请下载后查看" : "图片加载失败，请稍后重试");
         onCloseRef.current();
       }
     };
 
+    image.referrerPolicy = "no-referrer";
     image.src = previewUrl;
     void openImage();
 
@@ -158,7 +164,7 @@ function PhotoSwipeImagePreview({
       lightboxRef.current?.destroy();
       lightboxRef.current = null;
     };
-  }, [downloadUrl, file.id, file.name, previewUrl]);
+  }, [downloadUrl, file.id, file.name, previewUrl, showImageDetails]);
 
   return (
     <div
@@ -167,7 +173,10 @@ function PhotoSwipeImagePreview({
       className="fixed inset-0 z-[95] flex items-center justify-center bg-black/90 text-white"
       role="status"
     >
-      <Loader2 className="animate-spin" size={22} />
+      <ImageSkeleton
+        label="正在加载图片预览"
+        className="aspect-[4/3] w-[min(70vw,720px)] rounded-xl bg-white/10 dark:bg-white/10"
+      />
     </div>
   );
 }
@@ -177,11 +186,13 @@ export function FilePreviewDialog({
   file,
   onClose,
   previewUrl,
+  showImageDetails = true,
 }: {
   downloadUrl?: string;
   file: PreviewFile | null;
   onClose: () => void;
   previewUrl?: string;
+  showImageDetails?: boolean;
 }) {
   const fileUrl = useFileUrl();
   const kind = file ? getPreviewKind(file) : "unsupported";
@@ -189,9 +200,7 @@ export function FilePreviewDialog({
   const [loading, setLoading] = useState(kind !== "unsupported");
   useEffect(() => setLoading(kind !== "unsupported"), [file?.id, kind]);
 
-  const resolvedPreviewUrl = file
-    ? previewUrl || fileUrl(file.id, "preview")
-    : previewUrl || "";
+  const resolvedPreviewUrl = file ? previewUrl || fileUrl(file.id, "preview") : previewUrl || "";
   const resolvedDownloadUrl = file
     ? downloadUrl || fileUrl(file.id, "download")
     : downloadUrl || "";
@@ -219,6 +228,7 @@ export function FilePreviewDialog({
         file={file}
         onClose={onClose}
         previewUrl={resolvedPreviewUrl}
+        showImageDetails={showImageDetails}
       />
     );
   }

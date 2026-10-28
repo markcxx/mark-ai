@@ -86,6 +86,19 @@ export function extractWebImages(
   }
   for (const match of cleaned.matchAll(/<img\b[^>]*>/gi)) {
     const tag = match[0];
+    const before = cleaned.slice(0, match.index);
+    const figureStart = before.lastIndexOf("<figure");
+    const figureEnd = cleaned.indexOf("</figure>", match.index);
+    const figure =
+      figureStart > before.lastIndexOf("</figure>") && figureEnd >= 0
+        ? cleaned.slice(figureStart, figureEnd)
+        : "";
+    const caption = cleanText(figure.match(/<figcaption\b[^>]*>([\s\S]*?)<\/figcaption>/i)?.[1]);
+    const nearby = cleanText(
+      cleaned.slice(Math.max(0, match.index - 240), match.index) +
+        " " +
+        cleaned.slice(match.index + tag.length, match.index + tag.length + 240),
+    );
     const srcset = attribute(tag, "srcset")?.split(",").at(-1)?.trim().split(/\s+/)[0];
     candidates.push({
       url:
@@ -93,7 +106,10 @@ export function extractWebImages(
         attribute(tag, "data-original") ||
         srcset ||
         attribute(tag, "src"),
-      alt: attribute(tag, "alt"),
+      title: attribute(tag, "alt") || caption || attribute(tag, "title"),
+      description: [caption && `图片说明：${caption}`, nearby && `相邻正文：${nearby}`]
+        .filter(Boolean)
+        .join("；"),
       width: Number(attribute(tag, "width")) || undefined,
       height: Number(attribute(tag, "height")) || undefined,
     });

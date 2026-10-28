@@ -6,6 +6,12 @@ import type { ChatMessage } from "./types";
 
 type StreamEventType = "content" | "reasoning" | "error";
 
+export const encodeStepEvent = (encoder: TextEncoder, stepId: string, status: "started" | "tool") =>
+  encoder.encode(`${JSON.stringify({ type: "step", stepId, status })}\n`);
+
+export const encodeCompletionEvent = (encoder: TextEncoder, stepId: string) =>
+  encoder.encode(`${JSON.stringify({ type: "complete", stepId })}\n`);
+
 export const encodeStreamEvent = (encoder: TextEncoder, type: StreamEventType, text: string) =>
   encoder.encode(`${JSON.stringify({ type, text })}\n`);
 

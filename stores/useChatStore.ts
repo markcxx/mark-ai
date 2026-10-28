@@ -2,6 +2,7 @@ import toast from "react-hot-toast";
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 
+import { stageSessionMessages } from "@/lib/chat/client/pending-session";
 import { THINKING_TEXTS } from "@/lib/chat/constants";
 import { createMessageId, getModelKey } from "@/lib/chat/helpers";
 import { applyMessageVariant, toMessageVariant } from "@/lib/chat/message-variants";
@@ -10,6 +11,7 @@ import type {
   ConfiguredModel,
   FileAttachment,
   Message,
+  MessageSegment,
   QuotedSelection,
   QueuedChatMessage,
   RegenerateMode,
@@ -37,7 +39,9 @@ type StreamedMessageResult = Pick<
   >;
 
 type StreamOptions = {
+  sendStartedAt?: number;
   initialContent?: string;
+  initialSegments?: MessageSegment[];
   sessionId?: string;
   webSearchEnabled?: boolean;
 };
@@ -167,6 +171,7 @@ export const useChatStore = create<ChatStore>()(
     streamAssistantMessage: createStreamAssistantMessage(set, get),
 
     sendMessage: async () => {
+      const sendStartedAt = performance.now();
       const {
         input,
         isLoading,
@@ -284,17 +289,18 @@ export const useChatStore = create<ChatStore>()(
         if (!targetSessionId) return;
         sessionStore.setSessionGenerationStatus(targetSessionId, "generating");
 
-        await sessionStore.persistSessionMessages(targetSessionId, [
-          ...messages,
-          userMessage,
-          modelMessage,
-        ]);
+        stageSessionMessages(
+          targetSessionId,
+          [...messages, userMessage, modelMessage],
+          useSessionStore.getState().sessions.find((session) => session.id === targetSessionId)
+            ?.revision,
+        );
         startedStream = true;
         const streamedMessage = await streamAssistantMessage(
           [...messages, userMessage],
           modelMessageId,
           selectedModel,
-          { sessionId: targetSessionId, webSearchEnabled },
+          { sessionId: targetSessionId, webSearchEnabled, sendStartedAt },
         );
         const latestModelMessage = get().messages.find((m) => m.id === modelMessageId);
         const savedMessages = [
@@ -375,7 +381,8 @@ export const useChatStore = create<ChatStore>()(
       const index = messages.findIndex((item) => item.id === message.id);
       if (index < 0) return;
 
-      const { availableModels, selectedModelKey, setOpenMenuMessageId } = useUIStore.getState();
+      const { availableModels, selectedModelKey, setOpenMenuMessageId, webSearchEnabled } =
+        useUIStore.getState();
       const selectedModel = availableModels.find((m) => getModelKey(m) === selectedModelKey);
       const modelConfig =
         availableModels.find((m) => m.id === message.model && m.provider === message.provider) ||
@@ -386,7 +393,7 @@ export const useChatStore = create<ChatStore>()(
         return;
       }
 
-      const baseContent = message.content.trimEnd();
+      const baseContent = message.content;
       const initialContent = baseContent ? `${baseContent}\n\n` : "";
       const continuePrompt: Message = {
         content: "请从上次中断的位置继续，不要重复已经输出过的内容。",
@@ -417,13 +424,23 @@ export const useChatStore = create<ChatStore>()(
       setOpenMenuMessageId(null);
       useSessionStore.getState().setSessionGenerationStatus(targetSessionId, "generating");
 
-      await useSessionStore.getState().persistSessionMessages(targetSessionId, nextMessages);
+      stageSessionMessages(
+        targetSessionId,
+        nextMessages,
+        useSessionStore.getState().sessions.find((session) => session.id === targetSessionId)
+          ?.revision,
+      );
 
       const streamedMessage = await streamAssistantMessage(
         historyMessages,
         message.id,
         modelConfig,
-        { initialContent, sessionId: targetSessionId },
+        {
+          initialContent,
+          initialSegments: message.segments?.filter((segment) => segment.type !== "error"),
+          sessionId: targetSessionId,
+          webSearchEnabled,
+        },
       );
       const savedMessages = nextMessages.map((item) => {
         if (item.id !== message.id) return item;
@@ -515,7 +532,12 @@ export const useChatStore = create<ChatStore>()(
         setOpenMenuMessageId(null);
         sessionStore.setSessionGenerationStatus(targetSessionId, "generating");
 
-        await sessionStore.persistSessionMessages(targetSessionId, nextMessages);
+        stageSessionMessages(
+          targetSessionId,
+          nextMessages,
+          useSessionStore.getState().sessions.find((session) => session.id === targetSessionId)
+            ?.revision,
+        );
 
         const streamedMessage = await streamAssistantMessage(
           historyMessages,
@@ -608,7 +630,12 @@ export const useChatStore = create<ChatStore>()(
       setOpenMenuMessageId(null);
       sessionStore.setSessionGenerationStatus(targetSessionId, "generating");
 
-      await sessionStore.persistSessionMessages(targetSessionId, nextMessages);
+      stageSessionMessages(
+        targetSessionId,
+        nextMessages,
+        useSessionStore.getState().sessions.find((session) => session.id === targetSessionId)
+          ?.revision,
+      );
 
       const streamedMessage = await streamAssistantMessage(
         regenerateHistoryMessages,

@@ -1,3 +1,4 @@
+import { waitForImageFrames } from "./client/image-loading";
 import type { ChatSession, Message } from "./types";
 
 const EXPORT_SCHEMA_VERSION = 1;
@@ -73,6 +74,7 @@ export const exportSessionImage = async ({
   const target = document.getElementById(previewId);
   if (!target) throw new Error("找不到图片预览区域");
 
+  await waitForImageFrames(target);
   const blob = await snapdom.toBlob(target, {
     scale: 2,
     type: "png",

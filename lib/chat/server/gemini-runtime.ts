@@ -11,6 +11,8 @@ import {
 import type { ContextPreparation } from "@/lib/chat/context-window";
 import { estimateTextTokens } from "@/lib/chat/metrics";
 import {
+  encodeCompletionEvent,
+  encodeStepEvent,
   encodeToolEvent,
   encodeGeneratedFileEvent,
   encodeStreamEvent,
@@ -36,6 +38,7 @@ export const createGeminiStream = async ({
   apiKey,
   baseUrl,
   contextPreparation,
+  includeThoughts = true,
   messages,
   model,
   signal,
@@ -46,6 +49,7 @@ export const createGeminiStream = async ({
   apiKey: string;
   baseUrl?: string;
   contextPreparation?: ContextPreparation<ChatMessage>;
+  includeThoughts?: boolean;
   messages: ChatMessage[];
   model: string;
   signal?: AbortSignal;
@@ -89,7 +93,6 @@ export const createGeminiStream = async ({
   const toolResultMaxChars = contextPreparation
     ? Math.min(18_000, Math.max(2000, Math.floor(contextPreparation.inputBudgetTokens * 0.4)))
     : 18_000;
-  const streamTools = Boolean(toolRuntime?.debugChartAttempts || webSearchEnabled);
 
   if (builtinFunctions.length > 0) {
     const stream = new ReadableStream({
@@ -98,6 +101,8 @@ export const createGeminiStream = async ({
         const toolRuntimeState = new Map<string, unknown>();
         const webTools = new WebToolSession(messages, signal);
         let chartAttemptIndex = 0;
+        const runId = crypto.randomUUID();
+        let finalStepId = "";
         const toolContents = [...contents] as any[];
         let outputText = "";
         let latestUsage: ResolvedTokenUsage | undefined;
@@ -105,14 +110,10 @@ export const createGeminiStream = async ({
         let wordProtocolRetries = 0;
 
         try {
-          const maxToolRounds = builtinFunctions.some(
-            (toolFunction) => toolFunction.name === "word_document_begin",
-          )
-            ? 32
-            : webSearchEnabled
-              ? 8
-              : 5;
-          for (let round = 0; round < maxToolRounds + (webSearchEnabled ? 1 : 0); round += 1) {
+          for (let round = 0; ; round += 1) {
+            signal?.throwIfAborted();
+            const stepId = `${runId}:${round + 1}`;
+            controller.enqueue(encodeStepEvent(encoder, stepId, "started"));
             const request: GenerateContentParameters = {
               config: {
                 abortSignal: signal,
@@ -126,57 +127,58 @@ export const createGeminiStream = async ({
                       },
                     }
                   : {}),
-                tools:
-                  round >= maxToolRounds
-                    ? []
-                    : [
-                        {
-                          functionDeclarations: builtinFunctions.map((toolFunction) => ({
-                            description: toolFunction.description,
-                            name: toolFunction.name,
-                            parametersJsonSchema: toolFunction.parameters,
-                          })),
-                        },
-                      ],
+                tools: [
+                  {
+                    functionDeclarations: builtinFunctions.map((toolFunction) => ({
+                      description: toolFunction.description,
+                      name: toolFunction.name,
+                      parametersJsonSchema: toolFunction.parameters,
+                    })),
+                  },
+                ],
               },
               contents: toolContents,
               model,
             };
-            const response = streamTools
-              ? await (async () => {
-                  const chunks = await ai.models.generateContentStream({
-                    ...request,
-                    config: { ...request.config, thinkingConfig: { includeThoughts: true } },
-                  });
-                  const parts: Part[] = [];
-                  let usageMetadata: GenerateContentResponseUsageMetadata | undefined;
-                  let text = "";
-                  for await (const chunk of chunks) {
-                    if (chunk.usageMetadata) usageMetadata = chunk.usageMetadata;
-                    for (const part of chunk.candidates?.[0]?.content?.parts || []) {
-                      parts.push(part);
-                      if (part.text) {
-                        if (!part.thought) text += part.text;
-                        controller.enqueue(
-                          encodeStreamEvent(
-                            encoder,
-                            part.thought ? "reasoning" : "content",
-                            part.text,
-                          ),
-                        );
-                      }
-                    }
+            const response = await (async () => {
+              const chunks = await ai.models.generateContentStream({
+                ...request,
+                config: {
+                  ...request.config,
+                  ...(includeThoughts ? { thinkingConfig: { includeThoughts: true } } : {}),
+                },
+              });
+              const parts: Part[] = [];
+              let usageMetadata: GenerateContentResponseUsageMetadata | undefined;
+              let text = "";
+              let finishReason: string | undefined;
+              for await (const chunk of chunks) {
+                if (chunk.candidates?.[0]?.finishReason)
+                  finishReason = chunk.candidates[0].finishReason;
+                if (chunk.usageMetadata) usageMetadata = chunk.usageMetadata;
+                for (const part of chunk.candidates?.[0]?.content?.parts || []) {
+                  parts.push(part);
+                  if (part.text) {
+                    if (!part.thought) text += part.text;
+                    controller.enqueue(
+                      encodeStreamEvent(encoder, part.thought ? "reasoning" : "content", part.text),
+                    );
                   }
-                  return {
-                    usageMetadata,
-                    text,
-                    functionCalls: parts.flatMap((part) =>
-                      part.functionCall ? [part.functionCall] : [],
-                    ),
-                    candidates: [{ content: { role: "model", parts } }],
-                  };
-                })()
-              : await ai.models.generateContent(request);
+                }
+              }
+              return {
+                usageMetadata,
+                text,
+                functionCalls: parts.flatMap((part) =>
+                  part.functionCall ? [part.functionCall] : [],
+                ),
+                candidates: [{ finishReason, content: { role: "model", parts } }],
+              };
+            })();
+            const finishReason = response.candidates?.[0]?.finishReason;
+            if (finishReason && finishReason !== "STOP") {
+              throw new Error("模型回复未完整生成，请继续生成或切换模型。");
+            }
             const usageMetadata = response.usageMetadata;
             let providerUsage: TokenUsage | undefined;
             if (usageMetadata) {
@@ -215,11 +217,11 @@ export const createGeminiStream = async ({
             if (functionCalls.length === 0) {
               if (requiredWordToolNames.length === 0) {
                 outputText = response.text || "";
-                if (outputText && !streamTools) {
-                  controller.enqueue(encodeStreamEvent(encoder, "content", outputText));
-                }
+                if (!outputText.trim()) throw new Error("模型未返回回答正文，请重试或切换模型。");
+                finalStepId = stepId;
                 break;
               }
+              controller.enqueue(encodeStepEvent(encoder, stepId, "tool"));
               wordProtocolRetries += 1;
               if (wordProtocolRetries > 2) {
                 throw new Error(
@@ -237,12 +239,14 @@ export const createGeminiStream = async ({
               continue;
             }
             wordProtocolRetries = 0;
+            controller.enqueue(encodeStepEvent(encoder, stepId, "tool"));
 
             const modelContent = response.candidates?.[0]?.content;
             if (modelContent) toolContents.push(modelContent);
             const responseParts: any[] = [];
 
             for (const [index, functionCall] of functionCalls.entries()) {
+              signal?.throwIfAborted();
               const name = functionCall.name || "";
               const builtinTool = getBuiltinToolByFunction(name);
               const callId = functionCall.id || `gemini-tool-${round}-${index}`;
@@ -338,19 +342,15 @@ export const createGeminiStream = async ({
               }
             }
 
-            if (responseParts.length === 0) break;
+            if (responseParts.length === 0) throw new Error("模型请求的工具无法执行，请重试。");
             toolContents.push({ parts: responseParts, role: "user" });
-          }
-
-          if (requiredWordToolNames.length > 0) {
-            throw new Error(
-              `Word 文档生成超过最大步骤数，尚待执行 ${requiredWordToolNames.join(" 或 ")}`,
-            );
           }
 
           if (latestUsage) {
             controller.enqueue(encodeUsageEvent(encoder, latestUsage));
           }
+          signal?.throwIfAborted();
+          controller.enqueue(encodeCompletionEvent(encoder, finalStepId));
           controller.close();
         } catch (error) {
           controller.enqueue(
@@ -363,19 +363,14 @@ export const createGeminiStream = async ({
 
     return new Response(stream, {
       headers: {
-        "Cache-Control": "no-cache",
+        "Cache-Control": "no-cache, no-transform",
+        "X-Accel-Buffering": "no",
         Connection: "keep-alive",
         "Content-Type": "application/x-ndjson; charset=utf-8",
         ...getContextHeaders(contextPreparation),
       },
     });
   }
-
-  const responseStream = await ai.models.generateContentStream({
-    config: { abortSignal: signal },
-    contents,
-    model,
-  });
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -384,8 +379,26 @@ export const createGeminiStream = async ({
       let providerUsage: TokenUsage | undefined;
 
       try {
+        const responseStream = await ai.models.generateContentStream({
+          config: {
+            abortSignal: signal,
+            ...(includeThoughts ? { thinkingConfig: { includeThoughts: true } } : {}),
+          },
+          contents,
+          model,
+        });
         for await (const chunk of responseStream) {
-          if (chunk.text) {
+          signal?.throwIfAborted();
+          const parts = chunk.candidates?.[0]?.content?.parts;
+          if (parts?.length) {
+            for (const part of parts) {
+              if (!part.text) continue;
+              if (!part.thought) outputText += part.text;
+              controller.enqueue(
+                encodeStreamEvent(encoder, part.thought ? "reasoning" : "content", part.text),
+              );
+            }
+          } else if (chunk.text) {
             outputText += chunk.text;
             controller.enqueue(encodeStreamEvent(encoder, "content", chunk.text));
           }
@@ -425,7 +438,8 @@ export const createGeminiStream = async ({
 
   return new Response(stream, {
     headers: {
-      "Cache-Control": "no-cache",
+      "Cache-Control": "no-cache, no-transform",
+      "X-Accel-Buffering": "no",
       Connection: "keep-alive",
       "Content-Type": "application/x-ndjson; charset=utf-8",
       ...getContextHeaders(contextPreparation),

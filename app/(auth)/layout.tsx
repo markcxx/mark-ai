@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import Image from "@/components/ui/AppImage";
 import { useEffect, useState } from "react";
 
 import { AgentAvatar } from "@/components/chat/AgentAvatar";

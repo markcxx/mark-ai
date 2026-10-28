@@ -6,7 +6,9 @@ import { recordUserPlatform } from "@/lib/server/user-platforms";
 
 export const LOCAL_STORAGE_OWNER_ID = "local";
 
-export const getCurrentUserId = async (): Promise<string | undefined> => {
+export const getCurrentUserId = async (
+  options: { deferPlatformRecord?: (work: () => Promise<void>) => void } = {},
+): Promise<string | undefined> => {
   if (!isCloudMode()) return undefined;
 
   const { auth } = await import("@/lib/auth");
@@ -18,7 +20,9 @@ export const getCurrentUserId = async (): Promise<string | undefined> => {
 
   if (!session?.user?.id) return undefined;
   if (isActiveBan(session.user)) return undefined;
-  await recordUserPlatform(session.user.id, requestHeaders);
+  const record = () => recordUserPlatform(session.user.id, requestHeaders);
+  if (options.deferPlatformRecord) options.deferPlatformRecord(record);
+  else await record();
   return session.user.id;
 };
 

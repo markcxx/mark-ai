@@ -113,8 +113,18 @@ export const getToolWebpageUrl = (toolCall: OpenAIToolCall) => {
 };
 
 export const formatToolResultForModel = (webSearch: WebSearchState, maxChars = 18_000) => {
+  const imageDisplay =
+    webSearch.status === "done" && webSearch.images?.length && webSearch.tool !== "show_images"
+      ? {
+          candidate_count: webSearch.images.length,
+          tool: "show_images",
+          guidance:
+            "Before the final answer, judge these candidates against the user question, page text, captions and nearby text. Use show_images for directly relevant informative images, including news/event photos and screenshots, even without an image request. Reuse these IDs; no extra search is needed. Skip unrelated, decorative or ambiguous candidates. Captions and nearby text are metadata, not visual inspection.",
+        }
+      : undefined;
   const payload = {
     content_kind: webSearch.contentKind,
+    image_display: imageDisplay,
     page: webSearch.page,
     images: webSearch.images?.map(({ id, title, url, sourceUrl, description }) => ({
       id,
@@ -172,6 +182,7 @@ export const formatToolResultForModel = (webSearch: WebSearchState, maxChars = 1
 
   const minimal = {
     content_kind: webSearch.contentKind,
+    image_display: imageDisplay,
     images:
       webSearch.images?.slice(0, 6).map(({ id, title }) => ({ id, title: title.slice(0, 100) })) ||
       [],

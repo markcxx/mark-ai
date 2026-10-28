@@ -13,7 +13,7 @@ import {
   Brain,
   Video,
 } from "lucide-react";
-import Image from "next/image";
+import Image from "@/components/ui/AppImage";
 import { ModelDiscoveryDialog } from "./ModelDiscoveryDialog";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";

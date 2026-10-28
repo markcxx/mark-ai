@@ -125,7 +125,10 @@ describe("Anthropic Messages integration", () => {
       expect.objectContaining({ type: "attempt", index: 1, error: "$.series 不能为空" }),
     );
     expect(output).toContain("echarts");
-    expect(events.at(-1)).toMatchObject({ type: "usage", inputTokens: 17, outputTokens: 3 });
+    expect(events).toContainEqual(
+      expect.objectContaining({ type: "usage", inputTokens: 17, outputTokens: 3 }),
+    );
+    expect(events.at(-1)).toMatchObject({ type: "complete" });
     const calls = vi.mocked(fetchWithDevelopmentProxy).mock.calls;
     expect(calls[0][0]).toBe("https://api.commandcode.ai/provider/v1/messages");
     const headers = new Headers(calls[0][1]?.headers);

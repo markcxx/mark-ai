@@ -1,7 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
-import Image from "next/image";
+import Image from "@/components/ui/AppImage";
 
 import { cn } from "@/lib/utils";
 
@@ -229,7 +228,14 @@ export function VendorIcon({
           width={glyphSize}
         />
       ) : (
-        <span style={{ ...getMaskStyle(asset.slug), height: glyphSize, width: glyphSize }} />
+        <Image
+          native
+          mask
+          alt=""
+          src={`/images/model-icons/${asset.slug}.svg`}
+          width={glyphSize}
+          height={glyphSize}
+        />
       )}
     </span>
   );
@@ -254,18 +260,6 @@ const getModelAsset = (model?: string, provider?: string) => {
   }
   return asset;
 };
-
-const getMaskStyle = (slug: string): CSSProperties => ({
-  WebkitMaskImage: `url("/images/model-icons/${slug}.svg")`,
-  WebkitMaskPosition: "center",
-  WebkitMaskRepeat: "no-repeat",
-  WebkitMaskSize: "contain",
-  backgroundColor: "currentColor",
-  maskImage: `url("/images/model-icons/${slug}.svg")`,
-  maskPosition: "center",
-  maskRepeat: "no-repeat",
-  maskSize: "contain",
-});
 
 export function ProviderBrandIcon({
   colorful = false,
@@ -312,17 +306,29 @@ export function ProviderBrandIcon({
             height={Math.round(size * 0.8)}
           />
         ) : (
-          <span style={{ ...getMaskStyle(asset.slug), height: size * 0.76, width: size * 0.76 }} />
+          <Image
+            native
+            mask
+            alt=""
+            src={`/images/model-icons/${asset.slug}.svg`}
+            width={size * 0.76}
+            height={size * 0.76}
+          />
         )}
       </span>
     );
   }
 
   return (
-    <span
+    <Image
+      native
+      mask
+      alt=""
       aria-hidden="true"
-      className={cn("inline-block shrink-0", className)}
-      style={{ ...getMaskStyle(asset.slug), height: size, width: size }}
+      src={`/images/model-icons/${asset.slug}.svg`}
+      containerClassName={cn("shrink-0", className)}
+      width={size}
+      height={size}
     />
   );
 }
@@ -383,9 +389,14 @@ export function ModelBrandIcon({
           width={glyphSize}
         />
       ) : (
-        <span
+        <Image
+          native
+          mask
+          alt=""
           aria-hidden="true"
-          style={{ ...getMaskStyle(asset.slug), height: glyphSize, width: glyphSize }}
+          src={`/images/model-icons/${asset.slug}.svg`}
+          width={glyphSize}
+          height={glyphSize}
         />
       )}
     </span>

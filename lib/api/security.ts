@@ -34,6 +34,7 @@ const getClientAddress = (req: NextRequest) =>
 
 export const authorizeApiRequest = async (
   req: NextRequest,
+  options: { deferPlatformRecord?: (work: () => Promise<void>) => void } = {},
 ): Promise<AuthorizedRequest | RejectedRequest> => {
   if (!isCloudMode()) {
     return { authorized: true, key: `ip:${getClientAddress(req)}` };
@@ -58,7 +59,9 @@ export const authorizeApiRequest = async (
     };
   }
 
-  await recordUserPlatform(session.user.id, req.headers);
+  const record = () => recordUserPlatform(session.user.id, req.headers);
+  if (options.deferPlatformRecord) options.deferPlatformRecord(record);
+  else await record();
   return { authorized: true, key: `user:${session.user.id}`, userId: session.user.id };
 };
 

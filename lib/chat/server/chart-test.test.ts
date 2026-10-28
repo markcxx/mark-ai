@@ -98,7 +98,9 @@ describe("normal streaming chart generation", () => {
     const response = await run();
     const reader = response.body!.getReader();
     const first = await reader.read();
-    expect(new TextDecoder().decode(first.value)).toContain("正在选择图表");
+    expect(new TextDecoder().decode(first.value)).toContain('"type":"step"');
+    const thinking = await reader.read();
+    expect(new TextDecoder().decode(thinking.value)).toContain("正在选择图表");
     expect(fetchWithDevelopmentProxy).toHaveBeenCalledTimes(1);
     upstreamController.enqueue(
       encoder.encode(

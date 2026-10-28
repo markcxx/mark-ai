@@ -1,7 +1,7 @@
 "use client";
 
 import { LoaderCircle, LogIn, PanelLeftClose, Plus, Puzzle, Search } from "lucide-react";
-import Image from "next/image";
+import Image from "@/components/ui/AppImage";
 import { useEffect, useRef, useState } from "react";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
