@@ -20,9 +20,22 @@ const upstream = (delta: object) =>
 
 describe("thinking mode with search continuation", () => {
   beforeEach(() => vi.clearAllMocks());
-  it.each([true, false])(
-    "keeps the selected mode through every upstream request (%s)",
-    async (enabled) => {
+  it.each(
+    [
+      { id: "kimi-k2.5", provider: "moonshot", parameter: "thinking", on: "enabled" },
+      {
+        id: "deepseek-v4.1-flash-1017",
+        provider: "bailian",
+        parameter: "enable_thinking",
+        on: "enabled",
+      },
+      { id: "deepseek-v4.1-flash", provider: "infiniai", parameter: "thinking", on: "enabled" },
+      { id: "mimo-v2.6-pro", provider: "mimo", parameter: "thinking", on: "enabled" },
+      { id: "MiniMax-M3", provider: "minimax", parameter: "thinking", on: "adaptive" },
+    ].flatMap((model) => [true, false].map((enabled) => ({ ...model, enabled }))),
+  )(
+    "keeps $provider/$id thinking=$enabled through every upstream request",
+    async ({ id, provider, parameter, on, enabled }) => {
       vi.mocked(fetchWithDevelopmentProxy)
         .mockResolvedValueOnce(
           upstream({
@@ -39,13 +52,13 @@ describe("thinking mode with search continuation", () => {
         )
         .mockResolvedValueOnce(upstream({ content: "最终回答" }));
       const policy = getThinkingPolicy({
-        id: "kimi-k2.5",
-        provider: "moonshot",
+        id,
+        provider,
         runtime: "openai-compatible",
       });
       const response = await createOpenAICompatibleStream(
         [{ content: "查证", role: "user" }],
-        "kimi-k2.5",
+        id,
         "test-key",
         "https://test.invalid/v1",
         true,
@@ -60,7 +73,15 @@ describe("thinking mode with search continuation", () => {
         .mocked(fetchWithDevelopmentProxy)
         .mock.calls.map(([, init]) => JSON.parse(init!.body as string));
       expect(calls).toHaveLength(2);
-      for (const call of calls) expect(call.thinking.type).toBe(enabled ? "enabled" : "disabled");
+      for (const call of calls) {
+        if (parameter === "enable_thinking") {
+          expect(call.enable_thinking).toBe(enabled);
+          expect(call).not.toHaveProperty("thinking");
+        } else {
+          expect(call.thinking.type).toBe(enabled ? on : "disabled");
+          expect(call).not.toHaveProperty("enable_thinking");
+        }
+      }
       const assistant = calls[1].messages.find((m: { role: string }) => m.role === "assistant");
       if (enabled) expect(assistant.reasoning_content).toBe("先查证");
       else expect(assistant).not.toHaveProperty("reasoning_content");

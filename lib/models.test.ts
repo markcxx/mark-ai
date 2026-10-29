@@ -45,6 +45,40 @@ afterEach(() => {
 });
 
 describe("MarkAI model channels", () => {
+  it("publishes and resolves thinking by endpoint before channel display grouping", () => {
+    process.env.AI_MODEL_CONFIGS = JSON.stringify([
+      {
+        provider: "bailian",
+        id: "deepseek-v4.1-flash-1017",
+        apiKey: "test-key",
+        baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      },
+      {
+        provider: "markchannela",
+        id: "deepseek-v4.1-flash-1017",
+        apiKey: "test-key",
+        baseUrl: "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+      },
+      {
+        provider: "team-account",
+        id: "mimo-v2.6-pro",
+        apiKey: "test-key",
+        baseUrl: "https://api.xiaomimimo.com/v1",
+      },
+    ]);
+    const models = getPublicConfiguredModels();
+    for (const [provider, id] of [
+      ["bailian", "deepseek-v4.1-flash-1017"],
+      ["markai", "deepseek-v4.1-flash-1017"],
+      ["team-account", "mimo-v2.6-pro"],
+    ]) {
+      expect(models.find((m) => m.provider === provider && m.id === id)?.thinking).toEqual({
+        defaultEnabled: true,
+      });
+      expect(findConfiguredModel(id, provider, true)).toBeDefined();
+    }
+    expect(JSON.stringify(models)).not.toContain("test-key");
+  });
   it("selects Messages only for Claude in a mixed CommandCode channel", () => {
     process.env.AI_PROVIDERS = "markchannela";
     process.env.MARKCHANNELA_API_KEY = "test-key";
