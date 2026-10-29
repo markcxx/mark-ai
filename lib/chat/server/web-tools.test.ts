@@ -64,6 +64,64 @@ it("reads a user URL directly, allows discovered links, and refuses invented des
   expect(readWebpage).toHaveBeenCalledTimes(2);
 });
 
+it("keeps the first successful snapshot even when a later call changes provider", async () => {
+  vi.mocked(readWebpage).mockImplementation(async ({ provider }) => ({
+    ...page(),
+    content: "文字版正文\n原始第二行",
+    images: [],
+    retrieval: { provider: provider!, requestedProvider: provider, mode: "basic", attempts: [] },
+  }));
+  const session = new WebToolSession([{ role: "user", content: url }]);
+  const first = await execute(session, "read_webpage", { url, provider: "tavily" });
+  const reused = await execute(session, "read_webpage", { url, provider: "firecrawl" });
+  expect(reused.content).toBe(first.content);
+  expect(reused.images).toHaveLength(0);
+  expect(reused.retrieval).toMatchObject({ provider: "tavily", cached: true });
+  const continued = await execute(session, "read_webpage", {
+    url,
+    provider: "firecrawl",
+    start_line: 2,
+  });
+  expect(continued.content).toContain("2: 原始第二行");
+  expect((await execute(session, "find_in_page", { url, pattern: "第二行" })).content).toContain(
+    "原始第二行",
+  );
+  expect(readWebpage).toHaveBeenCalledTimes(1);
+  expect(JSON.parse(formatToolResultForModel(reused)).reader.provider).toBe("tavily");
+});
+
+it("coalesces concurrent reads of one URL even with different provider preferences", async () => {
+  const session = new WebToolSession([{ role: "user", content: url }]);
+  await Promise.all([
+    execute(session, "read_webpage", { url, provider: "firecrawl" }, "images"),
+    execute(session, "read_webpage", { url, provider: "tavily" }, "text"),
+  ]);
+  expect(readWebpage).toHaveBeenCalledTimes(1);
+  expect(readWebpage).toHaveBeenCalledWith(expect.objectContaining({ provider: "firecrawl" }));
+});
+
+it("permits retry after a failed read and fresh reading in a new generation", async () => {
+  vi.mocked(readWebpage).mockRejectedValueOnce(new Error("读取失败"));
+  const session = new WebToolSession([{ role: "user", content: url }]);
+  expect((await execute(session, "read_webpage", { url })).status).toBe("error");
+  expect((await execute(session, "read_webpage", { url, provider: "firecrawl" })).status).toBe(
+    "done",
+  );
+  const next = new WebToolSession([{ role: "user", content: url }]);
+  expect((await execute(next, "read_webpage", { url })).status).toBe("done");
+  expect(readWebpage).toHaveBeenCalledTimes(3);
+});
+
+it.each(["invalid", null, {}, 1])(
+  "rejects invalid reader selection %j before fetching",
+  async (provider) => {
+    const session = new WebToolSession([{ role: "user", content: url }]);
+    const result = await execute(session, "read_webpage", { url, provider });
+    expect(result.status).toBe("error");
+    expect(readWebpage).not.toHaveBeenCalled();
+  },
+);
+
 it("only displays registered images and carries selected assets into a reloaded follow-up", async () => {
   const session = new WebToolSession([{ role: "user", content: url }]);
   const read = await execute(session, "read_webpage", { url });
@@ -95,13 +153,17 @@ it.each([[4], [5, 1], [5, 3, 1, 0, 2]])(
     vi.mocked(readWebpage).mockResolvedValue({
       ...page(),
       images: Array.from({ length: 6 }, (_, index) => ({
-        url: `https://images.example.com/${index}.jpg`, title: `配图 ${index}`, sourceUrl: url,
+        url: `https://images.example.com/${index}.jpg`,
+        title: `配图 ${index}`,
+        sourceUrl: url,
       })),
     });
     const session = new WebToolSession([{ role: "user", content: url }]);
     const read = await execute(session, "read_webpage", { url });
     const selected = selectedIndexes.map((index) => read.images![index]);
-    const shown = await execute(session, "show_images", { image_ids: selected.map((image) => image.id) });
+    const shown = await execute(session, "show_images", {
+      image_ids: selected.map((image) => image.id),
+    });
     expect(shown.status).toBe("done");
     expect(shown.images).toEqual(selected);
   },
@@ -183,6 +245,12 @@ it("can select already retrieved images after more than sixteen calls and six di
 });
 
 it("surfaces displayable image IDs and guidance even when the tool result must be compacted", async () => {
+  vi.mocked(readWebpage).mockResolvedValue({
+    ...page(),
+    images: [
+      { ...page().images[0], description: "所属小节：会场布局；相邻正文：观众席围绕主舞台布置。" },
+    ],
+  });
   const session = new WebToolSession([{ role: "user", content: url }]);
   const read = await execute(session, "read_webpage", { url });
   for (const maxChars of [18_000, 2000]) {
@@ -194,6 +262,7 @@ it("surfaces displayable image IDs and guidance even when the tool result must b
     const payload = JSON.parse(output);
     expect(payload.image_display).toMatchObject({ candidate_count: 1, tool: "show_images" });
     expect(payload.images[0].id).toBe(read.images![0].id);
+    expect(payload.images[0].description).toContain("所属小节：会场布局");
   }
   const shown = await execute(session, "show_images", { image_ids: [read.images![0].id] });
   expect(JSON.parse(formatToolResultForModel(shown)).image_display).toBeUndefined();
@@ -225,4 +294,38 @@ it("reuses an unshown image from a previous page read after reload without searc
   expect(selected.status).toBe("done");
   expect(readWebpage).toHaveBeenCalledTimes(1);
   expect(searchTavily).not.toHaveBeenCalled();
+});
+
+it("coalesces simultaneous reads and identical searches while forwarding search controls", async () => {
+  const session = new WebToolSession([{ role: "user", content: url }]);
+  await Promise.all([
+    execute(session, "read_webpage", { url }, "a"),
+    execute(session, "read_webpage", { url }, "b"),
+  ]);
+  expect(readWebpage).toHaveBeenCalledTimes(1);
+  const options = {
+    query: "文档",
+    topic: "general",
+    include_domains: ["example.com"],
+    search_depth: "fast",
+    max_results: 12,
+  };
+  const [a, b] = await Promise.all([
+    execute(session, "web_search", options, "c"),
+    execute(session, "web_search", options, "d"),
+  ]);
+  expect(searchTavily).toHaveBeenCalledTimes(1);
+  expect(searchTavily).toHaveBeenCalledWith(
+    expect.objectContaining({
+      topic: "general",
+      includeDomains: ["example.com"],
+      searchDepth: "fast",
+      maxResults: 12,
+    }),
+  );
+  expect(a.results[0].citationId).toBe(b.results[0].citationId);
+});
+
+it("does not turn a guessed out-of-range offset into irrelevant last-line evidence", () => {
+  expect(() => getPageExcerpt({ ...page(), content: "只有一行" }, 70)).toThrow("超出网页范围");
 });

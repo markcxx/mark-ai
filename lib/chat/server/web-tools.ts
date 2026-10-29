@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import type { WebImage, WebSearchState } from "../types";
 import { publicResourceUrl, type WebImageCandidate } from "../../search/web-assets";
 import { searchTavily } from "../../search/tavily";
-import { readWebpage, type WebpageReadResponse } from "../../search/webpage";
+import { readWebpage, type WebpageReadResponse, type WebpageProvider } from "../../search/webpage";
 import type { ChatMessage } from "./types";
 import { WEB_TOOLS } from "./runtime-prompt";
 import { describeGenerationError } from "../generation-error";
@@ -31,7 +31,12 @@ function pageLines(content: string) {
 
 export function getPageExcerpt(document: WebpageReadResponse, start = 1, count = 80) {
   const lines = pageLines(document.content);
-  const first = Math.min(positiveInteger(start, 1, lines.length), lines.length);
+  const first = positiveInteger(start, 1, 100000);
+  if (first > lines.length) {
+    throw new Error(
+      `起始行 ${first} 超出网页范围（共 ${lines.length} 行），请从第 1 行读取或使用 find_in_page 定位。`,
+    );
+  }
   const selected: string[] = [];
   let length = 0;
   for (
@@ -62,6 +67,8 @@ export function getPageExcerpt(document: WebpageReadResponse, start = 1, count =
 export class WebToolSession {
   private knownUrls = new Set<string>();
   private documents = new Map<string, WebpageReadResponse>();
+  private pendingDocuments = new Map<string, Promise<WebpageReadResponse>>();
+  private searches = new Map<string, ReturnType<typeof searchTavily>>();
   private images = new Map<string, WebImage>();
   private citations = new Map<string, number>();
 
@@ -117,19 +124,54 @@ export class WebToolSession {
     return { url, title, content, citationId: this.citations.get(url)! };
   }
 
-  private async document(raw: unknown) {
+  canRunParallel(name: string, rawArgs: unknown) {
+    if (name === "web_search") return true;
+    if (name !== "read_webpage" && name !== "find_in_page") return false;
+    try {
+      const args = typeof rawArgs === "string" ? JSON.parse(rawArgs) : rawArgs;
+      const url = publicResourceUrl(args?.url);
+      return Boolean(url && this.knownUrls.has(url));
+    } catch {
+      return false;
+    }
+  }
+
+  private async document(raw: unknown, requestedProvider: unknown) {
+    if (
+      requestedProvider !== undefined &&
+      !["auto", "tavily", "firecrawl"].includes(requestedProvider as string)
+    )
+      throw new Error("网页读取服务无效，请选择 auto、tavily 或 firecrawl。");
     const url = publicResourceUrl(raw);
     if (!url || !this.knownUrls.has(url))
       throw new Error("请先通过搜索、用户提供的链接或已读页面的链接定位网页，再读取该 URL。");
-    let document = this.documents.get(url);
+    // One successful snapshot per URL and generation. Provider selection only
+    // applies to the first fetch; continuation and image decisions reuse it.
+    const provider =
+      !requestedProvider || requestedProvider === "auto"
+        ? "tavily"
+        : (requestedProvider as Exclude<WebpageProvider, "auto">);
+    const key = url;
+    let document = this.documents.get(key);
     if (!document) {
-      document = await readWebpage({ url, signal: this.signal });
+      let pending = this.pendingDocuments.get(key);
+      if (!pending) {
+        pending = readWebpage({ url, signal: this.signal, provider });
+        this.pendingDocuments.set(key, pending);
+      }
+      try {
+        document = await pending;
+      } finally {
+        if (this.pendingDocuments.get(key) === pending) this.pendingDocuments.delete(key);
+      }
       // Treat the reader's final URL as source metadata, never arbitrary fetch instructions.
       document.url = publicResourceUrl(document.url) || url;
       this.rememberUrl(document.url);
       for (const link of (document.links || []).slice(0, 50)) this.rememberUrl(link);
-      this.documents.set(url, document);
+      this.documents.set(key, document);
       this.documents.set(document.url, document);
+    } else if (document.retrieval) {
+      document = { ...document, retrieval: { ...document.retrieval, cached: true, attempts: [] } };
     }
     return document;
   }
@@ -165,11 +207,34 @@ export class WebToolSession {
       let result: WebSearchState;
       if (name === "web_search") {
         if (!query || query.length > 500) throw new Error("请输入不超过 500 个字符的搜索内容");
-        const found = await searchTavily({
+        const options = {
           query,
           includeImages: args.include_images === true,
-          signal: this.signal,
-        });
+          topic: args.topic,
+          searchDepth: args.search_depth,
+          maxResults: args.max_results,
+          chunksPerSource: args.chunks_per_source,
+          timeRange: args.time_range,
+          startDate: args.start_date,
+          endDate: args.end_date,
+          includeDomains: args.include_domains,
+          excludeDomains: args.exclude_domains,
+          includeDomainsMode: args.include_domains_mode,
+          filterByPublishedDate: args.filter_by_published_date,
+        };
+        const key = JSON.stringify(options);
+        let pending = this.searches.get(key);
+        if (!pending) {
+          pending = searchTavily({ ...options, signal: this.signal });
+          this.searches.set(key, pending);
+        }
+        let found;
+        try {
+          found = await pending;
+        } catch (error) {
+          this.searches.delete(key);
+          throw error;
+        }
         result = {
           ...state,
           contentKind: "search_snippets",
@@ -205,7 +270,7 @@ export class WebToolSession {
           ],
         };
       } else {
-        const document = await this.document(args.url);
+        const document = await this.document(args.url, args.provider);
         const base = {
           ...state,
           status: "done" as const,
@@ -213,6 +278,7 @@ export class WebToolSession {
           title: document.title,
           description: document.description,
           siteName: document.siteName,
+          retrieval: document.retrieval,
           images: this.registerImages(document.images || []),
           links: document.links?.slice(0, 30),
           results: [

@@ -1,3 +1,4 @@
+import { mapToolCalls } from "./tool-batch";
 import { ChartValidationLimitError } from "./chart-validation";
 import { describeGenerationError } from "@/lib/chat/generation-error";
 import { getThinkingRequestParameters, type ThinkingPolicy } from "@/lib/model-thinking";
@@ -7,6 +8,9 @@ import type { ContextPreparation } from "@/lib/chat/context-window";
 import { estimateTextTokens } from "@/lib/chat/metrics";
 import {
   formatToolResultForModel,
+  compactWebToolHistory,
+  WEB_TOOL_RESULT_MAX_CHARS,
+  WEB_TOOL_HISTORY_MAX_CHARS,
   getChoiceText,
   isUnsupportedStreamUsageError,
   normalizeToolCalls,
@@ -72,8 +76,11 @@ export const createOpenAICompatibleStream = async (
 
   const encoder = new TextEncoder();
   const toolResultMaxChars = contextPreparation
-    ? Math.min(18_000, Math.max(2000, Math.floor(contextPreparation.inputBudgetTokens * 0.4)))
-    : 18_000;
+    ? Math.min(
+        WEB_TOOL_RESULT_MAX_CHARS,
+        Math.max(2000, Math.floor(contextPreparation.inputBudgetTokens * 0.4)),
+      )
+    : WEB_TOOL_RESULT_MAX_CHARS;
   const openAIMessages = toOpenAIMessages({
     personalization,
     messages,
@@ -441,116 +448,155 @@ export const createOpenAICompatibleStream = async (
             tool_calls: executableToolCalls,
             ...(preserveReasoning ? { reasoning_content: pass.assistantReasoning } : {}),
           };
-          const toolResultMessages: OpenAIChatMessage[] = [];
-
-          for (const toolCall of executableToolCalls) {
-            signal?.throwIfAborted();
-            const builtinTool = getBuiltinToolByFunction(toolCall.function.name);
-            if (builtinTool && toolRuntime) {
-              let args: Record<string, unknown> = {};
-              try {
-                const parsedArgs = JSON.parse(toolCall.function.arguments || "{}");
-                if (parsedArgs && typeof parsedArgs === "object") {
-                  args = parsedArgs as Record<string, unknown>;
+          const toolResults = await mapToolCalls(
+            executableToolCalls,
+            (call) =>
+              webSearchEnabled &&
+              webTools.canRunParallel(call.function.name, call.function.arguments),
+            async (toolCall) => {
+              const toolResultMessages: OpenAIChatMessage[] = [];
+              signal?.throwIfAborted();
+              const builtinTool = getBuiltinToolByFunction(toolCall.function.name);
+              if (builtinTool && toolRuntime) {
+                let args: Record<string, unknown> = {};
+                try {
+                  const parsedArgs = JSON.parse(toolCall.function.arguments || "{}");
+                  if (parsedArgs && typeof parsedArgs === "object") {
+                    args = parsedArgs as Record<string, unknown>;
+                  }
+                } catch {
+                  // The executor will surface required-argument errors in a consistent format.
                 }
-              } catch {
-                // The executor will surface required-argument errors in a consistent format.
-              }
-              const runningState = {
-                artifactId: typeof args.documentId === "string" ? args.documentId : undefined,
-                callId: toolCall.id,
-                status: "running" as const,
-                toolId: builtinTool.id,
-                toolName: toolCall.function.name,
-              };
-              controller.enqueue(encodeGeneratedFileEvent(encoder, runningState));
+                const runningState = {
+                  artifactId: typeof args.documentId === "string" ? args.documentId : undefined,
+                  callId: toolCall.id,
+                  status: "running" as const,
+                  toolId: builtinTool.id,
+                  toolName: toolCall.function.name,
+                };
+                controller.enqueue(encodeGeneratedFileEvent(encoder, runningState));
 
-              const chartAttempt =
-                toolRuntime.debugChartAttempts && toolCall.function.name === "render_echarts_chart"
-                  ? { index: ++chartAttemptIndex, raw: toolCall.function.arguments }
-                  : undefined;
-              try {
-                const result = await executeBuiltinTool(toolCall.function.name, args, {
-                  runtimeState: toolRuntimeState,
-                  sessionId: toolRuntime.sessionId,
-                  userId: toolRuntime.userId,
-                });
-                controller.enqueue(
-                  encodeGeneratedFileEvent(encoder, {
-                    ...runningState,
-                    artifactId: result.preview?.documentId || runningState.artifactId,
-                    file: result.file,
-                    preview: result.preview,
-                    progress: result.progress,
-                    status: "done",
-                  }),
-                );
-                if (builtinTool.id === "word-document") {
-                  requiredWordToolNames =
-                    getWordContinuationToolNames(toolCall.function.name, result.content) || [];
-                }
-                if (chartAttempt)
+                const chartAttempt =
+                  toolRuntime.debugChartAttempts &&
+                  toolCall.function.name === "render_echarts_chart"
+                    ? { index: ++chartAttemptIndex, raw: toolCall.function.arguments }
+                    : undefined;
+                try {
+                  const result = await executeBuiltinTool(toolCall.function.name, args, {
+                    runtimeState: toolRuntimeState,
+                    sessionId: toolRuntime.sessionId,
+                    userId: toolRuntime.userId,
+                  });
                   controller.enqueue(
-                    encoder.encode(
-                      `${JSON.stringify({ type: "attempt", ...chartAttempt, validation: result.content.validation })}\n`,
-                    ),
+                    encodeGeneratedFileEvent(encoder, {
+                      ...runningState,
+                      artifactId: result.preview?.documentId || runningState.artifactId,
+                      file: result.file,
+                      preview: result.preview,
+                      progress: result.progress,
+                      status: "done",
+                    }),
                   );
-                if (result.output) {
-                  controller.enqueue(encodeStreamEvent(encoder, "content", result.output));
+                  if (builtinTool.id === "word-document") {
+                    requiredWordToolNames =
+                      getWordContinuationToolNames(toolCall.function.name, result.content) || [];
+                  }
+                  if (chartAttempt)
+                    controller.enqueue(
+                      encoder.encode(
+                        `${JSON.stringify({ type: "attempt", ...chartAttempt, validation: result.content.validation })}\n`,
+                      ),
+                    );
+                  if (result.output) {
+                    controller.enqueue(encodeStreamEvent(encoder, "content", result.output));
+                  }
+                  toolResultMessages.push({
+                    content: JSON.stringify(result.content),
+                    role: "tool",
+                    tool_call_id: toolCall.id,
+                  });
+                } catch (error) {
+                  const message = error instanceof Error ? error.message : "File generation failed";
+                  if (chartAttempt)
+                    controller.enqueue(
+                      encoder.encode(
+                        `${JSON.stringify({ type: "attempt", ...chartAttempt, error: message })}\n`,
+                      ),
+                    );
+                  controller.enqueue(
+                    encodeGeneratedFileEvent(encoder, {
+                      ...runningState,
+                      error: message,
+                      status: "error",
+                    }),
+                  );
+                  if (error instanceof ChartValidationLimitError) throw error;
+                  if (builtinTool.id === "word-document") requiredWordToolNames = [];
+                  toolResultMessages.push({
+                    content: JSON.stringify({ error: message, success: false }),
+                    role: "tool",
+                    tool_call_id: toolCall.id,
+                  });
                 }
+                return toolResultMessages;
+              }
+
+              if (webSearchEnabled && WEB_TOOL_NAMES.has(toolCall.function.name)) {
+                let args: Record<string, unknown> = {};
+                try {
+                  args = JSON.parse(toolCall.function.arguments || "{}");
+                } catch {
+                  /* Surface validation through the tool result. */
+                }
+                const result = await webTools.execute(
+                  toolCall.function.name,
+                  args || {},
+                  toolCall.id,
+                  (state) => controller.enqueue(encodeToolEvent(encoder, state)),
+                );
                 toolResultMessages.push({
-                  content: JSON.stringify(result.content),
+                  content: formatToolResultForModel(result, toolResultMaxChars),
                   role: "tool",
                   tool_call_id: toolCall.id,
                 });
-              } catch (error) {
-                const message = error instanceof Error ? error.message : "File generation failed";
-                if (chartAttempt)
-                  controller.enqueue(
-                    encoder.encode(
-                      `${JSON.stringify({ type: "attempt", ...chartAttempt, error: message })}\n`,
-                    ),
-                  );
-                controller.enqueue(
-                  encodeGeneratedFileEvent(encoder, {
-                    ...runningState,
-                    error: message,
-                    status: "error",
-                  }),
-                );
-                if (error instanceof ChartValidationLimitError) throw error;
-                if (builtinTool.id === "word-document") requiredWordToolNames = [];
-                toolResultMessages.push({
-                  content: JSON.stringify({ error: message, success: false }),
-                  role: "tool",
-                  tool_call_id: toolCall.id,
-                });
               }
-              continue;
-            }
-
-            if (webSearchEnabled && WEB_TOOL_NAMES.has(toolCall.function.name)) {
-              let args: Record<string, unknown> = {};
-              try {
-                args = JSON.parse(toolCall.function.arguments || "{}");
-              } catch {
-                /* Surface validation through the tool result. */
-              }
-              const result = await webTools.execute(
-                toolCall.function.name,
-                args || {},
-                toolCall.id,
-                (state) => controller.enqueue(encodeToolEvent(encoder, state)),
-              );
-              toolResultMessages.push({
-                content: formatToolResultForModel(result, toolResultMaxChars),
-                role: "tool",
-                tool_call_id: toolCall.id,
-              });
-            }
-          }
+              return toolResultMessages;
+            },
+            signal,
+          );
+          const toolResultMessages = toolResults.flat();
 
           currentMessages = [...currentMessages, assistantToolMessage, ...toolResultMessages];
+          const webCallIds = new Set(
+            currentMessages.flatMap((message) =>
+              (message.tool_calls || [])
+                .filter((call) => WEB_TOOL_NAMES.has(call.function.name))
+                .map((call) => call.id),
+            ),
+          );
+          compactWebToolHistory(
+            currentMessages.flatMap((message) =>
+              message.role === "tool" &&
+              message.tool_call_id &&
+              webCallIds.has(message.tool_call_id) &&
+              typeof message.content === "string"
+                ? [
+                    {
+                      content: message.content,
+                      replace: (value: string) => {
+                        message.content = value;
+                      },
+                    },
+                  ]
+                : [],
+            ),
+            Math.min(
+              WEB_TOOL_HISTORY_MAX_CHARS,
+              contextPreparation
+                ? Math.max(4000, contextPreparation.inputBudgetTokens)
+                : WEB_TOOL_HISTORY_MAX_CHARS,
+            ),
+          );
         }
 
         if (latestUsage) {

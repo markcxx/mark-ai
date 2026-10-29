@@ -164,6 +164,7 @@ export type WebResourceContext = {
 };
 
 export type WebSearchState = {
+  retrieval?: WebRetrievalDetails;
   links?: string[];
   callId?: string;
   images?: WebImage[];
@@ -182,6 +183,19 @@ export type WebSearchState = {
   tool?: "web_search" | "read_webpage" | "find_in_page" | "show_images";
   status: "searching" | "done" | "error";
   url?: string;
+};
+
+export type WebRetrievalDetails = {
+  requestedProvider?: "auto" | "tavily" | "firecrawl";
+  provider: string;
+  mode: string;
+  cached?: boolean;
+  attempts: {
+    provider: string;
+    mode: string;
+    durationMs: number;
+    outcome: "pending" | "accepted" | "unusable" | "cancelled" | "error";
+  }[];
 };
 
 export type ChatSession = {

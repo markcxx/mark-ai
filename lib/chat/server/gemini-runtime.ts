@@ -1,3 +1,4 @@
+import { mapToolCalls } from "./tool-batch";
 import { ChartValidationLimitError } from "./chart-validation";
 import { describeGenerationError } from "@/lib/chat/generation-error";
 import {
@@ -22,7 +23,12 @@ import {
 import type { ChatMessage } from "@/lib/chat/server/types";
 import { WEB_TOOLS } from "./runtime-prompt";
 import { WEB_TOOL_NAMES, WebToolSession } from "./web-tools";
-import { formatToolResultForModel } from "./openai-helpers";
+import {
+  compactWebToolHistory,
+  formatToolResultForModel,
+  WEB_TOOL_RESULT_MAX_CHARS,
+  WEB_TOOL_HISTORY_MAX_CHARS,
+} from "./openai-helpers";
 import { contentWithWebContext } from "../web-context";
 import {
   getUsageNumber,
@@ -91,8 +97,11 @@ export const createGeminiStream = async ({
   ];
   const allowedNames = new Set(builtinFunctions.map((tool) => tool.name));
   const toolResultMaxChars = contextPreparation
-    ? Math.min(18_000, Math.max(2000, Math.floor(contextPreparation.inputBudgetTokens * 0.4)))
-    : 18_000;
+    ? Math.min(
+        WEB_TOOL_RESULT_MAX_CHARS,
+        Math.max(2000, Math.floor(contextPreparation.inputBudgetTokens * 0.4)),
+      )
+    : WEB_TOOL_RESULT_MAX_CHARS;
 
   if (builtinFunctions.length > 0) {
     const stream = new ReadableStream({
@@ -243,107 +252,139 @@ export const createGeminiStream = async ({
 
             const modelContent = response.candidates?.[0]?.content;
             if (modelContent) toolContents.push(modelContent);
-            const responseParts: any[] = [];
-
-            for (const [index, functionCall] of functionCalls.entries()) {
-              signal?.throwIfAborted();
-              const name = functionCall.name || "";
-              const builtinTool = getBuiltinToolByFunction(name);
-              const callId = functionCall.id || `gemini-tool-${round}-${index}`;
-              const functionArgs = functionCall.args || {};
-              if (webSearchEnabled && WEB_TOOL_NAMES.has(name)) {
-                const result = await webTools.execute(name, functionArgs, callId, (state) =>
-                  controller.enqueue(encodeToolEvent(encoder, state)),
-                );
-                responseParts.push({
-                  functionResponse: {
-                    id: functionCall.id,
-                    name,
-                    response: JSON.parse(formatToolResultForModel(result, toolResultMaxChars)),
-                  },
-                });
-                continue;
-              }
-              if (!builtinTool || !toolRuntime) continue;
-
-              const runningState = {
-                artifactId:
-                  typeof functionArgs.documentId === "string" ? functionArgs.documentId : undefined,
-                callId,
-                status: "running" as const,
-                toolId: builtinTool.id,
-                toolName: name,
-              };
-              controller.enqueue(encodeGeneratedFileEvent(encoder, runningState));
-
-              const chartAttempt =
-                toolRuntime.debugChartAttempts && name === "render_echarts_chart"
-                  ? { index: ++chartAttemptIndex, raw: JSON.stringify(functionArgs, null, 2) }
-                  : undefined;
-              try {
-                const result = await executeBuiltinTool(name, functionArgs, {
-                  runtimeState: toolRuntimeState,
-                  sessionId: toolRuntime.sessionId,
-                  userId: toolRuntime.userId,
-                });
-                controller.enqueue(
-                  encodeGeneratedFileEvent(encoder, {
-                    ...runningState,
-                    artifactId: result.preview?.documentId || runningState.artifactId,
-                    file: result.file,
-                    preview: result.preview,
-                    progress: result.progress,
-                    status: "done",
-                  }),
-                );
-                if (builtinTool.id === "word-document") {
-                  requiredWordToolNames = getWordContinuationToolNames(name, result.content) || [];
-                }
-                if (chartAttempt)
-                  controller.enqueue(
-                    encoder.encode(
-                      `${JSON.stringify({ type: "attempt", ...chartAttempt, validation: result.content.validation })}\n`,
-                    ),
+            const responses = await mapToolCalls(
+              functionCalls,
+              (call) => webSearchEnabled && webTools.canRunParallel(call.name || "", call.args),
+              async (functionCall, index) => {
+                const responseParts: any[] = [];
+                signal?.throwIfAborted();
+                const name = functionCall.name || "";
+                const builtinTool = getBuiltinToolByFunction(name);
+                const callId = functionCall.id || `gemini-tool-${round}-${index}`;
+                const functionArgs = functionCall.args || {};
+                if (webSearchEnabled && WEB_TOOL_NAMES.has(name)) {
+                  const result = await webTools.execute(name, functionArgs, callId, (state) =>
+                    controller.enqueue(encodeToolEvent(encoder, state)),
                   );
-                if (result.output) {
-                  controller.enqueue(encodeStreamEvent(encoder, "content", result.output));
+                  responseParts.push({
+                    functionResponse: {
+                      id: functionCall.id,
+                      name,
+                      response: JSON.parse(formatToolResultForModel(result, toolResultMaxChars)),
+                    },
+                  });
+                  return responseParts;
                 }
-                responseParts.push({
-                  functionResponse: {
-                    id: functionCall.id,
-                    name,
-                    response: result.content,
-                  },
-                });
-              } catch (error) {
-                const message = error instanceof Error ? error.message : "File generation failed";
-                if (chartAttempt)
+                if (!builtinTool || !toolRuntime) return responseParts;
+
+                const runningState = {
+                  artifactId:
+                    typeof functionArgs.documentId === "string"
+                      ? functionArgs.documentId
+                      : undefined,
+                  callId,
+                  status: "running" as const,
+                  toolId: builtinTool.id,
+                  toolName: name,
+                };
+                controller.enqueue(encodeGeneratedFileEvent(encoder, runningState));
+
+                const chartAttempt =
+                  toolRuntime.debugChartAttempts && name === "render_echarts_chart"
+                    ? { index: ++chartAttemptIndex, raw: JSON.stringify(functionArgs, null, 2) }
+                    : undefined;
+                try {
+                  const result = await executeBuiltinTool(name, functionArgs, {
+                    runtimeState: toolRuntimeState,
+                    sessionId: toolRuntime.sessionId,
+                    userId: toolRuntime.userId,
+                  });
                   controller.enqueue(
-                    encoder.encode(
-                      `${JSON.stringify({ type: "attempt", ...chartAttempt, error: message })}\n`,
-                    ),
+                    encodeGeneratedFileEvent(encoder, {
+                      ...runningState,
+                      artifactId: result.preview?.documentId || runningState.artifactId,
+                      file: result.file,
+                      preview: result.preview,
+                      progress: result.progress,
+                      status: "done",
+                    }),
                   );
-                controller.enqueue(
-                  encodeGeneratedFileEvent(encoder, {
-                    ...runningState,
-                    error: message,
-                    status: "error",
-                  }),
-                );
-                if (error instanceof ChartValidationLimitError) throw error;
-                if (builtinTool.id === "word-document") requiredWordToolNames = [];
-                responseParts.push({
-                  functionResponse: {
-                    id: functionCall.id,
-                    name,
-                    response: { error: message, success: false },
-                  },
-                });
-              }
-            }
+                  if (builtinTool.id === "word-document") {
+                    requiredWordToolNames =
+                      getWordContinuationToolNames(name, result.content) || [];
+                  }
+                  if (chartAttempt)
+                    controller.enqueue(
+                      encoder.encode(
+                        `${JSON.stringify({ type: "attempt", ...chartAttempt, validation: result.content.validation })}\n`,
+                      ),
+                    );
+                  if (result.output) {
+                    controller.enqueue(encodeStreamEvent(encoder, "content", result.output));
+                  }
+                  responseParts.push({
+                    functionResponse: {
+                      id: functionCall.id,
+                      name,
+                      response: result.content,
+                    },
+                  });
+                } catch (error) {
+                  const message = error instanceof Error ? error.message : "File generation failed";
+                  if (chartAttempt)
+                    controller.enqueue(
+                      encoder.encode(
+                        `${JSON.stringify({ type: "attempt", ...chartAttempt, error: message })}\n`,
+                      ),
+                    );
+                  controller.enqueue(
+                    encodeGeneratedFileEvent(encoder, {
+                      ...runningState,
+                      error: message,
+                      status: "error",
+                    }),
+                  );
+                  if (error instanceof ChartValidationLimitError) throw error;
+                  if (builtinTool.id === "word-document") requiredWordToolNames = [];
+                  responseParts.push({
+                    functionResponse: {
+                      id: functionCall.id,
+                      name,
+                      response: { error: message, success: false },
+                    },
+                  });
+                }
+                return responseParts;
+              },
+              signal,
+            );
+            const responseParts = responses.flat();
 
             if (responseParts.length === 0) throw new Error("模型请求的工具无法执行，请重试。");
             toolContents.push({ parts: responseParts, role: "user" });
+            compactWebToolHistory(
+              toolContents.flatMap((content) =>
+                (content.parts || []).flatMap((part: any) => {
+                  const response = part.functionResponse;
+                  return response && WEB_TOOL_NAMES.has(response.name)
+                    ? [
+                        {
+                          content: JSON.stringify(response.response),
+                          replace: (value: string) => {
+                            response.response = JSON.parse(value);
+                          },
+                        },
+                      ]
+                    : [];
+                }),
+              ),
+              Math.min(
+                WEB_TOOL_HISTORY_MAX_CHARS,
+                contextPreparation
+                  ? Math.max(4000, contextPreparation.inputBudgetTokens)
+                  : WEB_TOOL_HISTORY_MAX_CHARS,
+              ),
+            );
           }
 
           if (latestUsage) {

@@ -156,10 +156,10 @@ export function ModelDetailCard({ model }: { model: ConfiguredModel }) {
   return (
     <div className="pb-1">
       <header className="px-4 pb-3 pt-3.5">
-        <p className="truncate font-jakarta text-sm font-semibold text-gray-900 dark:text-gray-100">
+        <p className="break-words font-jakarta text-sm font-semibold text-gray-900 dark:text-gray-100">
           {name}
         </p>
-        <p className="mt-0.5 truncate font-mono text-[11px] text-gray-400">{model.id}</p>
+        <p className="mt-0.5 break-all font-mono text-[11px] text-gray-400">{model.id}</p>
         {description && (
           <p className="mt-2 text-xs leading-5 text-gray-500 dark:text-gray-400">{description}</p>
         )}

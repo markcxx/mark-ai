@@ -52,11 +52,16 @@ export function normalizeWebImages(values: unknown[], sourceUrl?: string): WebIm
       (typeof item.height === "number" && item.height < 80)
     )
       continue;
+    const existing = unique.get(url);
     unique.set(url, {
       url,
-      title: cleanText(item.title || item.alt || item.description) || "网页图片",
-      description: cleanText(item.description || item.alt) || undefined,
-      sourceUrl: publicResourceUrl(item.sourceUrl || item.source_url || sourceUrl),
+      title:
+        existing?.title !== "网页图片" && existing?.title
+          ? existing.title
+          : cleanText(item.title || item.alt || item.description) || "网页图片",
+      description: existing?.description || cleanText(item.description || item.alt) || undefined,
+      sourceUrl:
+        existing?.sourceUrl || publicResourceUrl(item.sourceUrl || item.source_url || sourceUrl),
     });
     if (unique.size >= 12) break;
   }
@@ -70,6 +75,17 @@ const attribute = (tag: string, name: string) => {
   return match?.[1] ?? match?.[2] ?? match?.[3];
 };
 
+const markdownImagePattern =
+  /!\[([^\]]*)\]\(\s*(<?https?:\/\/[^\s)>]+>?|[^\s)>]+)(?:\s+["'][^)]*["'])?\s*\)/g;
+const markdownContextText = (value: string) =>
+  value
+    .replace(markdownImagePattern, " ")
+    .replace(/\[([^\]]*)\]\([^\s)]+(?:\s+["'][^)]*["'])?\)/g, "$1")
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
 export function extractWebImages(
   content: string,
   sourceUrl: string,
@@ -79,10 +95,37 @@ export function extractWebImages(
   const main =
     content.match(/<(?:article|main)\b[^>]*>([\s\S]*?)<\/(?:article|main)>/i)?.[1] || content;
   const cleaned = main.replace(/<(script|style|nav|footer|header|aside)\b[\s\S]*?<\/\1>/gi, " ");
-  for (const match of cleaned.matchAll(
-    /!\[([^\]]*)\]\(\s*(<?https?:\/\/[^\s)>]+>?|[^\s)>]+)(?:\s+["'][^)]*["'])?\s*\)/g,
-  )) {
-    candidates.push({ url: match[2].replace(/^<|>$/g, ""), alt: match[1] });
+  const headings = [...cleaned.matchAll(/^ {0,3}#{1,6}[\t ]+(.+?)[\t ]*#*[\t ]*$/gm)];
+  let headingIndex = -1;
+  for (const match of cleaned.matchAll(markdownImagePattern)) {
+    while (headings[headingIndex + 1] && headings[headingIndex + 1].index < match.index)
+      headingIndex++;
+    const heading = headings[headingIndex];
+    const sectionStart = heading ? heading.index + heading[0].length : 0;
+    const sectionEnd = headings[headingIndex + 1]?.index ?? cleaned.length;
+    const before = markdownContextText(
+      cleaned.slice(Math.max(sectionStart, match.index - 600), match.index),
+    ).slice(-120);
+    const after = markdownContextText(
+      cleaned.slice(
+        match.index + match[0].length,
+        Math.min(sectionEnd, match.index + match[0].length + 600),
+      ),
+    ).slice(0, 120);
+    const alt = cleanText(match[1]).slice(0, 80);
+    const section = heading && cleanText(heading[1]).slice(0, 60);
+    const nearby = cleanText(`${before} ${after}`);
+    candidates.push({
+      url: match[2].replace(/^<|>$/g, ""),
+      alt: match[1],
+      description: [
+        alt && `图片说明：${alt}`,
+        section && `所属小节：${section}`,
+        nearby && `相邻正文：${nearby}`,
+      ]
+        .filter(Boolean)
+        .join("；"),
+    });
   }
   for (const match of cleaned.matchAll(/<img\b[^>]*>/gi)) {
     const tag = match[0];

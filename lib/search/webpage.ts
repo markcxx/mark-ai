@@ -1,4 +1,7 @@
 import dns from "node:dns/promises";
+import { assessWebContent, cleanWebContent } from "./content-quality";
+import { fetchRetrievalJson, firstUsable, retrievalSignal } from "./retrieval";
+import type { WebRetrievalDetails } from "@/lib/chat/types";
 import net from "node:net";
 import {
   extractWebImages,
@@ -19,7 +22,10 @@ export type WebpageReadResponse = {
   images?: WebImageCandidate[];
   links?: string[];
   truncated?: boolean;
+  retrieval?: WebRetrievalDetails;
 };
+
+export type WebpageProvider = "auto" | "tavily" | "firecrawl";
 
 const FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v2/scrape";
 const TAVILY_EXTRACT_ENDPOINT = "https://api.tavily.com/extract";
@@ -196,19 +202,8 @@ const readResponseText = async (response: Response) => {
   return new TextDecoder("utf-8").decode(buffer);
 };
 
-const looksLikeBlockedPage = (content: string, title?: string) => {
-  const text = `${title || ""}\n${content}`.toLowerCase();
-  return [
-    "captcha",
-    "安全验证",
-    "请您登录",
-    "请登录",
-    "login required",
-    "verify you are human",
-    "access denied",
-    "forbidden",
-  ].some((keyword) => text.includes(keyword.toLowerCase()));
-};
+const looksLikeBlockedPage = (content: string, title?: string) =>
+  assessWebContent(content, title).blocked;
 
 const getReaderUrl = (url: URL) => `https://r.jina.ai/${url.toString()}`;
 
@@ -271,234 +266,103 @@ const readViaReader = async (url: URL, startedAt: number, signal?: AbortSignal) 
   }
 };
 
-const getProviderErrorMessage = async (response: Response, fallback: string) => {
-  const detail = await response.text().catch(() => "");
-  if (!detail) return fallback;
-
-  try {
-    const parsed = JSON.parse(detail);
-    const message =
-      parsed?.error ||
-      parsed?.message ||
-      parsed?.detail?.error ||
-      parsed?.detail ||
-      parsed?.warning;
-    if (typeof message === "string" && message.trim()) return message;
-  } catch {
-    // Use raw text below.
-  }
-
-  return detail.slice(0, 500);
-};
-
-const withTimeoutSignal = (signal: AbortSignal | undefined, timeoutMs: number) => {
-  signal?.throwIfAborted();
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  const abortRequest = () => controller.abort();
-  signal?.addEventListener("abort", abortRequest, { once: true });
-
-  return {
-    cleanup: () => {
-      clearTimeout(timeout);
-      signal?.removeEventListener("abort", abortRequest);
+const readViaFirecrawl = async (
+  url: URL,
+  startedAt: number,
+  signal: AbortSignal,
+  clean = false,
+) => {
+  const data = await fetchRetrievalJson(
+    FIRECRAWL_ENDPOINT,
+    getEnvKeys("FIRECRAWL_API_KEY"),
+    {
+      url: url.toString(),
+      formats: ["markdown", "links"],
+      onlyMainContent: true,
+      onlyCleanContent: clean,
+      blockAds: true,
+      removeBase64Images: true,
+      storeInCache: true,
+      proxy: "auto",
+      timeout: clean ? 10_000 : 8_000,
     },
-    signal: controller.signal,
-  };
+    signal,
+  );
+  if (data?.success === false) throw new Error("网页服务未能提取正文");
+  const page = data?.data || {};
+  const metadata = page.metadata || {};
+  const raw = String(page.markdown || page.text || "");
+  const sourceUrl =
+    publicResourceUrl(metadata.sourceURL || metadata.url || page.url) || url.toString();
+  const bodyImages = extractWebImages(raw, sourceUrl);
+  return {
+    content: raw.slice(0, MAX_CONTENT_CHARS),
+    title: String(metadata.title || page.title || metadata.ogTitle || url.hostname),
+    url: sourceUrl,
+    images: bodyImages.length
+      ? bodyImages
+      : normalizeWebImages([metadata.ogImage].filter(Boolean), sourceUrl),
+    links: [
+      ...new Set([
+        ...extractWebLinks(raw, sourceUrl),
+        ...(Array.isArray(page.links)
+          ? page.links.flatMap((link: unknown) => {
+              const safe = publicResourceUrl(link, sourceUrl);
+              return safe ? [safe] : [];
+            })
+          : []),
+      ]),
+    ].slice(0, 50),
+    truncated: raw.length > MAX_CONTENT_CHARS,
+    description: metadata.description || metadata.ogDescription,
+    favicon: metadata.favicon,
+    siteName: metadata.ogSiteName || metadata.siteName,
+    costTime: Date.now() - startedAt,
+  } satisfies WebpageReadResponse;
 };
 
-const readViaFirecrawl = async (url: URL, startedAt: number, signal?: AbortSignal) => {
-  const apiKeys = getEnvKeys("FIRECRAWL_API_KEY");
-  if (apiKeys.length === 0) {
-    throw new Error("网页读取服务尚未配置 FIRECRAWL_API_KEY");
-  }
-
-  let lastError = "Firecrawl scrape failed";
-
-  for (const apiKey of apiKeys) {
-    const timeoutSignal = withTimeoutSignal(signal, 70_000);
-
-    try {
-      const response = await fetch(FIRECRAWL_ENDPOINT, {
-        body: JSON.stringify({
-          blockAds: true,
-          formats: ["markdown", "links"],
-          onlyCleanContent: true,
-          onlyMainContent: true,
-          proxy: "auto",
-          removeBase64Images: true,
-          storeInCache: true,
-          timeout: 60_000,
-          url: url.toString(),
-        }),
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        method: "POST",
-        signal: timeoutSignal.signal,
-      });
-
-      if (!response.ok) {
-        lastError = await getProviderErrorMessage(response, `Firecrawl HTTP ${response.status}`);
-        continue;
-      }
-
-      const data = await response.json();
-      if (data?.success === false) {
-        lastError = data?.error || data?.warning || "Firecrawl scrape failed";
-        continue;
-      }
-
-      const page = data?.data || {};
-      const metadata = page.metadata || {};
-      const content = normalizeWhitespace(
-        String(page.markdown || page.text || page.html || ""),
-      ).slice(0, MAX_CONTENT_CHARS);
-      const title = normalizeWhitespace(
-        String(metadata.title || page.title || metadata.ogTitle || url.hostname),
-      );
-      const pageUrl = String(metadata.sourceURL || metadata.url || page.url || url.toString());
-
-      if (!content || looksLikeBlockedPage(content, title)) {
-        lastError = "Firecrawl 未能获取可读正文，可能需要登录或验证码";
-        continue;
-      }
-
-      const sourceUrl = publicResourceUrl(pageUrl) || url.toString();
-      const bodyImages = extractWebImages(String(page.markdown || page.html || ""), sourceUrl);
-      return {
-        content,
-        images: bodyImages.length
-          ? bodyImages
-          : normalizeWebImages([metadata.ogImage].filter(Boolean), sourceUrl),
-        links: extractWebLinks(String(page.markdown || ""), url.toString()).concat(
-          Array.isArray(page.links)
-            ? page.links
-                .flatMap((link: unknown) => {
-                  const safe = publicResourceUrl(link, url.toString());
-                  return safe ? [safe] : [];
-                })
-                .slice(0, 50)
-            : [],
-        ),
-        truncated: String(page.markdown || page.text || page.html || "").length > MAX_CONTENT_CHARS,
-        costTime: Date.now() - startedAt,
-        description: metadata.description || metadata.ogDescription,
-        favicon: metadata.favicon,
-        siteName: metadata.ogSiteName || metadata.siteName,
-        title,
-        url: pageUrl,
-      } satisfies WebpageReadResponse;
-    } finally {
-      timeoutSignal.cleanup();
-    }
-  }
-
-  throw new Error(lastError);
+const readViaTavilyExtract = async (
+  url: URL,
+  startedAt: number,
+  signal: AbortSignal,
+  advanced = false,
+) => {
+  const data = await fetchRetrievalJson(
+    TAVILY_EXTRACT_ENDPOINT,
+    getEnvKeys("TAVILY_API_KEY"),
+    {
+      urls: url.toString(),
+      extract_depth: advanced ? "advanced" : "basic",
+      format: "markdown",
+      include_images: true,
+      include_favicon: true,
+      timeout: advanced ? 10 : 8,
+    },
+    signal,
+  );
+  const result = Array.isArray(data.results) ? data.results[0] : undefined;
+  const raw = String(result?.raw_content || result?.content || "");
+  return {
+    content: raw.slice(0, MAX_CONTENT_CHARS),
+    title: String(result?.title || raw.match(/^#\s+(.+)$/m)?.[1] || url.hostname),
+    url: publicResourceUrl(result?.url) || url.toString(),
+    images: extractWebImages(
+      raw,
+      url.toString(),
+      Array.isArray(result?.images) ? result.images : [],
+    ),
+    links: extractWebLinks(raw, url.toString()),
+    truncated: raw.length > MAX_CONTENT_CHARS,
+    favicon: result?.favicon,
+    costTime: Date.now() - startedAt,
+  } satisfies WebpageReadResponse;
 };
 
-const readViaTavilyExtract = async (url: URL, startedAt: number, signal?: AbortSignal) => {
-  const apiKeys = getEnvKeys("TAVILY_API_KEY");
-  if (apiKeys.length === 0) {
-    throw new Error("网页读取服务尚未配置 TAVILY_API_KEY");
-  }
-
-  let lastError = "Tavily extract failed";
-
-  for (const apiKey of apiKeys) {
-    const timeoutSignal = withTimeoutSignal(signal, 45_000);
-
-    try {
-      const response = await fetch(TAVILY_EXTRACT_ENDPOINT, {
-        body: JSON.stringify({
-          extract_depth: "advanced",
-          format: "markdown",
-          include_favicon: true,
-          include_images: true,
-          timeout: 30,
-          urls: url.toString(),
-        }),
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        method: "POST",
-        signal: timeoutSignal.signal,
-      });
-
-      if (!response.ok) {
-        lastError = await getProviderErrorMessage(
-          response,
-          `Tavily Extract HTTP ${response.status}`,
-        );
-        continue;
-      }
-
-      const data = await response.json();
-      const result = Array.isArray(data?.results) ? data.results[0] : undefined;
-      const failed = Array.isArray(data?.failed_results) ? data.failed_results[0] : undefined;
-      const content = normalizeWhitespace(
-        String(result?.raw_content || result?.content || ""),
-      ).slice(0, MAX_CONTENT_CHARS);
-      const pageUrl = String(result?.url || url.toString());
-      const title = normalizeWhitespace(String(result?.title || url.hostname));
-
-      if (!content || looksLikeBlockedPage(content, title)) {
-        lastError = failed?.error || "Tavily Extract 未能获取可读正文";
-        continue;
-      }
-
-      return {
-        content,
-        images: extractWebImages(
-          String(result?.raw_content || result?.content || ""),
-          url.toString(),
-          Array.isArray(result?.images) ? result.images : [],
-        ),
-        links: extractWebLinks(
-          String(result?.raw_content || result?.content || ""),
-          url.toString(),
-        ),
-        truncated: String(result?.raw_content || result?.content || "").length > MAX_CONTENT_CHARS,
-        costTime: Date.now() - startedAt,
-        favicon: result?.favicon,
-        title,
-        url: pageUrl,
-      } satisfies WebpageReadResponse;
-    } finally {
-      timeoutSignal.cleanup();
-    }
-  }
-
-  throw new Error(lastError);
-};
-
-export async function readWebpage({
-  signal,
-  url,
-}: {
-  signal?: AbortSignal;
-  url: string;
-}): Promise<WebpageReadResponse> {
-  signal?.throwIfAborted();
-  const startedAt = Date.now();
-  let currentUrl = await assertPublicHttpUrl(url.trim());
-
-  try {
-    return await readViaFirecrawl(currentUrl, startedAt, signal);
-  } catch {
-    signal?.throwIfAborted();
-    // Fall back to Tavily Extract, then direct fetch/Jina reader below.
-  }
-
-  try {
-    return await readViaTavilyExtract(currentUrl, startedAt, signal);
-  } catch {
-    signal?.throwIfAborted();
-    // Fall back to direct fetch/Jina reader below.
-  }
-
+async function readDirect(
+  currentUrl: URL,
+  startedAt: number,
+  signal: AbortSignal,
+): Promise<WebpageReadResponse> {
   for (let redirect = 0; redirect <= MAX_REDIRECTS; redirect += 1) {
     signal?.throwIfAborted();
     const controller = new AbortController();
@@ -519,7 +383,11 @@ export async function readWebpage({
       if ([301, 302, 303, 307, 308].includes(response.status)) {
         const location = response.headers.get("location");
         if (!location) throw new Error("网页重定向缺少目标地址");
-        currentUrl = await assertPublicHttpUrl(new URL(location, currentUrl).toString());
+        currentUrl = await firstUsable(
+          () => assertPublicHttpUrl(new URL(location, currentUrl).toString()),
+          undefined,
+          signal,
+        );
         continue;
       }
 
@@ -572,4 +440,119 @@ export async function readWebpage({
   }
 
   throw new Error("网页重定向次数过多");
+}
+
+export async function readWebpage({
+  signal,
+  url,
+  provider = "auto",
+}: {
+  signal?: AbortSignal;
+  url: string;
+  provider?: WebpageProvider;
+}): Promise<WebpageReadResponse> {
+  if (!["auto", "tavily", "firecrawl"].includes(provider))
+    throw new Error("网页读取服务无效，请选择 auto、tavily 或 firecrawl。");
+  const startedAt = Date.now();
+  const operation = retrievalSignal(signal, 30_000);
+  const attempts: WebRetrievalDetails["attempts"] = [];
+  let needsCleaning = false;
+  const attempt =
+    (provider: string, mode: string, run: (signal: AbortSignal) => Promise<WebpageReadResponse>) =>
+    async (attemptSignal: AbortSignal) => {
+      const start = Date.now();
+      const trace: WebRetrievalDetails["attempts"][number] = {
+        provider,
+        mode,
+        durationMs: 0,
+        outcome: "pending",
+      };
+      attempts.push(trace);
+      try {
+        const result = await run(attemptSignal);
+        attemptSignal.throwIfAborted();
+        const content = cleanWebContent(result.content);
+        const quality = assessWebContent(content, result.title);
+        needsCleaning ||= quality.noisy;
+        if (!quality.usable) {
+          trace.outcome = "unusable";
+          throw new Error("网页未返回可用正文，请尝试其他来源");
+        }
+        trace.outcome = "accepted";
+        return { ...result, content, retrieval: { provider, mode, attempts: [] } };
+      } catch (error) {
+        if (trace.outcome === "pending")
+          trace.outcome = attemptSignal.aborted ? "cancelled" : "error";
+        throw error;
+      } finally {
+        trace.durationMs = Date.now() - start;
+      }
+    };
+  try {
+    // The DNS check itself is bounded and cancellation-aware as well.
+    const currentUrl = await firstUsable(
+      () => assertPublicHttpUrl(url.trim()),
+      undefined,
+      operation.signal,
+    );
+    const tavily = getEnvKeys("TAVILY_API_KEY").length > 0;
+    const firecrawl = getEnvKeys("FIRECRAWL_API_KEY").length > 0;
+    let result: WebpageReadResponse | undefined;
+    const tryReaders = async (enhanced: boolean) => {
+      const order =
+        provider === "firecrawl"
+          ? (["firecrawl", "tavily"] as const)
+          : (["tavily", "firecrawl"] as const);
+      const readers = order.flatMap((name) => {
+        if (name === "firecrawl")
+          return firecrawl && (!enhanced || needsCleaning)
+            ? [
+                attempt(name, enhanced ? "clean" : "basic", (s) =>
+                  readViaFirecrawl(currentUrl, startedAt, s, enhanced),
+                ),
+              ]
+            : [];
+        return tavily
+          ? [
+              attempt(name, enhanced ? "advanced" : "basic", (s) =>
+                readViaTavilyExtract(currentUrl, startedAt, s, enhanced),
+              ),
+            ]
+          : [];
+      });
+      // Honor the selected reader; use the backup only on failure or timeout.
+      for (const reader of readers) {
+        operation.signal.throwIfAborted();
+        const stage = retrievalSignal(operation.signal, enhanced ? 12_000 : 10_000);
+        try {
+          return await firstUsable(reader, undefined, stage.signal);
+        } catch {
+          operation.signal.throwIfAborted();
+        } finally {
+          stage.cleanup();
+        }
+      }
+      return undefined;
+    };
+    result = await tryReaders(false);
+    if (!result) result = await tryReaders(true);
+    if (!result)
+      result = await attempt("direct", "html", (s) => readDirect(currentUrl, startedAt, s))(
+        operation.signal,
+      );
+    return {
+      ...result,
+      costTime: Date.now() - startedAt,
+      retrieval: {
+        ...result.retrieval!,
+        requestedProvider: provider,
+        attempts: attempts.map((trace) => ({
+          ...trace,
+          outcome: trace.outcome === "pending" ? "cancelled" : trace.outcome,
+        })),
+      },
+    };
+  } finally {
+    operation.cleanup();
+  }
 }

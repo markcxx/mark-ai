@@ -16,6 +16,52 @@ const url = "https://example.com/article";
 const imageUrl = "https://cdn.example.com/body.jpg";
 
 beforeEach(() => vi.clearAllMocks());
+it("runs independent Gemini reads concurrently and keeps native result ordering", async () => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let started = 0;
+  const urls = [0, 1, 2].map((i) => `https://example.com/${i}`);
+  vi.mocked(readWebpage).mockImplementation(async ({ url }) => {
+    if (++started === 3) release();
+    await gate;
+    return { url, title: "页面", content: "正文内容", costTime: 1 };
+  });
+  mocks.stream.mockImplementationOnce(async function* () {
+    yield {
+      candidates: [
+        {
+          content: {
+            role: "model",
+            parts: urls.map((url, i) => ({
+              functionCall: { id: `call-${i}`, name: "read_webpage", args: { url } },
+              thoughtSignature: "signature",
+            })),
+          },
+        },
+      ],
+    };
+  });
+  mocks.stream.mockImplementationOnce(async function* () {
+    yield { candidates: [{ content: { parts: [{ text: "完成回答" }] } }] };
+  });
+  const response = await createGeminiStream({
+    apiKey: "fixture",
+    model: "test",
+    messages: [{ role: "user", content: urls.join(" ") }],
+    systemPrompt: "回答",
+    webSearchEnabled: true,
+  });
+  expect(await response.text()).toContain("完成回答");
+  expect(started).toBe(3);
+  const parts = mocks.stream.mock.calls[1][0].contents
+    .flatMap((content: { parts: { functionResponse?: { id: string } }[] }) => content.parts)
+    .filter((part: { functionResponse?: unknown }) => part.functionResponse);
+  expect(
+    parts.map((part: { functionResponse: { id: string } }) => part.functionResponse.id),
+  ).toEqual(["call-0", "call-1", "call-2"]);
+});
 it("streams shared web tools and preserves native function results without duplicating final text", async () => {
   vi.mocked(readWebpage).mockResolvedValue({
     url,
@@ -26,7 +72,7 @@ it("streams shared web tools and preserves native function results without dupli
   });
   const imageId = `img_${createHash("sha256").update(imageUrl).digest("hex").slice(0, 16)}`;
   for (const [name, args] of [
-    ["read_webpage", { url }],
+    ["read_webpage", { url, provider: "firecrawl" }],
     ["find_in_page", { url, pattern: "限制" }],
     ["show_images", { image_ids: [imageId] }],
   ] as const) {
@@ -69,6 +115,7 @@ it("streams shared web tools and preserves native function results without dupli
   ).toEqual(["read_webpage", "find_in_page", "show_images"]);
   expect(mocks.generate).not.toHaveBeenCalled();
   expect(readWebpage).toHaveBeenCalledTimes(1);
+  expect(readWebpage).toHaveBeenCalledWith(expect.objectContaining({ provider: "firecrawl" }));
   const second = mocks.stream.mock.calls[1][0];
   expect(
     second.contents.some((message: any) =>

@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { ChevronDown, SlidersHorizontal } from "lucide-react";
 import type { ConfiguredModel } from "@/lib/chat/types";
-import { getModelKey } from "@/lib/chat/helpers";
+import { getModelDisplayName, getModelKey } from "@/lib/chat/helpers";
 import { ModelBrandIcon } from "./ModelBrandIcon";
 import { ModelSelectorDialog, type ModelSelectionOption } from "./ModelSelectorDialog";
 
@@ -30,7 +30,7 @@ export function ModelSelect({
   const [keyword, setKeyword] = useState("");
   const selected = models.find((model) => getModelKey(model) === value);
   const option = options?.find((item) => item.key === value);
-  const name = selected?.id || option?.label || value || "选择模型";
+  const name = selected ? getModelDisplayName(selected.id) : option?.label || value || "选择模型";
   return (
     <>
       <button

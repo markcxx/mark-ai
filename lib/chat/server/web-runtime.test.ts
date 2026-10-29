@@ -78,7 +78,7 @@ it.each<Kind>(["openai", "anthropic"])(
   "%s carries reading, finding and selected images through the complete tool loop",
   async (kind) => {
     vi.mocked(fetchWithDevelopmentProxy)
-      .mockResolvedValueOnce(upstream(kind, "read_webpage", { url }))
+      .mockResolvedValueOnce(upstream(kind, "read_webpage", { url, provider: "firecrawl" }))
       .mockResolvedValueOnce(upstream(kind, "find_in_page", { url, pattern: "限制" }))
       .mockResolvedValueOnce(upstream(kind, "show_images", { image_ids: [imageId] }))
       .mockResolvedValueOnce(upstream(kind));
@@ -111,6 +111,7 @@ it.each<Kind>(["openai", "anthropic"])(
     ).toMatchObject({ id: imageId, sourceUrl: url });
     expect(events).toContainEqual({ type: "content", text: "正文证据：限制为 37。[1]" });
     expect(readWebpage).toHaveBeenCalledTimes(1);
+    expect(readWebpage).toHaveBeenCalledWith(expect.objectContaining({ provider: "firecrawl" }));
     expect(searchTavily).not.toHaveBeenCalled();
   },
 );
@@ -153,4 +154,47 @@ it("does not expose or execute browsing tools when web access is off", async () 
   expect(
     JSON.parse(String(vi.mocked(fetchWithDevelopmentProxy).mock.calls[0][1]?.body)).tools,
   ).toBeUndefined();
+});
+
+it("executes independent reads concurrently but returns tool messages in model order", async () => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let started = 0;
+  const urls = [0, 1, 2].map((i) => `https://example.com/${i}`);
+  vi.mocked(readWebpage).mockImplementation(async ({ url }) => {
+    if (++started === 3) release();
+    await gate;
+    return { url, title: "文章", content: "正文证据", costTime: 1 };
+  });
+  const calls = urls.map((url, index) => ({
+    index,
+    id: `call-${index}`,
+    type: "function",
+    function: { name: "read_webpage", arguments: JSON.stringify({ url }) },
+  }));
+  vi.mocked(fetchWithDevelopmentProxy)
+    .mockResolvedValueOnce(
+      new Response(
+        `data: ${JSON.stringify({ choices: [{ delta: { tool_calls: calls } }] })}\n\ndata: [DONE]\n\n`,
+      ),
+    )
+    .mockResolvedValueOnce(upstream("openai"));
+  const response = await createOpenAICompatibleStream(
+    [{ role: "user", content: urls.join(" ") }],
+    "test",
+    "fixture",
+    "https://model.example.com/v1",
+    true,
+  );
+  const events = await response.text();
+  expect(events).not.toContain('"type":"error"');
+  expect(started).toBe(3);
+  const second = JSON.parse(String(vi.mocked(fetchWithDevelopmentProxy).mock.calls[1][1]?.body));
+  expect(
+    second.messages
+      .filter((m: { role: string }) => m.role === "tool")
+      .map((m: { tool_call_id: string }) => m.tool_call_id),
+  ).toEqual(["call-0", "call-1", "call-2"]);
 });

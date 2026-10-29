@@ -19,8 +19,14 @@ export async function POST(req: NextRequest) {
     if (!url || url.length > 2_048) {
       return NextResponse.json({ error: "请输入有效的网页地址" }, { status: 400 });
     }
+    if (body.provider !== undefined && !["auto", "tavily", "firecrawl"].includes(body.provider)) {
+      return NextResponse.json(
+        { error: "网页读取服务无效，请选择 auto、tavily 或 firecrawl。" },
+        { status: 400 },
+      );
+    }
 
-    const data = await readWebpage({ signal: req.signal, url });
+    const data = await readWebpage({ signal: req.signal, url, provider: body.provider });
     return NextResponse.json({ ...data, ...getPageExcerpt(data, body.startLine, body.maxLines) });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {

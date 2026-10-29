@@ -21,6 +21,7 @@ import type {
   QuotedSelection,
 } from "@/lib/chat/types";
 import { isImageGenerationModel } from "@/lib/chat/image-models";
+import { getModelDisplayName } from "@/lib/chat/helpers";
 import { cn } from "@/lib/utils";
 import { ComposerMenu } from "./ComposerMenu";
 import { ContextWindowIndicator } from "./ContextWindowIndicator";
@@ -314,7 +315,11 @@ export function ChatInput({
                     if (availableModels.length > 0) setIsModelDialogOpen((value) => !value);
                   }}
                   ref={modelButtonRef}
-                  aria-label={selectedModel ? `选择模型，当前 ${selectedModel.id}` : "选择模型"}
+                  aria-label={
+                    selectedModel
+                      ? `选择模型，当前 ${getModelDisplayName(selectedModel.id)}`
+                      : "选择模型"
+                  }
                   data-markai-tooltip={
                     selectedModel ? `${selectedModel.id} · ${selectedModel.provider}` : "选择模型"
                   }
@@ -328,7 +333,7 @@ export function ChatInput({
                         size={20}
                       />
                       <span className="hidden max-w-[160px] truncate text-[13px] sm:inline">
-                        {selectedModel.id}
+                        {getModelDisplayName(selectedModel.id)}
                       </span>
                     </>
                   ) : (

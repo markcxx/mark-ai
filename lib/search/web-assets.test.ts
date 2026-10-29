@@ -60,3 +60,40 @@ it("provides captions and nearby article text for relevance selection without a 
   expect(image.description).toContain("主讲人介绍功能");
   expect(image.description).not.toContain("<");
 });
+
+it("associates Markdown pictures with their section without leaking the next subject or image URLs", () => {
+  const images = extractWebImages(
+    [
+      "## 会场布局",
+      "入口位于舞台左侧。",
+      "![会场全景](/venue.jpg)",
+      "观众席围绕主舞台布置。[布局说明](/layout)",
+      "![侧面视角](/side.jpg)",
+      "## 新款设备",
+      "设备采用可折叠设计。",
+      "![](/device.jpg)",
+      "屏幕可向外翻转。",
+    ].join("\n\n"),
+    "https://example.com/news",
+    ["https://example.com/venue.jpg"],
+  );
+  expect(images).toHaveLength(3);
+  expect(images[0].title).toBe("会场全景");
+  expect(images[0].description).toContain("所属小节：会场布局");
+  expect(images[0].description).toContain("入口位于舞台左侧");
+  expect(images[0].description).toContain("观众席围绕主舞台布置");
+  expect(images[0].description).not.toMatch(/设备|side\.jpg|\/layout|!\[/);
+  expect(images[2].description).toContain("所属小节：新款设备");
+  expect(images[2].description).toContain("屏幕可向外翻转");
+  expect(images[2].description).not.toContain("会场");
+});
+
+it("keeps Markdown context bounded and works without a heading or image caption", () => {
+  const [image] = extractWebImages(
+    `${"很长的正文".repeat(1000)}\n建筑的入口\n![](/building.jpg)\n屋顶的结构\n${"很长的正文".repeat(1000)}`,
+    "https://example.com/news",
+  );
+  expect(image.description).toContain("建筑的入口");
+  expect(image.description).toContain("屋顶的结构");
+  expect(image.description!.length).toBeLessThanOrEqual(300);
+});

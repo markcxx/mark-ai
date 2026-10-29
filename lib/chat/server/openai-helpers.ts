@@ -4,6 +4,10 @@ import { contentWithWebContext } from "@/lib/chat/web-context";
 import { getRuntimeSystemPrompt } from "./runtime-prompt";
 import type { ChatMessage, OpenAIChatMessage, OpenAIToolCall } from "./types";
 
+// Character limits, not token estimates: shared by all model protocols.
+export const WEB_TOOL_RESULT_MAX_CHARS = 8_000;
+export const WEB_TOOL_HISTORY_MAX_CHARS = 48_000;
+
 export const toOpenAIChatEndpoint = (baseUrl?: string) => {
   if (!baseUrl) return undefined;
 
@@ -114,108 +118,196 @@ export const getToolWebpageUrl = (toolCall: OpenAIToolCall) => {
   return url || toolCall.function.arguments.trim();
 };
 
-export const formatToolResultForModel = (webSearch: WebSearchState, maxChars = 18_000) => {
-  const imageDisplay =
-    webSearch.status === "done" && webSearch.images?.length && webSearch.tool !== "show_images"
-      ? {
-          candidate_count: webSearch.images.length,
-          tool: "show_images",
-          guidance:
-            "Judge these candidates against the user question, page text, captions and nearby text. Use show_images for directly relevant informative images, including news/event photos and screenshots, even without an image request. Choose the relevant IDs, their order and count; there is no target count. Call show_images where they fit in the answer, before, between or after paragraphs. Write preceding paragraphs before the call and continue any remaining text afterward; separate calls can accompany different sections. Stay within the requested scope; do not browse entry details merely to illustrate a list or simple fact. Reuse these IDs; no extra search is needed. Skip unrelated, decorative, ambiguous or already displayed candidates. Captions and nearby text are metadata, not visual inspection.",
-        }
-      : undefined;
+/** Reduce metadata before evidence; any discarded text is explicitly marked. */
+export function fitWebToolPayload(payload: Record<string, any>, maxChars: number): string {
+  const copy = structuredClone(payload);
+  const encoded = () => JSON.stringify(copy);
+  if (encoded().length <= maxChars) return encoded();
+  copy.truncated = true;
+  delete copy.links;
+  delete copy.description;
+  delete copy.siteName;
+  // Placement guidance is also in the system prompt; preserve image context first.
+  if (copy.image_display) delete copy.image_display.guidance;
+  if (copy.images)
+    copy.images = copy.images.map((image: any) => ({
+      id: image.id,
+      title: image.title?.slice(0, 100),
+      description: image.description?.slice(0, 160),
+    }));
+  // Keep page coordinates truthful after shortening the evidence window.
+  const trimContent = (limit: number) => {
+    if (typeof copy.content !== "string" || copy.content.length <= limit) return;
+    const numbered = copy.page && /^\d+: /.test(copy.content);
+    let text = copy.content.slice(0, limit);
+    if (numbered) {
+      text = text.slice(0, Math.max(0, text.lastIndexOf("\n")));
+      const last = text.match(/(?:^|\n)(\d+): [^\n]*$/);
+      copy.page = {
+        ...copy.page,
+        truncated: true,
+        endLine: last ? Number(last[1]) : copy.page.startLine - 1,
+        nextLine: last ? Number(last[1]) + 1 : copy.page.startLine,
+      };
+    }
+    copy.content = text;
+  };
+  if (encoded().length > maxChars) {
+    const count = Math.max(1, copy.results?.length || 0);
+    copy.results = copy.results?.map((item: any) => ({
+      ...item,
+      content: item.content?.slice(0, Math.max(80, Math.floor(maxChars / (count * 3)))),
+    }));
+    trimContent(Math.floor(maxChars * 0.55));
+  }
+  if (encoded().length > maxChars) {
+    delete copy.images;
+    delete copy.image_display;
+    delete copy.query;
+    delete copy.title;
+    copy.results = copy.results?.map((item: any) => ({
+      citationId: item.citationId,
+      title: item.title?.slice(0, 100),
+      url: item.url,
+      publishedDate: item.publishedDate,
+    }));
+    trimContent(Math.floor(maxChars * 0.3));
+  }
+  while (encoded().length > maxChars && copy.results?.length > 1) copy.results.pop();
+  if (encoded().length > maxChars) {
+    trimContent(0);
+    delete copy.results;
+    delete copy.url;
+    delete copy.next_action;
+    delete copy.error;
+  }
+  if (encoded().length > maxChars)
+    return JSON.stringify({ tool: copy.tool, status: copy.status, context_compacted: true });
+  return encoded();
+}
+
+export const formatToolResultForModel = (
+  webSearch: WebSearchState,
+  maxChars = WEB_TOOL_RESULT_MAX_CHARS,
+) => {
+  const images = webSearch.images || [];
+  if (webSearch.tool === "show_images" && webSearch.status === "done") {
+    return fitWebToolPayload(
+      {
+        tool: webSearch.tool,
+        status: webSearch.status,
+        image_ids: images.map(({ id }) => id),
+        untrusted_external_content: true,
+      },
+      maxChars,
+    );
+  }
   const payload = {
     content_kind: webSearch.contentKind,
-    image_display: imageDisplay,
-    page: webSearch.page,
-    images: webSearch.images?.map(({ id, title, url, sourceUrl, description }) => ({
-      id,
-      title,
-      url,
-      sourceUrl,
-      description,
-    })),
-    links: webSearch.links,
     untrusted_external_content: true,
+    reader: webSearch.retrieval
+      ? {
+          requested_provider: webSearch.retrieval.requestedProvider,
+          provider: webSearch.retrieval.provider,
+          cached: webSearch.retrieval.cached || false,
+        }
+      : undefined,
     next_action:
-      webSearch.status !== "done"
-        ? undefined
-        : webSearch.contentKind === "search_snippets"
-          ? "Answer now if these snippets sufficiently support the user's request. Call read_webpage only for a requested page or a specific missing fact needed for the answer. For lists/rankings, obtain the list and its freshness/source, not background on each entry."
-          : webSearch.page?.nextLine
-            ? "More page content exists, but reading it is optional. Answer now if the requested information is covered. Only use find_in_page or read_webpage(start_line=nextLine) to fill a specific remaining gap; continue when the user requested complete coverage."
-            : undefined,
-    answer: webSearch.answer,
+      webSearch.status === "done" &&
+      webSearch.contentKind === "search_snippets" &&
+      webSearch.results.length > 0
+        ? "Answer with citations if sufficient; read only for required missing evidence."
+        : undefined,
+    image_display:
+      webSearch.status === "done" && images.length && webSearch.tool !== "show_images"
+        ? {
+            candidate_count: images.length,
+            tool: "show_images",
+          }
+        : undefined,
+    // The server owns image URLs; the model needs IDs and relevance metadata only.
+    images: images.length
+      ? images.map(({ id, title, description }) => ({
+          id,
+          title: title.slice(0, 100),
+          description: description && description !== title ? description.slice(0, 160) : undefined,
+        }))
+      : undefined,
+    page: webSearch.page,
+    links: webSearch.links?.slice(0, 12),
     content: webSearch.content,
-    description: webSearch.description,
     error: webSearch.error,
-    query: webSearch.query,
-    results: webSearch.results.slice(0, 8).map((item) => ({
+    query: webSearch.tool === "web_search" ? webSearch.query.slice(0, 240) : undefined,
+    results: webSearch.results.map((item) => ({
       citationId: item.citationId,
-      content: item.content,
-      title: item.title,
+      content:
+        webSearch.contentKind === "page" || webSearch.contentKind === "page_matches"
+          ? undefined
+          : item.content,
+      title: item.title.slice(0, 160),
       url: item.url,
+      publishedDate: item.publishedDate,
     })),
-    siteName: webSearch.siteName,
     status: webSearch.status,
-    title: webSearch.title,
     tool: webSearch.tool,
     url: webSearch.url,
   };
-  const content = JSON.stringify(payload);
-  if (content.length <= maxChars) return content;
-
-  const resultContentChars = Math.max(
-    160,
-    Math.floor(maxChars / Math.max(webSearch.results.length * 3, 3)),
-  );
-  const compact = JSON.stringify({
-    ...payload,
-    answer: webSearch.answer?.slice(0, Math.floor(maxChars / 5)),
-    content: webSearch.content?.slice(0, Math.floor(maxChars / 3)),
-    results: webSearch.results.slice(0, 8).map((item) => ({
-      citationId: item.citationId,
-      content: item.content?.slice(0, resultContentChars),
-      title: item.title,
-      url: item.url,
-    })),
-    truncated: true,
-    page: webSearch.page && { ...webSearch.page, nextLine: webSearch.page.startLine },
-  });
-  if (compact.length <= maxChars) return compact;
-
-  const minimal = {
-    content_kind: webSearch.contentKind,
-    image_display: imageDisplay,
-    images:
-      webSearch.images?.slice(0, 6).map(({ id, title }) => ({ id, title: title.slice(0, 100) })) ||
-      [],
-    page: webSearch.page && { ...webSearch.page, nextLine: webSearch.page.startLine },
-    untrusted_external_content: true,
-    next_action:
-      webSearch.status === "done"
-        ? "Response truncated; this is not the full source. Answer if the available evidence already covers the request. Only if required information is missing, use find_in_page or read_webpage with a smaller max_lines. Do not expand the task to unrelated details. Image IDs remain usable with show_images."
-        : undefined,
-    query: webSearch.query.slice(0, 300),
-    results: webSearch.results.slice(0, 4).map((item) => ({
-      citationId: item.citationId,
-      title: item.title.slice(0, 100),
-      url: item.url.slice(0, 2048),
-    })),
-    status: webSearch.status,
-    tool: webSearch.tool,
-    truncated: true,
-    url: webSearch.url?.slice(0, 2048),
-    error: webSearch.error?.slice(0, 300),
-  };
-  while (JSON.stringify(minimal).length > maxChars && minimal.results.length) minimal.results.pop();
-  while (JSON.stringify(minimal).length > maxChars && minimal.images.length) minimal.images.pop();
-  if (JSON.stringify(minimal).length > maxChars) {
-    minimal.url = undefined;
-    minimal.query = "";
-  }
-  return JSON.stringify(minimal);
+  return fitWebToolPayload(payload, maxChars);
 };
+
+/** Keep model context bounded without changing persisted evidence or tool protocol. */
+export function compactWebToolHistory(
+  entries: { content: string; replace: (value: string) => void }[],
+  budget = WEB_TOOL_HISTORY_MAX_CHARS,
+) {
+  // Keep the newest copy of identical successful evidence. Persisted tool/UI
+  // records are untouched; only the next model request uses these short markers.
+  const seen = new Set<string>();
+  entries = entries.map((entry) => ({ ...entry }));
+  for (let index = entries.length - 1; index >= 0; index--) {
+    const entry = entries[index];
+    try {
+      const payload = JSON.parse(entry.content);
+      if (
+        !payload.untrusted_external_content ||
+        payload.status !== "done" ||
+        payload.context_compacted ||
+        payload.tool === "show_images"
+      )
+        continue;
+      const signature = JSON.stringify({ ...payload, reader: undefined });
+      if (seen.has(signature)) {
+        entry.content = JSON.stringify({
+          tool: payload.tool,
+          status: payload.status,
+          url: payload.url,
+          context_compacted: true,
+          duplicate_result: true,
+        });
+        entry.replace(entry.content);
+      } else seen.add(signature);
+    } catch {
+      /* Non-web payloads keep their original protocol. */
+    }
+  }
+  let totalChars = entries.reduce((sum, entry) => sum + entry.content.length, 0);
+  // Reclaim older evidence first. Dividing the budget across every call also
+  // shrinks the newest excerpt, encouraging repeated reads of missing lines.
+  for (const entry of entries) {
+    if (totalChars <= budget) break;
+    try {
+      const payload = JSON.parse(entry.content);
+      if (!payload.untrusted_external_content && !payload.context_compacted) continue;
+      const allowance = Math.max(120, entry.content.length - (totalChars - budget));
+      const compact = fitWebToolPayload({ ...payload, context_compacted: true }, allowance);
+      if (compact.length >= entry.content.length) continue;
+      totalChars -= entry.content.length - compact.length;
+      entry.replace(compact);
+    } catch {
+      /* Leave non-web tool protocols untouched. */
+    }
+  }
+}
 
 export const normalizeToolCalls = (toolCalls: OpenAIToolCall[]) =>
   toolCalls

@@ -54,7 +54,7 @@ export function SessionRow({
     <div className="relative" ref={menuOpen ? menuRef : undefined}>
       <div
         className={cn(
-          "group flex min-h-11 min-w-0 items-center gap-1 overflow-hidden rounded-xl pl-3 pr-1 text-sm transition-colors md:min-h-10",
+          "group flex min-h-11 min-w-0 items-center gap-1 overflow-hidden rounded-lg pl-3 pr-1 text-sm transition-colors md:min-h-10",
           active
             ? "bg-gray-200/50 text-gray-900 dark:bg-white/[0.08] dark:text-gray-100"
             : "text-gray-800 hover:bg-gray-200/40 dark:text-gray-300 dark:hover:bg-white/[0.05]",

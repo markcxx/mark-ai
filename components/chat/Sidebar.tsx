@@ -47,7 +47,7 @@ function SessionSkeletonList() {
   return (
     <div className="flex flex-col gap-0.5">
       {Array.from({ length: 3 }).map((_, index) => (
-        <div className="flex h-11 items-center rounded-xl px-3 md:h-10" key={index}>
+        <div className="flex h-11 items-center rounded-lg px-3 md:h-10" key={index}>
           <div className="h-4 w-3/4 animate-pulse rounded-md bg-gray-200/70 dark:bg-gray-700/70" />
         </div>
       ))}
@@ -216,7 +216,7 @@ export function Sidebar({
 
           <div className="mb-4 px-3">
             <button
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-full border border-gray-200/60 bg-white px-3 text-sm font-medium text-gray-900 shadow-sm transition-colors hover:bg-gray-50 dark:border-white/[0.08] dark:bg-[#191919] dark:text-gray-100 dark:hover:bg-white/[0.1]"
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-gray-200/60 bg-white px-3 text-sm font-medium text-gray-900 shadow-sm transition-colors hover:bg-gray-50 dark:border-white/[0.08] dark:bg-[#191919] dark:text-gray-100 dark:hover:bg-white/[0.1]"
               onClick={onNewChat}
               type="button"
             >

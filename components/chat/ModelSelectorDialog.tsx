@@ -505,6 +505,7 @@ export function ModelSelectorDialog({
                   </p>
                   {group.models.map((model) => {
                     const key = getModelKey(model);
+                    const name = getModelDisplayName(model.id);
                     const selected = key === selectedModelKey;
                     const metadata = getConfiguredModelMetadata(model);
                     const imageModel = isImageGenerationModel(model.id);
@@ -512,7 +513,7 @@ export function ModelSelectorDialog({
                     return (
                       <div className="flex min-w-0 items-center" key={key} role="none">
                         <button
-                          aria-label={`${model.id} · ${providerNames[model.provider] || model.provider}`}
+                          aria-label={`${name} · ${providerNames[model.provider] || model.provider}`}
                           aria-selected={selected}
                           className={cn(
                             "flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 text-left transition-colors md:h-9",
@@ -538,7 +539,7 @@ export function ModelSelectorDialog({
                                 : "text-gray-800 dark:text-gray-200",
                             )}
                           >
-                            {model.id}
+                            {name}
                           </span>
                           <span className="flex shrink-0 items-center gap-1 text-gray-400 dark:text-gray-500">
                             {imageModel && <ImagePlus aria-label="图片生成" size={13} />}
