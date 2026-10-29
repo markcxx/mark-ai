@@ -1,8 +1,8 @@
 import { normalizeWebImageUrl } from "../chat/web-image-url";
 import { fetchPublicImage } from "../server/public-image-fetch";
+import { detectImageContentType } from "../server/image-content-type";
 
 const MAX_BYTES = 8 * 1024 * 1024;
-const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp", "image/avif"]);
 
 /** Fetch public raster images without forwarding browser cookies or credentials. */
 export async function fetchWebImage(raw: string, signal: AbortSignal, sourceUrl?: string) {
@@ -28,10 +28,8 @@ export async function fetchWebImage(raw: string, signal: AbortSignal, sourceUrl?
       url = next;
       continue;
     }
-    const type = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() || "";
     if (
       !response.ok ||
-      !IMAGE_TYPES.has(type) ||
       !response.body ||
       Number(response.headers.get("content-length")) > MAX_BYTES
     ) {
@@ -54,7 +52,10 @@ export async function fetchWebImage(raw: string, signal: AbortSignal, sourceUrl?
       reader.releaseLock();
     }
     if (!size) throw new Error("来源图片为空");
-    return { bytes: Buffer.concat(chunks), type };
+    const bytes = Buffer.concat(chunks);
+    const type = detectImageContentType(bytes);
+    if (!type) throw new Error("来源图片格式无法识别，暂时无法加载");
+    return { bytes, type };
   }
   throw new Error("图片重定向次数过多");
 }
