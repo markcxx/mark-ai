@@ -3,6 +3,8 @@
 import Image from "@/components/ui/AppImage";
 import { useEffect, useState } from "react";
 
+import { AuthModelExamples } from "@/components/auth/AuthModelExamples";
+import { AuthModelBackdrop } from "@/components/auth/AuthModelBackdrop";
 import { AgentAvatar } from "@/components/chat/AgentAvatar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useSettingsStore } from "@/stores/useSettingsStore";
@@ -21,7 +23,11 @@ function AuthGuide({ compact = false }: { compact?: boolean }) {
   }, [reduceMotion]);
 
   return (
-    <div className={compact ? "mb-7 flex items-center gap-3 md:hidden" : "max-w-sm"}>
+    <div
+      className={
+        compact ? "mb-7 flex items-center gap-3 md:hidden" : "relative z-10 w-full max-w-sm"
+      }
+    >
       <div
         className={
           compact
@@ -42,10 +48,15 @@ function AuthGuide({ compact = false }: { compact?: boolean }) {
         />
       </div>
       <div>
-        <p className={compact ? "text-sm font-semibold" : "text-2xl font-semibold"}>很高兴见到你</p>
-        <p className="mt-1 text-sm leading-6 text-gray-500 dark:text-gray-400">
-          登录后继续你的对话、文件与工具。
+        <p className={compact ? "text-sm font-semibold" : "text-2xl font-semibold leading-relaxed"}>
+          全球主流模型，{!compact && <br />}一个工作空间
         </p>
+        <p className="mt-2 text-sm leading-7 text-gray-500 dark:text-gray-400">
+          {compact
+            ? "汇集主流闭源与开源模型，按任务自由选择。"
+            : "汇集 GPT、Claude、Gemini、DeepSeek、Qwen、Kimi 等主流闭源与开源模型，让对话、编程、推理与多模态创作更从容。"}
+        </p>
+        {!compact && <AuthModelExamples />}
       </div>
     </div>
   );
@@ -64,7 +75,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </header>
 
         <main className="grid min-h-0 flex-1 overflow-y-auto md:grid-cols-[minmax(280px,0.9fr)_minmax(440px,1.1fr)]">
-          <aside className="hidden items-center justify-center border-r border-gray-100 bg-gray-50/70 px-10 dark:border-white/[0.07] dark:bg-white/[0.02] md:flex">
+          <aside className="relative isolate hidden overflow-hidden items-center justify-center border-r border-gray-100 bg-gray-50/70 px-10 dark:border-white/[0.07] dark:bg-white/[0.02] md:flex">
+            <AuthModelBackdrop />
             <AuthGuide />
           </aside>
           <section className="flex items-center justify-center px-4 py-8 sm:px-8">

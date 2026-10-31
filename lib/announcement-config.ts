@@ -1,3 +1,9 @@
+export type AnnouncementScope = "current" | "registration" | "auth-models";
+export function getAnnouncementScope(url: string): AnnouncementScope | null {
+  const scope = new URL(url).searchParams.get("scope") ?? "current";
+  return scope === "current" || scope === "registration" || scope === "auth-models" ? scope : null;
+}
+
 export const ANNOUNCEMENT_LIMIT = 1000;
 export type AnnouncementConfig = {
   content: string;
@@ -18,6 +24,7 @@ export const DEFAULT_ANNOUNCEMENT: AnnouncementConfig = {
 
 export function isAnnouncementUrl(value: string) {
   if (!value || /[\\\u0000-\u0020\u007f]/.test(value)) return false;
+  if (/^mailto:[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/.test(value)) return true;
   if (value.startsWith("/") && !value.startsWith("//")) return true;
   try {
     const url = new URL(value);

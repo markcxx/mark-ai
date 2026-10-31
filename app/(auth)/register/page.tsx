@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 
+import { RegistrationNotice } from "@/components/RegistrationNotice";
 import { AppPasswordInput } from "@/components/ui/AppInput";
 import { getSocialErrorCallbackURL, signIn, signUp } from "@/lib/auth-client";
 
@@ -501,6 +502,8 @@ export default function RegisterPage() {
             </PrimaryButton>
           </form>
         )}
+
+        <RegistrationNotice />
 
         <p className="mt-auto pt-8 text-sm text-gray-500 dark:text-gray-400">
           已有账户？{" "}

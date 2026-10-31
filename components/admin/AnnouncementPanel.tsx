@@ -5,11 +5,43 @@ import toast from "react-hot-toast";
 import { AdminButton, AdminError, AdminLoading } from "./AdminPrimitives";
 import { AppInput, AppTextArea } from "@/components/ui/AppInput";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
+import { RegistrationNoticeSurface } from "@/components/RegistrationNotice";
 import { AnnouncementSurface } from "@/components/AnnouncementSurface";
 import { DEFAULT_ANNOUNCEMENT, isAnnouncementUrl } from "@/lib/announcement-config";
-import type { AnnouncementConfig } from "@/lib/announcement-config";
+import type { AnnouncementConfig, AnnouncementScope } from "@/lib/announcement-config";
 
 export function AnnouncementPanel() {
+  const [scope, setScope] = useState<AnnouncementScope>("current");
+  return (
+    <div>
+      <nav aria-label="公告位置" className="mb-6 flex flex-wrap gap-2">
+        {(
+          [
+            ["current", "站点顶部公告"],
+            ["registration", "注册页提示"],
+            ["auth-models", "登录页模型展示"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            type="button"
+            key={value}
+            aria-pressed={scope === value}
+            onClick={() => setScope(value)}
+            className={`min-h-11 rounded-lg px-4 text-sm ${scope === value ? "bg-gray-100 font-medium dark:bg-white/10" : "text-gray-500"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+      <AnnouncementEditor key={scope} scope={scope} />
+    </div>
+  );
+}
+
+function AnnouncementEditor({ scope }: { scope: AnnouncementScope }) {
+  const registration = scope === "registration";
+  const models = scope === "auth-models";
+  const endpoint = `/api/admin/announcement?scope=${scope}`;
   const [form, setForm] = useState<AnnouncementConfig>(DEFAULT_ANNOUNCEMENT);
   const [saved, setSaved] = useState<AnnouncementConfig>(DEFAULT_ANNOUNCEMENT);
   const [loading, setLoading] = useState(true);
@@ -34,7 +66,7 @@ export function AnnouncementPanel() {
     const controller = new AbortController();
     setLoading(true);
     setError("");
-    fetch("/api/admin/announcement", { cache: "no-store", signal: controller.signal })
+    fetch(endpoint, { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error("公告加载失败，请重试");
         const { announcement } = await response.json();
@@ -49,18 +81,18 @@ export function AnnouncementPanel() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [retry]);
+  }, [retry, endpoint]);
   async function save() {
     if (
       form.actionEnabled &&
       (!form.actionLabel.trim() || !isAnnouncementUrl(form.actionUrl.trim()))
     ) {
-      toast.error("请填写按钮文字及有效的站内路径或 HTTP/HTTPS 跳转地址");
+      toast.error("请填写按钮文字及有效的站内路径或 HTTP/HTTPS 链接或 mailto 邮箱地址");
       return;
     }
     setSaving(true);
     try {
-      const response = await fetch("/api/admin/announcement", {
+      const response = await fetch(endpoint, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
@@ -82,9 +114,15 @@ export function AnnouncementPanel() {
   return (
     <section className="max-w-3xl space-y-6">
       <div>
-        <h2 className="text-lg font-semibold">站点公告</h2>
+        <h2 className="text-lg font-semibold">
+          {models ? "登录页模型展示" : registration ? "注册页提示" : "站点公告"}
+        </h2>
         <p className="mt-2 text-sm leading-6 text-gray-500">
-          配置聊天页和下载页顶部的彩色公告栏。关闭显示后保留内容，方便下次启用。
+          {models
+            ? "配置登录和注册页面左侧的前沿模型示例，每行一个模型名称。请按本站实际提供的模型填写；留空或关闭后隐藏。"
+            : registration
+              ? "在注册与申请表单底部显示安静的文字提示。内容独立保存，不影响聊天页公告；留空或关闭后不显示。"
+              : "配置聊天页和下载页顶部的彩色公告栏。关闭显示后保留内容，方便下次启用。"}
         </p>
       </div>
       <div className="divide-y divide-gray-200 dark:divide-white/10">
@@ -98,32 +136,50 @@ export function AnnouncementPanel() {
             ],
             ["actionEnabled", "显示跳转按钮", "在公告右侧显示可跳转的操作按钮"],
           ] as const
-        ).map(([key, label, description]) => (
-          <label
-            key={key}
-            className="flex min-h-16 cursor-pointer items-center justify-between gap-4 py-3"
-          >
-            <span>
-              <span className="block text-sm font-medium">{label}</span>
-              <span className="mt-1 block text-xs leading-5 text-gray-500">{description}</span>
-            </span>
-            <button
-              role="switch"
-              type="button"
-              aria-label={label}
-              aria-checked={form[key]}
-              disabled={saving}
-              onClick={() => change({ [key]: !form[key] })}
-              className="flex h-11 w-11 shrink-0 items-center justify-center"
+        )
+          .filter(([key]) => (models ? key === "enabled" : !registration || key !== "closable"))
+          .map(([key, label, description]) => (
+            <label
+              key={key}
+              className="flex min-h-16 cursor-pointer items-center justify-between gap-4 py-3"
             >
-              <ToggleSwitch checked={form[key]} disabled={saving} />
-            </button>
-          </label>
-        ))}
+              <span>
+                <span className="block text-sm font-medium">
+                  {models
+                    ? "显示模型示例"
+                    : registration && key === "enabled"
+                      ? "显示注册页提示"
+                      : label}
+                </span>
+                <span className="mt-1 block text-xs leading-5 text-gray-500">
+                  {registration && key === "actionEnabled"
+                    ? "在提示正文后显示联系链接，支持 mailto 邮箱地址"
+                    : description}
+                </span>
+              </span>
+              <button
+                role="switch"
+                type="button"
+                aria-label={
+                  models
+                    ? "显示模型示例"
+                    : registration && key === "enabled"
+                      ? "显示注册页提示"
+                      : label
+                }
+                aria-checked={form[key]}
+                disabled={saving}
+                onClick={() => change({ [key]: !form[key] })}
+                className="flex h-11 w-11 shrink-0 items-center justify-center"
+              >
+                <ToggleSwitch checked={form[key]} disabled={saving} />
+              </button>
+            </label>
+          ))}
       </div>
       <div>
         <label htmlFor="announcement-content" className="mb-2 block text-sm font-medium">
-          公告内容
+          {models ? "模型名称（每行一个）" : "公告内容"}
         </label>
         <AppTextArea
           id="announcement-content"
@@ -132,11 +188,15 @@ export function AnnouncementPanel() {
           value={form.content}
           disabled={saving}
           onChange={(e) => change({ content: e.target.value })}
-          placeholder="输入要展示的公告文字"
+          placeholder={
+            registration
+              ? "例如：本站计划采用付费服务，请确认有使用需求后再申请。如需了解开通方式，请先邮件联系管理员。"
+              : "输入要展示的公告文字"
+          }
         />
         <p className="mt-2 text-right text-xs text-gray-400">{form.content.length} / 1000</p>
       </div>
-      {form.actionEnabled && (
+      {!models && form.actionEnabled && (
         <div className="grid gap-4 sm:grid-cols-[1fr_2fr]">
           <div>
             <label htmlFor="announcement-action-label" className="mb-2 block text-sm font-medium">
@@ -148,7 +208,7 @@ export function AnnouncementPanel() {
               disabled={saving}
               value={form.actionLabel}
               onChange={(e) => change({ actionLabel: e.target.value })}
-              placeholder="立即下载"
+              placeholder={registration ? "联系管理员" : "立即下载"}
             />
           </div>
           <div>
@@ -161,7 +221,9 @@ export function AnnouncementPanel() {
               disabled={saving}
               value={form.actionUrl}
               onChange={(e) => change({ actionUrl: e.target.value })}
-              placeholder="/download 或 https://example.com"
+              placeholder={
+                registration ? "mailto:你的联系邮箱" : "/download 或 https://example.com"
+              }
             />
           </div>
         </div>
@@ -180,13 +242,20 @@ export function AnnouncementPanel() {
               </button>
             )}
           </div>
-          {!previewHidden && (
-            <AnnouncementSurface
-              announcement={form}
-              preview
-              onClose={() => setPreviewHidden(true)}
-            />
-          )}
+          {!previewHidden &&
+            (models ? (
+              <p className="whitespace-pre-wrap rounded-lg bg-gray-50 p-4 text-sm leading-7 dark:bg-white/5">
+                {form.content}
+              </p>
+            ) : registration ? (
+              <RegistrationNoticeSurface announcement={{ ...form, enabled: true }} />
+            ) : (
+              <AnnouncementSurface
+                announcement={form}
+                preview
+                onClose={() => setPreviewHidden(true)}
+              />
+            ))}
         </div>
       )}
       <AdminButton
@@ -194,7 +263,7 @@ export function AnnouncementPanel() {
         disabled={saving || JSON.stringify(form) === JSON.stringify(saved)}
         onClick={() => void save()}
       >
-        {saving ? "正在保存…" : "保存公告设置"}
+        {saving ? "正在保存…" : models ? "保存模型展示" : "保存公告设置"}
       </AdminButton>
     </section>
   );

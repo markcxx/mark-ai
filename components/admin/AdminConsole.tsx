@@ -60,7 +60,7 @@ const views = [
     label: "审计日志",
   },
   {
-    description: "编辑聊天页和下载页的公告文字",
+    description: "编辑站点公告与注册页底部提示",
     icon: Megaphone,
     id: "announcement" as const,
     label: "站点公告",

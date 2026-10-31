@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { siteAnnouncements } from "@/lib/db/schema";
-import { DEFAULT_ANNOUNCEMENT } from "./announcement-config";
+import { type AnnouncementScope, DEFAULT_ANNOUNCEMENT } from "./announcement-config";
 
 export const ANNOUNCEMENT_LIMIT = 1000;
 
@@ -17,11 +17,11 @@ export function parseAnnouncement(body: unknown): string | null {
   return body.content.trim();
 }
 
-export async function readAnnouncement() {
+export async function readAnnouncement(scope: AnnouncementScope = "current") {
   const [announcement] = await getDb()
     .select()
     .from(siteAnnouncements)
-    .where(eq(siteAnnouncements.id, "current"))
+    .where(eq(siteAnnouncements.id, scope))
     .limit(1);
   return announcement ?? { ...DEFAULT_ANNOUNCEMENT, revision: "", updatedAt: null };
 }

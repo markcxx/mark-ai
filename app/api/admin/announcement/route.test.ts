@@ -59,11 +59,60 @@ it("keeps markup as literal text without treating it as commands or HTML", () =>
   expect(parseAnnouncement({ content: "正常公告" })).toBe("正常公告");
 });
 it("saves display and action settings and can withdraw without clearing text", async () => {
-  const response = await PUT(new Request("https://markai.test/api/admin/announcement", {
-    method: "PUT", headers: {"content-type":"application/json"},
-    body: JSON.stringify({content:"保留的公告",enabled:false,closable:false,actionEnabled:true,actionLabel:"下载 App",actionUrl:"/download"}),
-  }));
+  const response = await PUT(
+    new Request("https://markai.test/api/admin/announcement", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        content: "保留的公告",
+        enabled: false,
+        closable: false,
+        actionEnabled: true,
+        actionLabel: "下载 App",
+        actionUrl: "/download",
+      }),
+    }),
+  );
   expect(response.status).toBe(200);
-  expect((await response.json()).announcement).toMatchObject({content:"保留的公告",enabled:false,closable:false,actionEnabled:true,actionUrl:"/download"});
-  expect(mocks.values).toHaveBeenCalledWith(expect.objectContaining({action:"announcement.withdraw"}));
+  expect((await response.json()).announcement).toMatchObject({
+    content: "保留的公告",
+    enabled: false,
+    closable: false,
+    actionEnabled: true,
+    actionUrl: "/download",
+  });
+  expect(mocks.values).toHaveBeenCalledWith(
+    expect.objectContaining({ action: "announcement.withdraw" }),
+  );
+});
+
+it("stores registration tips separately and rejects unknown scopes", async () => {
+  const registrationRequest = new Request(
+    "https://markai.test/api/admin/announcement?scope=registration",
+    {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        content: "申请前请联系管理员",
+        actionEnabled: true,
+        actionLabel: "联系管理员",
+        actionUrl: "mailto:contact@example.com",
+      }),
+    },
+  );
+  const result = await PUT(registrationRequest);
+  expect(result.status).toBe(200);
+  expect((await result.json()).announcement.id).toBe("registration");
+  expect(mocks.values).toHaveBeenCalledWith(expect.objectContaining({ targetId: "registration" }));
+  await GET(new Request("https://markai.test/api/admin/announcement?scope=registration"));
+  expect(mocks.read).toHaveBeenCalledWith("registration");
+  mocks.batch.mockClear();
+  expect(
+    (
+      await PUT(
+        new Request("https://markai.test/api/admin/announcement?scope=other", { method: "PUT" }),
+      )
+    ).status,
+  ).toBe(400);
+  expect(mocks.batch).not.toHaveBeenCalled();
 });
