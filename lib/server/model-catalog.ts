@@ -128,3 +128,24 @@ export async function withModelCatalog<T extends { id: string; provider: string 
 export async function getServerModelMetadata(model: { id: string; provider: string }) {
   return resolveCatalogMetadata(model, await readModelCatalog(), overrides);
 }
+
+// Evaluation freshness is independent of specification freshness: a successful
+// models.dev refresh must not hide a failed AA refresh. Share the fetch lock.
+let nextRankingAttempt = 0;
+export async function readRankingCatalog(): Promise<ModelCatalog> {
+  const snapshot = await readModelCatalog();
+  const updated = Date.parse(snapshot.evaluationsUpdatedAt || "");
+  if (
+    (!Number.isFinite(updated) || Date.now() - updated > TTL) &&
+    Date.now() >= nextRankingAttempt &&
+    process.env.ARTIFICIAL_ANALYSIS_API_KEY?.trim()
+  ) {
+    nextRankingAttempt = Date.now() + TTL;
+    try {
+      return await refreshModelCatalog();
+    } catch {
+      console.warn("排行榜更新失败，继续使用已有评测快照。");
+    }
+  }
+  return refreshing ? refreshing.catch(() => snapshot) : snapshot;
+}

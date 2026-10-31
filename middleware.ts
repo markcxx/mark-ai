@@ -22,6 +22,7 @@ export async function middleware(req: NextRequest) {
 
   if (
     pathname === "/" ||
+    pathname === "/rankings" ||
     isPublicPath(pathname) ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/images")

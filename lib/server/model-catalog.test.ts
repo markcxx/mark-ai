@@ -85,3 +85,24 @@ it("serves bundled data without an AA key and never sends an unauthenticated AA 
   expect(mocks.fetch).toHaveBeenCalledTimes(1);
   expect(mocks.fetch.mock.calls[0][0]).toBe("https://models.dev/api.json");
 });
+
+it("refreshes stale evaluation data independently of a recent specification update", async () => {
+  mocks.fetch.mockImplementation(async (url: string) => {
+    if (url.includes("models.dev"))
+      return response({ openai: { models: { demo: { id: "demo", name: "Demo" } } } });
+    return response({
+      data: [row("fresh")],
+      intelligence_index_version: 5,
+      pagination: { has_more: false },
+    });
+  });
+  const { readModelCatalog, readRankingCatalog } = await import("./model-catalog");
+  const snapshot = await readModelCatalog();
+  snapshot.updatedAt = new Date().toISOString();
+  snapshot.evaluationsUpdatedAt = "2020-01-01T00:00:00.000Z";
+  const refreshed = await readRankingCatalog();
+  expect(refreshed.evaluations[0].slug).toBe("fresh");
+  expect(refreshed.indexVersion).toBe("5");
+  await readRankingCatalog();
+  expect(mocks.fetch).toHaveBeenCalledTimes(2);
+});

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ChartNoAxesColumnIncreasing,
   LoaderCircle,
   LogIn,
   MessageCirclePlus,
@@ -8,6 +9,7 @@ import {
   Puzzle,
   Search,
 } from "lucide-react";
+import Link from "next/link";
 import Image from "@/components/ui/AppImage";
 import { useEffect, useRef, useState } from "react";
 
@@ -227,6 +229,15 @@ export function Sidebar({
 
           <div className="mb-2 px-3">
             <nav className="flex flex-col gap-1">
+              <Link
+                href="/rankings"
+                className="flex min-h-11 items-center gap-2 rounded-lg px-1 text-sm text-gray-700 hover:bg-[#f0f1f2] dark:text-gray-300 dark:hover:bg-gray-800/60 md:min-h-9"
+              >
+                <span className="flex h-7 w-7 items-center justify-center text-gray-400">
+                  <ChartNoAxesColumnIncreasing size={15} />
+                </span>
+                模型排名
+              </Link>
               <SidebarNavItem
                 icon={Puzzle}
                 label="插件中心"
