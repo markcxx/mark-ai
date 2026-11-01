@@ -1,530 +1,505 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Pencil, Search } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { PencilLine, Sparkles } from "lucide-react";
 import toast from "react-hot-toast";
-import type { ConfiguredModel } from "@/lib/chat/types";
-import { getModelDisplayName, getModelKey } from "@/lib/chat/helpers";
-import {
-  isNewModel,
-  type ModelPresentation,
-  type ModelPresentationInput,
-} from "@/lib/model-presentation";
+import { getModelKey } from "@/lib/chat/helpers";
+import { isNewModel } from "@/lib/model-presentation";
+import { DEFAULT_PLANS, type PlanConfig, type PlanModel } from "@/lib/plans";
 import { useModelPresentationTime } from "@/hooks/useModelPresentationTime";
-import { ModelBrandIcon } from "@/components/chat/ModelBrandIcon";
-import { AppDialog } from "@/components/ui/AppDialog";
-import { AppInput, AppTextArea } from "@/components/ui/AppInput";
-import { AppNumberInput } from "@/components/ui/AppNumberInput";
-import { cn } from "@/lib/utils";
 import { AppSelect } from "@/components/ui/AppSelect";
-import { IconButton } from "@/components/ui/IconButton";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
-import { AdminButton, AdminCheckbox, AdminError, AdminLoading } from "./AdminPrimitives";
+import { ModelBrandIcon } from "@/components/chat/ModelBrandIcon";
+import { cn } from "@/lib/utils";
+import {
+  AdminEmpty,
+  AdminError,
+  AdminFilterTabs,
+  AdminLoading,
+  AdminPagination,
+  AdminSearch,
+  AdminSurface,
+  AdminToolbar,
+  adminRow,
+  adminTd,
+  adminTh,
+} from "./AdminPrimitives";
+import {
+  baseQuota,
+  formatAmount,
+  formatPrice,
+  ModelPriceDialog,
+  modelName,
+  priceState,
+  PriceStateBadge,
+  priceUnit,
+  type AdminModel,
+  type ModelEstimation,
+} from "./ModelPricingRow";
 
-type AdminModel = ConfiguredModel & { providerName: string; presentation: ModelPresentation };
-
-function localDate(value: string | null) {
-  if (!value) return "";
-  const date = new Date(value);
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
-}
+type StatusFilter = "all" | "attention" | "custom" | "free" | "new";
 
 export function ModelsPanel() {
   const [models, setModels] = useState<AdminModel[]>([]);
+  const [estimation, setEstimation] = useState<ModelEstimation>(DEFAULT_PLANS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
   const [keyword, setKeyword] = useState("");
-  const [provider, setProvider] = useState("");
-  const [onlyNew, setOnlyNew] = useState(false);
+  const [developer, setDeveloper] = useState("");
+  const [status, setStatus] = useState<StatusFilter>("all");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [editing, setEditing] = useState<AdminModel | null>(null);
+  const [pageSize, setPageSize] = useState(20);
   const [busy, setBusy] = useState("");
+  const [editing, setEditing] = useState<string>();
+  // Background refreshes pause while a price dialog or a toggle is in flight,
+  // and are discarded if anything changed while they were loading.
+  const locks = useRef(new Set<string>());
+  const changes = useRef(0);
+  const lock = useCallback((key: string, active: boolean) => {
+    changes.current += 1;
+    if (active) locks.current.add(key);
+    else locks.current.delete(key);
+  }, []);
+  useEffect(() => {
+    lock("dialog", Boolean(editing));
+  }, [editing, lock]);
   const now = useModelPresentationTime(models);
 
   useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true);
-    setError("");
-    fetch("/api/admin/models", { cache: "no-store", signal: controller.signal })
-      .then(async (response) => {
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || "模型列表加载失败");
-        setModels(data.models);
-      })
-      .catch((e) => {
-        if (!controller.signal.aborted) setError(e.message);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-    return () => controller.abort();
+    let controller: AbortController | undefined;
+    let initialPending = true;
+    const load = (initial = false) => {
+      if (!initial && (document.visibilityState !== "visible" || locks.current.size)) return;
+      controller?.abort();
+      const request = new AbortController();
+      controller = request;
+      const version = changes.current;
+      if (initial) {
+        setLoading(true);
+        setError("");
+      }
+      fetch("/api/admin/models", { cache: "no-store", signal: request.signal })
+        .then(async (response) => {
+          const data = await response.json();
+          if (!response.ok) throw Error(data.error || "模型列表加载失败");
+          if (request.signal.aborted || (!initial && changes.current !== version)) return;
+          setModels(data.models);
+          setEstimation(data.estimation);
+        })
+        .catch((e) => {
+          if (!request.signal.aborted) {
+            if (initial) setError(e.message);
+            else toast.error("最新模型价格读取失败，请重新打开页面");
+          }
+        })
+        .finally(() => {
+          if (!request.signal.aborted && initial) {
+            initialPending = false;
+            setLoading(false);
+          }
+        });
+    };
+    const refresh = () => {
+      if (!initialPending) load();
+    };
+    load(true);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      controller?.abort();
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, [retry]);
 
-  async function save(model: AdminModel, presentation: ModelPresentationInput, close = false) {
+  async function toggleNew(model: AdminModel) {
     if (busy) return;
-    setBusy(getModelKey(model));
+    const key = getModelKey(model);
+    setBusy(key);
+    lock("presentation", true);
     try {
       const response = await fetch("/api/admin/models", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: model.id, provider: model.provider, presentation }),
+        body: JSON.stringify({
+          id: model.id,
+          provider: model.provider,
+          presentation: {
+            ...model.presentation,
+            isNew: !isNewModel(model.presentation, now),
+            newUntil: null,
+          },
+        }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "模型配置保存失败");
+      if (!response.ok) throw Error(data.error || "上新标记保存失败");
       setModels((current) =>
-        current.map((item) =>
-          getModelKey(item) === getModelKey(model)
-            ? { ...item, presentation: data.presentation }
-            : item,
+        current.map((m) =>
+          getModelKey(m) === key ? { ...m, presentation: data.presentation } : m,
         ),
       );
-      if (close) setEditing(null);
-      toast.success("模型配置已保存");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "保存失败，请重试");
     } finally {
       setBusy("");
+      lock("presentation", false);
     }
   }
 
-  if (loading) return <AdminLoading />;
-  if (error) return <AdminError message={error} onRetry={() => setRetry((v) => v + 1)} />;
-  const filtered = models.filter(
-    (model) =>
-      (!provider || provider === model.provider) &&
-      (!onlyNew || isNewModel(model.presentation, now)) &&
-      [model.id, model.providerName, model.provider, model.presentation.displayName].some((text) =>
-        text.toLowerCase().includes(keyword.trim().toLowerCase()),
-      ),
+  async function saveFree(model: AdminModel, freeAccess: boolean) {
+    const key = getModelKey(model);
+    lock("free", true);
+    try {
+      const response = await fetch("/api/admin/plans", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ modelKey: key, freeAccess }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw Error(data.error || "免费额度保存失败");
+      const updated = (data.config as PlanConfig).models.find((m: PlanModel) => m.key === key);
+      if (updated)
+        setModels((current) =>
+          current.map((m) => (getModelKey(m) === key ? { ...m, pricing: updated } : m)),
+        );
+      toast.success(
+        freeAccess ? `${modelName(model)} 已对免费版开放` : `${modelName(model)} 已设为会员专享`,
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "保存失败，请重试");
+      throw e;
+    } finally {
+      lock("free", false);
+    }
+  }
+
+  async function savePrice(
+    model: AdminModel,
+    {
+      freeAccess,
+      input,
+      output,
+      creditsOverride,
+    }: {
+      input: number | null;
+      output: number | null;
+      freeAccess: boolean;
+      creditsOverride: number | null;
+    },
+    priceChanged: boolean,
+  ) {
+    const { pricing } = model;
+    const response = await fetch("/api/admin/plans", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        modelKey: getModelKey(model),
+        ...(priceChanged
+          ? { prices: { input, output, currency: pricing.currency, unit: pricing.unit } }
+          : {}),
+        freeAccess,
+        creditsOverride,
+        expectedPrices: { input: pricing.input, output: pricing.output },
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw Error(data.error || "价格保存失败，请重试");
+    const updated = (data.config as PlanConfig).models.find(
+      (m: PlanModel) => m.key === getModelKey(model),
+    );
+    if (!updated) throw Error("模型配置已变更，请重新加载列表");
+    changes.current += 1;
+    setModels((current) =>
+      current.map((m) => (getModelKey(m) === updated.key ? { ...m, pricing: updated } : m)),
+    );
+    toast.success(`${modelName(model)} 已保存`);
+  }
+
+  const counts = useMemo(
+    () => ({
+      all: models.length,
+      attention: models.filter((m) =>
+        ["missing", "warning", "estimated"].includes(priceState(m.pricing)),
+      ).length,
+      custom: models.filter((m) => priceState(m.pricing) === "custom").length,
+      free: models.filter((m) => m.pricing.freeAccess).length,
+      new: models.filter((m) => isNewModel(m.presentation, now)).length,
+    }),
+    [models, now],
   );
+  const developers = useMemo(
+    () => [...new Map(models.map((m) => [m.developer.id, m.developer.name])).entries()],
+    [models],
+  );
+
+  if (loading) return <AdminLoading rows={8} />;
+  if (error) return <AdminError message={error} onRetry={() => setRetry((v) => v + 1)} />;
+
+  const search = keyword.trim().toLowerCase();
+  const filtered = models.filter((m) => {
+    const state = priceState(m.pricing);
+    return (
+      (!developer || m.developer.id === developer) &&
+      (status === "all" ||
+        (status === "attention" && ["missing", "warning", "estimated"].includes(state)) ||
+        (status === "custom" && state === "custom") ||
+        (status === "free" && m.pricing.freeAccess) ||
+        (status === "new" && isNewModel(m.presentation, now))) &&
+      [m.id, modelName(m), m.developer.name, m.developer.id].some((s) =>
+        s.toLowerCase().includes(search),
+      )
+    );
+  });
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, pageCount);
   const pageModels = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  const pageStart = Math.max(1, Math.min(currentPage - 2, pageCount - 4));
-  const pageItems = Array.from({ length: Math.min(5, pageCount) }, (_, index) => pageStart + index);
-
-  const renderToggle = (model: AdminModel) => {
-    const active = isNewModel(model.presentation, now);
-    const name = model.presentation.displayName || getModelDisplayName(model.id);
-    return (
-      <button
-        type="button"
-        role="switch"
-        aria-label={`上新 ${name}（${model.provider}）`}
-        aria-checked={active}
-        disabled={Boolean(busy)}
-        className="flex h-11 w-11 items-center justify-center rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-white/[0.06]"
-        onClick={() =>
-          void save(model, {
-            ...model.presentation,
-            isNew: !active,
-            newUntil:
-              !active &&
-              model.presentation.newUntil &&
-              Date.parse(model.presentation.newUntil) <= now
-                ? null
-                : model.presentation.newUntil,
-          })
-        }
-      >
-        <ToggleSwitch checked={active} disabled={Boolean(busy)} />
-      </button>
-    );
-  };
-  const renderEdit = (model: AdminModel) => (
-    <IconButton
-      aria-label={`编辑 ${model.presentation.displayName || getModelDisplayName(model.id)}（${model.provider}）`}
-      data-markai-tooltip="编辑模型"
-      disabled={Boolean(busy)}
-      onClick={() => setEditing(model)}
-      shape="rounded"
-      size="sm"
-    >
-      <Pencil size={15} />
-    </IconButton>
-  );
-  const renderIdentity = (model: AdminModel) => (
-    <div className="flex min-w-0 items-center gap-3">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center">
-        <ModelBrandIcon model={model.id} provider={model.provider} size={24} />
-      </span>
-      <div className="min-w-0">
-        <p
-          className="truncate text-sm font-medium text-gray-900 dark:text-gray-100"
-          data-markai-tooltip={model.id}
-        >
-          {model.presentation.displayName || getModelDisplayName(model.id)}
-        </p>
-        {(model.presentation.description || model.presentation.displayName) && (
-          <p
-            className="mt-1 truncate text-xs text-gray-400"
-            data-markai-tooltip={model.presentation.description || model.id}
-          >
-            {model.presentation.description || model.id}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-  const endLabel = (model: AdminModel) =>
-    model.presentation.newUntil
-      ? new Date(model.presentation.newUntil).toLocaleString("zh-CN", {
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: false,
-        })
-      : "手动关闭";
+  const editingModel = models.find((m) => getModelKey(m) === editing);
+  const resetPage =
+    <T,>(setter: (value: T) => void) =>
+    (value: T) => {
+      setter(value);
+      setPage(1);
+    };
 
   return (
-    <section className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-gray-500">
-          <span className="font-medium tabular-nums text-gray-900 dark:text-gray-100">
-            {models.length}
-          </span>{" "}
-          个模型
-          <span className="mx-2 text-gray-300 dark:text-gray-700">/</span>
-          <span className="font-medium tabular-nums text-gray-900 dark:text-gray-100">
-            {models.filter((m) => isNewModel(m.presentation, now)).length}
-          </span>{" "}
-          个上新中
-        </p>
-        <span className="text-xs text-gray-400">模型列表随站点配置同步</span>
-      </div>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="relative min-w-0 flex-1">
-          <Search
-            size={16}
-            className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-gray-400"
-          />
-          <AppInput
-            aria-label="搜索站点模型"
-            className="!pl-9"
-            placeholder="搜索模型名称、ID 或提供商"
+    <>
+      <AdminSurface>
+        <AdminToolbar>
+          <AdminSearch
+            label="搜索模型"
+            onChange={resetPage(setKeyword)}
+            placeholder="搜索模型名称、ID 或原厂"
             value={keyword}
-            onChange={(e) => {
-              setKeyword(e.target.value);
-              setPage(1);
-            }}
           />
-        </div>
-        <div className="flex items-center gap-4">
           <AppSelect
-            aria-label="筛选提供商"
-            value={provider}
-            style={{ width: 160, minWidth: 0 }}
-            onChange={(value) => {
-              setProvider(value);
-              setPage(1);
-            }}
+            aria-label="按模型原厂筛选"
+            classNames={{ trigger: "min-h-10 md:min-h-9" }}
+            onChange={resetPage(setDeveloper)}
             options={[
-              { value: "", label: "全部提供商" },
-              ...[...new Map(models.map((m) => [m.provider, m.providerName])).entries()].map(
-                ([value, label]) => ({ value, label }),
-              ),
+              { value: "", label: "全部原厂" },
+              ...developers.map(([value, label]) => ({ value, label })),
             ]}
+            style={{ width: 132 }}
+            value={developer}
           />
-          <label className="flex min-h-11 shrink-0 cursor-pointer items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-            <AdminCheckbox
-              label="仅看上新"
-              checked={onlyNew}
-              onChange={(value) => {
-                setOnlyNew(value);
-                setPage(1);
-              }}
-            />
-            <span>仅看上新</span>
-          </label>
-        </div>
-      </div>
-      <div className="hidden overflow-x-auto md:block">
-        <table className="w-full min-w-[720px] table-fixed text-left text-sm">
-          <colgroup>
-            <col />
-            <col className="w-28" />
-            <col className="w-24" />
-            <col className="w-36" />
-            <col className="w-16" />
-            <col className="w-14" />
-          </colgroup>
-          <thead className="border-y border-gray-200 bg-gray-50/70 text-xs text-gray-400 dark:border-white/[0.08] dark:bg-white/[0.025]">
-            <tr>
-              <th className="px-4 py-3 font-medium">模型</th>
-              <th className="px-3 py-3 font-medium">提供商</th>
-              <th className="px-3 py-3 font-medium">上新</th>
-              <th className="px-3 py-3 font-medium">结束时间</th>
-              <th className="px-3 py-3 text-right font-medium">排序</th>
-              <th className="px-3 py-3 text-right font-medium">
-                <span className="sr-only">操作</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
-            {pageModels.map((model) => (
-              <tr
-                key={getModelKey(model)}
-                className="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.025]"
-              >
-                <td className="px-4 py-3">{renderIdentity(model)}</td>
-                <td
-                  className="truncate px-3 py-3 text-xs text-gray-500"
-                  data-markai-tooltip={model.providerName}
-                >
-                  {model.providerName}
-                </td>
-                <td className="px-3 py-2">{renderToggle(model)}</td>
-                <td className="px-3 py-3 text-xs text-gray-400">
-                  {model.presentation.isNew ? (
-                    <span
-                      className={cn(!isNewModel(model.presentation, now) && "text-gray-400")}
-                      data-markai-tooltip={
-                        model.presentation.newUntil
-                          ? new Date(model.presentation.newUntil).toLocaleString("zh-CN")
-                          : undefined
-                      }
-                    >
-                      {isNewModel(model.presentation, now) ? endLabel(model) : "已结束"}
-                    </span>
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td className="px-3 py-3 text-right text-xs tabular-nums text-gray-500">
-                  {model.presentation.sortOrder}
-                </td>
-                <td className="px-3 py-3 text-right">{renderEdit(model)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="divide-y divide-gray-100 border-y border-gray-200 md:hidden dark:divide-white/[0.05] dark:border-white/10">
-        {pageModels.map((model) => (
-          <div key={getModelKey(model)} className="py-3">
-            <div className="flex items-center gap-2">
-              <div className="min-w-0 flex-1">{renderIdentity(model)}</div>
-              {renderEdit(model)}
-            </div>
-            <div className="mt-1 flex min-w-0 items-center justify-between gap-3 pl-12 text-xs text-gray-400">
-              <span className="min-w-0 truncate">
-                {model.providerName} · 排序 {model.presentation.sortOrder}
-              </span>
-              <span className="flex shrink-0 items-center gap-1">上新{renderToggle(model)}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-      {!filtered.length && (
-        <p className="py-12 text-center text-sm text-gray-400">
-          {models.length ? "没有符合条件的模型" : "尚未配置站点模型"}
-        </p>
-      )}
-      {filtered.length > 0 && (
-        <nav
-          aria-label="模型列表分页"
-          className="flex flex-col gap-3 border-t border-gray-200 pt-4 text-xs text-gray-500 sm:flex-row sm:items-center sm:justify-between dark:border-white/10"
-        >
-          <p className="tabular-nums">
-            共 {filtered.length} 个模型 · 第 {(currentPage - 1) * pageSize + 1}–
-            {Math.min(currentPage * pageSize, filtered.length)} 个
-          </p>
-          <div className="flex items-center gap-1.5">
-            <AppSelect
-              aria-label="每页模型数"
-              value={pageSize}
-              style={{ width: 116 }}
-              onChange={(value) => {
-                setPageSize(value);
-                setPage(1);
-              }}
-              options={[10, 20, 50].map((value) => ({ value, label: `每页 ${value} 条` }))}
-            />
-            <IconButton
-              aria-label="上一页模型"
-              data-markai-tooltip="上一页"
-              disabled={currentPage <= 1}
-              shape="rounded"
-              size="sm"
-              onClick={() => setPage(currentPage - 1)}
-            >
-              <ChevronLeft size={16} />
-            </IconButton>
-            {pageItems.map((item) => (
-              <button
-                key={item}
-                type="button"
-                aria-label={`第 ${item} 页模型`}
-                aria-current={item === currentPage ? "page" : undefined}
-                onClick={() => setPage(item)}
-                className={cn(
-                  "hidden h-9 min-w-9 rounded-lg px-2 text-sm transition-colors sm:block",
-                  item === currentPage
-                    ? "bg-gray-100 font-medium text-gray-900 dark:bg-white/10 dark:text-gray-100"
-                    : "hover:bg-gray-100 dark:hover:bg-white/[0.06]",
-                )}
-              >
-                {item}
-              </button>
-            ))}
-            <span className="px-1 tabular-nums sm:hidden">
-              {currentPage}/{pageCount}
-            </span>
-            <IconButton
-              aria-label="下一页模型"
-              data-markai-tooltip="下一页"
-              disabled={currentPage >= pageCount}
-              shape="rounded"
-              size="sm"
-              onClick={() => setPage(currentPage + 1)}
-            >
-              <ChevronRight size={16} />
-            </IconButton>
-          </div>
-        </nav>
-      )}
-      {editing && (
-        <ModelEditor
-          model={editing}
-          saving={Boolean(busy)}
-          onClose={() => setEditing(null)}
-          onSave={(presentation) => void save(editing, presentation, true)}
-        />
-      )}
-    </section>
-  );
-}
+          <AdminFilterTabs<StatusFilter>
+            label="价格状态"
+            onChange={resetPage(setStatus)}
+            options={[
+              { value: "all", label: "全部", count: counts.all },
+              { value: "attention", label: "需关注", count: counts.attention },
+              { value: "custom", label: "已自定义", count: counts.custom },
+              { value: "free", label: "免费版可用", count: counts.free },
+              { value: "new", label: "上新中", count: counts.new },
+            ]}
+            value={status}
+          />
+        </AdminToolbar>
 
-function ModelEditor({
-  model,
-  saving,
-  onClose,
-  onSave,
-}: {
-  model: AdminModel;
-  saving: boolean;
-  onClose: () => void;
-  onSave: (value: ModelPresentationInput) => void;
-}) {
-  const [form, setForm] = useState<ModelPresentationInput>({ ...model.presentation });
-  const [until, setUntil] = useState(localDate(model.presentation.newUntil));
-  const [scheduled, setScheduled] = useState(Boolean(model.presentation.newUntil));
-  return (
-    <AppDialog
-      open
-      onClose={onClose}
-      title="编辑模型展示"
-      width={440}
-      height="100dvh"
-      closeDisabled={saving}
-      wrapperClassName="!justify-end !p-0"
-      panelClassName="!max-h-dvh !rounded-none"
-      bodyClassName="min-h-0 overflow-y-auto"
-    >
-      <form
-        className="space-y-5 p-5"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const date = scheduled ? new Date(until) : null;
-          if (
-            scheduled &&
-            (!date ||
-              !Number.isFinite(date.getTime()) ||
-              (form.isNew && date.getTime() <= Date.now()))
-          ) {
-            toast.error("请选择有效的上新结束时间");
-            return;
-          }
-          onSave({ ...form, newUntil: date?.toISOString() ?? null });
-        }}
-      >
-        <div className="break-all text-xs leading-6 text-gray-500">
-          {model.providerName} · {model.id}
-        </div>
-        <label className="block space-y-2 text-sm">
-          <span>展示名称</span>
-          <AppInput
-            maxLength={80}
-            disabled={saving}
-            value={form.displayName}
-            placeholder={getModelDisplayName(model.id)}
-            onChange={(e) => setForm({ ...form, displayName: e.target.value })}
+        {!filtered.length ? (
+          <AdminEmpty
+            description={
+              models.length ? "调整搜索词或筛选条件后再试" : "在环境配置中添加模型后显示"
+            }
+            title={models.length ? "没有符合条件的模型" : "尚未配置站点模型"}
           />
-          <span className="block text-xs text-gray-400">留空使用默认名称</span>
-        </label>
-        <label className="block space-y-2 text-sm">
-          <span>一句话介绍</span>
-          <AppTextArea
-            maxLength={160}
-            rows={3}
-            disabled={saving}
-            value={form.description}
-            placeholder="简要介绍适合使用这个模型的场景"
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-          />
-        </label>
-        <label className="flex min-h-11 items-center justify-between text-sm">
-          <span>设为上新模型</span>
-          <button
-            type="button"
-            role="switch"
-            aria-label="设为上新模型"
-            aria-checked={form.isNew}
-            disabled={saving}
-            className="flex h-11 w-11 items-center justify-center"
-            onClick={() => setForm({ ...form, isNew: !form.isNew })}
-          >
-            <ToggleSwitch checked={form.isNew} disabled={saving} />
-          </button>
-        </label>
-        <div className="space-y-3">
-          <label className="flex min-h-11 items-center gap-2 text-sm">
-            <AdminCheckbox
-              label="到期自动结束"
-              checked={scheduled}
-              disabled={saving}
-              onChange={setScheduled}
+        ) : (
+          <>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[960px] text-sm">
+                <thead>
+                  <tr>
+                    <th className={adminTh}>模型</th>
+                    <th className={adminTh}>
+                      <span className="grid w-[184px] grid-cols-2 gap-4 text-right">
+                        <span>输入</span>
+                        <span>输出</span>
+                      </span>
+                    </th>
+                    <th className={cn(adminTh, "text-right")}>基础版 / 月</th>
+                    <th className={cn(adminTh, "text-right")}>
+                      <span data-markai-tooltip="开启后免费用户可用，共享每月免费次数">
+                        免费版开放
+                      </span>
+                    </th>
+                    <th className={adminTh}>价格状态</th>
+                    <th className={cn(adminTh, "text-center")}>上新</th>
+                    <th className={cn(adminTh, "w-14")}>
+                      <span className="sr-only">操作</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageModels.map((model) => {
+                    const key = getModelKey(model);
+                    const { credits, messages } = baseQuota(estimation, model.pricing);
+                    const image = model.pricing.unit === "image";
+                    return (
+                      <tr
+                        className={cn(adminRow, "cursor-pointer")}
+                        key={key}
+                        onClick={() => setEditing(key)}
+                      >
+                        <td className={adminTd}>
+                          <div className="flex min-w-0 items-center gap-3">
+                            <ModelBrandIcon model={model.id} provider={model.provider} size={28} />
+                            <div className="min-w-0">
+                              <p className="truncate font-medium">{modelName(model)}</p>
+                              <p
+                                className="mt-0.5 truncate font-jakarta text-[11px] text-gray-400"
+                                data-markai-tooltip={model.id}
+                              >
+                                {model.developer.name} · {model.id}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className={adminTd}>
+                          <span className="grid w-[184px] grid-cols-2 gap-4 text-right font-jakarta tabular-nums">
+                            <span>{formatPrice(model.pricing, model.pricing.input)}</span>
+                            <span>{formatPrice(model.pricing, model.pricing.output)}</span>
+                          </span>
+                          <span className="mt-0.5 block w-[184px] text-right text-[10px] text-gray-400">
+                            {priceUnit(model.pricing)}
+                          </span>
+                        </td>
+                        <td className={cn(adminTd, "text-right font-jakarta tabular-nums")}>
+                          {credits === 0 ? (
+                            <span className="text-gray-400">不消耗</span>
+                          ) : (
+                            <>
+                              {formatAmount(messages)}
+                              <span className="ml-1 text-[11px] text-gray-400">
+                                {image ? "张" : "条"}
+                              </span>
+                            </>
+                          )}
+                        </td>
+                        <td className={cn(adminTd, "py-2")}>
+                          <div
+                            className="flex justify-end"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <ToggleSwitch
+                              aria-label={`${modelName(model)} 对免费版开放`}
+                              checked={model.pricing.freeAccess}
+                              disabled={Boolean(busy)}
+                              onChange={(checked) =>
+                                void saveFree(model, checked).catch(() => undefined)
+                              }
+                            />
+                          </div>
+                        </td>
+                        <td className={adminTd}>
+                          <PriceStateBadge pricing={model.pricing} />
+                        </td>
+                        <td
+                          className={cn(adminTd, "text-center")}
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <ToggleSwitch
+                            aria-label={`${modelName(model)} 上新标记`}
+                            checked={isNewModel(model.presentation, now)}
+                            disabled={Boolean(busy)}
+                            onChange={() => void toggleNew(model)}
+                          />
+                        </td>
+                        <td className={cn(adminTd, "pl-0 text-right")}>
+                          <button
+                            aria-label={`编辑 ${modelName(model)} 价格`}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-800 dark:hover:bg-white/[0.07] dark:hover:text-gray-200"
+                            data-markai-tooltip="编辑价格"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setEditing(key);
+                            }}
+                            type="button"
+                          >
+                            <PencilLine size={15} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <ul className="divide-y divide-gray-100 md:hidden dark:divide-white/[0.06]">
+              {pageModels.map((model) => {
+                const key = getModelKey(model);
+                const { credits, messages } = baseQuota(estimation, model.pricing);
+                const isNew = isNewModel(model.presentation, now);
+                return (
+                  <li className="px-3 py-3" key={key}>
+                    <div className="flex items-start gap-3">
+                      <ModelBrandIcon model={model.id} provider={model.provider} size={32} />
+                      <button
+                        className="min-w-0 flex-1 text-left"
+                        onClick={() => setEditing(key)}
+                        type="button"
+                      >
+                        <p className="truncate text-sm font-medium">{modelName(model)}</p>
+                        <p className="mt-0.5 truncate text-[11px] text-gray-400">
+                          {model.developer.name}
+                        </p>
+                        <p className="mt-2 font-jakarta text-xs tabular-nums text-gray-600 dark:text-gray-300">
+                          {formatPrice(model.pricing, model.pricing.input)} /{" "}
+                          {formatPrice(model.pricing, model.pricing.output)}
+                          <span className="ml-2 text-gray-400">
+                            {credits === 0 ? "不消耗" : `${formatAmount(messages)} 条/月`}
+                          </span>
+                          <span className="ml-2 text-gray-400">
+                            {model.pricing.freeAccess ? "免费版可用" : "仅会员"}
+                          </span>
+                        </p>
+                      </button>
+                      <PriceStateBadge pricing={model.pricing} />
+                    </div>
+                    <div className="mt-2 flex items-center justify-between pl-11">
+                      <label className="flex min-h-10 items-center gap-1 text-xs text-gray-500">
+                        <Sparkles size={13} className={isNew ? "text-amber-500" : undefined} />
+                        上新标记
+                        <ToggleSwitch
+                          aria-label={`${modelName(model)} 上新标记`}
+                          checked={isNew}
+                          disabled={Boolean(busy)}
+                          onChange={() => void toggleNew(model)}
+                        />
+                      </label>
+                      <button
+                        className="inline-flex min-h-10 items-center gap-1 rounded-md px-2 text-xs text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/[0.07]"
+                        onClick={() => setEditing(key)}
+                        type="button"
+                      >
+                        <PencilLine size={14} /> 编辑价格
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <AdminPagination
+              onPageChange={setPage}
+              onPageSizeChange={resetPage(setPageSize)}
+              page={currentPage}
+              pageSize={pageSize}
+              pageSizes={[20, 50, 100]}
+              total={filtered.length}
+              unit="个模型"
             />
-            到期自动结束
-          </label>
-          {scheduled ? (
-            <label className="block space-y-2 text-sm">
-              <span>结束时间（本地时间）</span>
-              <AppInput
-                type="datetime-local"
-                required
-                value={until}
-                disabled={saving}
-                onChange={(e) => setUntil(e.target.value)}
-              />
-            </label>
-          ) : (
-            <p className="text-xs text-gray-400">上新状态保持到手动关闭</p>
-          )}
-        </div>
-        <label className="block space-y-2 text-sm">
-          <span>展示顺序</span>
-          <AppNumberInput
-            min={0}
-            max={9999}
-            disabled={saving}
-            value={form.sortOrder}
-            onChange={(value) => setForm({ ...form, sortOrder: value ?? 0 })}
-          />
-          <span className="block text-xs text-gray-400">数字越小越靠前，仅影响上新栏顺序</span>
-        </label>
-        <div className="flex justify-end gap-2 border-t border-gray-200 pt-4 dark:border-white/10">
-          <AdminButton disabled={saving} onClick={onClose}>
-            取消
-          </AdminButton>
-          <AdminButton primary loading={saving} type="submit">
-            保存设置
-          </AdminButton>
-        </div>
-      </form>
-    </AppDialog>
+          </>
+        )}
+      </AdminSurface>
+
+      <ModelPriceDialog
+        estimation={estimation}
+        model={editingModel}
+        onClose={() => setEditing(undefined)}
+        onSave={savePrice}
+      />
+    </>
   );
 }

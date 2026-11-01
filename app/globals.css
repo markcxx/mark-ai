@@ -871,3 +871,17 @@ html[data-reduce-motion="true"] .markai-text-shimmer {
 .dark .markdown-body .markdown-table-copy:active {
   color: #ffffff;
 }
+
+/* Lifetime membership badge: slow gold sweep, the only perpetual badge motion. */
+@keyframes markai-badge-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -120% 0;
+  }
+}
+
+.markai-badge-shimmer {
+  animation: markai-badge-shimmer 3.2s ease-in-out infinite;
+}

@@ -1,11 +1,22 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Atom, Eye, History, ImagePlus, Video, Wrench } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Atom,
+  Coins,
+  Eye,
+  History,
+  ImagePlus,
+  MessageSquareText,
+  Video,
+  Wrench,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { ConfiguredModel } from "@/lib/chat/types";
-import { getModelDisplayName } from "@/lib/chat/helpers";
+import { getModelDisplayName, getModelKey } from "@/lib/chat/helpers";
 import { isImageGenerationModel } from "@/lib/chat/image-models";
 import { getConfiguredModelMetadata } from "@/lib/model-catalog";
 import { CAPABILITY_AXES, getModelRatingAxes } from "@/lib/model-ratings";
@@ -16,6 +27,7 @@ import {
   type ModelRatings,
 } from "@/lib/model-metadata";
 import { cn } from "@/lib/utils";
+import { formatCredits, perMessageCredits, useCreditStore } from "@/stores/useCreditStore";
 
 function RatingsRadar({ ratings }: { ratings: ModelRatings }) {
   const axes = getModelRatingAxes(ratings);
@@ -152,6 +164,11 @@ export function ModelDetailCard({ model }: { model: ConfiguredModel }) {
     });
   const pricing = metadata?.pricing;
   const benchmark = metadata?.benchmark;
+  const credits = useCreditStore((state) => state.summary);
+  const perMessage = perMessageCredits(credits, getModelKey(model));
+  const creditModel = credits?.models.find((item) => item.key === getModelKey(model));
+  const remainingMessages =
+    credits && !credits.unlimited && perMessage ? Math.floor(credits.remaining / perMessage) : null;
 
   return (
     <div className="pb-1">
@@ -242,6 +259,43 @@ export function ModelDetailCard({ model }: { model: ConfiguredModel }) {
           {capabilities.map((item) => (
             <DetailRow icon={item.icon} key={item.label} label={item.label} value={item.value} />
           ))}
+        </Section>
+      )}
+      {credits?.tier === "free" && (
+        <Section accent="bg-emerald-500" title="免费额度">
+          {creditModel?.freeAccess ? (
+            <>
+              <DetailRow
+                icon={MessageSquareText}
+                label="免费模型共享"
+                value={`每月 ${credits.total} 次`}
+              />
+              <DetailRow icon={Coins} label="本月剩余" value={`${credits.remaining} 次`} />
+            </>
+          ) : (
+            <DetailRow icon={Coins} label="会员专享" value="升级套餐后可用" />
+          )}
+        </Section>
+      )}
+      {credits && credits.tier !== "free" && perMessage !== null && (
+        <Section accent="bg-emerald-500" title="Credit 消耗">
+          <DetailRow
+            icon={Coins}
+            label="单次对话约"
+            value={perMessage === 0 ? "不消耗" : `${formatCredits(perMessage)} credits`}
+          />
+          <DetailRow
+            icon={MessageSquareText}
+            label="剩余可对话"
+            value={
+              credits.unlimited || perMessage === 0
+                ? "不限次数"
+                : `约 ${(remainingMessages ?? 0).toLocaleString("zh-CN")} 次`
+            }
+          />
+          <p className="mt-1 text-[11px] leading-4 text-gray-400 dark:text-gray-500">
+            每次调用（含重试、重新生成）固定扣除，与上下文长度无关。
+          </p>
         </Section>
       )}
       {pricing && (

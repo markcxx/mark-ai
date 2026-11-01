@@ -4,6 +4,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin } from "better-auth/plugins";
 import { and, eq, gt } from "drizzle-orm";
 
+import { getAppUrl } from "@/lib/app-url";
 import { getDb } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { sendResetPasswordEmail, sendVerificationEmail } from "@/lib/email";
@@ -16,7 +17,7 @@ import {
   normalizeEmail,
 } from "@/lib/registration";
 
-const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
+const appUrl = getAppUrl();
 const emailVerificationSetting =
   process.env.EMAIL_VERIFICATION_ENABLED ?? process.env.AUTH_EMAIL_VERIFICATION;
 const emailVerificationEnabled = ["1", "true", "yes", "on"].includes(

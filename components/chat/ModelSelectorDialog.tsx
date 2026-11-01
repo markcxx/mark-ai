@@ -27,6 +27,7 @@ import { useModelPresentationTime } from "@/hooks/useModelPresentationTime";
 import { cn } from "@/lib/utils";
 
 import { ModelDetailCard } from "./ModelDetailCard";
+import { isProOnly, useCreditStore } from "@/stores/useCreditStore";
 import { getModelVendor, ModelBrandIcon, VendorIcon, type ModelVendor } from "./ModelBrandIcon";
 
 export type ModelSelectionOption = { key: string; label: string; description?: string };
@@ -91,6 +92,7 @@ export function ModelSelectorDialog({
   setSelectedModelKey: (key: string) => void;
 }) {
   const now = useModelPresentationTime(availableModels);
+  const credits = useCreditStore((state) => state.summary);
   const panelRef = useRef<HTMLDivElement>(null);
   const detailRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -181,6 +183,7 @@ export function ModelSelectorDialog({
   useEffect(() => {
     if (open) {
       setActiveKey(selectedModelKey);
+      void useCreditStore.getState().load();
       return;
     }
     setTypeFilter("all");
@@ -552,6 +555,15 @@ export function ModelSelectorDialog({
                             {isNewModel(model.presentation, now) && (
                               <span className="rounded px-1 text-[10px] leading-4 text-blue-600 ring-1 ring-inset ring-blue-600/20 dark:text-blue-300 dark:ring-blue-300/25">
                                 新
+                              </span>
+                            )}
+                            {isProOnly(credits, key) && (
+                              <span
+                                aria-label="会员专享模型"
+                                className="rounded bg-amber-50 px-1.5 font-jakarta text-[11px] font-medium leading-5 text-amber-600 dark:bg-amber-400/10 dark:text-amber-300"
+                                data-markai-tooltip="会员专享，升级套餐后可用"
+                              >
+                                Pro
                               </span>
                             )}
                           </span>

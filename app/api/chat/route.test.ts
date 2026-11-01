@@ -8,7 +8,19 @@ const mocks = vi.hoisted(() => ({
   stream: vi.fn(),
   files: vi.fn(),
   metadata: vi.fn(),
+  allowance: vi.fn(),
+  record: vi.fn(),
+  cloud: vi.fn(() => false),
 }));
+vi.mock("@/lib/server/plans", () => ({
+  checkChatAllowance: mocks.allowance,
+  recordModelUsage: mocks.record,
+}));
+vi.mock("next/server", async (original) => ({
+  ...(await original<typeof import("next/server")>()),
+  after: (work: () => unknown) => void work(),
+}));
+vi.mock("@/lib/env", () => ({ isCloudMode: mocks.cloud, isLocalMode: () => !mocks.cloud() }));
 vi.mock("@/lib/api/security", () => ({
   authorizeApiRequest: mocks.auth,
   enforceRateLimit: () => null,
@@ -129,4 +141,44 @@ it("passes opt-in personalization without adding a settings database read", asyn
   );
   expect(response.status).toBe(200);
   expect(mocks.stream.mock.calls[0][11]).toEqual(languageModel);
+});
+
+it("rejects a members-only site model for a free account before calling the provider", async () => {
+  mocks.cloud.mockReturnValue(true);
+  mocks.model.mockResolvedValue({ ...model, siteModel: true });
+  mocks.allowance.mockResolvedValue("该模型为会员专享，升级套餐后即可使用");
+  const response = await POST(request());
+  expect(response.status).toBe(402);
+  expect(mocks.allowance).toHaveBeenCalledWith("u", "test:test");
+  expect(mocks.stream).not.toHaveBeenCalled();
+});
+it("never meters models on the user's own API key", async () => {
+  mocks.cloud.mockReturnValue(true);
+  mocks.model.mockResolvedValue(model);
+  mocks.allowance.mockResolvedValue("该模型为会员专享，升级套餐后即可使用");
+  const response = await POST(request());
+  expect(response.status).toBe(200);
+  expect(mocks.allowance).not.toHaveBeenCalled();
+});
+
+it("bills every successful site-model call, so a retry of the same message is billed again", async () => {
+  mocks.cloud.mockReturnValue(true);
+  mocks.model.mockResolvedValue({ ...model, siteModel: true });
+  mocks.allowance.mockResolvedValue(null);
+  const first = await (await POST(request())).text();
+  const retry = await (await POST(request())).text();
+  expect(first).toContain("你好");
+  expect(retry).toContain("你好");
+  await vi.waitFor(() => expect(mocks.record).toHaveBeenCalledTimes(2));
+  expect(mocks.record).toHaveBeenCalledWith("u", "test:test");
+});
+it("does not bill a call whose stream only carries an error", async () => {
+  mocks.cloud.mockReturnValue(true);
+  mocks.model.mockResolvedValue({ ...model, siteModel: true });
+  mocks.allowance.mockResolvedValue(null);
+  mocks.stream.mockImplementation(
+    async () => new Response('{"type":"error","error":"HTTP 500"}\n'),
+  );
+  await (await POST(request())).text();
+  expect(mocks.record).not.toHaveBeenCalled();
 });

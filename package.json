@@ -1,6 +1,6 @@
 {
   "name": "mark-ai",
-  "version": "0.1.11",
+  "version": "0.2.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -53,6 +53,7 @@
     "pdf-parse": "^1.1.1",
     "photoswipe": "^5.4.4",
     "postcss": "^8.5.19",
+    "qrcode": "^1.5.4",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "react-hot-toast": "^2.6.0",
@@ -72,6 +73,7 @@
     "@tailwindcss/typography": "^0.5.19",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.1",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "drizzle-kit": "^0.31.10",

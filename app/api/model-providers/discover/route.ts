@@ -1,4 +1,5 @@
 import { normalizeModelRuntime } from "@/lib/model-runtime";
+import { isAllowedOrigin } from "@/lib/app-url";
 import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { authorizeApiRequest, enforceRateLimit } from "@/lib/api/security";
@@ -11,12 +12,7 @@ import { discoverProviderModels } from "@/lib/server/provider-model-discovery";
 
 export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
-  const origin = req.headers.get("origin");
-  const allowedOrigins = new Set([new URL(req.url).origin]);
-  const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
-  if (appUrl) allowedOrigins.add(new URL(appUrl).origin);
-  if (origin && !allowedOrigins.has(origin))
-    return NextResponse.json({ error: "请求来源无效" }, { status: 403 });
+  if (!isAllowedOrigin(req)) return NextResponse.json({ error: "请求来源无效" }, { status: 403 });
   const auth = await authorizeApiRequest(req);
   if (!auth.authorized) return auth.response;
   const limited = enforceRateLimit({ key: auth.key, limit: 10, scope: "model-discovery" });

@@ -1,3 +1,4 @@
+import { getAppUrl } from "@/lib/app-url";
 import { eq } from "drizzle-orm";
 
 import { writeAdminAudit } from "@/lib/admin/auth";
@@ -96,7 +97,7 @@ export const processWaitlistAction = async ({
     })
     .where(eq(waitlistEntries.id, entryId));
 
-  const appUrl = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+  const appUrl = getAppUrl() || "";
   const inviteUrl = `${appUrl}/register?invite=${encodeURIComponent(token)}`;
   const delivery = await deliverTrackedEmail({
     dedupeKey: `waitlist-invitation:${invitation.id}`,

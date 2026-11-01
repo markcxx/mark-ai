@@ -19,6 +19,7 @@ import {
 } from "@/lib/chat/metrics";
 import type { Message, MessageSegment } from "@/lib/chat/types";
 import { useSettingsStore } from "@/stores/useSettingsStore";
+import { useCreditStore } from "@/stores/useCreditStore";
 import { useSessionStore } from "@/stores/useSessionStore";
 
 import type { ChatStore } from "../useChatStore";
@@ -560,6 +561,8 @@ export const createStreamAssistantMessage =
       };
     } finally {
       if (typeof window !== "undefined") window.removeEventListener("pagehide", preserveOnPageHide);
+      // Usage changed: the next menu or model picker open reloads the balance.
+      useCreditStore.setState({ loadedAt: 0 });
       if (sessionId && sessionStreamControllers.get(sessionId) === controller) {
         sessionStreamControllers.delete(sessionId);
         const sessionStore = useSessionStore.getState();

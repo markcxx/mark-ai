@@ -1,3 +1,7 @@
+import { readPlans } from "@/lib/server/plans";
+import { isAllowedOrigin } from "@/lib/app-url";
+import { getModelDeveloper } from "@/lib/model-developer";
+import { getModelKey } from "@/lib/chat/helpers";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { authorizeAdminApi } from "@/lib/admin/api";
@@ -17,13 +21,16 @@ export async function GET(request: Request) {
   const { response } = await authorizeAdminApi(request);
   if (response) return response;
   try {
-    const entries = await readModelPresentations();
+    const [entries, { config }] = await Promise.all([readModelPresentations(), readPlans()]);
     const models = getPublicConfiguredModels().map((model) => {
       const entry = entries.find(
         (item) => item.provider === model.provider && item.modelId === model.id,
       );
+      const quotaModel = config.models.find((m) => m.key === getModelKey(model));
       return {
         ...model,
+        pricing: quotaModel,
+        developer: getModelDeveloper(model.id),
         providerName: getProviderDisplayName(model.provider),
         presentation: entry
           ? {
@@ -37,7 +44,20 @@ export async function GET(request: Request) {
           : DEFAULT_MODEL_PRESENTATION,
       };
     });
-    return NextResponse.json({ models }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(
+      {
+        models,
+        estimation: {
+          baseCredits: config.baseCredits,
+          creditsPerYuan: config.creditsPerYuan,
+          inputTokens: config.inputTokens,
+          outputTokens: config.outputTokens,
+          usdRate: config.usdRate,
+          tiers: config.tiers,
+        },
+      },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   } catch (error) {
     console.error("Admin models load failed:", error);
     return NextResponse.json({ error: "模型配置加载失败，请稍后重试" }, { status: 500 });
@@ -47,11 +67,7 @@ export async function GET(request: Request) {
 export async function PUT(request: Request) {
   const { admin, response } = await authorizeAdminApi(request);
   if (response) return response;
-  const origin = request.headers.get("origin");
-  const allowedOrigins = new Set([new URL(request.url).origin]);
-  const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
-  if (appUrl) allowedOrigins.add(new URL(appUrl).origin);
-  if (origin && !allowedOrigins.has(origin)) {
+  if (!isAllowedOrigin(request)) {
     return NextResponse.json({ error: "请求来源无效" }, { status: 403 });
   }
   const body = await request.json().catch(() => null);

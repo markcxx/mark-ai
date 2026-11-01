@@ -1,24 +1,26 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Ban,
-  ChevronLeft,
-  ChevronRight,
-  Eye,
-  RefreshCw,
-  Search,
-  ShieldCheck,
-  Trash2,
-} from "lucide-react";
+import { UserMembershipCell } from "./UserMembershipCell";
+import { useCallback, useEffect, useState } from "react";
+import { Ban, Eye, ShieldCheck, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 
 import {
   AdminButton,
   AdminCheckbox,
+  AdminEmpty,
   AdminError,
   AdminLoading,
-  adminInputClass,
+  AdminPagination,
+  AdminRefresh,
+  AdminRowMenu,
+  AdminSearch,
+  AdminSelectionBar,
+  AdminSurface,
+  AdminToolbar,
+  adminRow,
+  adminTd,
+  adminTh,
   formatBytes,
   formatDateTime,
   StatusBadge,
@@ -31,6 +33,7 @@ import type { UserPlatformUsage } from "@/lib/client-platform";
 import { UserPlatformBadges } from "./UserPlatforms";
 
 export type AdminUserSummary = {
+  membership?: { tier: string; expiresAt: string | null };
   platforms?: UserPlatformUsage[];
   age?: number;
   avatar?: string;
@@ -68,7 +71,6 @@ export function UsersPanel() {
     ids: string[];
     label: string;
   }>();
-  const pageCount = Math.max(1, Math.ceil(total / pageSize));
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -93,12 +95,6 @@ export function UsersPanel() {
   }, [page, pageSize, role, search, status, platform]);
 
   useEffect(() => void load(), [load]);
-
-  const pageItems = useMemo(() => {
-    const start = Math.max(1, Math.min(page - 2, pageCount - 4));
-    const end = Math.min(pageCount, start + 4);
-    return Array.from({ length: end - start + 1 }, (_, index) => start + index);
-  }, [page, pageCount]);
 
   const confirmBan = async () => {
     if (!banTarget) return;
@@ -157,379 +153,306 @@ export function UsersPanel() {
     }
   };
 
+  const allSelected = users.length > 0 && selectedIds.length === users.length;
+  const toggleOne = (id: string, checked: boolean) =>
+    setSelectedIds((current) =>
+      checked ? [...current, id] : current.filter((item) => item !== id),
+    );
+  const displayName = (user: AdminUserSummary) =>
+    user.fullName || user.username || user.email.split("@")[0];
+  const rowMenu = (user: AdminUserSummary) => [
+    { icon: Eye, label: "查看详情", onClick: () => setSelectedUserId(user.id) },
+    {
+      icon: user.banned ? ShieldCheck : Ban,
+      label: user.banned ? "解除封禁" : "封禁用户",
+      onClick: () => setBanTarget({ banned: !user.banned, ids: [user.id], label: user.email }),
+    },
+    {
+      danger: true,
+      icon: Trash2,
+      label: "删除用户",
+      onClick: () => setDeleteTarget({ id: user.id, label: user.email }),
+    },
+  ];
+  const filtering =
+    Boolean(search.trim()) || role !== "all" || status !== "all" || platform !== "all";
+  const filterSelect = (
+    label: string,
+    value: string,
+    setter: (value: string) => void,
+    options: { label: string; value: string }[],
+  ) => (
+    <div className="w-[calc(50%-4px)] shrink-0 sm:w-32">
+      <AppSelect<string>
+        aria-label={label}
+        classNames={{ trigger: "min-h-10 md:min-h-9" }}
+        onChange={(next) => {
+          setter(next);
+          setPage(1);
+        }}
+        options={options}
+        style={{ width: "100%" }}
+        value={value}
+      />
+    </div>
+  );
+  const avatar = (user: AdminUserSummary) => (
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gray-100 text-xs font-medium text-gray-500 dark:bg-white/[0.08] dark:text-gray-300">
+      {user.avatar ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img alt="" className="h-full w-full object-cover" src={user.avatar} />
+      ) : (
+        displayName(user).slice(0, 1).toUpperCase()
+      )}
+    </span>
+  );
+
   return (
     <div>
-      <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center">
-        <div className="relative min-w-0 flex-1 lg:max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-          <input
-            className={`${adminInputClass} pl-9`}
-            onChange={(event) => {
-              setSearch(event.target.value);
+      <AdminSurface>
+        <AdminToolbar actions={<AdminRefresh loading={loading} onClick={() => void load()} />}>
+          <AdminSearch
+            label="搜索用户"
+            onChange={(value) => {
+              setSearch(value);
               setPage(1);
             }}
             placeholder="搜索邮箱、昵称或用户名"
             value={search}
           />
-        </div>
-        <div className="grid grid-cols-2 gap-2 lg:flex lg:w-auto lg:items-center">
-          <div className="min-w-0 lg:w-36">
-            <AppSelect
-              onChange={(value) => {
-                if (typeof value !== "string") return;
-                setRole(value);
-                setPage(1);
-              }}
-              options={[
-                { label: "全部角色", value: "all" },
-                { label: "普通用户", value: "user" },
-                { label: "管理员", value: "admin" },
-              ]}
-              style={{ width: "100%" }}
-              value={role}
-            />
-          </div>
-          <div className="min-w-0 lg:w-36">
-            <AppSelect
-              onChange={(value) => {
-                if (typeof value !== "string") return;
-                setStatus(value);
-                setPage(1);
-              }}
-              options={[
-                { label: "全部状态", value: "all" },
-                { label: "正常", value: "active" },
-                { label: "已封禁", value: "banned" },
-              ]}
-              style={{ width: "100%" }}
-              value={status}
-            />
-          </div>
-          <div className="min-w-0 lg:w-36">
-            <AppSelect
-              aria-label="筛选使用平台"
-              classNames={{ trigger: "min-h-10 md:min-h-8" }}
-              onChange={(value) => {
-                if (typeof value !== "string") return;
-                setPlatform(value);
-                setPage(1);
-              }}
-              options={[
-                { label: "全部平台", value: "all" },
-                { label: "Web", value: "web" },
-                { label: "Android", value: "android" },
-                { label: "未知平台", value: "unknown" },
-              ]}
-              style={{ width: "100%" }}
-              value={platform}
-            />
-          </div>
-          <AdminButton onClick={() => void load()}>
-            <RefreshCw size={15} /> <span>刷新</span>
+          {filterSelect("按角色筛选", role, setRole, [
+            { label: "全部角色", value: "all" },
+            { label: "普通用户", value: "user" },
+            { label: "管理员", value: "admin" },
+          ])}
+          {filterSelect("按状态筛选", status, setStatus, [
+            { label: "全部状态", value: "all" },
+            { label: "正常", value: "active" },
+            { label: "已封禁", value: "banned" },
+          ])}
+          {filterSelect("按使用平台筛选", platform, setPlatform, [
+            { label: "全部平台", value: "all" },
+            { label: "Web", value: "web" },
+            { label: "Android", value: "android" },
+            { label: "未知平台", value: "unknown" },
+          ])}
+        </AdminToolbar>
+        <AdminSelectionBar count={selectedIds.length} onClear={() => setSelectedIds([])}>
+          <AdminButton
+            compact
+            onClick={() =>
+              setBanTarget({
+                banned: true,
+                ids: selectedIds,
+                label: `${selectedIds.length} 位用户`,
+              })
+            }
+          >
+            <Ban size={14} /> 封禁
           </AdminButton>
-        </div>
-        {selectedIds.length > 0 && (
-          <div className="flex w-full items-center gap-1 overflow-x-auto pb-1 lg:w-auto lg:pb-0">
-            <AdminButton
-              onClick={() =>
-                setBanTarget({
-                  banned: true,
-                  ids: selectedIds,
-                  label: `${selectedIds.length} 位用户`,
-                })
-              }
-            >
-              <Ban size={14} /> 批量封禁
-            </AdminButton>
-            <AdminButton
-              onClick={() =>
-                setBanTarget({
-                  banned: false,
-                  ids: selectedIds,
-                  label: `${selectedIds.length} 位用户`,
-                })
-              }
-            >
-              <ShieldCheck size={14} /> 批量解封
-            </AdminButton>
-            <AdminButton
-              danger
-              onClick={() => setDeleteTarget({ label: `${selectedIds.length} 位用户` })}
-            >
-              <Trash2 size={14} /> 批量删除
-            </AdminButton>
-          </div>
-        )}
-      </div>
-      {loading ? (
-        <AdminLoading rows={7} />
-      ) : error ? (
-        <AdminError message={error} onRetry={() => void load()} />
-      ) : (
-        <>
-          <div className="hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[1240px] text-left text-sm">
-              <thead className="text-xs text-gray-400">
-                <tr>
-                  <th className="w-12 px-3 py-3">
-                    <AdminCheckbox
-                      checked={users.length > 0 && selectedIds.length === users.length}
-                      indeterminate={selectedIds.length > 0 && selectedIds.length < users.length}
-                      label="全选当前页用户"
-                      onChange={(checked) =>
-                        setSelectedIds(checked ? users.map((user) => user.id) : [])
-                      }
-                    />
-                  </th>
-                  <th className="px-5 py-3 font-medium">用户</th>
-                  <th className="px-5 py-3 font-medium">角色</th>
-                  <th className="px-5 py-3 font-medium">状态</th>
-                  <th className="px-5 py-3 font-medium">对话</th>
-                  <th className="px-5 py-3 font-medium">文件</th>
-                  <th className="px-5 py-3 font-medium">最近活动</th>
-                  <th className="px-5 py-3 font-medium">注册时间</th>
-                  <th className="px-5 py-3 text-right font-medium">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((user, index) => (
-                  <tr
-                    className={cn(
-                      "transition-colors hover:bg-gray-100/80 dark:hover:bg-white/[0.06]",
-                      index % 2 === 0 && "bg-gray-50/55 dark:bg-white/[0.018]",
-                    )}
-                    key={user.id}
-                  >
-                    <td className="px-3 py-3">
+          <AdminButton
+            compact
+            onClick={() =>
+              setBanTarget({
+                banned: false,
+                ids: selectedIds,
+                label: `${selectedIds.length} 位用户`,
+              })
+            }
+          >
+            <ShieldCheck size={14} /> 解封
+          </AdminButton>
+          <AdminButton
+            compact
+            danger
+            onClick={() => setDeleteTarget({ label: `${selectedIds.length} 位用户` })}
+          >
+            <Trash2 size={14} /> 删除
+          </AdminButton>
+        </AdminSelectionBar>
+
+        {loading ? (
+          <AdminLoading rows={7} />
+        ) : error ? (
+          <AdminError message={error} onRetry={() => void load()} />
+        ) : !users.length ? (
+          <AdminEmpty
+            description={filtering ? "调整搜索词或筛选条件后再试" : undefined}
+            title={filtering ? "没有符合条件的用户" : "暂无用户"}
+          />
+        ) : (
+          <>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[1080px] text-sm">
+                <thead>
+                  <tr>
+                    <th className={cn(adminTh, "w-10 pr-0")}>
                       <AdminCheckbox
-                        checked={selectedIds.includes(user.id)}
-                        label={`选择用户 ${user.email}`}
+                        checked={allSelected}
+                        indeterminate={selectedIds.length > 0 && !allSelected}
+                        label="全选当前页用户"
                         onChange={(checked) =>
-                          setSelectedIds((current) =>
-                            checked
-                              ? [...current, user.id]
-                              : current.filter((id) => id !== user.id),
-                          )
+                          setSelectedIds(checked ? users.map((u) => u.id) : [])
                         }
                       />
-                    </td>
-                    <td className="px-5 py-3">
-                      <p className="font-medium">
-                        {user.fullName || user.username || user.email.split("@")[0]}
-                      </p>
-                      <p className="mt-0.5 text-xs text-gray-400">{user.email}</p>
-                      <div className="mt-1.5">
-                        <UserPlatformBadges platforms={user.platforms} />
-                      </div>
-                    </td>
-                    <td className="px-5 py-3">
-                      <StatusBadge
-                        label={user.role === "admin" ? "管理员" : "用户"}
-                        status={user.role || "user"}
-                      />
-                    </td>
-                    <td className="px-5 py-3">
-                      <StatusBadge
-                        label={user.banned ? "已封禁" : "正常"}
-                        status={user.banned ? "banned" : "active"}
-                      />
-                    </td>
-                    <td className="px-5 py-3 text-gray-500">{user.sessionCount}</td>
-                    <td className="px-5 py-3 text-gray-500">
-                      {user.fileCount} · {formatBytes(user.fileBytes)}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3 text-gray-500">
-                      {formatDateTime(user.lastActiveAt)}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3 text-gray-500">
-                      {formatDateTime(user.createdAt)}
-                    </td>
-                    <td className="px-5 py-3">
-                      <div className="flex items-center justify-end gap-0.5">
-                        <AdminButton compact onClick={() => setSelectedUserId(user.id)}>
-                          <Eye size={14} /> 详情
-                        </AdminButton>
-                        <AdminButton
-                          compact
-                          disabled={actionLoading}
-                          onClick={() =>
-                            setBanTarget({
-                              banned: !user.banned,
-                              ids: [user.id],
-                              label: user.email,
-                            })
-                          }
-                        >
-                          {user.banned ? <ShieldCheck size={14} /> : <Ban size={14} />}
-                          {user.banned ? "解封" : "封禁"}
-                        </AdminButton>
-                        <AdminButton
-                          compact
-                          danger
-                          disabled={actionLoading}
-                          onClick={() => setDeleteTarget({ id: user.id, label: user.email })}
-                        >
-                          <Trash2 size={14} /> 删除
-                        </AdminButton>
-                      </div>
-                    </td>
+                    </th>
+                    <th className={adminTh}>用户</th>
+                    <th className={adminTh}>会员</th>
+                    <th className={adminTh}>状态</th>
+                    <th className={cn(adminTh, "text-right")}>对话</th>
+                    <th className={cn(adminTh, "text-right")}>文件</th>
+                    <th className={adminTh}>最近活动</th>
+                    <th className={adminTh}>
+                      <span className="sr-only">操作</span>
+                    </th>
                   </tr>
-                ))}
-                {!loading && !users.length && (
-                  <tr>
-                    <td className="px-5 py-14 text-center text-gray-400" colSpan={9}>
-                      没有符合条件的用户
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          <div className="space-y-2 md:hidden">
-            <div className="flex items-center gap-2 px-1 pb-1 text-xs text-gray-500">
-              <AdminCheckbox
-                checked={users.length > 0 && selectedIds.length === users.length}
-                indeterminate={selectedIds.length > 0 && selectedIds.length < users.length}
-                label="全选当前页用户"
-                onChange={(checked) => setSelectedIds(checked ? users.map((user) => user.id) : [])}
-              />
-              全选当前页
+                </thead>
+                <tbody>
+                  {users.map((user) => (
+                    <tr
+                      className={cn(
+                        adminRow,
+                        selectedIds.includes(user.id) && "bg-gray-50 dark:bg-white/[0.03]",
+                      )}
+                      key={user.id}
+                    >
+                      <td className={cn(adminTd, "pr-0")}>
+                        <AdminCheckbox
+                          checked={selectedIds.includes(user.id)}
+                          label={`选择用户 ${user.email}`}
+                          onChange={(checked) => toggleOne(user.id, checked)}
+                        />
+                      </td>
+                      <td className={adminTd}>
+                        <button
+                          className="flex min-w-0 items-center gap-3 text-left"
+                          onClick={() => setSelectedUserId(user.id)}
+                          type="button"
+                        >
+                          {avatar(user)}
+                          <span className="min-w-0">
+                            <span className="block truncate font-medium hover:underline">
+                              {displayName(user)}
+                            </span>
+                            <span className="mt-0.5 flex items-center gap-2 text-xs text-gray-400">
+                              <span className="truncate">{user.email}</span>
+                              <UserPlatformBadges platforms={user.platforms} />
+                            </span>
+                          </span>
+                        </button>
+                      </td>
+                      <td className={cn(adminTd, "py-2")}>
+                        <UserMembershipCell membership={user.membership} userId={user.id} />
+                      </td>
+                      <td className={adminTd}>
+                        <div className="flex flex-wrap gap-1">
+                          {user.role === "admin" && <StatusBadge label="管理员" status="admin" />}
+                          <StatusBadge
+                            label={user.banned ? "已封禁" : "正常"}
+                            status={user.banned ? "banned" : "active"}
+                          />
+                        </div>
+                      </td>
+                      <td
+                        className={cn(
+                          adminTd,
+                          "text-right font-jakarta tabular-nums text-gray-600 dark:text-gray-300",
+                        )}
+                      >
+                        {user.sessionCount}
+                      </td>
+                      <td
+                        className={cn(
+                          adminTd,
+                          "whitespace-nowrap text-right font-jakarta tabular-nums text-gray-600 dark:text-gray-300",
+                        )}
+                      >
+                        {user.fileCount}
+                        <span className="ml-1 text-[11px] text-gray-400">
+                          {formatBytes(user.fileBytes)}
+                        </span>
+                      </td>
+                      <td className={cn(adminTd, "whitespace-nowrap text-xs text-gray-500")}>
+                        <p>{formatDateTime(user.lastActiveAt)}</p>
+                        <p className="mt-0.5 text-[11px] text-gray-400">
+                          注册于 {formatDateTime(user.createdAt).split(" ")[0]}
+                        </p>
+                      </td>
+                      <td className={cn(adminTd, "py-2 text-right")}>
+                        <AdminRowMenu items={rowMenu(user)} label={`${user.email} 更多操作`} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            {users.map((user) => (
-              <article
-                className="rounded-xl bg-gray-50/80 p-3.5 dark:bg-white/[0.035]"
-                key={user.id}
-              >
-                <div className="flex items-start gap-3">
-                  <AdminCheckbox
-                    checked={selectedIds.includes(user.id)}
-                    label={`选择用户 ${user.email}`}
-                    onChange={(checked) =>
-                      setSelectedIds((current) =>
-                        checked ? [...current, user.id] : current.filter((id) => id !== user.id),
-                      )
-                    }
-                  />
-                  <button
-                    className="min-w-0 flex-1 text-left"
-                    onClick={() => setSelectedUserId(user.id)}
-                    type="button"
-                  >
-                    <p className="truncate text-sm font-semibold">
-                      {user.fullName || user.username || user.email.split("@")[0]}
-                    </p>
-                    <p className="mt-0.5 truncate text-xs text-gray-400">{user.email}</p>
-                  </button>
-                  <div className="flex shrink-0 gap-1">
-                    <StatusBadge
-                      label={user.role === "admin" ? "管理员" : "用户"}
-                      status={user.role || "user"}
-                    />
-                    <StatusBadge
-                      label={user.banned ? "已封禁" : "正常"}
-                      status={user.banned ? "banned" : "active"}
-                    />
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <UserPlatformBadges platforms={user.platforms} />
-                </div>
-                <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-                  <div>
-                    <p className="text-gray-400">对话</p>
-                    <p className="mt-1 font-medium">{user.sessionCount}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400">文件</p>
-                    <p className="mt-1 truncate font-medium">{user.fileCount} 个</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400">存储</p>
-                    <p className="mt-1 truncate font-medium">{formatBytes(user.fileBytes)}</p>
-                  </div>
-                </div>
-                <p className="mt-3 truncate text-[11px] text-gray-400">
-                  最近活动：{formatDateTime(user.lastActiveAt)}
-                </p>
-                <div className="mt-2 flex items-center gap-0.5 border-t border-gray-200/70 pt-2 dark:border-white/[0.07]">
-                  <AdminButton compact onClick={() => setSelectedUserId(user.id)}>
-                    <Eye size={14} /> 详情
-                  </AdminButton>
-                  <AdminButton
-                    compact
-                    disabled={actionLoading}
-                    onClick={() =>
-                      setBanTarget({
-                        banned: !user.banned,
-                        ids: [user.id],
-                        label: user.email,
-                      })
-                    }
-                  >
-                    {user.banned ? <ShieldCheck size={14} /> : <Ban size={14} />}
-                    {user.banned ? "解封" : "封禁"}
-                  </AdminButton>
-                  <AdminButton
-                    compact
-                    danger
-                    disabled={actionLoading}
-                    onClick={() => setDeleteTarget({ id: user.id, label: user.email })}
-                  >
-                    <Trash2 size={14} /> 删除
-                  </AdminButton>
-                </div>
-              </article>
-            ))}
-            {!users.length && (
-              <p className="py-12 text-center text-sm text-gray-400">没有符合条件的用户</p>
-            )}
-          </div>
-        </>
-      )}
-      {!loading && !error && total > 0 && (
-        <div className="mt-5 flex flex-col gap-3 text-sm text-gray-500 sm:flex-row sm:items-center sm:justify-between">
-          <p>
-            共 {total} 位用户 · 第 {page}/{pageCount} 页
-          </p>
-          <div className="flex w-full items-center gap-1.5 sm:w-auto sm:gap-2">
-            <AppSelect
-              onChange={(value) => {
-                if (typeof value !== "number") return;
-                setPageSize(value);
+            <div className="md:hidden">
+              <div className="flex min-h-11 items-center gap-2 border-b border-gray-100 px-3 text-xs text-gray-500 dark:border-white/[0.06]">
+                <AdminCheckbox
+                  checked={allSelected}
+                  indeterminate={selectedIds.length > 0 && !allSelected}
+                  label="全选当前页用户"
+                  onChange={(checked) => setSelectedIds(checked ? users.map((u) => u.id) : [])}
+                />
+                全选本页 {users.length} 位
+              </div>
+              <ul className="divide-y divide-gray-100 dark:divide-white/[0.06]">
+                {users.map((user) => (
+                  <li className="px-3 py-3" key={user.id}>
+                    <div className="flex items-start gap-3">
+                      <span className="pt-1.5">
+                        <AdminCheckbox
+                          checked={selectedIds.includes(user.id)}
+                          label={`选择用户 ${user.email}`}
+                          onChange={(checked) => toggleOne(user.id, checked)}
+                        />
+                      </span>
+                      <button
+                        className="flex min-w-0 flex-1 items-start gap-3 text-left"
+                        onClick={() => setSelectedUserId(user.id)}
+                        type="button"
+                      >
+                        {avatar(user)}
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-1.5">
+                            <span className="truncate text-sm font-medium">
+                              {displayName(user)}
+                            </span>
+                            {user.role === "admin" && <StatusBadge label="管理员" status="admin" />}
+                            {user.banned && <StatusBadge label="已封禁" status="banned" />}
+                          </span>
+                          <span className="mt-0.5 block truncate text-xs text-gray-400">
+                            {user.email}
+                          </span>
+                          <span className="mt-1.5 block text-[11px] text-gray-400">
+                            {user.sessionCount} 个对话 · {user.fileCount} 个文件 ·{" "}
+                            {formatBytes(user.fileBytes)}
+                          </span>
+                        </span>
+                      </button>
+                      <AdminRowMenu items={rowMenu(user)} label={`${user.email} 更多操作`} />
+                    </div>
+                    <div className="mt-2 overflow-x-auto pl-8">
+                      <UserMembershipCell membership={user.membership} userId={user.id} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <AdminPagination
+              onPageChange={setPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
                 setPage(1);
               }}
-              options={[
-                { label: "每页 20 条", value: 20 },
-                { label: "每页 50 条", value: 50 },
-                { label: "每页 100 条", value: 100 },
-              ]}
-              style={{ flex: 1, minWidth: 0, width: 126 }}
-              value={pageSize}
+              page={page}
+              pageSize={pageSize}
+              total={total}
+              unit="位用户"
             />
-            <AdminButton disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>
-              <ChevronLeft size={14} />
-            </AdminButton>
-            {pageItems.map((item) => (
-              <button
-                className={cn(
-                  "hidden h-9 min-w-9 rounded-lg px-2 text-sm transition-colors sm:block",
-                  item === page
-                    ? "bg-primary text-white"
-                    : "hover:bg-gray-100 dark:hover:bg-white/[0.06]",
-                )}
-                key={item}
-                onClick={() => setPage(item)}
-                type="button"
-              >
-                {item}
-              </button>
-            ))}
-            <AdminButton disabled={page >= pageCount} onClick={() => setPage((value) => value + 1)}>
-              <ChevronRight size={14} />
-            </AdminButton>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </AdminSurface>
       <UserManagementDrawer
         onChanged={() => void load()}
         onClose={() => setSelectedUserId(undefined)}

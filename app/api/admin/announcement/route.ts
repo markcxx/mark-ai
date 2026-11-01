@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { isAllowedOrigin } from "@/lib/app-url";
 import { NextResponse } from "next/server";
 import { authorizeAdminApi } from "@/lib/admin/api";
 import { ANNOUNCEMENT_LIMIT, readAnnouncement } from "@/lib/announcement";
@@ -19,11 +20,7 @@ export async function PUT(request: Request) {
   if (response) return response;
   const scope = getAnnouncementScope(request.url);
   if (!scope) return NextResponse.json({ error: "公告位置无效" }, { status: 400 });
-  const origin = request.headers.get("origin");
-  const allowedOrigins = new Set([new URL(request.url).origin]);
-  const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
-  if (appUrl) allowedOrigins.add(new URL(appUrl).origin);
-  if (origin && !allowedOrigins.has(origin)) {
+  if (!isAllowedOrigin(request)) {
     return NextResponse.json({ error: "请求来源无效" }, { status: 403 });
   }
   const config = parseAnnouncementConfig(await request.json().catch(() => null));

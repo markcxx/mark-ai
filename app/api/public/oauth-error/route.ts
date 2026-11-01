@@ -1,3 +1,4 @@
+import { getAppUrl } from "@/lib/app-url";
 import { NextRequest, NextResponse } from "next/server";
 
 import { getRegistrationMode } from "@/lib/registration";
@@ -17,8 +18,7 @@ const LOGIN_ERROR_CODES = new Set([
 const getLocalCallbackUrl = (value: string | null) =>
   value?.startsWith("/") && !value.startsWith("//") ? value : "/";
 
-const getRedirectBaseUrl = (request: NextRequest) =>
-  process.env.APP_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim() || request.url;
+const getRedirectBaseUrl = (request: NextRequest) => getAppUrl() || request.url;
 
 export function GET(request: NextRequest) {
   const error = request.nextUrl.searchParams.get("error") || "oauth_failed";

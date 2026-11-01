@@ -8,7 +8,10 @@ export function getGenerationErrorDisplay(raw: string) {
     details.match(/"(?:code|status)"\s*:\s*(\d{3})\b/)?.[1];
   let title = "回复生成失败";
   let message = "本次回复未能完成，可以重试或切换模型。";
-  if (code === "429" || /rate.?limit|too many requests/i.test(details)) {
+  if (/会员专享|免费对话已用完|套餐额度已用完/.test(details)) {
+    title = "套餐额度不足";
+    message = details;
+  } else if (code === "429" || /rate.?limit|too many requests/i.test(details)) {
     title = "请求暂时受限";
     message = "当前请求过于频繁或可用额度不足，请稍后重试，或检查模型额度。";
   } else if (code === "503" || /high demand|overloaded|UNAVAILABLE/i.test(details)) {
@@ -34,6 +37,7 @@ export function getGenerationErrorDisplay(raw: string) {
     message = "服务商未能完成本次请求，请稍后重试或切换其他模型。";
   }
   if (
+    title !== "套餐额度不足" &&
     !code &&
     details.length <= 180 &&
     /[\u4e00-\u9fff]/.test(details) &&

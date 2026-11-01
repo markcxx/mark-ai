@@ -12,6 +12,8 @@ export type ConfiguredModel = {
   runtime: ModelRuntime;
   apiKey: string;
   baseUrl?: string;
+  /** Set only on routes from the site configuration, never on user-owned keys. */
+  siteModel?: true;
 };
 
 export type PublicConfiguredModel = Pick<ConfiguredModel, "id" | "provider"> & {
@@ -272,6 +274,16 @@ export const getProviderDisplayName = (provider: string): string => {
   return PROVIDER_DISPLAY_NAMES[provider] || provider;
 };
 
+/**
+ * Key under which a site route is published and priced: mark* routes and
+ * provider_keyN splits collapse onto the provider the client sees.
+ */
+export const getPublicModelKey = (model: Pick<ConfiguredModel, "id" | "provider">) => {
+  const split = model.provider.match(/^(.+)_key\d+$/)?.[1];
+  const provider = isMarkProvider(model.provider) ? "markai" : split || model.provider;
+  return `${provider}:${model.id}`;
+};
+
 export const getPublicConfiguredModels = (): PublicConfiguredModel[] => {
   const grouped = new Map<string, PublicConfiguredModel>();
   for (const model of getConfiguredModels()) {
@@ -333,5 +345,5 @@ export const findConfiguredModel = (
   }
 
   if (!found) return undefined;
-  return { ...found, apiKey: pickRandomKey(found.apiKey) };
+  return { ...found, apiKey: pickRandomKey(found.apiKey), siteModel: true as const };
 };

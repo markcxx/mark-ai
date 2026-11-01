@@ -1,5 +1,11 @@
 "use client";
 
+import type { PlanId } from "@/lib/plans";
+import { useCreditStore } from "@/stores/useCreditStore";
+import { CreditMeter, MembershipBadge } from "./MembershipBadge";
+import dynamic from "next/dynamic";
+const PlansDialog = dynamic(() => import("./PlansDialog").then((m) => m.PlansDialog));
+
 import { useOpenSettings } from "@/hooks/useOpenSettings";
 
 import {
@@ -28,6 +34,16 @@ export function UserAccountMenu() {
   const openSettings = useOpenSettings();
   const [isAdmin, setIsAdmin] = useState(false);
   const [open, setOpen] = useState(false);
+  const [plansOpen, setPlansOpen] = useState(false);
+  const credits = useCreditStore((state) => state.summary);
+  const tier = (credits?.tier || "free") as PlanId;
+  const userId = data?.user?.id;
+  // Refresh on sign-in, when the menu opens and after the plans dialog closes
+  // (a purchase may have changed the tier).
+  useEffect(() => {
+    if (!userId) return;
+    void useCreditStore.getState().load(open || !plansOpen);
+  }, [userId, open, plansOpen]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -76,6 +92,35 @@ export function UserAccountMenu() {
               <p className="mt-0.5 truncate text-xs text-gray-400">{user.email}</p>
             </div>
             <div className="py-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  setPlansOpen(true);
+                }}
+                className="mb-1 block w-full rounded-lg bg-gray-100/80 px-3 py-2.5 text-left transition-colors hover:bg-gray-100 dark:bg-white/[0.06] dark:hover:bg-white/10"
+              >
+                <span className="flex items-center justify-between gap-2">
+                  <span className="flex min-w-0 items-center gap-2 text-sm font-medium">
+                    <MembershipBadge tier={tier} />
+                    {tier === "free" ? "升级会员" : tier === "lifetime" ? "永久会员" : "我的套餐"}
+                  </span>
+                  <span className="shrink-0 text-xs text-gray-500">
+                    {tier === "free" ? "查看套餐 →" : tier === "lifetime" ? "" : "续费 / 升级 →"}
+                  </span>
+                </span>
+                {credits && (
+                  <span className="mt-2.5 block">
+                    <CreditMeter
+                      periodEnd={credits.unlimited ? undefined : credits.periodEnd}
+                      remaining={credits.remaining}
+                      total={credits.total}
+                      unit={credits.unit}
+                      unlimited={credits.unlimited}
+                    />
+                  </span>
+                )}
+              </button>
               <Link
                 href="/download"
                 onClick={() => setOpen(false)}
@@ -154,7 +199,17 @@ export function UserAccountMenu() {
           onClick={() => setOpen((value) => !value)}
           type="button"
         >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-violet-500 via-blue-500 to-cyan-400 text-sm font-bold text-white shadow-sm ring-2 ring-white dark:ring-black">
+          <div
+            className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-violet-500 via-blue-500 to-cyan-400 text-sm font-bold text-white shadow-sm ring-2 ${
+              {
+                free: "ring-white dark:ring-black",
+                starter: "ring-sky-300 dark:ring-sky-500/60",
+                plus: "ring-violet-400 dark:ring-violet-500/70",
+                pro: "ring-fuchsia-400 dark:ring-fuchsia-500/70",
+                lifetime: "ring-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.45)]",
+              }[tier] || "ring-white dark:ring-black"
+            }`}
+          >
             {profile?.avatar || user.image ? (
               <Image
                 alt={name}
@@ -169,8 +224,11 @@ export function UserAccountMenu() {
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
-              {name}
+            <p className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+                {name}
+              </span>
+              <MembershipBadge tier={tier} />
             </p>
             <p className="truncate text-xs text-gray-400">{user.email}</p>
           </div>
@@ -180,6 +238,7 @@ export function UserAccountMenu() {
           />
         </button>
       </div>
+      {plansOpen && <PlansDialog onClose={() => setPlansOpen(false)} />}
       <FileManagerDrawer
         onClose={() => useUIStore.getState().setFileManagerOpen(false)}
         open={fileManagerOpen}

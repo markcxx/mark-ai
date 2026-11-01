@@ -7,6 +7,8 @@ const PUBLIC_PATHS = [
   "/api/public",
   "/share/",
   "/api/waitlist",
+  // ZPay calls these without a session; they verify signatures themselves.
+  "/api/payments/zpay/",
   "/login",
   "/register",
   "/reset-password",

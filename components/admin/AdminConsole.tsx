@@ -15,6 +15,8 @@ import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Toaster } from "react-hot-toast";
 
+import { PlansPanel } from "./PlansPanel";
+import { CreditCard } from "lucide-react";
 import { ModelsPanel } from "@/components/admin/ModelsPanel";
 import { AuditPanel } from "@/components/admin/AuditPanel";
 import { AnnouncementPanel } from "@/components/admin/AnnouncementPanel";
@@ -26,7 +28,8 @@ import { PRIMARY_COLOR_VALUES } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 
-type AdminView = "audit" | "overview" | "users" | "waitlist" | "announcement" | "models";
+export type AdminView =
+  "audit" | "overview" | "users" | "waitlist" | "announcement" | "models" | "plans";
 
 const views = [
   {
@@ -48,10 +51,16 @@ const views = [
     label: "用户管理",
   },
   {
-    description: "维护模型展示与上新信息",
+    description: "维护模型 API 价格，自动估算消息额度与积分",
     icon: Boxes,
     id: "models" as const,
     label: "模型管理",
+  },
+  {
+    description: "管理付费套餐与开通方式",
+    icon: CreditCard,
+    id: "plans" as const,
+    label: "套餐管理",
   },
   {
     description: "查看后台操作与安全记录",
@@ -67,14 +76,15 @@ const views = [
   },
 ];
 
-export function AdminConsole() {
+export function AdminConsole({ initialView = "overview" }: { initialView?: AdminView }) {
   const router = useRouter();
   const { setTheme } = useTheme();
   const general = useSettingsStore((state) => state.general);
   const settingsLoaded = useSettingsStore((state) => state.isLoaded);
-  const [view, setView] = useState<AdminView>("overview");
+  const [view, setView] = useState<AdminView>(initialView);
   const [overviewRangeDays, setOverviewRangeDays] = useState(14);
   const [overviewRefreshToken, setOverviewRefreshToken] = useState(0);
+  useEffect(() => setView(initialView), [initialView]);
   const current = views.find((item) => item.id === view)!;
 
   useEffect(() => {
@@ -118,7 +128,7 @@ export function AdminConsole() {
               icon={item.icon}
               key={item.id}
               label={item.label}
-              onClick={() => setView(item.id)}
+              onClick={() => router.push(`/admin/${item.id}`)}
             />
           ))}
         </nav>
@@ -137,7 +147,9 @@ export function AdminConsole() {
           "min-w-0 flex-1 overflow-y-auto border-0",
           view === "overview"
             ? "bg-[#f4f5f7] dark:bg-[#111214]"
-            : "bg-[var(--chat-panel-bg)] md:rounded-xl md:border md:border-[#e5e5e5] dark:md:border-gray-700",
+            : view === "announcement"
+              ? "bg-[var(--chat-panel-bg)] md:rounded-xl md:border md:border-[#e5e5e5] dark:md:border-gray-700"
+              : "bg-[#f4f5f7] md:rounded-xl md:border md:border-[#e5e5e5] dark:bg-[#0e0f11] dark:md:border-white/10",
         )}
       >
         <header
@@ -164,7 +176,7 @@ export function AdminConsole() {
               返回
             </button>
           </div>
-          <div className="mx-auto mt-3 grid max-w-[1440px] grid-cols-3 gap-1 md:hidden">
+          <div className="mx-auto mt-3 grid max-w-[1440px] grid-cols-4 gap-1 md:hidden">
             {views.map((item) => {
               const Icon = item.icon;
               return (
@@ -176,7 +188,7 @@ export function AdminConsole() {
                       : "text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/[0.06]",
                   )}
                   key={item.id}
-                  onClick={() => setView(item.id)}
+                  onClick={() => router.push(`/admin/${item.id}`)}
                   type="button"
                 >
                   <Icon size={15} />
@@ -189,7 +201,7 @@ export function AdminConsole() {
         <div
           className={cn(
             "mx-auto max-w-[1440px] px-3 py-4",
-            view === "overview" ? "md:px-6 md:py-6" : "md:p-8",
+            view === "overview" || view !== "announcement" ? "md:px-6 md:py-6" : "md:p-8",
           )}
         >
           {view === "overview" && (
@@ -204,6 +216,7 @@ export function AdminConsole() {
           {view === "users" && <UsersPanel />}
           {view === "audit" && <AuditPanel />}
           {view === "models" && <ModelsPanel />}
+          {view === "plans" && <PlansPanel />}
           {view === "announcement" && <AnnouncementPanel />}
         </div>
       </main>

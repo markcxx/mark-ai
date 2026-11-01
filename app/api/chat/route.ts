@@ -1,4 +1,5 @@
 import { createRequestTiming } from "@/lib/chat/server/request-timing";
+import { billOnFirstOutput } from "@/lib/chat/server/billable-stream";
 import { describeGenerationError } from "@/lib/chat/generation-error";
 import { getThinkingPolicy } from "@/lib/model-thinking";
 import { after, NextRequest, NextResponse } from "next/server";
@@ -15,7 +16,7 @@ import { getChatSession } from "@/lib/chat/storage";
 import { getRuntimeSystemPrompt, WEB_TOOLS } from "@/lib/chat/server/runtime-prompt";
 import type { ChatMessage } from "@/lib/chat/server/types";
 import type { FileAttachment } from "@/lib/chat/types";
-import { isLocalMode } from "@/lib/env";
+import { isCloudMode, isLocalMode } from "@/lib/env";
 import { hasKnownContextWindow } from "@/lib/model-metadata";
 import { getServerModelMetadata } from "@/lib/server/model-catalog";
 import {
@@ -117,6 +118,38 @@ export async function POST(req: NextRequest) {
     if (hasSession && !session)
       return NextResponse.json({ error: "会话不存在或无权访问" }, { status: 404 });
 
+    // Site models are metered by membership. Only routes the user configured
+    // with their own API key are exempt; that is decided by origin, not by
+    // comparing keys (site keys rotate per request).
+    let billingKey: string | undefined;
+    if (isCloudMode() && authorization.userId && selectedModel.siteModel) {
+      const { getPublicModelKey } = await import("@/lib/models");
+      const { checkChatAllowance } = await import("@/lib/server/plans");
+      billingKey = getPublicModelKey(selectedModel);
+      const denied = await timing.measure("quota", () =>
+        checkChatAllowance(authorization.userId!, billingKey!),
+      );
+      if (denied)
+        return NextResponse.json({ error: denied, code: "quota_exceeded" }, { status: 402 });
+    }
+    // Every provider call that produces output is billed once: new messages,
+    // retries and regenerations alike. Failed calls are not billed.
+    const billed = (response: Response) =>
+      billingKey
+        ? billOnFirstOutput(response, () => {
+            const userId = authorization.userId!;
+            const key = billingKey!;
+            after(async () => {
+              try {
+                const { recordModelUsage } = await import("@/lib/server/plans");
+                await recordModelUsage(userId, key);
+              } catch (error) {
+                console.error("Usage recording failed:", error);
+              }
+            });
+          })
+        : response;
+
     if (isImageGenerationModel(selectedModel.id)) {
       try {
         const { generateOrEditImage } = await import("@/lib/chat/server/image-runtime");
@@ -128,12 +161,14 @@ export async function POST(req: NextRequest) {
           signal: req.signal,
           userId: storageOwnerId,
         });
-        return new Response(`${JSON.stringify({ generatedImage, type: "image" })}\n`, {
-          headers: {
-            "Cache-Control": "no-cache, no-transform",
-            "Content-Type": "application/x-ndjson; charset=utf-8",
-          },
-        });
+        return billed(
+          new Response(`${JSON.stringify({ generatedImage, type: "image" })}\n`, {
+            headers: {
+              "Cache-Control": "no-cache, no-transform",
+              "Content-Type": "application/x-ndjson; charset=utf-8",
+            },
+          }),
+        );
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") throw error;
         console.error("Image generation error:", error);
@@ -229,47 +264,51 @@ export async function POST(req: NextRequest) {
           ? (await import("@/lib/chat/server/anthropic-runtime")).createAnthropicStream
           : (await import("@/lib/chat/server/openai-runtime")).createOpenAICompatibleStream;
       return timing.response(
-        await createStream(
-          preparedMessages,
-          selectedModel.id,
-          selectedModel.apiKey,
-          selectedModel.baseUrl,
-          Boolean(webSearchEnabled),
-          timezone,
-          req.signal,
-          contextPreparation,
-          typeof sessionId === "string" && sessionId
-            ? {
-                enabledToolIds,
-                sessionId,
-                skillPrompt,
-                userId: storageOwnerId,
-              }
-            : undefined,
-          { policy: thinkingPolicy, enabled: thinkingEnabled },
-          undefined,
-          body.languageModel,
+        billed(
+          await createStream(
+            preparedMessages,
+            selectedModel.id,
+            selectedModel.apiKey,
+            selectedModel.baseUrl,
+            Boolean(webSearchEnabled),
+            timezone,
+            req.signal,
+            contextPreparation,
+            typeof sessionId === "string" && sessionId
+              ? {
+                  enabledToolIds,
+                  sessionId,
+                  skillPrompt,
+                  userId: storageOwnerId,
+                }
+              : undefined,
+            { policy: thinkingPolicy, enabled: thinkingEnabled },
+            undefined,
+            body.languageModel,
+          ),
         ),
       );
     }
 
     const { createGeminiStream } = await import("@/lib/chat/server/gemini-runtime");
     return timing.response(
-      await createGeminiStream({
-        apiKey: selectedModel.apiKey,
-        baseUrl: selectedModel.baseUrl,
-        contextPreparation,
-        includeThoughts: modelMetadata?.supportsReasoning !== false,
-        messages: preparedMessages,
-        model: selectedModel.id,
-        signal: req.signal,
-        systemPrompt: runtimeSystemPrompt,
-        webSearchEnabled: Boolean(webSearchEnabled),
-        toolRuntime:
-          typeof sessionId === "string" && sessionId
-            ? { enabledToolIds, sessionId, userId: storageOwnerId }
-            : undefined,
-      }),
+      billed(
+        await createGeminiStream({
+          apiKey: selectedModel.apiKey,
+          baseUrl: selectedModel.baseUrl,
+          contextPreparation,
+          includeThoughts: modelMetadata?.supportsReasoning !== false,
+          messages: preparedMessages,
+          model: selectedModel.id,
+          signal: req.signal,
+          systemPrompt: runtimeSystemPrompt,
+          webSearchEnabled: Boolean(webSearchEnabled),
+          toolRuntime:
+            typeof sessionId === "string" && sessionId
+              ? { enabledToolIds, sessionId, userId: storageOwnerId }
+              : undefined,
+        }),
+      ),
     );
   } catch (error) {
     console.error("Chat error:", error);

@@ -9,6 +9,7 @@ import {
   chatSessions,
   storageFiles,
   users,
+  userMemberships,
   userPlatforms,
   waitlistEntries,
 } from "@/lib/db/schema";
@@ -126,8 +127,14 @@ export async function GET(request: Request) {
     rows.push(row);
     platformsByUser.set(row.userId, rows);
   }
+  const memberships = await db
+    .select()
+    .from(userMemberships)
+    .where(inArray(userMemberships.userId, userIds));
+  const membershipMap = new Map(memberships.map((m) => [m.userId, m]));
   const rows = baseRows.map((user) => ({
     ...user,
+    membership: membershipMap.get(user.id) ?? { tier: "free", expiresAt: null },
     platforms: (platformsByUser.get(user.id) || []).map(({ userId: _userId, ...usage }) => usage),
     fileBytes: Number(filesByUser.get(user.id)?.bytes || 0),
     fileCount: Number(filesByUser.get(user.id)?.count || 0),
