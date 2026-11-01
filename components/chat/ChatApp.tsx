@@ -44,6 +44,7 @@ import { SessionSearchDialog } from "./SessionSearchDialog";
 import { SelectionQuoteAction } from "./SelectionQuoteAction";
 import { TopHeader } from "./TopHeader";
 import { AnnouncementBar } from "@/components/AnnouncementBar";
+import { GuestPlansSection } from "./GuestPlansSection";
 import { WelcomePanel } from "./WelcomePanel";
 
 // Draft changes stay inside the composer instead of rerendering chat history.
@@ -768,9 +769,11 @@ export default function ChatApp({
                 ref={messagesScrollRef}
                 className={cn(
                   "flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-3 md:px-8",
-                  showWelcome
-                    ? "justify-center pb-6 pt-0 md:pb-8"
-                    : "pb-[calc(var(--chat-composer-height,10rem)+1.5rem)] pt-4 md:pt-6",
+                  showWelcome && guest
+                    ? "justify-start pb-8 pt-[max(2rem,12vh)] md:pb-10"
+                    : showWelcome
+                      ? "justify-center pb-6 pt-0 md:pb-8"
+                      : "pb-[calc(var(--chat-composer-height,10rem)+1.5rem)] pt-4 md:pt-6",
                 )}
                 onScroll={handleMessagesScroll}
               >
@@ -820,6 +823,7 @@ export default function ChatApp({
                       textareaRef={textareaRef}
                       webSearchEnabled={webSearchEnabled}
                     />
+                    {guest && <GuestPlansSection onSignIn={requestGuestSignIn} />}
                   </WelcomePanel>
                 ) : (
                   <div

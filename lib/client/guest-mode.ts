@@ -15,13 +15,23 @@ export const setGuestMode = (enabled: boolean, draftReader?: () => string) => {
   if (draftReader) readDraft = draftReader;
 };
 
-/** Saves the current draft and sends the visitor to login, returning to `/`. */
-export const requestGuestSignIn = () => {
+const saveDraft = () => {
   const draft = readDraft().trim();
   try {
     if (draft) window.localStorage.setItem(GUEST_DRAFT_STORAGE_KEY, draft);
   } catch {
-    // The login flow still works when browser storage is unavailable.
+    // The auth flow still works when browser storage is unavailable.
   }
+};
+
+/** Saves the current draft and sends the visitor to login, returning to `/`. */
+export const requestGuestSignIn = () => {
+  saveDraft();
   window.location.assign("/login?callbackUrl=%2F");
+};
+
+/** Saves the current draft and sends the visitor to registration. */
+export const requestGuestRegister = () => {
+  saveDraft();
+  window.location.assign("/register");
 };

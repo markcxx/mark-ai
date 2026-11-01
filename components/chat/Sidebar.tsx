@@ -3,7 +3,7 @@
 import {
   ChartNoAxesColumnIncreasing,
   LoaderCircle,
-  LogIn,
+  History,
   MessageCirclePlus,
   PanelLeftClose,
   Puzzle,
@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Image from "@/components/ui/AppImage";
+import { requestGuestRegister } from "@/lib/client/guest-mode";
 import { useEffect, useRef, useState } from "react";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -258,8 +259,14 @@ export function Sidebar({
           >
             <div className="flex flex-col gap-4 pt-2">
               {guest && (
-                <div className="px-3 py-2 text-sm leading-6 text-gray-400">
-                  登录后可查看和同步历史对话
+                <div className="mx-3 rounded-xl border border-dashed border-gray-200 px-3 py-3 dark:border-white/10">
+                  <p className="flex items-center gap-1.5 text-xs font-medium text-gray-700 dark:text-gray-200">
+                    <History className="text-gray-400" size={14} />
+                    历史对话
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-gray-400">
+                    登录后自动保存每一次对话，并在网页和手机端同步。
+                  </p>
                 </div>
               )}
               {!guest && isLoadingSessions && <SessionSkeletonList />}
@@ -297,23 +304,30 @@ export function Sidebar({
 
           <div className="mt-auto border-t border-gray-200/50 p-3 dark:border-gray-700/50">
             {guest ? (
-              <button
-                className="flex h-11 w-full items-center gap-3 rounded-lg px-2 text-left transition-colors hover:bg-black/[0.045] dark:hover:bg-white/[0.07]"
-                onClick={onSignIn}
-                type="button"
-              >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-200/80 text-gray-500 dark:bg-white/[0.08] dark:text-gray-300">
-                  <LogIn size={17} />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
-                    登录 / 注册
-                  </span>
-                  <span className="block truncate text-xs text-gray-400">
-                    同步会话、文件与个性化设置
-                  </span>
-                </span>
-              </button>
+              <div className="rounded-xl border border-gray-200/80 bg-[var(--chat-panel-bg)] p-3 dark:border-white/[0.08]">
+                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  开始使用 MarkAI
+                </p>
+                <p className="mt-0.5 text-xs leading-5 text-gray-400">
+                  免费注册即可对话，同步会话、文件与设置
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button
+                    className="min-h-10 rounded-lg border border-gray-200 text-sm font-medium text-gray-800 transition-colors hover:bg-gray-50 md:min-h-9 dark:border-white/15 dark:text-gray-100 dark:hover:bg-white/[0.05]"
+                    onClick={onSignIn}
+                    type="button"
+                  >
+                    登录
+                  </button>
+                  <button
+                    className="flex min-h-10 items-center justify-center rounded-lg bg-gray-900 text-sm font-medium text-white transition-colors hover:bg-gray-700 md:min-h-9 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
+                    onClick={requestGuestRegister}
+                    type="button"
+                  >
+                    注册
+                  </button>
+                </div>
+              </div>
             ) : (
               <UserAccountMenu />
             )}

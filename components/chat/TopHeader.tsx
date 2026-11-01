@@ -1,5 +1,6 @@
 "use client";
 
+import { requestGuestRegister } from "@/lib/client/guest-mode";
 import { useEffect, useRef, useState } from "react";
 import {
   Copy,
@@ -204,65 +205,75 @@ export function TopHeader({
         <div className="flex items-center gap-1 md:gap-2">
           <ThemeToggle />
           {onSignIn ? (
-            <button
-              className="inline-flex h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/[0.07] md:h-9"
-              onClick={onSignIn}
-              type="button"
-            >
-              <LogIn size={17} />
-              登录
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                className="hidden h-9 items-center rounded-lg px-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 sm:inline-flex dark:text-gray-200 dark:hover:bg-white/[0.07]"
+                onClick={onSignIn}
+                type="button"
+              >
+                登录
+              </button>
+              <button
+                className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-gray-900 px-3.5 text-sm font-medium text-white transition-colors hover:bg-gray-700 md:h-9 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
+                onClick={() => (window.innerWidth < 640 ? onSignIn() : requestGuestRegister())}
+                type="button"
+              >
+                <LogIn className="sm:hidden" size={16} />
+                <span className="sm:hidden">登录</span>
+                <span className="hidden sm:inline">免费注册</span>
+              </button>
+            </div>
           ) : (
-          <div className="relative" ref={shareMenuRef}>
-            <IconButton
-              onClick={() => {
-                setMenuOpen(false);
-                setShareMenuOpen((open) => !open);
-              }}
-              title="分享与导出"
-            >
-              <Share2 size={20} />
-            </IconButton>
+            <div className="relative" ref={shareMenuRef}>
+              <IconButton
+                onClick={() => {
+                  setMenuOpen(false);
+                  setShareMenuOpen((open) => !open);
+                }}
+                title="分享与导出"
+              >
+                <Share2 size={20} />
+              </IconButton>
 
-            {shareMenuOpen && (
-              <DropdownSurface className="absolute right-0 top-11 w-48">
-                {activeSession && (
+              {shareMenuOpen && (
+                <DropdownSurface className="absolute right-0 top-11 w-48">
+                  {activeSession && (
+                    <MenuAction
+                      icon={Link2}
+                      label="分享链接"
+                      onClick={() => {
+                        setShareMenuOpen(false);
+                        setShareDialogOpen(true);
+                      }}
+                    />
+                  )}
                   <MenuAction
-                    icon={Link2}
-                    label="分享链接"
+                    icon={Copy}
+                    label="复制对话"
                     onClick={() => {
                       setShareMenuOpen(false);
-                      setShareDialogOpen(true);
+                      copyConversation();
                     }}
                   />
-                )}
-                <MenuAction
-                  icon={Copy}
-                  label="复制对话"
-                  onClick={() => {
-                    setShareMenuOpen(false);
-                    copyConversation();
-                  }}
-                />
-                <MenuAction
-                  icon={FileJson}
-                  label="导出 JSON"
-                  onClick={() => {
-                    setShareMenuOpen(false);
-                    exportSessionJson();
-                  }}
-                />
-                <MenuAction
-                  icon={ImageDown}
-                  label="导出图片"
-                  onClick={() => {
-                    setShareMenuOpen(false);
-                    exportSessionImage();
-                  }}
-                />
-              </DropdownSurface>
-            )}
-          </div>
+                  <MenuAction
+                    icon={FileJson}
+                    label="导出 JSON"
+                    onClick={() => {
+                      setShareMenuOpen(false);
+                      exportSessionJson();
+                    }}
+                  />
+                  <MenuAction
+                    icon={ImageDown}
+                    label="导出图片"
+                    onClick={() => {
+                      setShareMenuOpen(false);
+                      exportSessionImage();
+                    }}
+                  />
+                </DropdownSurface>
+              )}
+            </div>
           )}
         </div>
       </header>
