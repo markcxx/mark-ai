@@ -430,6 +430,7 @@ export function ModelsPanel() {
               {pageModels.map((model) => {
                 const key = getModelKey(model);
                 const { credits, messages } = baseQuota(estimation, model.pricing);
+                const image = model.pricing.unit === "image";
                 const isNew = isNewModel(model.presentation, now);
                 return (
                   <li className="px-3 py-3" key={key}>
@@ -445,10 +446,13 @@ export function ModelsPanel() {
                           {model.developer.name}
                         </p>
                         <p className="mt-2 font-jakarta text-xs tabular-nums text-gray-600 dark:text-gray-300">
-                          {formatPrice(model.pricing, model.pricing.input)} /{" "}
-                          {formatPrice(model.pricing, model.pricing.output)}
+                          {model.pricing.basis === "site"
+                            ? `${formatPrice(model.pricing, model.pricing.output)} / 张`
+                            : `${formatPrice(model.pricing, model.pricing.input)} / ${formatPrice(model.pricing, model.pricing.output)}`}
                           <span className="ml-2 text-gray-400">
-                            {credits === 0 ? "不消耗" : `${formatAmount(messages)} 条/月`}
+                            {credits === 0
+                              ? "不消耗"
+                              : `${formatAmount(messages)} ${image ? "张" : "条"}/月`}
                           </span>
                           <span className="ml-2 text-gray-400">
                             {model.pricing.freeAccess ? "免费版可用" : "仅会员"}

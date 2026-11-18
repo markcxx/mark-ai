@@ -60,7 +60,9 @@ describe("creditsPerMessage", () => {
     expect(creditsPerMessage(DEFAULT_PLANS, { ...model, creditsOverride: 25 })).toBe(25);
   });
   it("maps base credits to monthly conversations", () => {
-    expect(estimateMessages(DEFAULT_PLANS, { ...model, creditsOverride: 25 }, 1)).toBe(80);
+    expect(
+      estimateMessages(DEFAULT_PLANS, { ...model, creditsOverride: 25 }, DEFAULT_PLANS.tiers[0]),
+    ).toBe(80);
   });
   it("accepts custom credit settings and rejects invalid ones", () => {
     expect(parsePlans({ ...config({}), baseCredits: 5000 })?.baseCredits).toBe(5000);

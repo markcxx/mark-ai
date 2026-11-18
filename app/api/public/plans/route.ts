@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
             key: model.key,
             name: model.name,
             category: model.category,
-            messages: estimateMessages(config, model, tier.multiplier),
+            messages: estimateMessages(config, model, tier),
           })),
         })),
       },

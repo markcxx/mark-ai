@@ -3,11 +3,11 @@ import type { ModelPrice } from "@/lib/plans";
 import prices from "./plan-prices-data.json";
 
 // Explicit IDs only: a new release or a priority variant must never inherit an
-// unrelated model's price. Facts are a reviewed snapshot, not a live price API.
+// unrelated model's price. This catalog includes reviewed API prices and site rates.
 const catalog = new Map<string, ModelPrice>(
   prices.map(({ id, ...price }) => [id.toLowerCase(), price as ModelPrice]),
 );
-export function officialPlanPrice(id: string): ModelPrice {
+export function defaultPlanPrice(id: string): ModelPrice {
   return (
     catalog.get(id.toLowerCase()) ?? {
       input: null,

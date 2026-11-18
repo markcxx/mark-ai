@@ -65,7 +65,9 @@ export function PriceStateBadge({ pricing }: { pricing: PlanModel }) {
       ? ({ historical: "历史参考", retired: "原渠道已下线", unverified: "待核实" } as const)[
           pricing.status as "historical" | "retired" | "unverified"
         ] || PRICE_STATE_LABELS.warning
-      : PRICE_STATE_LABELS[state];
+      : state === "verified" && pricing.basis === "site"
+        ? "站点定价"
+        : PRICE_STATE_LABELS[state];
   return (
     <span
       className={cn(
@@ -104,7 +106,7 @@ const decimal = (value: string) =>
 export function baseQuota(estimation: ModelEstimation, pricing: PlanModel) {
   const config = { ...DEFAULT_PLANS, ...estimation };
   const credits = creditsPerMessage(config, pricing);
-  return { credits, messages: estimateMessages(config, pricing, 1) };
+  return { credits, messages: estimateMessages(config, pricing, config.tiers[0]) };
 }
 
 /** Price editor with an explicit save and a live per-tier quota preview. */
@@ -158,8 +160,9 @@ export function ModelPriceDialog({
     };
     return config.tiers.map((tier) => ({
       tier,
-      before: estimateMessages(config, model.pricing, tier.multiplier),
-      after: estimateMessages(config, priced, tier.multiplier),
+      before: estimateMessages(config, model.pricing, tier),
+      after: estimateMessages(config, priced, tier),
+      perUnit: creditsPerMessage(config, priced, tier),
     }));
   }, [draft.credits, estimation, input, model, output]);
 
@@ -167,6 +170,7 @@ export function ModelPriceDialog({
 
   const { pricing } = model;
   const image = pricing.unit === "image";
+  const sitePrice = pricing.basis === "site";
   const priceDirty = input !== pricing.input || output !== pricing.output;
   const creditsOverride = draft.credits.trim() === "" ? null : Number(draft.credits);
   const creditsInvalid =
@@ -225,7 +229,9 @@ export function ModelPriceDialog({
 
         <fieldset>
           <legend className="mb-2 flex w-full items-center justify-between text-xs text-gray-500">
-            <span>API 价格（{priceUnit(pricing)}）</span>
+            <span>
+              {pricing.basis === "site" ? "站点定价" : "API 价格"}（{priceUnit(pricing)}）
+            </span>
             {dirty && (
               <button
                 className="inline-flex min-h-8 items-center gap-1 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
@@ -278,9 +284,11 @@ export function ModelPriceDialog({
 
         <label className="block">
           <span className="mb-1.5 flex items-center justify-between text-sm font-medium">
-            每次对话扣除 credits
+            {image ? "每张图片扣除 credits" : "每次对话扣除 credits"}
             <span className="text-[11px] font-normal text-gray-400">
-              留空按价格自动计算（当前 {formatAmount(derivedCredits)}）
+              {sitePrice
+                ? "留空按各档套餐售价换算"
+                : `留空按价格自动计算（当前 ${formatAmount(derivedCredits)}）`}
             </span>
           </span>
           <div className="relative">
@@ -294,7 +302,13 @@ export function ModelPriceDialog({
                 setDraft({ ...draft, credits: event.target.value.replace(/\D/g, "") });
                 setError("");
               }}
-              placeholder={derivedCredits === null ? "待补充价格" : `自动：${derivedCredits}`}
+              placeholder={
+                derivedCredits === null
+                  ? "待补充价格"
+                  : sitePrice
+                    ? "按套餐自动换算"
+                    : `自动：${derivedCredits}`
+              }
               value={draft.credits}
             />
             <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">
@@ -321,18 +335,23 @@ export function ModelPriceDialog({
         <div className="rounded-lg border border-gray-200 dark:border-white/10">
           <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2 text-xs dark:border-white/[0.06]">
             <span className="font-medium">每月可用{image ? "张数" : "消息数"}预估</span>
-            <span className="text-gray-400">
-              每{image ? "张" : "条"} {formatAmount(credits)} credits
-            </span>
+            {!sitePrice && (
+              <span className="text-gray-400">
+                每{image ? "张" : "条"} {formatAmount(credits)} credits
+              </span>
+            )}
           </div>
           <ul className="divide-y divide-gray-100 dark:divide-white/[0.06]">
-            {preview.map(({ tier, before, after }) => (
+            {preview.map(({ tier, before, after, perUnit }) => (
               <li className="flex items-center justify-between px-3 py-2 text-sm" key={tier.id}>
                 <span className="text-gray-600 dark:text-gray-300">
                   {PLAN_NAMES[tier.id]}
                   <span className="ml-1.5 text-[11px] text-gray-400">×{tier.multiplier}</span>
                 </span>
                 <span className="font-jakarta tabular-nums">
+                  {sitePrice && perUnit !== null && perUnit > 0 && (
+                    <span className="mr-2 text-[11px] text-gray-400">{perUnit} credits/张</span>
+                  )}
                   {dirty && before !== after && (
                     <span className="mr-2 text-xs text-gray-400 line-through">
                       {formatAmount(before)}
@@ -346,8 +365,9 @@ export function ModelPriceDialog({
             ))}
           </ul>
           <p className="border-t border-gray-100 px-3 py-2 text-[11px] leading-5 text-gray-400 dark:border-white/[0.06]">
-            按单次 {estimation.inputTokens.toLocaleString()} 输入 /{" "}
-            {estimation.outputTokens.toLocaleString()} 输出 tokens 估算，所有模型共享套餐额度。
+            {image
+              ? "按成功生成的图片张数扣除，共享套餐额度。"
+              : `按单次 ${estimation.inputTokens.toLocaleString()} 输入 / ${estimation.outputTokens.toLocaleString()} 输出 tokens 估算，所有模型共享套餐额度。`}
           </p>
         </div>
 

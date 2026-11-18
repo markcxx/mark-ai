@@ -1,6 +1,26 @@
 // Generated from lib/model-metadata.ts and lib/chat/image-models.ts.
 const modelMetadata = [
   {
+    "id": "gpt-6.1-terra",
+    "displayName": "GPT-6.1 Terra",
+    "family": "GPT-6.1",
+    "description": "面向视觉推理、计算机操作和写作的高效推理模型。",
+    "contextWindowTokens": 1050000,
+    "knowledgeCutoff": "2026-06-01",
+    "maxOutputTokens": 128000,
+    "sourceUrl": "https://developers.openai.com/api/docs/models/gpt-6.1-terra",
+    "pricing": {
+      "input": 1,
+      "output": 5,
+      "cachedInput": 0.05,
+      "currency": "USD",
+      "sourceUrl": "https://developers.openai.com/api/docs/pricing",
+    },
+    "supportsReasoning": true,
+    "supportsVision": true,
+    "supportsVideo": false,
+  },
+  {
     "id": "gpt-6.1-sol",
     "displayName": "GPT-6.1 Sol",
     "family": "GPT-6.1",
@@ -314,6 +334,14 @@ const modelMetadata = [
     "knowledgeCutoff": "2026-02-16",
     "maxOutputTokens": 128000,
     "sourceUrl": "https://developers.openai.com/api/docs/models/gpt-5.6-terra",
+    "pricing": {
+      "input": 2,
+      "output": 12,
+      "cachedInput": 0.2,
+      "currency": "USD",
+      "sourceUrl":
+          "https://developers.openai.com/api/docs/models/gpt-5.6-terra",
+    },
     "supportsReasoning": true,
     "supportsToolCalling": true,
     "supportsVision": true,

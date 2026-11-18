@@ -228,11 +228,9 @@ export function PlansPanel() {
                   <ul className="space-y-1.5">
                     {samples.map((model) => {
                       const [provider, ...rest] = model.key.split(":");
-                      const before = estimateMessages(config, model, saved.multiplier);
-                      const after = invalid
-                        ? null
-                        : estimateMessages(preview, model, tier.multiplier);
-                      const cost = invalid ? null : creditsPerMessage(preview, model);
+                      const before = estimateMessages(config, model, saved);
+                      const after = invalid ? null : estimateMessages(preview, model, tier);
+                      const cost = invalid ? null : creditsPerMessage(preview, model, tier);
                       return (
                         <li className="flex items-center gap-2 text-xs" key={model.key}>
                           <ModelBrandIcon

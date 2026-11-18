@@ -21,7 +21,7 @@ export async function GET() {
             name: m.name,
             category: m.category ?? "flagship",
             priceStatus: m.status,
-            messages: estimateMessages(config, m, t.multiplier),
+            messages: estimateMessages(config, m, t),
           })),
       })),
       membership,

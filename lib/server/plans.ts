@@ -1,5 +1,5 @@
 import "server-only";
-import { officialPlanPrice } from "./plan-prices";
+import { defaultPlanPrice } from "./plan-prices";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { membershipPlans, userMemberships } from "@/lib/db/schema";
@@ -17,7 +17,7 @@ export async function readPlans() {
   const notice = await readAnnouncement("registration");
   const existing = row?.config;
   const defaults: PlanModel[] = models.map((m) => {
-    const p = officialPlanPrice(m.id);
+    const p = defaultPlanPrice(m.id);
     return {
       ...p,
       key: getModelKey(m),
@@ -176,7 +176,7 @@ export async function readCreditSummary(userId: string): Promise<CreditSummary> 
     periodEnd: new Date(end).toISOString(),
     models: config.models.map((model) => ({
       key: model.key,
-      perMessage: creditsPerMessage(config, model),
+      perMessage: creditsPerMessage(config, model, tier),
       freeAccess: model.freeAccess,
     })),
   };
@@ -224,7 +224,7 @@ export async function recordModelUsage(userId: string, modelKey: string) {
       userId,
       modelKey,
       tier: membership.tier,
-      credits: paid && model ? (creditsPerMessage(config, model) ?? 0) : 0,
+      credits: tier && model ? (creditsPerMessage(config, model, tier) ?? 0) : 0,
       free: paid || lifetime ? 0 : 1,
     });
 }

@@ -13,7 +13,7 @@ export type ModelPrice = {
   currency: "CNY" | "USD";
   unit: "mtok" | "image";
   source: string;
-  basis: "manufacturer" | "cloud";
+  basis: "manufacturer" | "cloud" | "site";
   note: string;
   checkedAt: string;
   status: "verified" | "historical" | "retired" | "estimated" | "unverified";
@@ -80,23 +80,34 @@ export function conversationCost(config: PlanConfig, model: PlanModel) {
   return ((config.inputTokens * model.input + config.outputTokens * model.output) / 1e6) * rate;
 }
 
+type TierPrice = Pick<PlanConfig["tiers"][number], "price" | "multiplier">;
+
 /**
  * Credits charged for one reply. This is the single source for display and
- * billing: an admin override wins, otherwise price-derived and rounded up so
- * any paid model costs at least one credit.
+ * billing. An admin override wins; a nonzero derived charge is at least one credit.
  */
-export function creditsPerMessage(config: PlanConfig, model: PlanModel): number | null {
+export function creditsPerMessage(
+  config: PlanConfig,
+  model: PlanModel,
+  tier: TierPrice = config.tiers[0],
+): number | null {
   if (typeof model.creditsOverride === "number") return model.creditsOverride;
   const cost = conversationCost(config, model);
   if (cost === null) return null;
-  return cost === 0 ? 0 : Math.max(1, Math.ceil(cost * config.creditsPerYuan));
+  if (cost === 0) return 0;
+  if (model.basis === "site") {
+    // Convert the retail price using what the customer paid for these credits.
+    const credits = (cost * config.baseCredits * tier.multiplier) / tier.price;
+    return Math.max(1, Math.round(credits));
+  }
+  return Math.max(1, Math.ceil(cost * config.creditsPerYuan));
 }
 
 /** Monthly conversations a tier allows with one model (credits shared across models). */
-export function estimateMessages(config: PlanConfig, model: PlanModel, multiplier: number) {
-  const credits = creditsPerMessage(config, model);
+export function estimateMessages(config: PlanConfig, model: PlanModel, tier: TierPrice) {
+  const credits = creditsPerMessage(config, model, tier);
   return credits !== null && credits > 0
-    ? Math.floor((config.baseCredits * multiplier) / credits)
+    ? Math.floor((config.baseCredits * tier.multiplier) / credits)
     : null;
 }
 
@@ -156,7 +167,7 @@ export function parsePlans(value: unknown): PlanConfig | null {
         m.key.length > 500 ||
         typeof m.name !== "string" ||
         m.name.length > 200 ||
-        !["manufacturer", "cloud"].includes(m.basis) ||
+        !["manufacturer", "cloud", "site"].includes(m.basis) ||
         typeof m.source !== "string" ||
         m.source.length > 1000 ||
         typeof m.note !== "string" ||

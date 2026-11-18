@@ -281,20 +281,28 @@ export function ModelDetailCard({ model }: { model: ConfiguredModel }) {
         <Section accent="bg-emerald-500" title="Credit 消耗">
           <DetailRow
             icon={Coins}
-            label="单次对话约"
-            value={perMessage === 0 ? "不消耗" : `${formatCredits(perMessage)} credits`}
+            label={imageModel ? "每张消耗" : "单次对话约"}
+            value={
+              credits.unlimited || perMessage === 0
+                ? "不消耗"
+                : `${formatCredits(perMessage)} credits`
+            }
           />
           <DetailRow
             icon={MessageSquareText}
-            label="剩余可对话"
+            label={imageModel ? "剩余可生成" : "剩余可对话"}
             value={
               credits.unlimited || perMessage === 0
-                ? "不限次数"
-                : `约 ${(remainingMessages ?? 0).toLocaleString("zh-CN")} 次`
+                ? imageModel
+                  ? "不限张数"
+                  : "不限次数"
+                : `约 ${(remainingMessages ?? 0).toLocaleString("zh-CN")} ${imageModel ? "张" : "次"}`
             }
           />
           <p className="mt-1 text-[11px] leading-4 text-gray-400 dark:text-gray-500">
-            每次调用（含重试、重新生成）固定扣除，与上下文长度无关。
+            {imageModel
+              ? "生成、编辑或重新生成成功后，按张扣除。"
+              : "每次调用（含重试、重新生成）固定扣除，与上下文长度无关。"}
           </p>
         </Section>
       )}
