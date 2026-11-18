@@ -14,6 +14,15 @@ vi.mock("@/lib/models", () => ({
   getProviderDisplayName: (provider: string) => provider,
 }));
 vi.mock("@/lib/model-presentation-server", () => ({ readModelPresentations: mocks.read }));
+vi.mock("@/lib/server/plans", () => ({
+  readPlans: async () => ({
+    config: {
+      models: [
+        { key: "a:same", input: 0, output: 0.5, currency: "CNY", unit: "image", basis: "site" },
+      ],
+    },
+  }),
+}));
 vi.mock("@/lib/db", () => ({
   getDb: () => ({ batch: mocks.batch, insert: () => ({ values: mocks.values }) }),
 }));
@@ -68,6 +77,8 @@ it("lists all configured models while ignoring stale metadata", async () => {
   const result = await (await GET(request())).json();
   expect(result.models.map((m: { provider: string }) => m.provider)).toEqual(["a", "b"]);
   expect(result.models.every((m: object) => !("apiKey" in m))).toBe(true);
+  expect(result.models[0].pricing).toMatchObject({ output: 0.5, unit: "image", basis: "site" });
+  expect(result.models[1].pricing).toBeUndefined();
 });
 it("keeps the launch revision through edits and rotates it on relaunch", async () => {
   const first = await (await PUT(request())).json();
