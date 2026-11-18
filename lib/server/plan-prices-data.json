@@ -1,5 +1,29 @@
 [
   {
+    "id": "gpt-6.2-astra",
+    "input": 8,
+    "output": 40,
+    "currency": "USD",
+    "source": "https://developers.openai.com/api/docs/models/gpt-6.2-astra",
+    "note": "标准短上下文；超过 272K 输入时，输入与缓存×2、输出×1.5",
+    "checkedAt": "2026-11-18",
+    "unit": "mtok",
+    "status": "verified",
+    "basis": "manufacturer"
+  },
+  {
+    "id": "gpt-6.2-sol",
+    "input": 2,
+    "output": 10,
+    "currency": "USD",
+    "source": "https://developers.openai.com/api/docs/models/gpt-6.2-sol",
+    "note": "标准短上下文；超过 272K 输入时，输入与缓存×2、输出×1.5",
+    "checkedAt": "2026-11-18",
+    "unit": "mtok",
+    "status": "verified",
+    "basis": "manufacturer"
+  },
+  {
     "id": "gpt-5.6-terra",
     "input": 2,
     "output": 12,

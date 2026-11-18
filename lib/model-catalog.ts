@@ -311,6 +311,8 @@ export function resolveCatalogMetadata(
       },
     };
   }
+  // Keep reviewed official rates for models that define them locally.
+  if (metadata && local?.pricing) metadata.pricing = local.pricing;
   const override = overrides[`${model.provider}/${model.id}`];
   if (override)
     metadata = {

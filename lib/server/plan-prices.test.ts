@@ -49,6 +49,8 @@ describe("site model prices", () => {
   it.each([
     ["gpt-5.6-terra", 2, 12, 0.2],
     ["gpt-6.1-terra", 1, 5, 0.05],
+    ["gpt-6.2-astra", 8, 40, 0.4],
+    ["gpt-6.2-sol", 2, 10, 0.1],
   ])("uses the official %s rate for the plan and model card", (id, input, output, cachedInput) => {
     expect(defaultPlanPrice(id)).toMatchObject({ input, output, currency: "USD", unit: "mtok" });
     expect(getModelMetadata(id)?.pricing).toMatchObject({ input, output, cachedInput });

@@ -34,6 +34,7 @@ export type ModelMetadata = {
   family: string;
   id: string;
   knowledgeCutoff?: string;
+  maxInputTokens?: number;
   maxOutputTokens?: number;
   pricing?: ModelPricing;
   ratings?: ModelRatings;
@@ -69,6 +70,54 @@ const GPT_TERRA_PRICING = "https://developers.openai.com/api/docs/pricing";
 // Keep this list deliberately conservative. Unknown/custom models remain unknown instead of
 // inheriting an unsafe context limit from a similarly named model.
 export const MODEL_METADATA: ModelMetadata[] = [
+  {
+    id: "gpt-6.2-astra",
+    displayName: "GPT-6.2 Astra",
+    family: "GPT-6.2",
+    description: "面向复杂推理、软件开发和专业文档任务的旗舰模型。",
+    contextWindowTokens: 1_050_000,
+    maxInputTokens: 922_000,
+    maxOutputTokens: 128_000,
+    knowledgeCutoff: "2026-05-18",
+    sourceUrl: "https://developers.openai.com/api/docs/models/gpt-6.2-astra",
+    pricing: {
+      input: 8,
+      cachedInput: 0.4,
+      cacheWrite: 10,
+      output: 40,
+      currency: "USD",
+      sourceUrl: "https://developers.openai.com/api/docs/models/gpt-6.2-astra",
+      sourceLabel: "OpenAI 标准价（短上下文，缓存写入按 30 分钟保留）",
+    },
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVision: true,
+    supportsVideo: false,
+  },
+  {
+    id: "gpt-6.2-sol",
+    displayName: "GPT-6.2 Sol",
+    family: "GPT-6.2",
+    description: "面向日常工作、编程和规模化智能体任务的通用推理模型。",
+    contextWindowTokens: 1_050_000,
+    maxInputTokens: 922_000,
+    maxOutputTokens: 128_000,
+    knowledgeCutoff: "2026-06-01",
+    sourceUrl: "https://developers.openai.com/api/docs/models/gpt-6.2-sol",
+    pricing: {
+      input: 2,
+      cachedInput: 0.1,
+      cacheWrite: 2.5,
+      output: 10,
+      currency: "USD",
+      sourceUrl: "https://developers.openai.com/api/docs/models/gpt-6.2-sol",
+      sourceLabel: "OpenAI 标准价（短上下文，缓存写入按 30 分钟保留）",
+    },
+    supportsReasoning: true,
+    supportsToolCalling: true,
+    supportsVision: true,
+    supportsVideo: false,
+  },
   {
     id: "gpt-6.1-terra",
     displayName: "GPT-6.1 Terra",

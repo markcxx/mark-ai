@@ -234,6 +234,7 @@ export function ModelDetailCard({ model }: { model: ConfiguredModel }) {
         </Section>
       )}
       {(hasKnownContextWindow(metadata) ||
+        metadata?.maxInputTokens ||
         metadata?.maxOutputTokens ||
         metadata?.knowledgeCutoff) && (
         <Section accent="bg-blue-500" title="规格">
@@ -241,6 +242,12 @@ export function ModelDetailCard({ model }: { model: ConfiguredModel }) {
             <DetailRow
               label="上下文长度"
               value={`${formatContextWindow(metadata.contextWindowTokens)} tokens`}
+            />
+          )}
+          {metadata?.maxInputTokens && (
+            <DetailRow
+              label="最大输入"
+              value={`${formatContextWindow(metadata.maxInputTokens)} tokens`}
             />
           )}
           {metadata?.maxOutputTokens && (
@@ -326,6 +333,16 @@ export function ModelDetailCard({ model }: { model: ConfiguredModel }) {
           )}
           {pricing.cachedInput === undefined && <DetailRow label="缓存命中" value="暂无报价" />}
           {pricing.cacheWrite === undefined && <DetailRow label="缓存写入" value="暂无报价" />}
+          {pricing.sourceUrl && (
+            <a
+              className="mt-1 inline-block text-[11px] leading-4 text-blue-600 hover:underline dark:text-blue-400"
+              href={pricing.sourceUrl}
+              rel="noreferrer"
+              target="_blank"
+            >
+              价格来源
+            </a>
+          )}
         </Section>
       )}
       {!metadata && !imageModel && (

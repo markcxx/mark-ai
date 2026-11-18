@@ -52,6 +52,21 @@ describe("model catalog", () => {
     expect(rows[1].ratings.price).toBeUndefined();
   });
 
+  it("keeps the official 6.2 price and uses the catalog for benchmark scores", () => {
+    const custom = {
+      ...catalog,
+      evaluations: parseArtificialAnalysis([aaRow("gpt-6.2-astra", 10, 50)]),
+    };
+    const metadata = resolveCatalogMetadata({ id: "gpt-6.2-astra", provider: "markai" }, custom);
+    expect(metadata?.pricing).toMatchObject({
+      input: 8,
+      output: 40,
+      cachedInput: 0.4,
+      cacheWrite: 10,
+    });
+    expect(metadata?.benchmark?.intelligence).toBe(50);
+  });
+
   it("ranks ties consistently and makes cheaper prices score higher", () => {
     const rows = parseArtificialAnalysis([
       aaRow("cheap", 1, 1),

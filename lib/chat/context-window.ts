@@ -80,7 +80,10 @@ export const prepareMessagesForContext = <T extends ContextMessage>(
   const outputReserveTokens = getOutputReserveTokens(metadata);
   const inputBudgetTokens = Math.max(
     512,
-    metadata.contextWindowTokens - outputReserveTokens - Math.max(overheadTokens, 0),
+    Math.min(
+      metadata.contextWindowTokens - outputReserveTokens,
+      metadata.maxInputTokens ?? Infinity,
+    ) - Math.max(overheadTokens, 0),
   );
   let prepared = [...messages];
   let removedMessageCount = 0;

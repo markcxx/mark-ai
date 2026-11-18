@@ -34,6 +34,15 @@ describe("context window preparation", () => {
     expect(getOutputReserveTokens(metadata)).toBe(1024);
   });
 
+  it("reserves room for overhead within a lower, explicit input limit", () => {
+    const result = prepareMessagesForContext(
+      [{ role: "user", content: "新问题" }],
+      { ...metadata, contextWindowTokens: 1_050_000, maxInputTokens: 922_000 },
+      256,
+    );
+    expect(result.inputBudgetTokens).toBe(921_744);
+  });
+
   it("drops older turns before truncating the newest message", () => {
     const messages = [
       { content: "旧问题".repeat(2000), role: "user" },
