@@ -3,7 +3,13 @@ import { describe, expect, it } from "vitest";
 import { isImageGenerationModel } from "./image-models";
 
 describe("image model registry", () => {
-  it.each(["gpt-image-2", "gpt-image-2.5-sunburst", "gpt-image-2.5-flare"])(
+  it.each([
+    "gpt-image-2",
+    "gpt-image-2.5-sunburst",
+    "gpt-image-2.5-flare",
+    "gpt-image-2.6-sunburst",
+    "gpt-image-2.6-flare",
+  ])(
     "routes %s through image generation",
     (modelId) => {
       expect(isImageGenerationModel(modelId)).toBe(true);

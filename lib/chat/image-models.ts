@@ -2,6 +2,8 @@ export const IMAGE_GENERATION_MODEL_IDS = [
   "gpt-image-2",
   "gpt-image-2.5-sunburst",
   "gpt-image-2.5-flare",
+  "gpt-image-2.6-sunburst",
+  "gpt-image-2.6-flare",
   "wan2.7-image",
   "wan2.7-image-pro",
   "qwen-image-2.0",
